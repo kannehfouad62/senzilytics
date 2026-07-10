@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "prisma generate",
     "repair:workflows": "tsx prisma/repair-workflows.ts"
   },
   "dependencies": {
