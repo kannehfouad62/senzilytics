@@ -134,6 +134,43 @@ enum WorkflowDecision {
   SKIP
 }
 
+enum DocumentEntityType {
+  INCIDENT
+  INVESTIGATION
+  CORRECTIVE_ACTION
+  AUDIT
+  AUDIT_FINDING
+  INSPECTION
+  INSPECTION_FINDING
+  COMPLIANCE
+  TRAINING
+  WORKFLOW
+  ORGANIZATION
+  SITE
+  USER
+  OTHER
+}
+
+enum DocumentCategory {
+  EVIDENCE
+  PHOTO
+  VIDEO
+  REPORT
+  POLICY
+  PROCEDURE
+  CERTIFICATE
+  TRAINING_MATERIAL
+  AUDIT_RECORD
+  INSPECTION_RECORD
+  OTHER
+}
+
+enum DocumentStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
 model Organization {
   id        String   @id @default(cuid())
   name      String
@@ -148,6 +185,7 @@ model Organization {
   notifications     Notification[]
   workflowTemplates WorkflowTemplate[]
   workflowInstances WorkflowInstance[]
+  documents         Document[]
 }
 
 model Site {
@@ -202,6 +240,7 @@ model User {
   trainingRecords   TrainingRecord[]
   activityLogs      ActivityLog[]
   notifications     Notification[]
+  uploadedDocuments Document[]
 
   startedWorkflowInstances WorkflowInstance[]
   assignedWorkflowSteps    WorkflowInstanceStep[] @relation("WorkflowAssignedUser")
@@ -486,9 +525,9 @@ model WorkflowInstanceStep {
   decision WorkflowDecision?
   comments String?
 
-  startedAt   DateTime?
-  dueAt       DateTime?
-  completedAt DateTime?
+  startedAt        DateTime?
+  dueAt            DateTime?
+  completedAt      DateTime?
   reminderSentAt   DateTime?
   escalationSentAt DateTime?
 
@@ -499,4 +538,40 @@ model WorkflowInstanceStep {
 
   assignedUser User? @relation("WorkflowAssignedUser", fields: [assignedUserId], references: [id])
   completedBy  User? @relation("WorkflowCompletedBy", fields: [completedById], references: [id])
+}
+
+model Document {
+  id             String  @id @default(cuid())
+  organizationId String
+  uploadedById   String?
+
+  entityType DocumentEntityType
+  entityId   String
+
+  category DocumentCategory @default(OTHER)
+  status   DocumentStatus   @default(ACTIVE)
+
+  name         String
+  originalName String
+  description  String?
+
+  storageKey String
+  storageUrl String
+  mimeType   String
+  sizeBytes  Int
+
+  version  Int     @default(1)
+  checksum String?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+  deletedAt  DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy   User?        @relation(fields: [uploadedById], references: [id])
+
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, status])
+  @@index([uploadedById])
 }
