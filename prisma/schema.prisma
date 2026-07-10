@@ -1,0 +1,502 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ORG_ADMIN
+  EHS_MANAGER
+  SUPERVISOR
+  EMPLOYEE
+  AUDITOR
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Status {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CLOSED
+  OVERDUE
+}
+
+enum IncidentType {
+  INJURY
+  NEAR_MISS
+  PROPERTY_DAMAGE
+  ENVIRONMENTAL
+  VEHICLE
+  SECURITY
+  OTHER
+}
+
+enum PermissionKey {
+  MANAGE_ORGANIZATION
+  MANAGE_USERS
+  VIEW_USERS
+  VIEW_DASHBOARD
+  VIEW_REPORTS
+  CREATE_INCIDENT
+  VIEW_INCIDENT
+  UPDATE_INCIDENT
+  DELETE_INCIDENT
+  CREATE_CAPA
+  UPDATE_CAPA
+  CLOSE_CAPA
+  VIEW_AUDITS
+  MANAGE_AUDITS
+  VIEW_INSPECTIONS
+  MANAGE_INSPECTIONS
+  VIEW_COMPLIANCE
+  MANAGE_COMPLIANCE
+  VIEW_TRAINING
+  MANAGE_TRAINING
+  USE_AI
+  MANAGE_WORKFLOWS
+  VIEW_ACTIVITY_LOG
+  MANAGE_NOTIFICATIONS
+  MANAGE_DOCUMENTS
+}
+
+enum ActivityAction {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  LOGIN
+  LOGOUT
+  ASSIGN
+  COMMENT
+  SYSTEM
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  CRITICAL
+  ASSIGNMENT
+  DUE_DATE
+  SYSTEM
+}
+
+enum WorkflowEntityType {
+  INCIDENT
+  CORRECTIVE_ACTION
+  AUDIT
+  INSPECTION
+  COMPLIANCE
+  TRAINING
+  DOCUMENT
+  PERMIT
+  MOC
+  OBSERVATION
+}
+
+enum WorkflowStepType {
+  START
+  REVIEW
+  APPROVAL
+  TASK
+  VERIFICATION
+  CLOSE
+}
+
+enum WorkflowInstanceStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkflowStepStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  COMPLETED
+  SKIPPED
+  CANCELLED
+}
+
+enum WorkflowDecision {
+  APPROVE
+  REJECT
+  SKIP
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  industry  String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sites             Site[]
+  users             User[]
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
+  workflowTemplates WorkflowTemplate[]
+  workflowInstances WorkflowInstance[]
+}
+
+model Site {
+  id             String       @id @default(cuid())
+  name           String
+  address        String?
+  city           String?
+  state          String?
+  country        String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  departments     Department[]
+  incidents       Incident[]
+  audits          Audit[]
+  inspections     Inspection[]
+  complianceItems ComplianceItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Department {
+  id     String @id @default(cuid())
+  name   String
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  users User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id       String   @id @default(cuid())
+  name     String
+  email    String   @unique
+  password String?
+  role     UserRole @default(EMPLOYEE)
+  jobTitle String?
+  phone    String?
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  reportedIncidents Incident[]         @relation("ReportedIncidents")
+  assignedActions   CorrectiveAction[]
+  trainingRecords   TrainingRecord[]
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
+
+  startedWorkflowInstances WorkflowInstance[]
+  assignedWorkflowSteps    WorkflowInstanceStep[] @relation("WorkflowAssignedUser")
+  completedWorkflowSteps   WorkflowInstanceStep[] @relation("WorkflowCompletedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Incident {
+  id          String       @id @default(cuid())
+  title       String
+  description String
+  type        IncidentType
+  riskLevel   RiskLevel    @default(LOW)
+  status      Status       @default(OPEN)
+  location    String?
+  occurredAt  DateTime
+
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id])
+
+  reportedById String
+  reportedBy   User   @relation("ReportedIncidents", fields: [reportedById], references: [id])
+
+  investigation Investigation?
+  actions       CorrectiveAction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Investigation {
+  id                  String  @id @default(cuid())
+  summary             String?
+  rootCause           String?
+  immediateCause      String?
+  contributingFactors String?
+
+  incidentId String   @unique
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CorrectiveAction {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      Status    @default(OPEN)
+  riskLevel   RiskLevel @default(LOW)
+  dueDate     DateTime
+
+  incidentId String?
+  incident   Incident? @relation(fields: [incidentId], references: [id])
+
+  assignedToId String
+  assignedTo   User   @relation(fields: [assignedToId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Audit {
+  id          String    @id @default(cuid())
+  title       String
+  scope       String?
+  status      Status    @default(OPEN)
+  scheduledAt DateTime?
+  completedAt DateTime?
+
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id])
+
+  findings AuditFinding[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditFinding {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  riskLevel   RiskLevel @default(LOW)
+  status      Status    @default(OPEN)
+
+  auditId String
+  audit   Audit  @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Inspection {
+  id          String    @id @default(cuid())
+  title       String
+  area        String?
+  status      Status    @default(OPEN)
+  scheduledAt DateTime?
+  completedAt DateTime?
+
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id])
+
+  findings InspectionFinding[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InspectionFinding {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  riskLevel   RiskLevel @default(LOW)
+  status      Status    @default(OPEN)
+
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ComplianceItem {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      Status   @default(OPEN)
+  dueDate     DateTime
+
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TrainingRecord {
+  id          String    @id @default(cuid())
+  courseName  String
+  status      Status    @default(OPEN)
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RolePermission {
+  id         String        @id @default(cuid())
+  role       UserRole
+  permission PermissionKey
+
+  createdAt DateTime @default(now())
+
+  @@unique([role, permission])
+}
+
+model ActivityLog {
+  id             String         @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         ActivityAction
+  entityType     String
+  entityId       String?
+  title          String
+  description    String?
+  metadata       Json?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  type           NotificationType @default(INFO)
+  title          String
+  message        String
+  link           String?
+  readAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WorkflowTemplate {
+  id             String             @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  entityType     WorkflowEntityType
+  isActive       Boolean            @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  steps        WorkflowTemplateStep[]
+  instances    WorkflowInstance[]
+
+  @@index([organizationId, entityType, isActive])
+}
+
+model WorkflowTemplateStep {
+  id           String           @id @default(cuid())
+  templateId   String
+  name         String
+  description  String?
+  stepType     WorkflowStepType
+  sequence     Int
+  requiredRole UserRole?
+  slaHours     Int?
+
+  approveNextStepId String?
+  rejectNextStepId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  template WorkflowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  approveNextStep WorkflowTemplateStep? @relation("ApproveNextStep", fields: [approveNextStepId], references: [id])
+
+  rejectNextStep WorkflowTemplateStep? @relation("RejectNextStep", fields: [rejectNextStepId], references: [id])
+
+  approveParents WorkflowTemplateStep[] @relation("ApproveNextStep")
+  rejectParents  WorkflowTemplateStep[] @relation("RejectNextStep")
+
+  @@unique([templateId, sequence])
+}
+
+model WorkflowInstance {
+  id             String                 @id @default(cuid())
+  organizationId String
+  templateId     String
+  entityType     WorkflowEntityType
+  entityId       String
+  status         WorkflowInstanceStatus @default(ACTIVE)
+  currentStepId  String?
+
+  startedById String?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  template     WorkflowTemplate       @relation(fields: [templateId], references: [id])
+  startedBy    User?                  @relation(fields: [startedById], references: [id])
+  steps        WorkflowInstanceStep[]
+}
+
+model WorkflowInstanceStep {
+  id             String @id @default(cuid())
+  instanceId     String
+  templateStepId String
+
+  name     String
+  stepType WorkflowStepType
+  sequence Int
+
+  status WorkflowStepStatus @default(PENDING)
+
+  assignedRole   UserRole?
+  assignedUserId String?
+
+  completedById String?
+
+  decision WorkflowDecision?
+  comments String?
+
+  startedAt   DateTime?
+  dueAt       DateTime?
+  completedAt DateTime?
+  reminderSentAt   DateTime?
+  escalationSentAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  assignedUser User? @relation("WorkflowAssignedUser", fields: [assignedUserId], references: [id])
+  completedBy  User? @relation("WorkflowCompletedBy", fields: [completedById], references: [id])
+}
