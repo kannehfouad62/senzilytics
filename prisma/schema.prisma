@@ -560,8 +560,10 @@ model Document {
   mimeType   String
   sizeBytes  Int
 
-  version  Int     @default(1)
-  checksum String?
+  version        Int     @default(1)
+  versionGroupId String  @default(cuid())
+  isLatest       Boolean @default(true)
+  checksum       String?
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -573,5 +575,7 @@ model Document {
 
   @@index([organizationId, entityType, entityId])
   @@index([organizationId, status])
+  @@index([organizationId, checksum])
+  @@index([organizationId, versionGroupId, version])
   @@index([uploadedById])
 }
