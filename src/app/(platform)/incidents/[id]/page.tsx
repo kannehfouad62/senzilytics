@@ -1,14 +1,41 @@
-import { archiveDocumentAction, deleteDocumentAction } from "@/core/documents/document.actions";
+import {
+  archiveDocumentAction,
+  deleteDocumentAction,
+} from "@/core/documents/document.actions";
+import { DocumentPreview } from "@/core/documents/document-preview";
 import { MultiDocumentUpload } from "@/core/documents/multi-document-upload";
+import { ReplaceDocumentUpload } from "@/core/documents/replace-document-upload";
+import { ConfirmDocumentAction } from "@/core/documents/confirm-document-action";
+import { DocumentVersionHistory } from "@/core/documents/document-version-history";
 import { decideIncidentWorkflow } from "@/core/workflow/workflow.actions";
-import {createCorrectiveAction, updateCorrectiveActionStatus, updateIncidentStatus, upsertInvestigation,} from "@/features/incidents/actions";
+import {
+  createCorrectiveAction,
+  updateCorrectiveActionStatus,
+  updateIncidentStatus,
+  upsertInvestigation,
+} from "@/features/incidents/actions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
-import { DocumentEntityType, DocumentStatus, RiskLevel, Status, WorkflowDecision, WorkflowEntityType, DocumentCategory,} from "@prisma/client";
-import { Archive, ArrowLeft, ClipboardCheck, Download, FileText, SearchCheck, Trash2,} from "lucide-react";
+import {
+  DocumentCategory,
+  DocumentEntityType,
+  DocumentStatus,
+  RiskLevel,
+  Status,
+  WorkflowDecision,
+  WorkflowEntityType,
+} from "@prisma/client";
+import {
+  Archive,
+  ArrowLeft,
+  ClipboardCheck,
+  Download,
+  FileText,
+  SearchCheck,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DocumentPreview } from "@/core/documents/document-preview";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +49,11 @@ export default async function IncidentDetailPage({
   params,
 }: IncidentDetailPageProps) {
   const { id } = await params;
-  const { organizationId, user: currentUser } =
-    await getCurrentUserTenant();
+
+  const {
+    organizationId,
+    user: currentUser,
+  } = await getCurrentUserTenant();
 
   const incident = await prisma.incident.findFirst({
     where: {
@@ -51,73 +81,79 @@ export default async function IncidentDetailPage({
     notFound();
   }
 
-  const [users, workflowInstance, documents] = await Promise.all([
-    prisma.user.findMany({
-      where: {
-        organizationId,
-      },
-      orderBy: {
-        name: "asc",
-      },
-    }),
-
-    prisma.workflowInstance.findFirst({
-      where: {
-        entityId: incident.id,
-        entityType: WorkflowEntityType.INCIDENT,
-        organizationId,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      include: {
-        template: true,
-        steps: {
-          orderBy: {
-            sequence: "asc",
-          },
-          include: {
-            assignedUser: true,
-            completedBy: true,
-          },
+  const [users, workflowInstance, documents] =
+    await Promise.all([
+      prisma.user.findMany({
+        where: {
+          organizationId,
         },
-      },
-    }),
-
-    prisma.document.findMany({
-      where: {
-        organizationId,
-        entityType: DocumentEntityType.INCIDENT,
-        entityId: incident.id,
-        status: {
-          not: DocumentStatus.DELETED,
+        orderBy: {
+          name: "asc",
         },
-      },
-      include: {
-        uploadedBy: {
-          select: {
-            name: true,
+      }),
+
+      prisma.workflowInstance.findFirst({
+        where: {
+          entityId: incident.id,
+          entityType: WorkflowEntityType.INCIDENT,
+          organizationId,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        include: {
+          template: true,
+          steps: {
+            orderBy: {
+              sequence: "asc",
+            },
+            include: {
+              assignedUser: true,
+              completedBy: true,
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    }),
-  ]);
+      }),
 
-  const currentWorkflowStep = workflowInstance?.steps.find(
-    (step) =>
-      step.id === workflowInstance.currentStepId ||
-      step.templateStepId === workflowInstance.currentStepId
-  );
+      prisma.document.findMany({
+        where: {
+          organizationId,
+          entityType: DocumentEntityType.INCIDENT,
+          entityId: incident.id,
+          isLatest: true,
+          status: {
+            not: DocumentStatus.DELETED,
+          },
+        },
+        include: {
+          uploadedBy: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+    ]);
+
+  const currentWorkflowStep =
+    workflowInstance?.steps.find(
+      (step) =>
+        step.id === workflowInstance.currentStepId ||
+        step.templateStepId ===
+          workflowInstance.currentStepId
+    );
 
   const canActOnCurrentStep = Boolean(
     currentWorkflowStep &&
-      (currentWorkflowStep.assignedUserId === currentUser.id ||
+      (currentWorkflowStep.assignedUserId ===
+        currentUser.id ||
         (!currentWorkflowStep.assignedUserId &&
           (!currentWorkflowStep.assignedRole ||
-            currentWorkflowStep.assignedRole === currentUser.role)))
+            currentWorkflowStep.assignedRole ===
+              currentUser.role)))
   );
 
   const now = new Date();
@@ -133,7 +169,9 @@ export default async function IncidentDetailPage({
       </Link>
 
       <section className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
-        <p className="text-sm text-cyan-300">Incident Record</p>
+        <p className="text-sm text-cyan-300">
+          Incident Record
+        </p>
 
         <h1 className="mt-2 text-4xl font-bold tracking-tight text-white">
           {incident.title}
@@ -147,7 +185,11 @@ export default async function IncidentDetailPage({
           action={updateIncidentStatus}
           className="mt-6 flex flex-wrap items-end gap-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4"
         >
-          <input type="hidden" name="incidentId" value={incident.id} />
+          <input
+            type="hidden"
+            name="incidentId"
+            value={incident.id}
+          />
 
           <div>
             <label className="mb-2 block text-sm text-slate-300">
@@ -160,7 +202,10 @@ export default async function IncidentDetailPage({
               className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-cyan-400"
             >
               {Object.values(Status).map((status) => (
-                <option key={status} value={status}>
+                <option
+                  key={status}
+                  value={status}
+                >
                   {status.replaceAll("_", " ")}
                 </option>
               ))}
@@ -180,24 +225,37 @@ export default async function IncidentDetailPage({
             label="Type"
             value={incident.type.replaceAll("_", " ")}
           />
-          <InfoCard label="Risk Level" value={incident.riskLevel} />
+
+          <InfoCard
+            label="Risk Level"
+            value={incident.riskLevel}
+          />
+
           <InfoCard
             label="Status"
             value={incident.status.replaceAll("_", " ")}
           />
-          <InfoCard label="Site" value={incident.site.name} />
+
+          <InfoCard
+            label="Site"
+            value={incident.site.name}
+          />
+
           <InfoCard
             label="Reported By"
             value={incident.reportedBy.name}
           />
+
           <InfoCard
             label="Location"
             value={incident.location || "N/A"}
           />
+
           <InfoCard
             label="Occurred"
             value={incident.occurredAt.toLocaleString()}
           />
+
           <InfoCard
             label="Created"
             value={incident.createdAt.toLocaleString()}
@@ -208,7 +266,9 @@ export default async function IncidentDetailPage({
       {workflowInstance && (
         <section className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl">
           <div className="mb-6">
-            <p className="text-sm text-cyan-300">Workflow Engine</p>
+            <p className="text-sm text-cyan-300">
+              Workflow Engine
+            </p>
 
             <h2 className="mt-1 text-2xl font-semibold text-white">
               {workflowInstance.template.name}
@@ -220,7 +280,8 @@ export default async function IncidentDetailPage({
             </p>
           </div>
 
-          {currentWorkflowStep && canActOnCurrentStep ? (
+          {currentWorkflowStep &&
+          canActOnCurrentStep ? (
             <form
               action={decideIncidentWorkflow}
               className="mb-6 space-y-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-5"
@@ -232,7 +293,9 @@ export default async function IncidentDetailPage({
               />
 
               <div>
-                <p className="text-sm text-cyan-300">Current Step</p>
+                <p className="text-sm text-cyan-300">
+                  Current Step
+                </p>
 
                 <h3 className="mt-1 text-xl font-semibold text-white">
                   {currentWorkflowStep.name}
@@ -254,7 +317,8 @@ export default async function IncidentDetailPage({
                   <span>
                     Assigned user:{" "}
                     <strong className="font-medium text-slate-200">
-                      {currentWorkflowStep.assignedUser?.name ||
+                      {currentWorkflowStep.assignedUser
+                        ?.name ||
                         "Role-based assignment"}
                     </strong>
                   </span>
@@ -312,7 +376,9 @@ export default async function IncidentDetailPage({
             </form>
           ) : currentWorkflowStep ? (
             <div className="mb-6 rounded-2xl border border-orange-400/20 bg-orange-400/10 p-5">
-              <p className="text-sm text-orange-300">Current Step</p>
+              <p className="text-sm text-orange-300">
+                Current Step
+              </p>
 
               <h3 className="mt-1 text-xl font-semibold text-white">
                 {currentWorkflowStep.name}
@@ -332,17 +398,21 @@ export default async function IncidentDetailPage({
             </div>
           ) : (
             <div className="mb-6 rounded-2xl border border-green-400/20 bg-green-400/10 p-5">
-              <p className="text-sm text-green-300">Workflow Complete</p>
+              <p className="text-sm text-green-300">
+                Workflow Complete
+              </p>
 
               <p className="mt-1 text-sm text-slate-300">
-                There is no active workflow step requiring action.
+                There is no active workflow step requiring
+                action.
               </p>
             </div>
           )}
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {workflowInstance.steps.map((step) => {
-              const isCurrentStep = currentWorkflowStep?.id === step.id;
+              const isCurrentStep =
+                currentWorkflowStep?.id === step.id;
 
               const isOverdue = Boolean(
                 step.status === "IN_PROGRESS" &&
@@ -395,21 +465,29 @@ export default async function IncidentDetailPage({
                   <div className="space-y-2 text-sm text-slate-400">
                     <WorkflowDetailRow
                       label="Type"
-                      value={step.stepType.replaceAll("_", " ")}
+                      value={step.stepType.replaceAll(
+                        "_",
+                        " "
+                      )}
                     />
 
                     <WorkflowDetailRow
                       label="Assigned Role"
                       value={
                         step.assignedRole
-                          ? step.assignedRole.replaceAll("_", " ")
+                          ? step.assignedRole.replaceAll(
+                              "_",
+                              " "
+                            )
                           : "None"
                       }
                     />
 
                     <WorkflowDetailRow
                       label="Assigned User"
-                      value={step.assignedUser?.name || "None"}
+                      value={
+                        step.assignedUser?.name || "None"
+                      }
                     />
 
                     <WorkflowDetailRow
@@ -449,14 +527,19 @@ export default async function IncidentDetailPage({
                       label="Decision"
                       value={
                         step.decision
-                          ? step.decision.replaceAll("_", " ")
+                          ? step.decision.replaceAll(
+                              "_",
+                              " "
+                            )
                           : "None"
                       }
                     />
 
                     <WorkflowDetailRow
                       label="Completed By"
-                      value={step.completedBy?.name || "N/A"}
+                      value={
+                        step.completedBy?.name || "N/A"
+                      }
                     />
 
                     {step.comments && (
@@ -464,6 +547,7 @@ export default async function IncidentDetailPage({
                         <p className="text-xs text-slate-500">
                           Comments
                         </p>
+
                         <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">
                           {step.comments}
                         </p>
@@ -479,25 +563,27 @@ export default async function IncidentDetailPage({
 
       <section className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl">
         <div className="mb-6">
-          <p className="text-sm text-cyan-300">Document Management</p>
+          <p className="text-sm text-cyan-300">
+            Document Management
+          </p>
 
           <h2 className="mt-1 text-2xl font-semibold text-white">
             Incident Attachments
           </h2>
 
           <p className="mt-2 text-sm text-slate-400">
-            Upload photographs, evidence, reports, videos, and supporting
-            records.
+            Upload photographs, evidence, reports, videos,
+            and supporting records.
           </p>
         </div>
 
         <MultiDocumentUpload
-  entityType={DocumentEntityType.INCIDENT}
-  entityId={incident.id}
-  organizationId={organizationId}
-  userId={currentUser.id}
-  defaultCategory={DocumentCategory.EVIDENCE}
-/>
+          entityType={DocumentEntityType.INCIDENT}
+          entityId={incident.id}
+          organizationId={organizationId}
+          userId={currentUser.id}
+          defaultCategory={DocumentCategory.EVIDENCE}
+        />
 
         <div className="mt-6 space-y-3">
           {documents.map((document) => (
@@ -517,22 +603,32 @@ export default async function IncidentDetailPage({
                     </p>
 
                     <p className="mt-1 break-words text-sm text-slate-400">
-                      {document.description || document.originalName}
+                      {document.description ||
+                        document.originalName}
                     </p>
 
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                       <span>
                         Uploaded by{" "}
-                        {document.uploadedBy?.name || "System"}
+                        {document.uploadedBy?.name ||
+                          "System"}
                       </span>
 
-                      <span>{document.createdAt.toLocaleString()}</span>
+                      <span>
+                        {document.createdAt.toLocaleString()}
+                      </span>
 
-                      <span>{formatFileSize(document.sizeBytes)}</span>
+                      <span>
+                        {formatFileSize(
+                          document.sizeBytes
+                        )}
+                      </span>
 
                       <span>{document.mimeType}</span>
 
-                      <span>Version {document.version}</span>
+                      <span>
+                        Version {document.version}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -540,7 +636,8 @@ export default async function IncidentDetailPage({
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`rounded-full border px-3 py-1 text-xs ${
-                      document.status === DocumentStatus.ARCHIVED
+                      document.status ===
+                      DocumentStatus.ARCHIVED
                         ? "border-slate-400/20 bg-slate-400/10 text-slate-300"
                         : "border-cyan-400/20 bg-cyan-400/10 text-cyan-300"
                     }`}
@@ -549,18 +646,26 @@ export default async function IncidentDetailPage({
                   </span>
 
                   <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
-                    {document.category.replaceAll("_", " ")}
+                    {document.category.replaceAll(
+                      "_",
+                      " "
+                    )}
                   </span>
                 </div>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-3 border-t border-white/10 pt-4">
+                <DocumentPreview
+                  documentId={document.id}
+                  documentName={document.name}
+                  mimeType={document.mimeType}
+                />
 
-              <DocumentPreview
+<DocumentVersionHistory
   documentId={document.id}
   documentName={document.name}
-  mimeType={document.mimeType}
 />
+
                 <a
                   href={`/api/documents/${document.id}/download`}
                   className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
@@ -569,8 +674,23 @@ export default async function IncidentDetailPage({
                   Download
                 </a>
 
-                {document.status === DocumentStatus.ACTIVE && (
-                  <form action={archiveDocumentAction}>
+                {document.status ===
+                  DocumentStatus.ACTIVE && (
+                  <ReplaceDocumentUpload
+                    documentId={document.id}
+                    documentName={document.name}
+                    entityType={document.entityType}
+                    entityId={document.entityId}
+                    organizationId={organizationId}
+                    userId={currentUser.id}
+                  />
+                )}
+
+                {document.status ===
+                  DocumentStatus.ACTIVE && (
+                  <form
+                    action={archiveDocumentAction}
+                  >
                     <input
                       type="hidden"
                       name="documentId"
@@ -583,13 +703,14 @@ export default async function IncidentDetailPage({
                       value={`/incidents/${incident.id}`}
                     />
 
-                    <button
-                      type="submit"
-                      className="inline-flex items-center gap-2 rounded-xl border border-orange-400/20 bg-orange-400/10 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-400/20"
-                    >
-                      <Archive size={16} />
-                      Archive
-                    </button>
+<ConfirmDocumentAction
+  title="Archive document?"
+  description="The document will remain available in the Document Center but will be marked as archived."
+  confirmLabel="Archive Document"
+  buttonLabel="Archive"
+  icon={<Archive size={16} />}
+  buttonClassName="inline-flex items-center gap-2 rounded-xl border border-orange-400/20 bg-orange-400/10 px-4 py-2 text-sm font-semibold text-orange-300 transition hover:bg-orange-400/20"
+/>
                   </form>
                 )}
 
@@ -606,13 +727,14 @@ export default async function IncidentDetailPage({
                     value={`/incidents/${incident.id}`}
                   />
 
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-400/20"
-                  >
-                    <Trash2 size={16} />
-                    Delete
-                  </button>
+<ConfirmDocumentAction
+  title="Delete document permanently?"
+  description="The file will be removed from private Blob storage and the document record will be marked as deleted. This action cannot be undone."
+  confirmLabel="Delete Permanently"
+  buttonLabel="Delete"
+  icon={<Trash2 size={16} />}
+  buttonClassName="inline-flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-400/20"
+/>
                 </form>
               </div>
             </article>
@@ -653,17 +775,25 @@ export default async function IncidentDetailPage({
 
               <DetailBlock
                 label="Root Cause"
-                value={incident.investigation.rootCause}
+                value={
+                  incident.investigation.rootCause
+                }
               />
 
               <DetailBlock
                 label="Immediate Cause"
-                value={incident.investigation.immediateCause}
+                value={
+                  incident.investigation
+                    .immediateCause
+                }
               />
 
               <DetailBlock
                 label="Contributing Factors"
-                value={incident.investigation.contributingFactors}
+                value={
+                  incident.investigation
+                    .contributingFactors
+                }
               />
             </div>
           ) : (
@@ -686,7 +816,9 @@ export default async function IncidentDetailPage({
               label="Summary"
               name="summary"
               rows={3}
-              defaultValue={incident.investigation?.summary || ""}
+              defaultValue={
+                incident.investigation?.summary || ""
+              }
               placeholder="Summarize the investigation..."
             />
 
@@ -694,7 +826,10 @@ export default async function IncidentDetailPage({
               label="Root Cause"
               name="rootCause"
               rows={3}
-              defaultValue={incident.investigation?.rootCause || ""}
+              defaultValue={
+                incident.investigation?.rootCause ||
+                ""
+              }
               placeholder="Example: Inadequate traffic separation"
             />
 
@@ -703,7 +838,8 @@ export default async function IncidentDetailPage({
               name="immediateCause"
               rows={3}
               defaultValue={
-                incident.investigation?.immediateCause || ""
+                incident.investigation
+                  ?.immediateCause || ""
               }
               placeholder="Example: Forklift entered pedestrian pathway"
             />
@@ -713,7 +849,8 @@ export default async function IncidentDetailPage({
               name="contributingFactors"
               rows={3}
               defaultValue={
-                incident.investigation?.contributingFactors || ""
+                incident.investigation
+                  ?.contributingFactors || ""
               }
               placeholder="Example: Poor lighting, congestion, unclear signage"
             />
@@ -748,7 +885,8 @@ export default async function IncidentDetailPage({
             {incident.actions.map((action) => {
               const isActionOverdue =
                 action.dueDate < now &&
-                action.status !== Status.COMPLETED &&
+                action.status !==
+                  Status.COMPLETED &&
                 action.status !== Status.CLOSED;
 
               return (
@@ -774,12 +912,16 @@ export default async function IncidentDetailPage({
                     >
                       {isActionOverdue
                         ? "OVERDUE"
-                        : action.status.replaceAll("_", " ")}
+                        : action.status.replaceAll(
+                            "_",
+                            " "
+                          )}
                     </span>
                   </div>
 
                   <p className="whitespace-pre-wrap text-sm text-slate-400">
-                    {action.description || "No description provided."}
+                    {action.description ||
+                      "No description provided."}
                   </p>
 
                   <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
@@ -812,7 +954,9 @@ export default async function IncidentDetailPage({
                   </div>
 
                   <form
-                    action={updateCorrectiveActionStatus}
+                    action={
+                      updateCorrectiveActionStatus
+                    }
                     className="mt-4 flex flex-wrap items-end gap-3"
                   >
                     <input
@@ -837,11 +981,19 @@ export default async function IncidentDetailPage({
                         defaultValue={action.status}
                         className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400"
                       >
-                        {Object.values(Status).map((status) => (
-                          <option key={status} value={status}>
-                            {status.replaceAll("_", " ")}
-                          </option>
-                        ))}
+                        {Object.values(Status).map(
+                          (status) => (
+                            <option
+                              key={status}
+                              value={status}
+                            >
+                              {status.replaceAll(
+                                "_",
+                                " "
+                              )}
+                            </option>
+                          )
+                        )}
                       </select>
                     </div>
 
@@ -905,11 +1057,16 @@ export default async function IncidentDetailPage({
                   defaultValue={RiskLevel.LOW}
                   className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-cyan-400"
                 >
-                  {Object.values(RiskLevel).map((risk) => (
-                    <option key={risk} value={risk}>
-                      {risk}
-                    </option>
-                  ))}
+                  {Object.values(RiskLevel).map(
+                    (risk) => (
+                      <option
+                        key={risk}
+                        value={risk}
+                      >
+                        {risk}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
 
@@ -924,12 +1081,18 @@ export default async function IncidentDetailPage({
                   defaultValue=""
                   className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-cyan-400"
                 >
-                  <option value="" disabled>
+                  <option
+                    value=""
+                    disabled
+                  >
                     Select a user
                   </option>
 
                   {users.map((user) => (
-                    <option key={user.id} value={user.id}>
+                    <option
+                      key={user.id}
+                      value={user.id}
+                    >
                       {user.name}
                     </option>
                   ))}
@@ -972,7 +1135,10 @@ function InfoCard({
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-xs text-slate-500">
+        {label}
+      </p>
+
       <p className="mt-1 break-words font-medium text-slate-100">
         {value}
       </p>
@@ -989,7 +1155,9 @@ function DetailBlock({
 }) {
   return (
     <div>
-      <p className="mb-1 text-xs text-slate-500">{label}</p>
+      <p className="mb-1 text-xs text-slate-500">
+        {label}
+      </p>
 
       <p className="whitespace-pre-wrap rounded-2xl border border-white/10 bg-slate-950/50 p-4 text-sm text-slate-300">
         {value || "Not provided."}
@@ -1037,23 +1205,34 @@ function WorkflowDetailRow({
 }) {
   return (
     <p>
-      {label}: <span className="text-slate-200">{value}</span>
+      {label}:{" "}
+      <span className="text-slate-200">
+        {value}
+      </span>
     </p>
   );
 }
 
-function formatFileSize(sizeBytes: number) {
+function formatFileSize(
+  sizeBytes: number
+) {
   if (sizeBytes < 1024) {
     return `${sizeBytes} B`;
   }
 
-  const kilobytes = sizeBytes / 1024;
+  const kilobytes =
+    sizeBytes / 1024;
 
   if (kilobytes < 1024) {
-    return `${kilobytes.toFixed(1)} KB`;
+    return `${kilobytes.toFixed(
+      1
+    )} KB`;
   }
 
-  const megabytes = kilobytes / 1024;
+  const megabytes =
+    kilobytes / 1024;
 
-  return `${megabytes.toFixed(1)} MB`;
+  return `${megabytes.toFixed(
+    1
+  )} MB`;
 }

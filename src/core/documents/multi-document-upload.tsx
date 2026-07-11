@@ -31,7 +31,12 @@ const ACCEPTED_MIME_TYPES = new Set([
   "text/csv",
 ]);
 
-type UploadState = "queued" | "uploading" | "success" | "error";
+type UploadState =
+  | "queued"
+  | "hashing"
+  | "uploading"
+  | "success"
+  | "error";
 
 type UploadItem = {
   id: string;
@@ -48,6 +53,21 @@ type MultiDocumentUploadProps = {
   userId: string;
   defaultCategory?: DocumentCategory;
 };
+
+async function calculateFileChecksum(file: File) {
+  const fileBuffer = await file.arrayBuffer();
+
+  const hashBuffer = await crypto.subtle.digest(
+    "SHA-256",
+    fileBuffer
+  );
+
+  const hashBytes = Array.from(new Uint8Array(hashBuffer));
+
+  return hashBytes
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 export function MultiDocumentUpload({
   entityType,
@@ -155,35 +175,43 @@ export function MultiDocumentUpload({
 
   async function uploadItem(item: UploadItem) {
     updateItem(item.id, {
-      state: "uploading",
+      state: "hashing",
       progress: 0,
       error: undefined,
     });
-
-    const safeFileName = item.file.name
-      .trim()
-      .replace(/[^a-zA-Z0-9._-]+/g, "-");
-
-    const pathname = [
-      organizationId,
-      entityType.toLowerCase(),
-      entityId,
-      safeFileName,
-    ].join("/");
-
-    const clientPayload = JSON.stringify({
-      organizationId,
-      userId,
-      entityType,
-      entityId,
-      category,
-      displayName: item.file.name,
-      originalName: item.file.name,
-      description: description.trim() || null,
-      sizeBytes: item.file.size,
-    });
-
+  
     try {
+      const checksum = await calculateFileChecksum(item.file);
+  
+      updateItem(item.id, {
+        state: "uploading",
+        progress: 0,
+      });
+  
+      const safeFileName = item.file.name
+        .trim()
+        .replace(/[^a-zA-Z0-9._-]+/g, "-");
+  
+      const pathname = [
+        organizationId,
+        entityType.toLowerCase(),
+        entityId,
+        safeFileName,
+      ].join("/");
+  
+      const clientPayload = JSON.stringify({
+        organizationId,
+        userId,
+        entityType,
+        entityId,
+        category,
+        displayName: item.file.name,
+        originalName: item.file.name,
+        description: description.trim() || null,
+        sizeBytes: item.file.size,
+        checksum,
+      });
+  
       await upload(pathname, item.file, {
         access: "private",
         handleUploadUrl: "/api/documents/upload",
@@ -195,7 +223,7 @@ export function MultiDocumentUpload({
           });
         },
       });
-
+  
       updateItem(item.id, {
         state: "success",
         progress: 100,
@@ -373,12 +401,13 @@ export function MultiDocumentUpload({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {item.state === "uploading" && (
-                    <LoaderCircle
-                      size={18}
-                      className="animate-spin text-cyan-300"
-                    />
-                  )}
+                {(item.state === "hashing" ||
+  item.state === "uploading") && (
+  <LoaderCircle
+    size={18}
+    className="animate-spin text-cyan-300"
+  />
+)}
 
                   {item.state === "success" && (
                     <CheckCircle2
@@ -406,6 +435,12 @@ export function MultiDocumentUpload({
                     )}
                 </div>
               </div>
+
+              {item.state === "hashing" && (
+  <p className="mt-3 text-xs text-cyan-300">
+    Checking file for duplicates...
+  </p>
+)}
 
               {(item.state === "uploading" ||
                 item.state === "success") && (

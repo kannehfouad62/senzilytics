@@ -1,21 +1,69 @@
 "use server";
 
-import { del } from "@vercel/blob";
-import { redirect } from "next/navigation";
-
 import {
   archiveDocument,
   deleteDocument,
   restoreDocument,
 } from "@/core/documents/document.service";
-import { getCurrentUserTenant } from "@/lib/tenant";
+import { requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserTenant } from "@/lib/tenant";
+import { PermissionKey } from "@prisma/client";
+import { del } from "@vercel/blob";
+import { redirect } from "next/navigation";
 
-export async function archiveDocumentAction(formData: FormData) {
-  const { organizationId, user } = await getCurrentUserTenant();
+function getSafeReturnPath(
+  value: FormDataEntryValue | null
+) {
+  const path =
+    typeof value === "string"
+      ? value.trim()
+      : "/documents";
 
-  const documentId = String(formData.get("documentId"));
-  const returnTo = getSafeReturnPath(formData.get("returnTo"));
+  if (
+    !path.startsWith("/") ||
+    path.startsWith("//")
+  ) {
+    return "/documents";
+  }
+
+  return path;
+}
+
+function getRequiredDocumentId(
+  formData: FormData
+) {
+  const documentId = String(
+    formData.get("documentId") || ""
+  ).trim();
+
+  if (!documentId) {
+    throw new Error(
+      "Document ID is required."
+    );
+  }
+
+  return documentId;
+}
+
+export async function archiveDocumentAction(
+  formData: FormData
+) {
+  await requirePermission(
+    PermissionKey.MANAGE_DOCUMENTS
+  );
+
+  const {
+    organizationId,
+    user,
+  } = await getCurrentUserTenant();
+
+  const documentId =
+    getRequiredDocumentId(formData);
+
+  const returnTo = getSafeReturnPath(
+    formData.get("returnTo")
+  );
 
   await archiveDocument({
     organizationId,
@@ -26,42 +74,26 @@ export async function archiveDocumentAction(formData: FormData) {
   redirect(returnTo);
 }
 
-export async function deleteDocumentAction(formData: FormData) {
-  const { organizationId, user } = await getCurrentUserTenant();
+export async function restoreDocumentAction(
+  formData: FormData
+) {
+  await requirePermission(
+    PermissionKey.MANAGE_DOCUMENTS
+  );
 
-  const documentId = String(formData.get("documentId"));
-  const returnTo = String(formData.get("returnTo") || "/dashboard");
+  const {
+    organizationId,
+    user,
+  } = await getCurrentUserTenant();
 
-  const document = await prisma.document.findFirst({
-    where: {
-      id: documentId,
-      organizationId,
-      status: {
-        not: "DELETED",
-      },
-    },
-    select: {
-      id: true,
-      storageKey: true,
-      storageUrl: true,
-    },
-  });
+  const documentId =
+    getRequiredDocumentId(formData);
 
-  if (!document) {
-    throw new Error("Document not found.");
-  }
+  const returnTo = getSafeReturnPath(
+    formData.get("returnTo")
+  );
 
-  try {
-    await del(document.storageKey);
-  } catch (error) {
-    console.error("Blob deletion failed:", error);
-
-    throw new Error(
-      "The file could not be removed from storage. The document record was not deleted."
-    );
-  }
-
-  await deleteDocument({
+  await restoreDocument({
     organizationId,
     userId: user.id,
     documentId,
@@ -70,27 +102,61 @@ export async function deleteDocumentAction(formData: FormData) {
   redirect(returnTo);
 }
 
-function getSafeReturnPath(value: FormDataEntryValue | null) {
-  const path = typeof value === "string" ? value : "/documents";
+export async function deleteDocumentAction(
+  formData: FormData
+) {
+  await requirePermission(
+    PermissionKey.MANAGE_DOCUMENTS
+  );
 
-  if (!path.startsWith("/") || path.startsWith("//")) {
-    return "/documents";
+  const {
+    organizationId,
+    user,
+  } = await getCurrentUserTenant();
+
+  const documentId =
+    getRequiredDocumentId(formData);
+
+  const returnTo = getSafeReturnPath(
+    formData.get("returnTo")
+  );
+
+  const document =
+    await prisma.document.findFirst({
+      where: {
+        id: documentId,
+        organizationId,
+        status: {
+          not: "DELETED",
+        },
+      },
+      select: {
+        id: true,
+        storageKey: true,
+        storageUrl: true,
+      },
+    });
+
+  if (!document) {
+    throw new Error(
+      "Document not found."
+    );
   }
 
-  return path;
-}
+  try {
+    await del(document.storageKey);
+  } catch (error) {
+    console.error(
+      "Blob deletion failed:",
+      error
+    );
 
-export async function restoreDocumentAction(formData: FormData) {
-  const { organizationId, user } = await getCurrentUserTenant();
-
-  const documentId = String(formData.get("documentId") || "");
-  const returnTo = getSafeReturnPath(formData.get("returnTo"));
-
-  if (!documentId) {
-    throw new Error("Document ID is required.");
+    throw new Error(
+      "The file could not be removed from storage. The document record was not deleted."
+    );
   }
 
-  await restoreDocument({
+  await deleteDocument({
     organizationId,
     userId: user.id,
     documentId,

@@ -19,6 +19,9 @@ export type CreateDocumentRecordInput = {
   mimeType: string;
   sizeBytes: number;
   checksum?: string | null;
+  version?: number;
+  versionGroupId?: string;
+  isLatest?: boolean;
 };
 
 export function createDocumentRecord(input: CreateDocumentRecordInput) {
@@ -38,6 +41,9 @@ export function createDocumentRecord(input: CreateDocumentRecordInput) {
       mimeType: input.mimeType,
       sizeBytes: input.sizeBytes,
       checksum: input.checksum,
+      version: input.version ?? 1,
+      versionGroupId: input.versionGroupId,
+      isLatest: input.isLatest ?? true,
     },
   });
 }
@@ -138,6 +144,48 @@ export function restoreTenantDocument(input: {
     data: {
       status: DocumentStatus.ACTIVE,
       archivedAt: null,
+    },
+  });
+}
+
+export function findLatestDocumentVersion(input: {
+  organizationId: string;
+  documentId: string;
+}) {
+  return prisma.document.findFirst({
+    where: {
+      id: input.documentId,
+      organizationId: input.organizationId,
+      status: {
+        not: DocumentStatus.DELETED,
+      },
+    },
+  });
+}
+
+export function findDocumentVersionHistory(input: {
+  organizationId: string;
+  versionGroupId: string;
+}) {
+  return prisma.document.findMany({
+    where: {
+      organizationId: input.organizationId,
+      versionGroupId: input.versionGroupId,
+      status: {
+        not: DocumentStatus.DELETED,
+      },
+    },
+    include: {
+      uploadedBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: {
+      version: "desc",
     },
   });
 }

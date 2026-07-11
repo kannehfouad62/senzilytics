@@ -3,15 +3,19 @@ import {
   ActivityAction,
   DocumentCategory,
   DocumentEntityType,
+  DocumentStatus,
 } from "@prisma/client";
 import {
   archiveTenantDocument,
   createDocumentRecord,
+  findDocumentVersionHistory,
+  findLatestDocumentVersion,
   findTenantDocumentById,
   findTenantDocuments,
   restoreTenantDocument,
   softDeleteTenantDocument,
 } from "./document.repository";
+import { prisma } from "@/lib/prisma";
 
 const MAX_DOCUMENT_SIZE_BYTES = 25 * 1024 * 1024;
 
@@ -209,4 +213,107 @@ export async function restoreDocument(input: {
       relatedEntityId: document.entityId,
     },
   });
+}
+
+export async function registerDocumentVersion(input: {
+  organizationId: string;
+  userId: string;
+  replacedDocumentId: string;
+  name: string;
+  originalName: string;
+  description?: string | null;
+  storageKey: string;
+  storageUrl: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksum: string;
+}) {
+  validateDocumentFile({
+    mimeType: input.mimeType,
+    sizeBytes: input.sizeBytes,
+  });
+
+  const previousDocument = await findLatestDocumentVersion({
+    organizationId: input.organizationId,
+    documentId: input.replacedDocumentId,
+  });
+
+  if (!previousDocument) {
+    throw new Error("The document being replaced was not found.");
+  }
+
+  if (!previousDocument.isLatest) {
+    throw new Error(
+      "Only the latest document version can be replaced."
+    );
+  }
+
+  if (previousDocument.checksum === input.checksum) {
+    throw new Error(
+      "The replacement file is identical to the current version."
+    );
+  }
+
+  const nextVersion = previousDocument.version + 1;
+
+  const document = await prisma.$transaction(async (transaction) => {
+    await transaction.document.update({
+      where: {
+        id: previousDocument.id,
+      },
+      data: {
+        isLatest: false,
+      },
+    });
+
+    return transaction.document.create({
+      data: {
+        organizationId: previousDocument.organizationId,
+        uploadedById: input.userId,
+        entityType: previousDocument.entityType,
+        entityId: previousDocument.entityId,
+        category: previousDocument.category,
+        status: DocumentStatus.ACTIVE,
+        name: input.name,
+        originalName: input.originalName,
+        description:
+          input.description ?? previousDocument.description,
+        storageKey: input.storageKey,
+        storageUrl: input.storageUrl,
+        mimeType: input.mimeType,
+        sizeBytes: input.sizeBytes,
+        checksum: input.checksum,
+        version: nextVersion,
+        versionGroupId: previousDocument.versionGroupId,
+        isLatest: true,
+      },
+    });
+  });
+
+  await logActivity({
+    organizationId: input.organizationId,
+    userId: input.userId,
+    action: ActivityAction.UPDATE,
+    entityType: "Document",
+    entityId: document.id,
+    title: "Document version uploaded",
+    description: `${document.name} version ${document.version}`,
+    metadata: {
+      previousDocumentId: previousDocument.id,
+      versionGroupId: document.versionGroupId,
+      previousVersion: previousDocument.version,
+      newVersion: document.version,
+      relatedEntityType: document.entityType,
+      relatedEntityId: document.entityId,
+    },
+  });
+
+  return document;
+}
+
+export function getDocumentVersionHistory(input: {
+  organizationId: string;
+  versionGroupId: string;
+}) {
+  return findDocumentVersionHistory(input);
 }

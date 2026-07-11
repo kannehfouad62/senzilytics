@@ -1,9 +1,15 @@
-import { registerDocument } from "@/core/documents/document.service";
+import {
+  registerDocument,
+  registerDocumentVersion,
+} from "@/core/documents/document.service";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/permissions";
 import {
   DocumentCategory,
   DocumentEntityType,
+  DocumentStatus,
+  PermissionKey,
 } from "@prisma/client";
 import {
   handleUpload,
@@ -40,6 +46,8 @@ type UploadPayload = {
   originalName: string;
   description: string | null;
   sizeBytes: number;
+  checksum: string;
+  replacedDocumentId: string | null;
 };
 
 function isDocumentEntityType(
@@ -64,6 +72,13 @@ function isDocumentCategory(
   );
 }
 
+function isSha256Checksum(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[a-f0-9]{64}$/i.test(value)
+  );
+}
+
 function parseUploadPayload(
   value: string | null | undefined
 ): UploadPayload {
@@ -71,23 +86,23 @@ function parseUploadPayload(
     throw new Error("Upload information is missing.");
   }
 
-  let parsed: unknown;
+  let parsedValue: unknown;
 
   try {
-    parsed = JSON.parse(value);
+    parsedValue = JSON.parse(value);
   } catch {
-    throw new Error("Upload information is invalid.");
+    throw new Error("Upload information is not valid JSON.");
   }
 
   if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    Array.isArray(parsed)
+    typeof parsedValue !== "object" ||
+    parsedValue === null ||
+    Array.isArray(parsedValue)
   ) {
     throw new Error("Upload information is invalid.");
   }
 
-  const payload = parsed as Partial<UploadPayload>;
+  const payload = parsedValue as Partial<UploadPayload>;
 
   if (
     typeof payload.organizationId !== "string" ||
@@ -103,9 +118,10 @@ function parseUploadPayload(
     typeof payload.originalName !== "string" ||
     !payload.originalName.trim() ||
     typeof payload.sizeBytes !== "number" ||
-    !Number.isFinite(payload.sizeBytes)
+    !Number.isFinite(payload.sizeBytes) ||
+    !isSha256Checksum(payload.checksum)
   ) {
-    throw new Error("Upload information is incomplete.");
+    throw new Error("Upload information is incomplete or invalid.");
   }
 
   return {
@@ -122,6 +138,12 @@ function parseUploadPayload(
         ? payload.description.trim()
         : null,
     sizeBytes: payload.sizeBytes,
+    checksum: payload.checksum.toLowerCase(),
+    replacedDocumentId:
+      typeof payload.replacedDocumentId === "string" &&
+      payload.replacedDocumentId.trim()
+        ? payload.replacedDocumentId.trim()
+        : null,
   };
 }
 
@@ -336,14 +358,12 @@ async function validateRelatedEntity(input: {
   }
 }
 
-export async function POST(
-  request: Request
-): Promise<NextResponse> {
+export async function POST(request: Request) {
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
 
   if (!blobToken) {
     console.error(
-      "BLOB_READ_WRITE_TOKEN is missing from the deployment environment."
+      "Document upload configuration error: BLOB_READ_WRITE_TOKEN is missing."
     );
 
     return NextResponse.json(
@@ -364,7 +384,7 @@ export async function POST(
   } catch {
     return NextResponse.json(
       {
-        error: "Invalid upload request body.",
+        error: "The upload request body is invalid.",
       },
       {
         status: 400,
@@ -389,6 +409,10 @@ export async function POST(
             "You must be logged in to upload documents."
           );
         }
+
+        await requirePermission(
+          PermissionKey.MANAGE_DOCUMENTS
+        );
 
         const currentUser = await prisma.user.findUnique({
           where: {
@@ -430,37 +454,96 @@ export async function POST(
           );
         }
 
-        const entityExists = await validateRelatedEntity({
-          organizationId: currentUser.organizationId,
-          entityType: payload.entityType,
-          entityId: payload.entityId,
-        });
-
-        if (!entityExists) {
-          throw new Error(
-            "The related record was not found in your organization."
-          );
-        }
-
-        const duplicateDocument = await prisma.document.findFirst({
-          where: {
+        const relatedEntityExists =
+          await validateRelatedEntity({
             organizationId: currentUser.organizationId,
             entityType: payload.entityType,
             entityId: payload.entityId,
-            originalName: payload.originalName,
-            sizeBytes: payload.sizeBytes,
-            status: {
-              not: "DELETED",
+          });
+
+        if (!relatedEntityExists) {
+          throw new Error(
+            "The related record does not exist in your organization."
+          );
+        }
+
+        if (payload.replacedDocumentId) {
+          const documentBeingReplaced =
+            await prisma.document.findFirst({
+              where: {
+                id: payload.replacedDocumentId,
+                organizationId: currentUser.organizationId,
+                status: {
+                  not: DocumentStatus.DELETED,
+                },
+              },
+              select: {
+                id: true,
+                checksum: true,
+                isLatest: true,
+                entityType: true,
+                entityId: true,
+              },
+            });
+
+          if (!documentBeingReplaced) {
+            throw new Error(
+              "The document being replaced was not found."
+            );
+          }
+
+          if (!documentBeingReplaced.isLatest) {
+            throw new Error(
+              "Only the latest document version can be replaced."
+            );
+          }
+
+          if (
+            documentBeingReplaced.entityType !==
+              payload.entityType ||
+            documentBeingReplaced.entityId !== payload.entityId
+          ) {
+            throw new Error(
+              "The replacement file does not belong to the same record."
+            );
+          }
+
+          if (
+            documentBeingReplaced.checksum === payload.checksum
+          ) {
+            throw new Error(
+              "The replacement file is identical to the current version."
+            );
+          }
+        }
+
+        const duplicateDocument =
+          await prisma.document.findFirst({
+            where: {
+              organizationId: currentUser.organizationId,
+              entityType: payload.entityType,
+              entityId: payload.entityId,
+              checksum: payload.checksum,
+              status: {
+                not: DocumentStatus.DELETED,
+              },
+              ...(payload.replacedDocumentId
+                ? {
+                    id: {
+                      not: payload.replacedDocumentId,
+                    },
+                  }
+                : {}),
             },
-          },
-          select: {
-            id: true,
-          },
-        });
-        
+            select: {
+              id: true,
+              name: true,
+            },
+          });
+
         if (duplicateDocument) {
           throw new Error(
-            "A document with the same filename and file size already exists for this record."
+            `This exact file already exists as "${duplicateDocument.name}".`
           );
         }
 
@@ -473,11 +556,12 @@ export async function POST(
             .startsWith(requiredPathPrefix)
         ) {
           throw new Error(
-            "The upload path is outside your organization."
+            "The upload path does not belong to your organization."
           );
         }
 
         return {
+          access: "private",
           allowedContentTypes: ALLOWED_CONTENT_TYPES,
           maximumSizeInBytes: MAX_FILE_SIZE_BYTES,
           addRandomSuffix: true,
@@ -491,7 +575,7 @@ export async function POST(
       }) => {
         const payload = parseUploadPayload(tokenPayload);
 
-        const existingDocument =
+        const existingBlobDocument =
           await prisma.document.findFirst({
             where: {
               organizationId: payload.organizationId,
@@ -502,7 +586,27 @@ export async function POST(
             },
           });
 
-        if (existingDocument) {
+        if (existingBlobDocument) {
+          return;
+        }
+
+        if (payload.replacedDocumentId) {
+          await registerDocumentVersion({
+            organizationId: payload.organizationId,
+            userId: payload.userId,
+            replacedDocumentId: payload.replacedDocumentId,
+            name: payload.displayName,
+            originalName: payload.originalName,
+            description: payload.description,
+            storageKey: blob.pathname,
+            storageUrl: blob.url,
+            mimeType:
+              blob.contentType ||
+              "application/octet-stream",
+            sizeBytes: payload.sizeBytes,
+            checksum: payload.checksum,
+          });
+
           return;
         }
 
@@ -521,7 +625,7 @@ export async function POST(
             blob.contentType ||
             "application/octet-stream",
           sizeBytes: payload.sizeBytes,
-          checksum: blob.etag,
+          checksum: payload.checksum,
         });
       },
     });
