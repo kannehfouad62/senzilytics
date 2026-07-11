@@ -1,33 +1,14 @@
 import { archiveDocumentAction, deleteDocumentAction } from "@/core/documents/document.actions";
 import { IncidentDocumentUpload } from "@/core/documents/incident-document-upload";
 import { decideIncidentWorkflow } from "@/core/workflow/workflow.actions";
-import {
-  createCorrectiveAction,
-  updateCorrectiveActionStatus,
-  updateIncidentStatus,
-  upsertInvestigation,
-} from "@/features/incidents/actions";
+import {createCorrectiveAction, updateCorrectiveActionStatus, updateIncidentStatus, upsertInvestigation,} from "@/features/incidents/actions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
-import {
-  DocumentEntityType,
-  DocumentStatus,
-  RiskLevel,
-  Status,
-  WorkflowDecision,
-  WorkflowEntityType,
-} from "@prisma/client";
-import {
-  Archive,
-  ArrowLeft,
-  ClipboardCheck,
-  Download,
-  FileText,
-  SearchCheck,
-  Trash2,
-} from "lucide-react";
+import { DocumentEntityType, DocumentStatus, RiskLevel, Status, WorkflowDecision, WorkflowEntityType,} from "@prisma/client";
+import { Archive, ArrowLeft, ClipboardCheck, Download, FileText, SearchCheck, Trash2,} from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DocumentPreview } from "@/core/documents/document-preview";
 
 export const dynamic = "force-dynamic";
 
@@ -572,6 +553,12 @@ export default async function IncidentDetailPage({
               </div>
 
               <div className="mt-4 flex flex-wrap gap-3 border-t border-white/10 pt-4">
+
+              <DocumentPreview
+  documentId={document.id}
+  documentName={document.name}
+  mimeType={document.mimeType}
+/>
                 <a
                   href={`/api/documents/${document.id}/download`}
                   className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"

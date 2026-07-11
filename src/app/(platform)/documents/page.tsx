@@ -1,31 +1,13 @@
-import {
-    archiveDocumentAction,
-    deleteDocumentAction,
-    restoreDocumentAction,
-  } from "@/core/documents/document.actions";
-  import { requirePermission } from "@/lib/permissions";
-  import { prisma } from "@/lib/prisma";
-  import { getCurrentUserTenant } from "@/lib/tenant";
-  import {
-    DocumentCategory,
-    DocumentEntityType,
-    DocumentStatus,
-    PermissionKey,
-    Prisma,
-  } from "@prisma/client";
-  import {
-    Archive,
-    Download,
-    FileArchive,
-    FileText,
-    FolderOpen,
-    RotateCcw,
-    Search,
-    Trash2,
-  } from "lucide-react";
-  import Link from "next/link";
+import { archiveDocumentAction, deleteDocumentAction, restoreDocumentAction,} from "@/core/documents/document.actions";
+import { requirePermission } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserTenant } from "@/lib/tenant";
+import { DocumentCategory, DocumentEntityType, DocumentStatus, PermissionKey, Prisma,} from "@prisma/client";
+import { Archive, Download, FileArchive, FileText, FolderOpen, RotateCcw, Search, Trash2,} from "lucide-react";
+import Link from "next/link";
+import { DocumentPreview } from "@/core/documents/document-preview";
   
-  export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic";
   
   type DocumentCenterPageProps = {
     searchParams: Promise<{
@@ -36,7 +18,7 @@ import {
     }>;
   };
   
-  export default async function DocumentCenterPage({
+export default async function DocumentCenterPage({
     searchParams,
   }: DocumentCenterPageProps) {
     await requirePermission(PermissionKey.MANAGE_DOCUMENTS);
@@ -332,6 +314,12 @@ import {
                   </div>
   
                   <div className="mt-5 flex flex-wrap gap-3 border-t border-white/10 pt-4">
+
+                  <DocumentPreview
+  documentId={document.id}
+  documentName={document.name}
+  mimeType={document.mimeType}
+/>
                     <a
                       href={`/api/documents/${document.id}/download`}
                       className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
