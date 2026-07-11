@@ -442,6 +442,28 @@ export async function POST(
           );
         }
 
+        const duplicateDocument = await prisma.document.findFirst({
+          where: {
+            organizationId: currentUser.organizationId,
+            entityType: payload.entityType,
+            entityId: payload.entityId,
+            originalName: payload.originalName,
+            sizeBytes: payload.sizeBytes,
+            status: {
+              not: "DELETED",
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+        
+        if (duplicateDocument) {
+          throw new Error(
+            "A document with the same filename and file size already exists for this record."
+          );
+        }
+
         const requiredPathPrefix =
           `${currentUser.organizationId}/`.toLowerCase();
 

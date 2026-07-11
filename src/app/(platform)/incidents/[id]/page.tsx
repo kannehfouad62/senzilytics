@@ -1,10 +1,10 @@
 import { archiveDocumentAction, deleteDocumentAction } from "@/core/documents/document.actions";
-import { IncidentDocumentUpload } from "@/core/documents/incident-document-upload";
+import { MultiDocumentUpload } from "@/core/documents/multi-document-upload";
 import { decideIncidentWorkflow } from "@/core/workflow/workflow.actions";
 import {createCorrectiveAction, updateCorrectiveActionStatus, updateIncidentStatus, upsertInvestigation,} from "@/features/incidents/actions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
-import { DocumentEntityType, DocumentStatus, RiskLevel, Status, WorkflowDecision, WorkflowEntityType,} from "@prisma/client";
+import { DocumentEntityType, DocumentStatus, RiskLevel, Status, WorkflowDecision, WorkflowEntityType, DocumentCategory,} from "@prisma/client";
 import { Archive, ArrowLeft, ClipboardCheck, Download, FileText, SearchCheck, Trash2,} from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -491,11 +491,13 @@ export default async function IncidentDetailPage({
           </p>
         </div>
 
-        <IncidentDocumentUpload
-          incidentId={incident.id}
-          organizationId={organizationId}
-          userId={currentUser.id}
-        />
+        <MultiDocumentUpload
+  entityType={DocumentEntityType.INCIDENT}
+  entityId={incident.id}
+  organizationId={organizationId}
+  userId={currentUser.id}
+  defaultCategory={DocumentCategory.EVIDENCE}
+/>
 
         <div className="mt-6 space-y-3">
           {documents.map((document) => (
