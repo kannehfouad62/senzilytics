@@ -13,12 +13,13 @@ import {
   Settings,
   ShieldCheck,
   Users,
-  ClipboardList, GitBranch,
+  ClipboardList, GitBranch, FolderOpen,
 } from "lucide-react";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "My Tasks", href: "/tasks", icon: ClipboardList },
+  { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Workflows", href: "/workflows", icon: GitBranch },
   { label: "Organizations", href: "/organizations", icon: Building2 },
   { label: "Users", href: "/users", icon: Users },

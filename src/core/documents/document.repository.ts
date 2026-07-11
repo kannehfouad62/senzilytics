@@ -124,3 +124,20 @@ export function softDeleteTenantDocument(input: {
     },
   });
 }
+
+export function restoreTenantDocument(input: {
+  organizationId: string;
+  documentId: string;
+}) {
+  return prisma.document.updateMany({
+    where: {
+      id: input.documentId,
+      organizationId: input.organizationId,
+      status: DocumentStatus.ARCHIVED,
+    },
+    data: {
+      status: DocumentStatus.ACTIVE,
+      archivedAt: null,
+    },
+  });
+}

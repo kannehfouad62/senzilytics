@@ -9,6 +9,7 @@ import {
   createDocumentRecord,
   findTenantDocumentById,
   findTenantDocuments,
+  restoreTenantDocument,
   softDeleteTenantDocument,
 } from "./document.repository";
 
@@ -165,5 +166,47 @@ export async function deleteDocument(input: {
     entityId: document.id,
     title: "Document deleted",
     description: document.name,
+  });
+}
+
+export async function restoreDocument(input: {
+  organizationId: string;
+  userId: string;
+  documentId: string;
+}) {
+  const document = await findTenantDocumentById({
+    organizationId: input.organizationId,
+    documentId: input.documentId,
+  });
+
+  if (!document) {
+    throw new Error("Document not found.");
+  }
+
+  if (document.status !== "ARCHIVED") {
+    throw new Error("Only archived documents can be restored.");
+  }
+
+  const result = await restoreTenantDocument({
+    organizationId: input.organizationId,
+    documentId: input.documentId,
+  });
+
+  if (result.count === 0) {
+    throw new Error("The document could not be restored.");
+  }
+
+  await logActivity({
+    organizationId: input.organizationId,
+    userId: input.userId,
+    action: ActivityAction.UPDATE,
+    entityType: "Document",
+    entityId: document.id,
+    title: "Document restored",
+    description: document.name,
+    metadata: {
+      relatedEntityType: document.entityType,
+      relatedEntityId: document.entityId,
+    },
   });
 }
