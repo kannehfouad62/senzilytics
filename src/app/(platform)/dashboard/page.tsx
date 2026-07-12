@@ -3,6 +3,7 @@ import { getExecutiveDashboardData } from "@/core/analytics/dashboard.service";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { OperationalDashboardCharts } from "@/core/analytics/operational-dashboard-charts";
 import { PerformanceDashboardCharts } from "@/core/analytics/performance-dashboard-charts";
+import { sendTestEmailAction } from "@/core/email/email.actions";
 import {
   AlertTriangle,
   BriefcaseBusiness,
@@ -91,6 +92,15 @@ export default async function DashboardPage() {
           <h1 className="mt-2 text-4xl font-bold tracking-tight text-white">
             Welcome back, {user.name}
           </h1>
+
+          <form action={sendTestEmailAction} className="mb-8">
+  <button
+    type="submit"
+    className="rounded-2xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300"
+  >
+    Send Test Email
+  </button>
+</form>
 
           <p className="mt-2 max-w-3xl text-slate-400">
             Review operational risk, incident activity,
