@@ -1,35 +1,36 @@
-import { prisma } from "@/lib/prisma";
+import { sendWorkflowSlaEmail } from "@/core/notifications/notification-email.service";
 import { createNotification } from "@/core/notifications/notifications.service";
+import { prisma } from "@/lib/prisma";
 import {
   NotificationType,
+  WorkflowInstanceStatus,
   UserRole,
-  WorkflowEntityType,
   WorkflowStepStatus,
 } from "@prisma/client";
 
-const REMINDER_WINDOW_HOURS = 4;
+const REMINDER_WINDOW_HOURS = 24;
 
 function getEntityLink(
-  entityType: WorkflowEntityType,
+  entityType: string,
   entityId: string
-): string {
+) {
   switch (entityType) {
-    case WorkflowEntityType.INCIDENT:
+    case "INCIDENT":
       return `/incidents/${entityId}`;
 
-    case WorkflowEntityType.CORRECTIVE_ACTION:
+    case "CORRECTIVE_ACTION":
       return "/actions";
 
-    case WorkflowEntityType.AUDIT:
-      return "/audits";
+    case "AUDIT":
+      return `/audits/${entityId}`;
 
-    case WorkflowEntityType.INSPECTION:
-      return "/inspections";
+    case "INSPECTION":
+      return `/inspections/${entityId}`;
 
-    case WorkflowEntityType.COMPLIANCE:
+    case "COMPLIANCE":
       return "/compliance";
 
-    case WorkflowEntityType.TRAINING:
+    case "TRAINING":
       return "/training";
 
     default:
@@ -37,69 +38,109 @@ function getEntityLink(
   }
 }
 
-async function resolveStepRecipients(input: {
+async function getStepRecipients(input: {
   organizationId: string;
-  assignedUserId: string | null;
-  assignedRole: UserRole | null;
+  assignedUserId?: string | null;
+  assignedRole?: string | null;
 }) {
   if (input.assignedUserId) {
-    return [input.assignedUserId];
+    const user = await prisma.user.findFirst({
+      where: {
+        id: input.assignedUserId,
+        organizationId: input.organizationId,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+
+    return user ? [user] : [];
   }
 
   if (!input.assignedRole) {
     return [];
   }
 
-  const users = await prisma.user.findMany({
+  return prisma.user.findMany({
     where: {
       organizationId: input.organizationId,
-      role: input.assignedRole,
+      role: input.assignedRole as never,
     },
     select: {
       id: true,
+      name: true,
+      email: true,
     },
   });
-
-  return users.map((user) => user.id);
 }
 
 export async function processWorkflowSlaNotifications() {
   const now = new Date();
 
-  const reminderThreshold = new Date(
-    now.getTime() + REMINDER_WINDOW_HOURS * 60 * 60 * 1000
+  const reminderWindowEnd = new Date(
+    now.getTime() +
+      REMINDER_WINDOW_HOURS * 60 * 60 * 1000
   );
 
-  const activeSteps = await prisma.workflowInstanceStep.findMany({
+  const steps = await prisma.workflowInstanceStep.findMany({
     where: {
       status: WorkflowStepStatus.IN_PROGRESS,
       dueAt: {
         not: null,
+        lte: reminderWindowEnd,
       },
       instance: {
-        status: "ACTIVE",
+        status: WorkflowInstanceStatus.ACTIVE,
       },
     },
     include: {
-      instance: true,
+      instance: {
+        include: {
+          template: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      dueAt: "asc",
     },
   });
 
-  let remindersCreated = 0;
-  let escalationsCreated = 0;
+  let remindersSent = 0;
+  let overdueAlertsSent = 0;
+  let skipped = 0;
 
-  for (const step of activeSteps) {
+  for (const step of steps) {
     if (!step.dueAt) {
+      skipped += 1;
       continue;
     }
 
-    const recipients = await resolveStepRecipients({
+    const isOverdue = step.dueAt < now;
+
+    if (isOverdue && step.overdueNotifiedAt) {
+      skipped += 1;
+      continue;
+    }
+
+    if (!isOverdue && step.reminderSentAt) {
+      skipped += 1;
+      continue;
+    }
+
+    const recipients = await getStepRecipients({
       organizationId: step.instance.organizationId,
       assignedUserId: step.assignedUserId,
       assignedRole: step.assignedRole,
     });
 
     if (recipients.length === 0) {
+      skipped += 1;
       continue;
     }
 
@@ -108,56 +149,60 @@ export async function processWorkflowSlaNotifications() {
       step.instance.entityId
     );
 
-    const isOverdue = step.dueAt < now;
+    await Promise.all(
+      recipients.map(async (recipient) => {
+        await createNotification({
+          organizationId: step.instance.organizationId,
+          userId: recipient.id,
+          type: NotificationType.DUE_DATE,
+          title: isOverdue
+            ? "Workflow step overdue"
+            : "Workflow step due soon",
+          message: isOverdue
+            ? `${step.name} is overdue.`
+            : `${step.name} is due within 24 hours.`,
+          link,
+        });
 
-    const isApproachingDueDate =
-      step.dueAt >= now && step.dueAt <= reminderThreshold;
+        if (!recipient.email) {
+          return;
+        }
 
-    if (isOverdue && !step.escalationSentAt) {
-      await Promise.all(
-        recipients.map((userId) =>
-          createNotification({
-            organizationId: step.instance.organizationId,
-            userId,
-            type: NotificationType.CRITICAL,
-            title: "Workflow task overdue",
-            message: `"${step.name}" is overdue and requires immediate attention.`,
-            link,
-          })
-        )
-      );
+        try {
+          await sendWorkflowSlaEmail({
+            recipientEmail: recipient.email,
+            recipientName: recipient.name,
+            entityType: step.instance.entityType,
+            entityId: step.instance.entityId,
+            workflowName:
+              step.instance.template.name,
+            stepName: step.name,
+            dueAt: step.dueAt!,
+            notificationKind: isOverdue
+              ? "OVERDUE"
+              : "REMINDER",
+          });
+        } catch (error) {
+          console.error(
+            `Workflow SLA email failed for user ${recipient.id}:`,
+            error
+          );
+        }
+      })
+    );
 
+    if (isOverdue) {
       await prisma.workflowInstanceStep.update({
         where: {
           id: step.id,
         },
         data: {
-          escalationSentAt: now,
+          overdueNotifiedAt: now,
         },
       });
 
-      escalationsCreated += recipients.length;
-      continue;
-    }
-
-    if (
-      isApproachingDueDate &&
-      !step.reminderSentAt &&
-      !step.escalationSentAt
-    ) {
-      await Promise.all(
-        recipients.map((userId) =>
-          createNotification({
-            organizationId: step.instance.organizationId,
-            userId,
-            type: NotificationType.DUE_DATE,
-            title: "Workflow task due soon",
-            message: `"${step.name}" is due within ${REMINDER_WINDOW_HOURS} hours.`,
-            link,
-          })
-        )
-      );
-
+      overdueAlertsSent += 1;
+    } else {
       await prisma.workflowInstanceStep.update({
         where: {
           id: step.id,
@@ -167,13 +212,14 @@ export async function processWorkflowSlaNotifications() {
         },
       });
 
-      remindersCreated += recipients.length;
+      remindersSent += 1;
     }
   }
 
   return {
-    processedSteps: activeSteps.length,
-    remindersCreated,
-    escalationsCreated,
+    checked: steps.length,
+    remindersSent,
+    overdueAlertsSent,
+    skipped,
   };
 }

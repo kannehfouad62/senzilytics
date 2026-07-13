@@ -5,28 +5,33 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function isAuthorizedCronRequest(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
+function isAuthorizedCronRequest(
+  request: NextRequest
+) {
+  const cronSecret =
+    process.env.CRON_SECRET?.trim();
 
   if (!cronSecret) {
     console.error(
-      "Workflow SLA Cron configuration error: CRON_SECRET is missing."
+      "CRON_SECRET is missing."
     );
 
     return false;
   }
 
-  const authorizationHeader =
+  const authorization =
     request.headers.get("authorization");
 
-  return authorizationHeader === `Bearer ${cronSecret}`;
+  return authorization ===
+    `Bearer ${cronSecret}`;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest
+) {
   if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json(
       {
-        success: false,
         error: "Unauthorized.",
       },
       {
@@ -46,7 +51,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error(
-      "Workflow SLA processing failed:",
+      "Workflow SLA Cron failed:",
       error
     );
 

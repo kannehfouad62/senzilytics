@@ -525,11 +525,12 @@ model WorkflowInstanceStep {
   decision WorkflowDecision?
   comments String?
 
-  startedAt        DateTime?
-  dueAt            DateTime?
-  completedAt      DateTime?
-  reminderSentAt   DateTime?
-  escalationSentAt DateTime?
+  startedAt         DateTime?
+  dueAt             DateTime?
+  completedAt       DateTime?
+  escalationSentAt  DateTime?
+  reminderSentAt    DateTime?
+  overdueNotifiedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -538,6 +539,8 @@ model WorkflowInstanceStep {
 
   assignedUser User? @relation("WorkflowAssignedUser", fields: [assignedUserId], references: [id])
   completedBy  User? @relation("WorkflowCompletedBy", fields: [completedById], references: [id])
+
+  @@index([status, dueAt])
 }
 
 model Document {

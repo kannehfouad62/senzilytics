@@ -50,6 +50,17 @@ type WorkflowDecisionEmailInput = {
   completedByName?: string | null;
 };
 
+type WorkflowSlaEmailInput = {
+  recipientEmail: string;
+  recipientName: string;
+  entityType: string;
+  entityId: string;
+  workflowName: string;
+  stepName: string;
+  dueAt: Date;
+  notificationKind: "REMINDER" | "OVERDUE";
+};
+
 function formatDateTime(value: Date) {
   return value.toLocaleString("en-US", {
     dateStyle: "medium",
@@ -325,6 +336,77 @@ export async function sendWorkflowDecisionEmail(
   if (!result.success) {
     console.error(
       "Workflow-decision email failed:",
+      result.error
+    );
+  }
+
+  return result;
+}
+
+export async function sendWorkflowSlaEmail(
+  input: WorkflowSlaEmailInput
+) {
+  const entityUrl = getEntityUrl({
+    entityType: input.entityType,
+    entityId: input.entityId,
+  });
+
+  const isOverdue =
+    input.notificationKind === "OVERDUE";
+
+  const result = await sendEmail({
+    to: input.recipientEmail,
+    subject: isOverdue
+      ? `Overdue workflow step: ${input.stepName}`
+      : `Workflow step due soon: ${input.stepName}`,
+    html: createSenzilyticsEmailTemplate({
+      preheader: isOverdue
+        ? "A workflow step is overdue in Senzilytics."
+        : "A workflow step is due within the next 24 hours.",
+      heading: isOverdue
+        ? "Workflow step is overdue"
+        : "Workflow step is due soon",
+      body:
+        `Hello ${input.recipientName},\n\n` +
+        (isOverdue
+          ? "A workflow step assigned to you has passed its due date. Please review and complete it as soon as possible."
+          : "A workflow step assigned to you is due within the next 24 hours."),
+      actionLabel: "Review Workflow Step",
+      actionUrl: entityUrl,
+      details: [
+        {
+          label: "Workflow",
+          value: input.workflowName,
+        },
+        {
+          label: "Step",
+          value: input.stepName,
+        },
+        {
+          label: "Record type",
+          value: input.entityType.replaceAll("_", " "),
+        },
+        {
+          label: "Due date",
+          value: formatDateTime(input.dueAt),
+        },
+        {
+          label: "Status",
+          value: isOverdue ? "OVERDUE" : "DUE SOON",
+        },
+      ],
+    }),
+    text:
+      `${isOverdue ? "Workflow step overdue" : "Workflow step due soon"}\n` +
+      `Workflow: ${input.workflowName}\n` +
+      `Step: ${input.stepName}\n` +
+      `Due: ${formatDateTime(input.dueAt)}\n` +
+      `Review: ${entityUrl}`,
+  });
+
+  if (!result.success) {
+    console.error(
+      "Workflow SLA email failed:",
       result.error
     );
   }
