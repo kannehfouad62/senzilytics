@@ -61,6 +61,18 @@ type WorkflowSlaEmailInput = {
   notificationKind: "REMINDER" | "OVERDUE";
 };
 
+type CorrectiveActionSlaEmailInput = {
+  recipientEmail: string;
+  recipientName: string;
+  actionTitle: string;
+  actionDescription?: string | null;
+  incidentId?: string | null;
+  incidentTitle?: string | null;
+  dueDate: Date;
+  riskLevel: string;
+  notificationKind: "REMINDER" | "OVERDUE";
+};
+
 function formatDateTime(value: Date) {
   return value.toLocaleString("en-US", {
     dateStyle: "medium",
@@ -407,6 +419,87 @@ export async function sendWorkflowSlaEmail(
   if (!result.success) {
     console.error(
       "Workflow SLA email failed:",
+      result.error
+    );
+  }
+
+  return result;
+}
+
+
+export async function sendCorrectiveActionSlaEmail(
+  input: CorrectiveActionSlaEmailInput
+) {
+  const applicationUrl = getApplicationUrl();
+
+  const actionUrl = input.incidentId
+    ? `${applicationUrl}/incidents/${input.incidentId}`
+    : `${applicationUrl}/actions`;
+
+  const isOverdue =
+    input.notificationKind === "OVERDUE";
+
+  const result = await sendEmail({
+    to: input.recipientEmail,
+    subject: isOverdue
+      ? `Overdue corrective action: ${input.actionTitle}`
+      : `Corrective action due soon: ${input.actionTitle}`,
+    html: createSenzilyticsEmailTemplate({
+      preheader: isOverdue
+        ? "A corrective action assigned to you is overdue."
+        : "A corrective action assigned to you is due soon.",
+      heading: isOverdue
+        ? "Corrective action is overdue"
+        : "Corrective action is due soon",
+      body:
+        `Hello ${input.recipientName},\n\n` +
+        (isOverdue
+          ? "A corrective action assigned to you has passed its due date. Please review it and provide an update as soon as possible."
+          : "A corrective action assigned to you is due within the next seven days. Please review its progress and complete it before the deadline."),
+      actionLabel: "Review Corrective Action",
+      actionUrl,
+      details: [
+        {
+          label: "Action",
+          value: input.actionTitle,
+        },
+        {
+          label: "Description",
+          value:
+            input.actionDescription ||
+            "No description was provided.",
+        },
+        {
+          label: "Related incident",
+          value:
+            input.incidentTitle ||
+            "No linked incident",
+        },
+        {
+          label: "Risk level",
+          value: input.riskLevel.replaceAll("_", " "),
+        },
+        {
+          label: "Due date",
+          value: formatDateTime(input.dueDate),
+        },
+        {
+          label: "Status",
+          value: isOverdue ? "OVERDUE" : "DUE SOON",
+        },
+      ],
+    }),
+    text:
+      `${isOverdue ? "Corrective action overdue" : "Corrective action due soon"}\n\n` +
+      `Action: ${input.actionTitle}\n` +
+      `Risk level: ${input.riskLevel}\n` +
+      `Due date: ${formatDateTime(input.dueDate)}\n` +
+      `Review: ${actionUrl}`,
+  });
+
+  if (!result.success) {
+    console.error(
+      "Corrective-action SLA email failed:",
       result.error
     );
   }

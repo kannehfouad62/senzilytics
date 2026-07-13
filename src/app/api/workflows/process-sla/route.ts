@@ -1,3 +1,4 @@
+import { processCorrectiveActionSlaNotifications } from "@/core/notifications/corrective-action-sla.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -5,12 +6,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function isAuthorizedCronRequest(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
+function isAuthorizedCronRequest(
+  request: NextRequest
+) {
+  const cronSecret =
+    process.env.CRON_SECRET?.trim();
 
   if (!cronSecret) {
     console.error(
-      "Workflow SLA Cron configuration error: CRON_SECRET is missing."
+      "SLA Cron configuration error: CRON_SECRET is missing."
     );
 
     return false;
@@ -19,10 +23,15 @@ function isAuthorizedCronRequest(request: NextRequest) {
   const authorizationHeader =
     request.headers.get("authorization");
 
-  return authorizationHeader === `Bearer ${cronSecret}`;
+  return (
+    authorizationHeader ===
+    `Bearer ${cronSecret}`
+  );
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest
+) {
   if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json(
       {
@@ -36,17 +45,44 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result =
-      await processWorkflowSlaNotifications();
+    const [
+      workflowResult,
+      correctiveActionResult,
+    ] = await Promise.all([
+      processWorkflowSlaNotifications(),
+      processCorrectiveActionSlaNotifications(),
+    ]);
 
     return NextResponse.json({
       success: true,
       processedAt: new Date().toISOString(),
-      ...result,
+
+      workflows: workflowResult,
+
+      correctiveActions:
+        correctiveActionResult,
+
+      totals: {
+        checked:
+          workflowResult.checked +
+          correctiveActionResult.checked,
+
+        remindersSent:
+          workflowResult.remindersSent +
+          correctiveActionResult.remindersSent,
+
+        overdueAlertsSent:
+          workflowResult.overdueAlertsSent +
+          correctiveActionResult.overdueAlertsSent,
+
+        skipped:
+          workflowResult.skipped +
+          correctiveActionResult.skipped,
+      },
     });
   } catch (error) {
     console.error(
-      "Workflow SLA processing failed:",
+      "Scheduled SLA processing failed:",
       error
     );
 
@@ -56,7 +92,7 @@ export async function GET(request: NextRequest) {
         error:
           error instanceof Error
             ? error.message
-            : "Workflow SLA processing failed.",
+            : "Scheduled SLA processing failed.",
       },
       {
         status: 500,

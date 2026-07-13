@@ -288,12 +288,14 @@ model Investigation {
 }
 
 model CorrectiveAction {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  status      Status    @default(OPEN)
-  riskLevel   RiskLevel @default(LOW)
-  dueDate     DateTime
+  id                String    @id @default(cuid())
+  title             String
+  description       String?
+  status            Status    @default(OPEN)
+  riskLevel         RiskLevel @default(LOW)
+  dueDate           DateTime
+  reminderSentAt    DateTime?
+  overdueNotifiedAt DateTime?
 
   incidentId String?
   incident   Incident? @relation(fields: [incidentId], references: [id])
@@ -303,6 +305,8 @@ model CorrectiveAction {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([status, dueDate])
 }
 
 model Audit {
