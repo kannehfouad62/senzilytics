@@ -235,12 +235,13 @@ model User {
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
-  reportedIncidents Incident[]         @relation("ReportedIncidents")
-  assignedActions   CorrectiveAction[]
-  trainingRecords   TrainingRecord[]
-  activityLogs      ActivityLog[]
-  notifications     Notification[]
-  uploadedDocuments Document[]
+  reportedIncidents      Incident[]         @relation("ReportedIncidents")
+  assignedInvestigations Investigation[]    @relation("InvestigationAssignedUser")
+  assignedActions        CorrectiveAction[]
+  trainingRecords        TrainingRecord[]
+  activityLogs           ActivityLog[]
+  notifications          Notification[]
+  uploadedDocuments      Document[]
 
   startedWorkflowInstances WorkflowInstance[]
   assignedWorkflowSteps    WorkflowInstanceStep[] @relation("WorkflowAssignedUser")
@@ -280,11 +281,22 @@ model Investigation {
   immediateCause      String?
   contributingFactors String?
 
+  status            Status    @default(OPEN)
+  dueDate           DateTime?
+  reminderSentAt    DateTime?
+  overdueNotifiedAt DateTime?
+
+  assignedToId String?
+  assignedTo   User?   @relation("InvestigationAssignedUser", fields: [assignedToId], references: [id])
+
   incidentId String   @unique
   incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([status, dueDate])
+  @@index([assignedToId])
 }
 
 model CorrectiveAction {

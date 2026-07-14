@@ -509,6 +509,58 @@ export async function upsertInvestigationService(input: {
     );
   }
 
+  const assignedUser =
+    await prisma.user.findFirst({
+      where: {
+        id:
+          incident.investigation
+            ?.assignedToId ||
+          input.userId,
+        organizationId:
+          input.organizationId,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+
+  if (!assignedUser) {
+    throw new Error(
+      "The investigation assignee was not found in this organization."
+    );
+  }
+
+  function calculateInvestigationDueDate(
+    riskLevel: RiskLevel
+  ) {
+    const dueDate = new Date();
+  
+    const dueHoursByRiskLevel: Record<
+      RiskLevel,
+      number
+    > = {
+      LOW: 336,
+      MEDIUM: 168,
+      HIGH: 72,
+      CRITICAL: 24,
+    };
+  
+    dueDate.setHours(
+      dueDate.getHours() +
+        dueHoursByRiskLevel[riskLevel]
+    );
+  
+    return dueDate;
+  }
+
+  const investigationDueDate =
+    incident.investigation?.dueDate ||
+    calculateInvestigationDueDate(
+      incident.riskLevel
+    );
+
   const investigation =
     await upsertTenantInvestigation({
       incidentId: input.incidentId,
@@ -517,6 +569,8 @@ export async function upsertInvestigationService(input: {
       immediateCause: input.immediateCause,
       contributingFactors:
         input.contributingFactors,
+      assignedToId: assignedUser.id,
+      dueDate: investigationDueDate,
     });
 
   await logActivity({
@@ -524,12 +578,18 @@ export async function upsertInvestigationService(input: {
     userId: input.userId,
     action: ActivityAction.UPDATE,
     entityType: "Investigation",
-    entityId: input.incidentId,
+    entityId: investigation.id,
     title: "Investigation updated",
     description:
       "Incident investigation details were saved.",
     metadata: {
       incidentId: input.incidentId,
+      assignedToId:
+        assignedUser.id,
+      dueDate:
+        investigationDueDate.toISOString(),
+      status:
+        investigation.status,
     },
   });
 

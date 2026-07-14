@@ -1,5 +1,6 @@
 import { processCorrectiveActionSlaNotifications } from "@/core/notifications/corrective-action-sla.service";
 import { processIncidentEscalations } from "@/core/notifications/incident-escalation.service";
+import { processInvestigationSlaNotifications } from "@/core/notifications/investigation-sla.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
 import {
   NextRequest,
@@ -25,7 +26,9 @@ function isAuthorizedCronRequest(
   }
 
   const authorizationHeader =
-    request.headers.get("authorization");
+    request.headers.get(
+      "authorization"
+    );
 
   return (
     authorizationHeader ===
@@ -36,7 +39,9 @@ function isAuthorizedCronRequest(
 export async function GET(
   request: NextRequest
 ) {
-  if (!isAuthorizedCronRequest(request)) {
+  if (
+    !isAuthorizedCronRequest(request)
+  ) {
     return NextResponse.json(
       {
         success: false,
@@ -53,10 +58,12 @@ export async function GET(
       workflowResult,
       correctiveActionResult,
       incidentEscalationResult,
+      investigationResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
       processCorrectiveActionSlaNotifications(),
       processIncidentEscalations(),
+      processInvestigationSlaNotifications(),
     ]);
 
     return NextResponse.json({
@@ -72,33 +79,51 @@ export async function GET(
       incidentEscalations:
         incidentEscalationResult,
 
+      investigations:
+        investigationResult,
+
       totals: {
         checked:
           workflowResult.checked +
           correctiveActionResult.checked +
-          incidentEscalationResult.checked,
+          incidentEscalationResult.checked +
+          investigationResult.checked,
 
         remindersSent:
           workflowResult.remindersSent +
-          correctiveActionResult.remindersSent,
+          correctiveActionResult.remindersSent +
+          investigationResult.remindersSent,
 
         overdueAlertsSent:
           workflowResult.overdueAlertsSent +
-          correctiveActionResult.overdueAlertsSent,
+          correctiveActionResult.overdueAlertsSent +
+          investigationResult.overdueAlertsSent,
 
         incidentEscalationLevelsProcessed:
-          incidentEscalationResult.escalationLevelsProcessed,
+          incidentEscalationResult
+            .escalationLevelsProcessed,
 
         incidentInAppNotificationsSent:
-          incidentEscalationResult.inAppNotificationsSent,
+          incidentEscalationResult
+            .inAppNotificationsSent,
 
         incidentEscalationEmailsSent:
-          incidentEscalationResult.emailsSent,
+          incidentEscalationResult
+            .emailsSent,
+
+        investigationInAppNotificationsSent:
+          investigationResult
+            .inAppNotificationsSent,
+
+        investigationEmailsSent:
+          investigationResult
+            .emailsSent,
 
         skipped:
           workflowResult.skipped +
           correctiveActionResult.skipped +
-          incidentEscalationResult.skipped,
+          incidentEscalationResult.skipped +
+          investigationResult.skipped,
       },
     });
   } catch (error) {
