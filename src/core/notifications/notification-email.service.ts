@@ -4,6 +4,35 @@ import {
 } from "@/core/email/email.service";
 import { createSenzilyticsEmailTemplate } from "@/core/email/email-template";
 
+type IncidentReporterConfirmationEmailInput = {
+  recipientEmail: string;
+  recipientName: string;
+  incidentId: string;
+  incidentTitle: string;
+  incidentDescription: string;
+  incidentType: string;
+  riskLevel: string;
+  status: string;
+  siteName: string;
+  location?: string | null;
+  occurredAt: Date;
+};
+
+type HighRiskIncidentAlertEmailInput = {
+  recipientEmail: string;
+  recipientName: string;
+  incidentId: string;
+  incidentTitle: string;
+  incidentDescription: string;
+  incidentType: string;
+  riskLevel: string;
+  status: string;
+  siteName: string;
+  location?: string | null;
+  occurredAt: Date;
+  reportedByName: string;
+};
+
 type CorrectiveActionAssignmentEmailInput = {
   recipientEmail: string;
   recipientName: string;
@@ -80,6 +109,10 @@ function formatDateTime(value: Date) {
   });
 }
 
+function formatEnumValue(value: string) {
+  return value.replaceAll("_", " ");
+}
+
 function getEntityUrl(input: {
   entityType: string;
   entityId: string;
@@ -102,6 +135,169 @@ function getEntityUrl(input: {
     default:
       return `${applicationUrl}/tasks`;
   }
+}
+
+export async function sendIncidentReporterConfirmationEmail(
+  input: IncidentReporterConfirmationEmailInput
+) {
+  const applicationUrl = getApplicationUrl();
+  const incidentUrl = `${applicationUrl}/incidents/${input.incidentId}`;
+
+  const result = await sendEmail({
+    to: input.recipientEmail,
+    subject: `Incident submitted: ${input.incidentTitle}`,
+    html: createSenzilyticsEmailTemplate({
+      preheader:
+        "Your incident report was submitted successfully in Senzilytics.",
+      heading: "Incident report submitted",
+      body:
+        `Hello ${input.recipientName},\n\n` +
+        `Your incident report has been submitted successfully. ` +
+        `The incident is now available for review and has entered the applicable workflow process.`,
+      actionLabel: "Review Incident",
+      actionUrl: incidentUrl,
+      details: [
+        {
+          label: "Incident",
+          value: input.incidentTitle,
+        },
+        {
+          label: "Description",
+          value: input.incidentDescription,
+        },
+        {
+          label: "Incident type",
+          value: formatEnumValue(input.incidentType),
+        },
+        {
+          label: "Risk level",
+          value: formatEnumValue(input.riskLevel),
+        },
+        {
+          label: "Status",
+          value: formatEnumValue(input.status),
+        },
+        {
+          label: "Site",
+          value: input.siteName,
+        },
+        {
+          label: "Location",
+          value: input.location || "No location was provided.",
+        },
+        {
+          label: "Occurred",
+          value: formatDateTime(input.occurredAt),
+        },
+      ],
+    }),
+    text:
+      `Hello ${input.recipientName},\n\n` +
+      `Your incident report was submitted successfully.\n\n` +
+      `Incident: ${input.incidentTitle}\n` +
+      `Type: ${formatEnumValue(input.incidentType)}\n` +
+      `Risk level: ${formatEnumValue(input.riskLevel)}\n` +
+      `Status: ${formatEnumValue(input.status)}\n` +
+      `Site: ${input.siteName}\n` +
+      `Occurred: ${formatDateTime(input.occurredAt)}\n\n` +
+      `Review the incident: ${incidentUrl}`,
+  });
+
+  if (!result.success) {
+    console.error(
+      "Incident reporter confirmation email failed:",
+      result.error
+    );
+  }
+
+  return result;
+}
+
+export async function sendHighRiskIncidentAlertEmail(
+  input: HighRiskIncidentAlertEmailInput
+) {
+  const applicationUrl = getApplicationUrl();
+  const incidentUrl = `${applicationUrl}/incidents/${input.incidentId}`;
+  const isCritical = input.riskLevel === "CRITICAL";
+
+  const result = await sendEmail({
+    to: input.recipientEmail,
+    subject: `${isCritical ? "CRITICAL" : "HIGH"} incident alert: ${input.incidentTitle}`,
+    html: createSenzilyticsEmailTemplate({
+      preheader: isCritical
+        ? "A critical-risk incident requires immediate review."
+        : "A high-risk incident requires prompt review.",
+      heading: isCritical
+        ? "Critical incident reported"
+        : "High-risk incident reported",
+      body:
+        `Hello ${input.recipientName},\n\n` +
+        (isCritical
+          ? "A critical-risk incident has been reported and requires immediate assessment, response, and management oversight."
+          : "A high-risk incident has been reported and requires prompt assessment and management review."),
+      actionLabel: "Review Incident Immediately",
+      actionUrl: incidentUrl,
+      details: [
+        {
+          label: "Incident",
+          value: input.incidentTitle,
+        },
+        {
+          label: "Description",
+          value: input.incidentDescription,
+        },
+        {
+          label: "Incident type",
+          value: formatEnumValue(input.incidentType),
+        },
+        {
+          label: "Risk level",
+          value: formatEnumValue(input.riskLevel),
+        },
+        {
+          label: "Status",
+          value: formatEnumValue(input.status),
+        },
+        {
+          label: "Site",
+          value: input.siteName,
+        },
+        {
+          label: "Location",
+          value: input.location || "No location was provided.",
+        },
+        {
+          label: "Occurred",
+          value: formatDateTime(input.occurredAt),
+        },
+        {
+          label: "Reported by",
+          value: input.reportedByName,
+        },
+      ],
+    }),
+    text:
+      `${isCritical ? "CRITICAL" : "HIGH"} incident alert\n\n` +
+      `Incident: ${input.incidentTitle}\n` +
+      `Description: ${input.incidentDescription}\n` +
+      `Type: ${formatEnumValue(input.incidentType)}\n` +
+      `Risk level: ${formatEnumValue(input.riskLevel)}\n` +
+      `Status: ${formatEnumValue(input.status)}\n` +
+      `Site: ${input.siteName}\n` +
+      `Location: ${input.location || "Not provided"}\n` +
+      `Occurred: ${formatDateTime(input.occurredAt)}\n` +
+      `Reported by: ${input.reportedByName}\n\n` +
+      `Review immediately: ${incidentUrl}`,
+  });
+
+  if (!result.success) {
+    console.error(
+      "High-risk incident escalation email failed:",
+      result.error
+    );
+  }
+
+  return result;
 }
 
 export async function sendCorrectiveActionAssignmentEmail(
@@ -145,7 +341,7 @@ export async function sendCorrectiveActionAssignmentEmail(
         },
         {
           label: "Risk level",
-          value: input.riskLevel.replaceAll("_", " "),
+          value: formatEnumValue(input.riskLevel),
         },
         {
           label: "Due date",
@@ -204,11 +400,11 @@ export async function sendCorrectiveActionStatusEmail(
         },
         {
           label: "Previous status",
-          value: input.previousStatus.replaceAll("_", " "),
+          value: formatEnumValue(input.previousStatus),
         },
         {
           label: "New status",
-          value: input.newStatus.replaceAll("_", " "),
+          value: formatEnumValue(input.newStatus),
         },
         {
           label: "Updated by",
@@ -252,7 +448,7 @@ export async function sendWorkflowAssignmentEmail(
     },
     {
       label: "Record type",
-      value: input.entityType.replaceAll("_", " "),
+      value: formatEnumValue(input.entityType),
     },
   ];
 
@@ -325,7 +521,7 @@ export async function sendWorkflowDecisionEmail(
         },
         {
           label: "Decision",
-          value: input.decision.replaceAll("_", " "),
+          value: formatEnumValue(input.decision),
         },
         {
           label: "Completed by",
@@ -396,7 +592,7 @@ export async function sendWorkflowSlaEmail(
         },
         {
           label: "Record type",
-          value: input.entityType.replaceAll("_", " "),
+          value: formatEnumValue(input.entityType),
         },
         {
           label: "Due date",
@@ -425,7 +621,6 @@ export async function sendWorkflowSlaEmail(
 
   return result;
 }
-
 
 export async function sendCorrectiveActionSlaEmail(
   input: CorrectiveActionSlaEmailInput
@@ -477,7 +672,7 @@ export async function sendCorrectiveActionSlaEmail(
         },
         {
           label: "Risk level",
-          value: input.riskLevel.replaceAll("_", " "),
+          value: formatEnumValue(input.riskLevel),
         },
         {
           label: "Due date",

@@ -1,13 +1,19 @@
-import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/core/activity-log/activity-log.service";
+import {
+  sendHighRiskIncidentAlertEmail,
+  sendIncidentReporterConfirmationEmail,
+} from "@/core/notifications/notification-email.service";
 import { createNotification } from "@/core/notifications/notifications.service";
 import { startWorkflowForEntity } from "@/core/workflow/workflow.service";
+import { prisma } from "@/lib/prisma";
 import {
   ActivityAction,
   IncidentType,
   NotificationType,
   RiskLevel,
-  Status, WorkflowEntityType,
+  Status,
+  UserRole,
+  WorkflowEntityType,
 } from "@prisma/client";
 import {
   createTenantCorrectiveAction,
@@ -18,6 +24,268 @@ import {
   updateTenantIncidentStatus,
   upsertTenantInvestigation,
 } from "./incident.repository";
+
+type IncidentNotificationRecipient = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+function isEscalationRiskLevel(
+  riskLevel: RiskLevel
+) {
+  return (
+    riskLevel === RiskLevel.HIGH ||
+    riskLevel === RiskLevel.CRITICAL
+  );
+}
+
+function getIncidentNotificationType(
+  riskLevel: RiskLevel
+) {
+  if (riskLevel === RiskLevel.CRITICAL) {
+    return NotificationType.CRITICAL;
+  }
+
+  if (riskLevel === RiskLevel.HIGH) {
+    return NotificationType.WARNING;
+  }
+
+  return NotificationType.INFO;
+}
+
+function getIncidentNotificationTitle(
+  riskLevel: RiskLevel
+) {
+  if (riskLevel === RiskLevel.CRITICAL) {
+    return "Critical incident reported";
+  }
+
+  if (riskLevel === RiskLevel.HIGH) {
+    return "High-risk incident reported";
+  }
+
+  return "New incident reported";
+}
+
+function getIncidentNotificationMessage(input: {
+  incidentTitle: string;
+  siteName: string;
+  riskLevel: RiskLevel;
+}) {
+  if (input.riskLevel === RiskLevel.CRITICAL) {
+    return `A critical incident, "${input.incidentTitle}", was reported at ${input.siteName}. Immediate review is required.`;
+  }
+
+  if (input.riskLevel === RiskLevel.HIGH) {
+    return `A high-risk incident, "${input.incidentTitle}", was reported at ${input.siteName}. Prompt review is required.`;
+  }
+
+  return `A new incident, "${input.incidentTitle}", was reported at ${input.siteName}.`;
+}
+
+async function createIncidentNotificationSafely(input: {
+  organizationId: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  link: string;
+  context: string;
+}) {
+  try {
+    await createNotification({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      type: input.type,
+      title: input.title,
+      message: input.message,
+      link: input.link,
+    });
+
+    return true;
+  } catch (error) {
+    console.error(
+      `${input.context} in-app notification failed for user ${input.userId}:`,
+      error
+    );
+
+    return false;
+  }
+}
+
+async function notifyIncidentCreated(input: {
+  organizationId: string;
+  reporterId: string;
+  incident: {
+    id: string;
+    title: string;
+    description: string;
+    type: IncidentType;
+    riskLevel: RiskLevel;
+    status: Status;
+    location: string | null;
+    occurredAt: Date;
+  };
+  site: {
+    id: string;
+    name: string;
+  };
+}) {
+  const incidentLink = `/incidents/${input.incident.id}`;
+
+  const [reporter, managementRecipients] =
+    await Promise.all([
+      prisma.user.findFirst({
+        where: {
+          id: input.reporterId,
+          organizationId: input.organizationId,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      }),
+
+      prisma.user.findMany({
+        where: {
+          organizationId: input.organizationId,
+          id: {
+            not: input.reporterId,
+          },
+          role: {
+            in: [
+              UserRole.ORG_ADMIN,
+              UserRole.EHS_MANAGER,
+            ],
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+        orderBy: [
+          {
+            role: "asc",
+          },
+          {
+            name: "asc",
+          },
+        ],
+      }),
+    ]);
+
+  if (!reporter) {
+    console.error(
+      `Incident reporter ${input.reporterId} could not be found for incident ${input.incident.id}.`
+    );
+  } else {
+    await createIncidentNotificationSafely({
+      organizationId: input.organizationId,
+      userId: reporter.id,
+      type: NotificationType.SUCCESS,
+      title: "Incident submitted",
+      message: `Your incident "${input.incident.title}" was submitted successfully.`,
+      link: incidentLink,
+      context: "Incident reporter confirmation",
+    });
+
+    if (reporter.email) {
+      try {
+        await sendIncidentReporterConfirmationEmail({
+          recipientEmail: reporter.email,
+          recipientName: reporter.name,
+          incidentId: input.incident.id,
+          incidentTitle: input.incident.title,
+          incidentDescription:
+            input.incident.description,
+          incidentType: input.incident.type,
+          riskLevel: input.incident.riskLevel,
+          status: input.incident.status,
+          siteName: input.site.name,
+          location: input.incident.location,
+          occurredAt: input.incident.occurredAt,
+        });
+      } catch (error) {
+        console.error(
+          `Incident reporter confirmation email failed for incident ${input.incident.id}:`,
+          error
+        );
+      }
+    }
+  }
+
+  const notificationType =
+    getIncidentNotificationType(
+      input.incident.riskLevel
+    );
+
+  const notificationTitle =
+    getIncidentNotificationTitle(
+      input.incident.riskLevel
+    );
+
+  const notificationMessage =
+    getIncidentNotificationMessage({
+      incidentTitle: input.incident.title,
+      siteName: input.site.name,
+      riskLevel: input.incident.riskLevel,
+    });
+
+  await Promise.all(
+    managementRecipients.map(
+      async (
+        recipient: IncidentNotificationRecipient
+      ) => {
+        await createIncidentNotificationSafely({
+          organizationId: input.organizationId,
+          userId: recipient.id,
+          type: notificationType,
+          title: notificationTitle,
+          message: notificationMessage,
+          link: incidentLink,
+          context: "Incident management alert",
+        });
+
+        if (
+          !isEscalationRiskLevel(
+            input.incident.riskLevel
+          ) ||
+          !recipient.email
+        ) {
+          return;
+        }
+
+        try {
+          await sendHighRiskIncidentAlertEmail({
+            recipientEmail: recipient.email,
+            recipientName: recipient.name,
+            incidentId: input.incident.id,
+            incidentTitle: input.incident.title,
+            incidentDescription:
+              input.incident.description,
+            incidentType: input.incident.type,
+            riskLevel: input.incident.riskLevel,
+            status: input.incident.status,
+            siteName: input.site.name,
+            location: input.incident.location,
+            occurredAt:
+              input.incident.occurredAt,
+            reportedByName:
+              reporter?.name || "Unknown reporter",
+          });
+        } catch (error) {
+          console.error(
+            `Incident escalation email failed for recipient ${recipient.id} and incident ${input.incident.id}:`,
+            error
+          );
+        }
+      }
+    )
+  );
+}
 
 export async function createIncidentService(input: {
   organizationId: string;
@@ -34,10 +302,17 @@ export async function createIncidentService(input: {
       id: input.siteId,
       organizationId: input.organizationId,
     },
+    select: {
+      id: true,
+      name: true,
+      organizationId: true,
+    },
   });
 
   if (!site) {
-    throw new Error("Invalid site for this organization.");
+    throw new Error(
+      "Invalid site for this organization."
+    );
   }
 
   const incident = await createTenantIncident({
@@ -65,14 +340,31 @@ export async function createIncidentService(input: {
     },
   });
 
-  await createNotification({
-    organizationId: input.organizationId,
-    userId: input.userId,
-    type: NotificationType.SUCCESS,
-    title: "Incident submitted",
-    message: `Your incident "${incident.title}" was submitted successfully.`,
-    link: `/incidents/${incident.id}`,
-  });
+  try {
+    await notifyIncidentCreated({
+      organizationId: input.organizationId,
+      reporterId: input.userId,
+      incident: {
+        id: incident.id,
+        title: incident.title,
+        description: incident.description,
+        type: incident.type,
+        riskLevel: incident.riskLevel,
+        status: incident.status,
+        location: incident.location,
+        occurredAt: incident.occurredAt,
+      },
+      site: {
+        id: site.id,
+        name: site.name,
+      },
+    });
+  } catch (error) {
+    console.error(
+      `Automatic incident notification processing failed for incident ${incident.id}:`,
+      error
+    );
+  }
 
   await startWorkflowForEntity({
     organizationId: input.organizationId,
@@ -96,15 +388,18 @@ export async function updateIncidentStatusService(input: {
   );
 
   if (!incident) {
-    throw new Error("Invalid incident for this organization.");
+    throw new Error(
+      "Invalid incident for this organization."
+    );
   }
 
   const previousStatus = incident.status;
 
-  const updatedIncident = await updateTenantIncidentStatus({
-    incidentId: input.incidentId,
-    status: input.status,
-  });
+  const updatedIncident =
+    await updateTenantIncidentStatus({
+      incidentId: input.incidentId,
+      status: input.status,
+    });
 
   await logActivity({
     organizationId: input.organizationId,
@@ -139,7 +434,9 @@ export async function createCorrectiveActionService(input: {
   );
 
   if (!incident) {
-    throw new Error("Invalid incident for this organization.");
+    throw new Error(
+      "Invalid incident for this organization."
+    );
   }
 
   const assignedUser = await prisma.user.findFirst({
@@ -150,7 +447,9 @@ export async function createCorrectiveActionService(input: {
   });
 
   if (!assignedUser) {
-    throw new Error("Invalid assigned user for this organization.");
+    throw new Error(
+      "Invalid assigned user for this organization."
+    );
   }
 
   const action = await createTenantCorrectiveAction({
@@ -205,16 +504,20 @@ export async function upsertInvestigationService(input: {
   );
 
   if (!incident) {
-    throw new Error("Invalid incident for this organization.");
+    throw new Error(
+      "Invalid incident for this organization."
+    );
   }
 
-  const investigation = await upsertTenantInvestigation({
-    incidentId: input.incidentId,
-    summary: input.summary,
-    rootCause: input.rootCause,
-    immediateCause: input.immediateCause,
-    contributingFactors: input.contributingFactors,
-  });
+  const investigation =
+    await upsertTenantInvestigation({
+      incidentId: input.incidentId,
+      summary: input.summary,
+      rootCause: input.rootCause,
+      immediateCause: input.immediateCause,
+      contributingFactors:
+        input.contributingFactors,
+    });
 
   await logActivity({
     organizationId: input.organizationId,
@@ -223,7 +526,8 @@ export async function upsertInvestigationService(input: {
     entityType: "Investigation",
     entityId: input.incidentId,
     title: "Investigation updated",
-    description: "Incident investigation details were saved.",
+    description:
+      "Incident investigation details were saved.",
     metadata: {
       incidentId: input.incidentId,
     },
@@ -246,15 +550,18 @@ export async function updateCorrectiveActionStatusService(input: {
   });
 
   if (!action) {
-    throw new Error("Invalid corrective action for this organization.");
+    throw new Error(
+      "Invalid corrective action for this organization."
+    );
   }
 
   const previousStatus = action.status;
 
-  const updatedAction = await updateTenantCorrectiveActionStatus({
-    actionId: input.actionId,
-    status: input.status,
-  });
+  const updatedAction =
+    await updateTenantCorrectiveActionStatus({
+      actionId: input.actionId,
+      status: input.status,
+    });
 
   await logActivity({
     organizationId: input.organizationId,
