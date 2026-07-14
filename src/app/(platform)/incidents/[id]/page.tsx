@@ -7,6 +7,7 @@ import { MultiDocumentUpload } from "@/core/documents/multi-document-upload";
 import { ReplaceDocumentUpload } from "@/core/documents/replace-document-upload";
 import { ConfirmDocumentAction } from "@/core/documents/confirm-document-action";
 import { DocumentVersionHistory } from "@/core/documents/document-version-history";
+import { IncidentInvestigationAssistant } from "@/features/incidents/incident-investigation-assistant";
 import { decideIncidentWorkflow } from "@/core/workflow/workflow.actions";
 import {
   createCorrectiveAction,
@@ -801,6 +802,12 @@ export default async function IncidentDetailPage({
               No investigation has been added yet.
             </p>
           )}
+
+<div className="mb-6">
+  <IncidentInvestigationAssistant
+    incidentId={incident.id}
+  />
+</div>
 
           <form
             action={upsertInvestigation}
