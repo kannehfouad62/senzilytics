@@ -8,6 +8,7 @@ import { ReplaceDocumentUpload } from "@/core/documents/replace-document-upload"
 import { ConfirmDocumentAction } from "@/core/documents/confirm-document-action";
 import { DocumentVersionHistory } from "@/core/documents/document-version-history";
 import { IncidentInvestigationAssistant } from "@/features/incidents/incident-investigation-assistant";
+import { IncidentCapaRecommendationEngine } from "@/features/incidents/incident-capa-recommendation-engine";
 import { decideIncidentWorkflow } from "@/core/workflow/workflow.actions";
 import {
   createCorrectiveAction,
@@ -887,6 +888,12 @@ export default async function IncidentDetailPage({
               </p>
             </div>
           </div>
+
+          <div className="mb-6">
+  <IncidentCapaRecommendationEngine
+    incidentId={incident.id}
+  />
+</div>
 
           <div className="space-y-4">
             {incident.actions.map((action) => {
