@@ -1,6 +1,10 @@
 import { processCorrectiveActionSlaNotifications } from "@/core/notifications/corrective-action-sla.service";
+import { processIncidentEscalations } from "@/core/notifications/incident-escalation.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
-import { NextRequest, NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,24 +52,31 @@ export async function GET(
     const [
       workflowResult,
       correctiveActionResult,
+      incidentEscalationResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
       processCorrectiveActionSlaNotifications(),
+      processIncidentEscalations(),
     ]);
 
     return NextResponse.json({
       success: true,
-      processedAt: new Date().toISOString(),
+      processedAt:
+        new Date().toISOString(),
 
       workflows: workflowResult,
 
       correctiveActions:
         correctiveActionResult,
 
+      incidentEscalations:
+        incidentEscalationResult,
+
       totals: {
         checked:
           workflowResult.checked +
-          correctiveActionResult.checked,
+          correctiveActionResult.checked +
+          incidentEscalationResult.checked,
 
         remindersSent:
           workflowResult.remindersSent +
@@ -75,9 +86,19 @@ export async function GET(
           workflowResult.overdueAlertsSent +
           correctiveActionResult.overdueAlertsSent,
 
+        incidentEscalationLevelsProcessed:
+          incidentEscalationResult.escalationLevelsProcessed,
+
+        incidentInAppNotificationsSent:
+          incidentEscalationResult.inAppNotificationsSent,
+
+        incidentEscalationEmailsSent:
+          incidentEscalationResult.emailsSent,
+
         skipped:
           workflowResult.skipped +
-          correctiveActionResult.skipped,
+          correctiveActionResult.skipped +
+          incidentEscalationResult.skipped,
       },
     });
   } catch (error) {
