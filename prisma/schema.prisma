@@ -68,6 +68,40 @@ enum PermissionKey {
   MANAGE_DOCUMENTS
 }
 
+enum AuditType {
+  INTERNAL
+  EXTERNAL
+  REGULATORY
+  COMPLIANCE
+  MANAGEMENT_SYSTEM
+  SUPPLIER
+  PROCESS
+  SAFETY
+  ENVIRONMENTAL
+  OTHER
+}
+
+enum AuditTeamRole {
+  LEAD_AUDITOR
+  AUDITOR
+  TECHNICAL_EXPERT
+  OBSERVER
+}
+
+enum AuditQuestionType {
+  YES_NO
+  COMPLIANCE
+  TEXT
+  NUMBER
+}
+
+enum AuditResponseResult {
+  NOT_ASSESSED
+  COMPLIANT
+  NON_COMPLIANT
+  NOT_APPLICABLE
+}
+
 enum ActivityAction {
   CREATE
   UPDATE
@@ -179,13 +213,14 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sites             Site[]
-  users             User[]
-  activityLogs      ActivityLog[]
-  notifications     Notification[]
-  workflowTemplates WorkflowTemplate[]
-  workflowInstances WorkflowInstance[]
-  documents         Document[]
+  sites                   Site[]
+  users                   User[]
+  activityLogs            ActivityLog[]
+  notifications           Notification[]
+  workflowTemplates       WorkflowTemplate[]
+  workflowInstances       WorkflowInstance[]
+  documents               Document[]
+  auditChecklistTemplates AuditChecklistTemplate[]
 }
 
 model Site {
@@ -238,6 +273,9 @@ model User {
   reportedIncidents      Incident[]         @relation("ReportedIncidents")
   assignedInvestigations Investigation[]    @relation("InvestigationAssignedUser")
   assignedActions        CorrectiveAction[]
+  leadAudits             Audit[]            @relation("AuditLeadAuditor")
+  auditTeamMemberships   AuditTeamMember[]
+  auditResponses         AuditResponse[]    @relation("AuditResponseAnsweredBy")
   trainingRecords        TrainingRecord[]
   activityLogs           ActivityLog[]
   notifications          Notification[]
@@ -312,6 +350,9 @@ model CorrectiveAction {
   incidentId String?
   incident   Incident? @relation(fields: [incidentId], references: [id])
 
+  auditFindingId String?       @unique
+  auditFinding   AuditFinding? @relation(fields: [auditFindingId], references: [id])
+
   assignedToId String
   assignedTo   User   @relation(fields: [assignedToId], references: [id])
 
@@ -322,20 +363,153 @@ model CorrectiveAction {
 }
 
 model Audit {
-  id          String    @id @default(cuid())
-  title       String
-  scope       String?
-  status      Status    @default(OPEN)
-  scheduledAt DateTime?
-  completedAt DateTime?
+  id        String    @id @default(cuid())
+  title     String
+  reference String?
+  scope     String?
+  type      AuditType @default(INTERNAL)
+  status    Status    @default(OPEN)
+
+  scheduledAt       DateTime?
+  dueDate           DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  reminderSentAt    DateTime?
+  overdueNotifiedAt DateTime?
 
   siteId String
   site   Site   @relation(fields: [siteId], references: [id])
 
-  findings AuditFinding[]
+  leadAuditorId String?
+  leadAuditor   User?   @relation("AuditLeadAuditor", fields: [leadAuditorId], references: [id])
+
+  checklistTemplateId String?
+  checklistTemplate   AuditChecklistTemplate? @relation(fields: [checklistTemplateId], references: [id])
+
+  teamMembers    AuditTeamMember[]
+  checklistItems AuditChecklistItem[]
+  responses      AuditResponse[]
+  findings       AuditFinding[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([siteId, status])
+  @@index([leadAuditorId])
+  @@index([status, dueDate])
+  @@index([checklistTemplateId])
+}
+
+model AuditTeamMember {
+  id        String        @id @default(cuid())
+  auditId   String
+  userId    String
+  role      AuditTeamRole @default(AUDITOR)
+  createdAt DateTime      @default(now())
+
+  audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([auditId, userId])
+  @@index([userId])
+}
+
+model AuditChecklistTemplate {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  auditType      AuditType @default(INTERNAL)
+  version        Int       @default(1)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sections     AuditChecklistSection[]
+  audits       Audit[]
+
+  @@unique([organizationId, name, version])
+  @@index([organizationId, auditType, isActive])
+}
+
+model AuditChecklistSection {
+  id          String   @id @default(cuid())
+  templateId  String
+  name        String
+  description String?
+  sequence    Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  template  AuditChecklistTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  questions AuditChecklistQuestion[]
+
+  @@unique([templateId, sequence])
+}
+
+model AuditChecklistQuestion {
+  id           String            @id @default(cuid())
+  sectionId    String
+  questionText String
+  guidance     String?
+  questionType AuditQuestionType @default(COMPLIANCE)
+  isRequired   Boolean           @default(true)
+  weight       Int               @default(1)
+  sequence     Int
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  section        AuditChecklistSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  checklistItems AuditChecklistItem[]
+
+  @@unique([sectionId, sequence])
+}
+
+model AuditChecklistItem {
+  id                 String            @id @default(cuid())
+  auditId            String
+  templateQuestionId String?
+  sectionName        String
+  questionText       String
+  guidance           String?
+  questionType       AuditQuestionType @default(COMPLIANCE)
+  isRequired         Boolean           @default(true)
+  weight             Int               @default(1)
+  sequence           Int
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  audit            Audit                   @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  templateQuestion AuditChecklistQuestion? @relation(fields: [templateQuestionId], references: [id], onDelete: SetNull)
+  response         AuditResponse?
+
+  @@unique([auditId, sequence])
+  @@index([templateQuestionId])
+}
+
+model AuditResponse {
+  id              String              @id @default(cuid())
+  auditId         String
+  checklistItemId String              @unique
+  answeredById    String?
+  result          AuditResponseResult @default(NOT_ASSESSED)
+  responseText    String?
+  numericValue    Decimal?            @db.Decimal(18, 4)
+  booleanValue    Boolean?
+  score           Decimal?            @db.Decimal(8, 2)
+  comments        String?
+  answeredAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  audit         Audit              @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  checklistItem AuditChecklistItem @relation(fields: [checklistItemId], references: [id], onDelete: Cascade)
+  answeredBy    User?              @relation("AuditResponseAnsweredBy", fields: [answeredById], references: [id])
+  finding       AuditFinding?
+
+  @@index([auditId, result])
+  @@index([answeredById])
 }
 
 model AuditFinding {
@@ -344,12 +518,21 @@ model AuditFinding {
   description String?
   riskLevel   RiskLevel @default(LOW)
   status      Status    @default(OPEN)
+  dueDate     DateTime?
 
   auditId String
   audit   Audit  @relation(fields: [auditId], references: [id], onDelete: Cascade)
 
+  responseId String?        @unique
+  response   AuditResponse? @relation(fields: [responseId], references: [id], onDelete: SetNull)
+
+  correctiveAction CorrectiveAction?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([auditId, status])
+  @@index([riskLevel, dueDate])
 }
 
 model Inspection {

@@ -1,3 +1,4 @@
+import { processAuditSlaNotifications } from "@/core/notifications/audit-sla.service";
 import { processCorrectiveActionSlaNotifications } from "@/core/notifications/corrective-action-sla.service";
 import { processIncidentEscalations } from "@/core/notifications/incident-escalation.service";
 import { processInvestigationSlaNotifications } from "@/core/notifications/investigation-sla.service";
@@ -59,11 +60,13 @@ export async function GET(
       correctiveActionResult,
       incidentEscalationResult,
       investigationResult,
+      auditResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
       processCorrectiveActionSlaNotifications(),
       processIncidentEscalations(),
       processInvestigationSlaNotifications(),
+      processAuditSlaNotifications(),
     ]);
 
     return NextResponse.json({
@@ -82,22 +85,30 @@ export async function GET(
       investigations:
         investigationResult,
 
+      audits:
+        auditResult,
+
       totals: {
         checked:
           workflowResult.checked +
           correctiveActionResult.checked +
           incidentEscalationResult.checked +
-          investigationResult.checked,
+          investigationResult.checked +
+          auditResult.checked,
 
         remindersSent:
           workflowResult.remindersSent +
           correctiveActionResult.remindersSent +
-          investigationResult.remindersSent,
+          investigationResult.remindersSent +
+          auditResult.auditRemindersSent +
+          auditResult.findingRemindersSent,
 
         overdueAlertsSent:
           workflowResult.overdueAlertsSent +
           correctiveActionResult.overdueAlertsSent +
-          investigationResult.overdueAlertsSent,
+          investigationResult.overdueAlertsSent +
+          auditResult.auditOverdueAlertsSent +
+          auditResult.findingOverdueAlertsSent,
 
         incidentEscalationLevelsProcessed:
           incidentEscalationResult
@@ -119,11 +130,20 @@ export async function GET(
           investigationResult
             .emailsSent,
 
+        auditInAppNotificationsSent:
+          auditResult
+            .inAppNotificationsSent,
+
+        auditEmailsSent:
+          auditResult
+            .emailsSent,
+
         skipped:
           workflowResult.skipped +
           correctiveActionResult.skipped +
           incidentEscalationResult.skipped +
-          investigationResult.skipped,
+          investigationResult.skipped +
+          auditResult.skipped,
       },
     });
   } catch (error) {

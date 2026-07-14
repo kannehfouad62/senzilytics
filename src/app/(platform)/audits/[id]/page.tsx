@@ -4,7 +4,7 @@ import {
   removeAuditTeamMember,
   saveAuditResponse,
   updateAuditFindingStatus,
-  updateAuditStatus,
+  updateAuditStatus, convertAuditFindingToCorrectiveAction,
 } from "@/features/audits/actions";
 import { requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -606,119 +606,238 @@ export default async function AuditDetailPage({
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <h2 className="text-xl font-semibold text-white">
-              Audit Findings
-            </h2>
+  <h2 className="text-xl font-semibold text-white">
+    Audit Findings
+  </h2>
 
-            <div className="mt-5 space-y-4">
-              {audit.findings.map(
-                (finding) => (
-                  <div
-                    key={
-                      finding.id
-                    }
-                    className="rounded-2xl border border-white/10 bg-slate-950/50 p-5"
+  <p className="mt-1 text-sm text-slate-400">
+    Review findings, update their status, and convert unresolved findings into
+    assigned corrective actions.
+  </p>
+
+  <div className="mt-5 space-y-4">
+    {audit.findings.map((finding) => (
+      <div
+        key={finding.id}
+        className="rounded-2xl border border-white/10 bg-slate-950/50 p-5"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-white">
+              {finding.title}
+            </h3>
+
+            <p className="mt-2 text-sm text-slate-400">
+              {finding.description || "No description provided."}
+            </p>
+
+            {finding.dueDate && (
+              <p className="mt-3 text-xs text-slate-500">
+                Due: {formatDate(finding.dueDate)}
+              </p>
+            )}
+          </div>
+
+          <RiskBadge riskLevel={finding.riskLevel} />
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4">
+          <StatusBadge status={finding.status} />
+
+          <form
+            action={updateAuditFindingStatus}
+            className="flex flex-wrap gap-2"
+          >
+            <input
+              type="hidden"
+              name="auditId"
+              value={audit.id}
+            />
+
+            <input
+              type="hidden"
+              name="findingId"
+              value={finding.id}
+            />
+
+            <select
+              name="status"
+              defaultValue={finding.status}
+              className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white"
+            >
+              {Object.values(Status).map((status) => (
+                <option
+                  key={status}
+                  value={status}
+                >
+                  {status.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="submit"
+              className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-300"
+            >
+              Update
+            </button>
+          </form>
+        </div>
+
+        {finding.correctiveAction ? (
+          <div className="mt-5 rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
+            <p className="text-xs font-medium text-green-300">
+              CORRECTIVE ACTION CREATED
+            </p>
+
+            <p className="mt-2 text-sm font-semibold text-white">
+              {finding.correctiveAction.title}
+            </p>
+
+            <p className="mt-2 text-xs text-slate-300">
+              Assigned to{" "}
+              {finding.correctiveAction.assignedTo.name}
+              {" · "}
+              {finding.correctiveAction.status.replaceAll("_", " ")}
+            </p>
+
+            <p className="mt-1 text-xs text-slate-400">
+              Due: {formatDate(finding.correctiveAction.dueDate)}
+            </p>
+          </div>
+        ) : finding.status !== Status.COMPLETED &&
+          finding.status !== Status.CLOSED ? (
+          <form
+            action={convertAuditFindingToCorrectiveAction}
+            className="mt-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4"
+          >
+            <input
+              type="hidden"
+              name="auditId"
+              value={audit.id}
+            />
+
+            <input
+              type="hidden"
+              name="findingId"
+              value={finding.id}
+            />
+
+            <h4 className="text-sm font-semibold text-cyan-200">
+              Convert to Corrective Action
+            </h4>
+
+            <p className="mt-1 text-xs text-slate-400">
+              Assign ownership and a completion deadline for this finding.
+            </p>
+
+            <div className="mt-4 space-y-4">
+              <Field label="Action title">
+                <input
+                  name="title"
+                  required
+                  defaultValue={`Corrective action: ${finding.title}`}
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Description">
+                <textarea
+                  name="description"
+                  rows={3}
+                  defaultValue={finding.description || ""}
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Assign to">
+                <select
+                  name="assignedToId"
+                  required
+                  defaultValue=""
+                  className={inputClass}
+                >
+                  <option
+                    value=""
+                    disabled
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div>
-                        <h3 className="font-semibold text-white">
-                          {
-                            finding.title
-                          }
-                        </h3>
+                    Select assignee
+                  </option>
 
-                        <p className="mt-2 text-sm text-slate-400">
-                          {finding.description ||
-                            "No description provided."}
-                        </p>
-                      </div>
+                  {users.map((user) => (
+                    <option
+                      key={user.id}
+                      value={user.id}
+                    >
+                      {user.name} —{" "}
+                      {user.jobTitle ||
+                        user.role.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
-                      <RiskBadge
-                        riskLevel={
-                          finding.riskLevel
-                        }
-                      />
-                    </div>
-
-                    <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4">
-                      <StatusBadge
-                        status={
-                          finding.status
-                        }
-                      />
-
-                      <form
-                        action={
-                          updateAuditFindingStatus
-                        }
-                        className="flex gap-2"
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Risk level">
+                  <select
+                    name="riskLevel"
+                    defaultValue={finding.riskLevel}
+                    className={inputClass}
+                  >
+                    {Object.values(RiskLevel).map((riskLevel) => (
+                      <option
+                        key={riskLevel}
+                        value={riskLevel}
                       >
-                        <input
-                          type="hidden"
-                          name="auditId"
-                          value={
-                            audit.id
-                          }
-                        />
+                        {riskLevel}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
 
-                        <input
-                          type="hidden"
-                          name="findingId"
-                          value={
-                            finding.id
-                          }
-                        />
-
-                        <select
-                          name="status"
-                          defaultValue={
-                            finding.status
-                          }
-                          className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white"
-                        >
-                          {Object.values(
-                            Status
-                          ).map(
-                            (
-                              status
-                            ) => (
-                              <option
-                                key={
-                                  status
-                                }
-                                value={
-                                  status
-                                }
-                              >
-                                {status.replaceAll(
-                                  "_",
-                                  " "
-                                )}
-                              </option>
-                            )
-                          )}
-                        </select>
-
-                        <button
-                          type="submit"
-                          className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-300"
-                        >
-                          Update
-                        </button>
-                      </form>
-                    </div>
-                  </div>
-                )
-              )}
-
-              {audit.findings.length ===
-                0 && (
-                <p className="text-sm text-slate-500">
-                  No findings recorded.
-                </p>
-              )}
+                <Field label="Due date">
+                  <input
+                    name="dueDate"
+                    type="datetime-local"
+                    required
+                    className={inputClass}
+                  />
+                </Field>
+              </div>
             </div>
-          </section>
+
+            <button
+              type="submit"
+              className="mt-4 rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
+            >
+              Create Corrective Action
+            </button>
+          </form>
+        ) : (
+          <div className="mt-5 rounded-2xl border border-slate-400/20 bg-slate-400/5 p-4">
+            <p className="text-xs text-slate-400">
+              This finding is {finding.status.toLowerCase()} and cannot be
+              converted into a corrective action.
+            </p>
+          </div>
+        )}
+      </div>
+    ))}
+
+    {audit.findings.length === 0 && (
+      <div className="rounded-2xl border border-dashed border-white/15 p-10 text-center">
+        <CircleAlert
+          size={30}
+          className="mx-auto text-slate-500"
+        />
+
+        <p className="mt-3 text-sm text-slate-500">
+          No findings recorded.
+        </p>
+      </div>
+    )}
+  </div>
+</section>
         </main>
 
         <aside className="space-y-6">
