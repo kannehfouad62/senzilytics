@@ -1,5 +1,9 @@
+import { processMocSlaNotifications } from "@/core/notifications/moc-sla.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
-import { NextRequest, NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,18 +24,27 @@ function isAuthorizedCronRequest(
   }
 
   const authorization =
-    request.headers.get("authorization");
+    request.headers.get(
+      "authorization"
+    );
 
-  return authorization ===
-    `Bearer ${cronSecret}`;
+  return (
+    authorization ===
+    `Bearer ${cronSecret}`
+  );
 }
 
 export async function GET(
   request: NextRequest
 ) {
-  if (!isAuthorizedCronRequest(request)) {
+  if (
+    !isAuthorizedCronRequest(
+      request
+    )
+  ) {
     return NextResponse.json(
       {
+        success: false,
         error: "Unauthorized.",
       },
       {
@@ -40,28 +53,43 @@ export async function GET(
     );
   }
 
+  const processedAt =
+    new Date().toISOString();
+
   try {
-    const result =
-      await processWorkflowSlaNotifications();
+    const [
+      workflowResult,
+      mocResult,
+    ] = await Promise.all([
+      processWorkflowSlaNotifications(),
+      processMocSlaNotifications(),
+    ]);
 
     return NextResponse.json({
       success: true,
-      processedAt: new Date().toISOString(),
-      ...result,
+      processedAt,
+
+      workflow:
+        workflowResult,
+
+      moc:
+        mocResult,
     });
   } catch (error) {
     console.error(
-      "Workflow SLA Cron failed:",
+      "Workflow and MOC SLA cron failed:",
       error
     );
 
     return NextResponse.json(
       {
         success: false,
+        processedAt,
+
         error:
           error instanceof Error
             ? error.message
-            : "Workflow SLA processing failed.",
+            : "SLA processing failed.",
       },
       {
         status: 500,

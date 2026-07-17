@@ -66,6 +66,10 @@ enum PermissionKey {
   VIEW_ACTIVITY_LOG
   MANAGE_NOTIFICATIONS
   MANAGE_DOCUMENTS
+  VIEW_RISKS
+  MANAGE_RISKS
+  VIEW_MOC
+  MANAGE_MOC
 }
 
 enum AuditType {
@@ -170,6 +174,7 @@ enum WorkflowEntityType {
   PERMIT
   MOC
   OBSERVATION
+  RISK
 }
 
 enum WorkflowStepType {
@@ -218,6 +223,9 @@ enum DocumentEntityType {
   SITE
   USER
   OTHER
+  RISK
+  RISK_CONTROL
+  MOC
 }
 
 enum DocumentCategory {
@@ -240,6 +248,396 @@ enum DocumentStatus {
   DELETED
 }
 
+enum RiskStatus {
+  DRAFT
+  ACTIVE
+  UNDER_REVIEW
+  TREATMENT_REQUIRED
+  ACCEPTED
+  CLOSED
+  ARCHIVED
+}
+
+enum RiskCategory {
+  SAFETY
+  ENVIRONMENTAL
+  OCCUPATIONAL_HEALTH
+  OPERATIONAL
+  COMPLIANCE
+  SECURITY
+  QUALITY
+  STRATEGIC
+  REPUTATIONAL
+  FINANCIAL
+  TECHNOLOGY
+  OTHER
+}
+
+enum RiskLikelihood {
+  RARE
+  UNLIKELY
+  POSSIBLE
+  LIKELY
+  ALMOST_CERTAIN
+}
+
+enum RiskImpact {
+  INSIGNIFICANT
+  MINOR
+  MODERATE
+  MAJOR
+  CATASTROPHIC
+}
+
+enum RiskReviewFrequency {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+  BIENNIAL
+  AD_HOC
+}
+
+enum RiskControlType {
+  EXISTING
+  PLANNED
+}
+
+enum RiskControlHierarchy {
+  ELIMINATION
+  SUBSTITUTION
+  ENGINEERING
+  ADMINISTRATIVE
+  TRAINING
+  PPE
+  MONITORING
+  OTHER
+}
+
+enum RiskControlEffectiveness {
+  INEFFECTIVE
+  WEAK
+  PARTIALLY_EFFECTIVE
+  EFFECTIVE
+  HIGHLY_EFFECTIVE
+  NOT_ASSESSED
+}
+
+enum RiskLinkedEntityType {
+  INCIDENT
+  INVESTIGATION
+  CORRECTIVE_ACTION
+  AUDIT
+  AUDIT_FINDING
+  INSPECTION
+  INSPECTION_FINDING
+  COMPLIANCE
+  WORKFLOW
+  DOCUMENT
+}
+
+enum MocStatus {
+  DRAFT
+  TECHNICAL_REVIEW
+  RISK_REVIEW
+  PENDING_APPROVAL
+  APPROVED
+  IMPLEMENTATION
+  VERIFICATION
+  CLOSED
+  REJECTED
+  CANCELLED
+}
+
+enum MocChangeType {
+  PROCESS
+  EQUIPMENT
+  CHEMICAL
+  SOFTWARE
+  FACILITY
+  ORGANIZATIONAL
+  PROCEDURE
+  MATERIAL
+  TECHNOLOGY
+  OTHER
+}
+
+enum MocChangeDuration {
+  TEMPORARY
+  PERMANENT
+  EMERGENCY
+}
+
+enum MocPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum MocApprovalRole {
+  OPERATIONS
+  EHS
+  ENGINEERING
+  QUALITY
+  MAINTENANCE
+  INFORMATION_TECHNOLOGY
+  SITE_MANAGEMENT
+  EXECUTIVE
+  OTHER
+}
+
+enum MocApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NOT_REQUIRED
+}
+
+enum MocTaskType {
+  IMPLEMENTATION
+  VERIFICATION
+  TRAINING
+  INSPECTION
+  DOCUMENTATION
+  COMPLIANCE
+  COMMUNICATION
+  OTHER
+}
+
+enum MocTaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+  CANCELLED
+}
+
+enum EnterpriseAuditProgramStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  INACTIVE
+  ARCHIVED
+}
+
+enum EnterpriseAuditFrequency {
+  ONE_TIME
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+  CUSTOM
+}
+
+enum EnterpriseAuditRiskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum EnterpriseAuditScheduleStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum EnterpriseAuditProtocolStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum EnterpriseAuditQuestionResponseType {
+  PASS_FAIL
+  YES_NO
+  NUMERIC
+  FREE_TEXT
+  OBSERVATION
+  MULTIPLE_CHOICE
+  RATING
+  NOT_APPLICABLE
+}
+
+enum EnterpriseAuditFindingTrigger {
+  NEVER
+  ON_FAIL
+  ON_NO
+  BELOW_THRESHOLD
+  ABOVE_THRESHOLD
+  SELECTED_OPTIONS
+  MANUAL_REVIEW
+}
+
+enum EnterpriseAuditSeverity {
+  OBSERVATION
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum EnterpriseAuditScheduleTeamRole {
+  LEAD_AUDITOR
+  AUDITOR
+  TECHNICAL_EXPERT
+  OBSERVER
+  TRAINEE
+}
+
+enum EnterpriseAuditStatus {
+  DRAFT
+  PLANNED
+  SCHEDULED
+  IN_PROGRESS
+  PENDING_REVIEW
+  COMPLETED
+  OVERDUE
+  CANCELLED
+  CLOSED
+}
+
+enum EnterpriseAuditSource {
+  MANUAL
+  SCHEDULE
+  PROGRAM
+  FOLLOW_UP
+  AI_RECOMMENDATION
+  LEGACY_MIGRATION
+}
+
+enum EnterpriseAuditTeamRole {
+  LEAD_AUDITOR
+  AUDITOR
+  TECHNICAL_EXPERT
+  OBSERVER
+  TRAINEE
+  APPROVER
+}
+
+enum EnterpriseAuditSectionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  NOT_APPLICABLE
+  BLOCKED
+}
+
+enum EnterpriseAuditQuestionStatus {
+  NOT_ASSESSED
+  IN_PROGRESS
+  ANSWERED
+  NOT_APPLICABLE
+  BLOCKED
+}
+
+enum EnterpriseAuditResponseResult {
+  NOT_ASSESSED
+  PASS
+  FAIL
+  YES
+  NO
+  COMPLIANT
+  NON_COMPLIANT
+  PARTIALLY_COMPLIANT
+  NOT_APPLICABLE
+  OBSERVATION
+  INFORMATION_ONLY
+}
+
+enum EnterpriseAuditEvidenceType {
+  PHOTO
+  DOCUMENT
+  VIDEO
+  AUDIO
+  LINK
+  NOTE
+  MEASUREMENT
+  SIGNATURE
+  OTHER
+}
+
+enum EnterpriseAuditFindingStatus {
+  DRAFT
+  OPEN
+  UNDER_REVIEW
+  ACTION_REQUIRED
+  IN_PROGRESS
+  PENDING_VERIFICATION
+  VERIFIED
+  CLOSED
+  REJECTED
+  CANCELLED
+}
+
+enum EnterpriseAuditFindingCategory {
+  SAFETY
+  ENVIRONMENTAL
+  QUALITY
+  OPERATIONAL
+  REGULATORY
+  SECURITY
+  TECHNOLOGY
+  TRAINING
+  DOCUMENTATION
+  MAINTENANCE
+  HUMAN_FACTORS
+  MANAGEMENT_SYSTEM
+  POSITIVE_PRACTICE
+  OTHER
+}
+
+enum EnterpriseAuditFindingType {
+  NONCONFORMITY
+  MAJOR_NONCONFORMITY
+  MINOR_NONCONFORMITY
+  OBSERVATION
+  OPPORTUNITY_FOR_IMPROVEMENT
+  POSITIVE_PRACTICE
+}
+
+enum EnterpriseAuditVerificationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  REOPENED
+}
+
+enum EnterpriseAuditLinkStatus {
+  PROPOSED
+  APPROVED
+  CREATED
+  REJECTED
+  CANCELLED
+}
+
+enum EnterpriseAuditHistoryAction {
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  ASSIGNED
+  STARTED
+  RESPONSE_RECORDED
+  EVIDENCE_ADDED
+  FINDING_CREATED
+  FINDING_UPDATED
+  CAPA_LINKED
+  RISK_LINKED
+  SUBMITTED_FOR_REVIEW
+  COMPLETED
+  VERIFIED
+  CLOSED
+  REOPENED
+  CANCELLED
+  AI_ANALYSIS_GENERATED
+  OTHER
+}
+
 model Organization {
   id        String   @id @default(cuid())
   name      String
@@ -257,6 +655,22 @@ model Organization {
   documents                    Document[]
   auditChecklistTemplates      AuditChecklistTemplate[]
   inspectionChecklistTemplates InspectionChecklistTemplate[]
+  risks                        Risk[]
+  managementOfChanges          ManagementOfChange[]
+
+  auditProgramsV2 AuditProgram[] @relation("AuditProgramOrganization")
+
+  auditSchedulesV2 AuditSchedule[] @relation("AuditScheduleOrganization")
+
+  auditProtocolsV2 AuditProtocol[] @relation("AuditProtocolOrganization")
+
+  enterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditOrganization")
+
+  enterpriseAuditEvidenceV2 EnterpriseAuditEvidence[] @relation("EnterpriseAuditEvidenceOrganization")
+
+  enterpriseAuditFindingsV2 EnterpriseAuditFinding[] @relation("EnterpriseAuditFindingOrganization")
+
+  enterpriseAuditHistoryV2 EnterpriseAuditHistory[] @relation("EnterpriseAuditHistoryOrganization")
 }
 
 model Site {
@@ -269,14 +683,21 @@ model Site {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  departments     Department[]
-  incidents       Incident[]
-  audits          Audit[]
-  inspections     Inspection[]
-  complianceItems ComplianceItem[]
+  departments         Department[]
+  incidents           Incident[]
+  audits              Audit[]
+  inspections         Inspection[]
+  complianceItems     ComplianceItem[]
+  risks               Risk[]
+  managementOfChanges ManagementOfChange[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  auditProgramScopesV2 AuditProgramSite[] @relation("AuditProgramSiteScope")
+
+  auditSchedulesV2   AuditSchedule[]   @relation("AuditScheduleSite")
+  enterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditSite")
 }
 
 model Department {
@@ -285,7 +706,14 @@ model Department {
   siteId String
   site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
-  users User[]
+  users               User[]
+  risks               Risk[]
+  managementOfChanges ManagementOfChange[]
+
+  auditProgramScopesV2 AuditProgramDepartment[] @relation("AuditProgramDepartmentScope")
+
+  auditSchedulesV2   AuditSchedule[]   @relation("AuditScheduleDepartment")
+  enterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditDepartment")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -320,9 +748,65 @@ model User {
   notifications             Notification[]
   uploadedDocuments         Document[]
 
+  ownedRisks           Risk[]        @relation("RiskOwner")
+  ownedRiskControls    RiskControl[] @relation("RiskControlOwner")
+  completedRiskReviews RiskReview[]  @relation("RiskReviewCompletedBy")
+
   startedWorkflowInstances WorkflowInstance[]
   assignedWorkflowSteps    WorkflowInstanceStep[] @relation("WorkflowAssignedUser")
   completedWorkflowSteps   WorkflowInstanceStep[] @relation("WorkflowCompletedBy")
+
+  requestedChanges ManagementOfChange[] @relation("MocRequestor")
+  ownedChanges     ManagementOfChange[] @relation("MocOwner")
+  mocApprovals     MocApproval[]        @relation("MocApprover")
+  assignedMocTasks MocTask[]            @relation("MocTaskAssignee")
+  verifiedMocTasks MocTask[]            @relation("MocTaskVerifiedBy")
+
+  ownedAuditProgramsV2       AuditProgram[]            @relation("AuditProgramOwner")
+  ledAuditSchedulesV2        AuditSchedule[]           @relation("AuditScheduleLeadAuditor")
+  auditScheduleMembershipsV2 AuditScheduleTeamMember[] @relation("AuditScheduleTeamMemberUser")
+  createdAuditSchedulesV2    AuditSchedule[]           @relation("AuditScheduleCreatedBy")
+  updatedAuditSchedulesV2    AuditSchedule[]           @relation("AuditScheduleUpdatedBy")
+  createdAuditProtocolsV2    AuditProtocol[]           @relation("AuditProtocolCreatedBy")
+  updatedAuditProtocolsV2    AuditProtocol[]           @relation("AuditProtocolUpdatedBy")
+
+  ledEnterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditLeadAuditor")
+
+  ownedEnterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditOwner")
+
+  createdEnterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditCreatedBy")
+
+  updatedEnterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditUpdatedBy")
+
+  enterpriseAuditMembershipsV2 EnterpriseAuditTeamMember[] @relation("EnterpriseAuditTeamMemberUser")
+
+  answeredEnterpriseAuditResponsesV2 EnterpriseAuditResponse[] @relation("EnterpriseAuditResponseAnsweredBy")
+
+  reviewedEnterpriseAuditResponsesV2 EnterpriseAuditResponse[] @relation("EnterpriseAuditResponseReviewedBy")
+
+  capturedEnterpriseAuditEvidenceV2 EnterpriseAuditEvidence[] @relation("EnterpriseAuditEvidenceCapturedBy")
+
+  ownedEnterpriseAuditFindingsV2 EnterpriseAuditFinding[] @relation("EnterpriseAuditFindingOwner")
+
+  createdEnterpriseAuditFindingsV2 EnterpriseAuditFinding[] @relation("EnterpriseAuditFindingCreatedBy")
+
+  updatedEnterpriseAuditFindingsV2 EnterpriseAuditFinding[] @relation("EnterpriseAuditFindingUpdatedBy")
+
+  verifiedEnterpriseAuditFindingsV2 EnterpriseAuditFindingVerification[] @relation("EnterpriseAuditFindingVerifiedBy")
+
+  suggestedEnterpriseAuditActionsV2 EnterpriseAuditFindingActionLink[] @relation("EnterpriseAuditFindingActionSuggestedOwner")
+
+  createdEnterpriseAuditActionLinksV2 EnterpriseAuditFindingActionLink[] @relation("EnterpriseAuditFindingActionCreatedBy")
+
+  reviewedEnterpriseAuditActionLinksV2 EnterpriseAuditFindingActionLink[] @relation("EnterpriseAuditFindingActionReviewedBy")
+
+  createdEnterpriseAuditRiskLinksV2 EnterpriseAuditFindingRiskLink[] @relation("EnterpriseAuditFindingRiskCreatedBy")
+
+  reviewedEnterpriseAuditRiskLinksV2 EnterpriseAuditFindingRiskLink[] @relation("EnterpriseAuditFindingRiskReviewedBy")
+
+  enterpriseAuditHistoryV2 EnterpriseAuditHistory[] @relation("EnterpriseAuditHistoryUser")
+
+  enterpriseAuditFindingHistoryV2 EnterpriseAuditFindingHistory[] @relation("EnterpriseAuditFindingHistoryUser")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -397,6 +881,8 @@ model CorrectiveAction {
 
   assignedToId String
   assignedTo   User   @relation(fields: [assignedToId], references: [id])
+
+  enterpriseAuditFindingLinks EnterpriseAuditFindingActionLink[] @relation("EnterpriseAuditFindingCorrectiveAction")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -575,6 +1061,1031 @@ model AuditFinding {
 
   @@index([auditId, status])
   @@index([riskLevel, dueDate])
+}
+
+// ============================================================
+// AUDIT MANAGEMENT 2.0 — PLANNING, SCHEDULING, AND PROTOCOLS
+// ============================================================
+
+model AuditProgram {
+  id             String @id @default(cuid())
+  organizationId String
+
+  name        String
+  description String?
+  code        String?
+
+  standardName    String?
+  standardVersion String?
+  framework       String?
+  objectives      String?
+  scope           String?
+
+  status       EnterpriseAuditProgramStatus @default(DRAFT)
+  frequency    EnterpriseAuditFrequency
+  riskPriority EnterpriseAuditRiskPriority  @default(MEDIUM)
+
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+
+  ownerId String?
+
+  defaultProtocolId String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation("AuditProgramOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  owner User? @relation("AuditProgramOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  defaultProtocol AuditProtocol? @relation("AuditProgramDefaultProtocol", fields: [defaultProtocolId], references: [id], onDelete: SetNull)
+
+  enterpriseAudits EnterpriseAudit[] @relation("EnterpriseAuditProgram")
+
+  sites       AuditProgramSite[]
+  departments AuditProgramDepartment[]
+  schedules   AuditSchedule[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId, status, isActive])
+  @@index([organizationId, riskPriority])
+  @@index([ownerId])
+  @@index([defaultProtocolId])
+  @@index([effectiveFrom, effectiveTo])
+}
+
+model AuditProgramSite {
+  id        String @id @default(cuid())
+  programId String
+  siteId    String
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  program AuditProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  site Site @relation("AuditProgramSiteScope", fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, siteId])
+  @@index([siteId])
+}
+
+model AuditProgramDepartment {
+  id           String @id @default(cuid())
+  programId    String
+  departmentId String
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  program AuditProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  department Department @relation("AuditProgramDepartmentScope", fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, departmentId])
+  @@index([departmentId])
+}
+
+model AuditSchedule {
+  id             String @id @default(cuid())
+  organizationId String
+  programId      String
+
+  name        String
+  description String?
+
+  status    EnterpriseAuditScheduleStatus @default(ACTIVE)
+  frequency EnterpriseAuditFrequency
+
+  intervalValue Int @default(1)
+
+  /**
+   * Optional recurrence configuration.
+   * Examples:
+   * {
+   * "weekdays": ["MONDAY"]
+   * }
+   * {
+   * "dayOfMonth": 1
+   * }
+   * {
+   * "month": 1,
+   * "dayOfMonth": 15
+   * }
+   */
+  recurrenceRule Json?
+
+  timezone String @default("America/Chicago")
+
+  startDate DateTime
+  endDate   DateTime?
+
+  nextRunAt DateTime?
+  lastRunAt DateTime?
+
+  generateDaysBefore Int @default(30)
+  dueDaysAfter       Int @default(14)
+
+  siteId       String
+  departmentId String?
+
+  leadAuditorId String?
+  protocolId    String?
+
+  autoGenerate       Boolean @default(true)
+  requireTeam        Boolean @default(false)
+  requireLeadAuditor Boolean @default(true)
+
+  lastGenerationKey String?
+  generationCount   Int     @default(0)
+
+  createdById String?
+  updatedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation("AuditScheduleOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  program AuditProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  site Site @relation("AuditScheduleSite", fields: [siteId], references: [id], onDelete: Restrict)
+
+  department Department? @relation("AuditScheduleDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
+
+  leadAuditor User? @relation("AuditScheduleLeadAuditor", fields: [leadAuditorId], references: [id], onDelete: SetNull)
+
+  protocol AuditProtocol? @relation("AuditScheduleProtocol", fields: [protocolId], references: [id], onDelete: SetNull)
+
+  createdBy User? @relation("AuditScheduleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  updatedBy User? @relation("AuditScheduleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  enterpriseAudits EnterpriseAudit[] @relation("EnterpriseAuditSchedule")
+
+  teamMembers AuditScheduleTeamMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, status, autoGenerate])
+  @@index([programId])
+  @@index([siteId])
+  @@index([departmentId])
+  @@index([leadAuditorId])
+  @@index([protocolId])
+  @@index([nextRunAt, status, autoGenerate])
+  @@index([startDate, endDate])
+}
+
+model AuditScheduleTeamMember {
+  id         String @id @default(cuid())
+  scheduleId String
+  userId     String
+
+  role EnterpriseAuditScheduleTeamRole @default(AUDITOR)
+
+  isRequired Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  schedule AuditSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  user User @relation("AuditScheduleTeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, userId])
+  @@index([userId])
+  @@index([scheduleId, role])
+}
+
+model AuditProtocol {
+  id             String @id @default(cuid())
+  organizationId String
+
+  name        String
+  description String?
+  code        String?
+
+  standardName    String?
+  standardVersion String?
+  framework       String?
+
+  version Int @default(1)
+
+  status   EnterpriseAuditProtocolStatus @default(DRAFT)
+  isActive Boolean                       @default(true)
+
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+
+  /**
+   * When a protocol is revised, this can point back to the
+   * preceding version while retaining the complete history.
+   */
+  previousVersionId String?
+
+  createdById String?
+  updatedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation("AuditProtocolOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  previousVersion AuditProtocol? @relation("AuditProtocolVersionHistory", fields: [previousVersionId], references: [id], onDelete: SetNull)
+
+  newerVersions AuditProtocol[] @relation("AuditProtocolVersionHistory")
+
+  createdBy User? @relation("AuditProtocolCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  updatedBy User? @relation("AuditProtocolUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  enterpriseAudits EnterpriseAudit[] @relation("EnterpriseAuditProtocol")
+
+  sections AuditProtocolSection[]
+
+  defaultForPrograms AuditProgram[] @relation("AuditProgramDefaultProtocol")
+
+  schedules AuditSchedule[] @relation("AuditScheduleProtocol")
+
+  @@unique([organizationId, name, version])
+  @@unique([organizationId, code, version])
+  @@index([organizationId, status, isActive])
+  @@index([previousVersionId])
+  @@index([effectiveFrom, effectiveTo])
+}
+
+model AuditProtocolSection {
+  id         String @id @default(cuid())
+  protocolId String
+
+  title       String
+  description String?
+  guidance    String?
+  standardRef String?
+
+  sequence Int
+  weight   Int @default(1)
+
+  isRequired Boolean @default(true)
+  isActive   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  protocol           AuditProtocol            @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  executionSnapshots EnterpriseAuditSection[] @relation("EnterpriseAuditSourceProtocolSection")
+
+  questions AuditProtocolQuestion[]
+
+  @@unique([protocolId, sequence])
+  @@index([protocolId, isActive])
+}
+
+model AuditProtocolQuestion {
+  id        String @id @default(cuid())
+  sectionId String
+
+  questionText String
+  description  String?
+  guidance     String?
+
+  standardClause String?
+  regulatoryRef  String?
+
+  responseType EnterpriseAuditQuestionResponseType
+
+  sequence Int
+  weight   Int @default(1)
+
+  isRequired Boolean @default(true)
+  isActive   Boolean @default(true)
+
+  allowNotApplicable Boolean @default(true)
+  requireComment     Boolean @default(false)
+  requireEvidence    Boolean @default(false)
+  requirePhoto       Boolean @default(false)
+
+  minimumNumericValue Decimal? @db.Decimal(18, 4)
+  maximumNumericValue Decimal? @db.Decimal(18, 4)
+
+  minimumPassingScore Decimal? @db.Decimal(8, 2)
+  maximumScore        Decimal? @db.Decimal(8, 2)
+
+  findingTrigger  EnterpriseAuditFindingTrigger @default(MANUAL_REVIEW)
+  defaultSeverity EnterpriseAuditSeverity?
+
+  automaticallyCreateFinding Boolean @default(false)
+  automaticallySuggestCapa   Boolean @default(false)
+  automaticallySuggestRisk   Boolean @default(false)
+
+  findingTitleTemplate       String?
+  findingDescriptionTemplate String?
+
+  aiGuidance String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  section AuditProtocolSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  options AuditQuestionOption[]
+
+  executionSnapshots EnterpriseAuditQuestion[] @relation("EnterpriseAuditSourceProtocolQuestion")
+
+  @@unique([sectionId, sequence])
+  @@index([sectionId, isActive])
+  @@index([responseType])
+  @@index([findingTrigger, automaticallyCreateFinding])
+}
+
+model AuditQuestionOption {
+  id         String @id @default(cuid())
+  questionId String
+
+  label       String
+  value       String
+  description String?
+
+  sequence Int
+
+  scoreValue Decimal? @db.Decimal(8, 2)
+
+  isPassing       Boolean?
+  triggersFinding Boolean  @default(false)
+
+  findingSeverity EnterpriseAuditSeverity?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  question           AuditProtocolQuestion                   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  executionSnapshots EnterpriseAuditQuestionOptionSnapshot[] @relation("EnterpriseAuditSourceQuestionOption")
+
+  @@unique([questionId, value])
+  @@unique([questionId, sequence])
+  @@index([questionId, isActive])
+}
+
+// ============================================================
+// AUDIT MANAGEMENT 2.0 — EXECUTION, FINDINGS, AND TRACEABILITY
+// ============================================================
+
+model EnterpriseAudit {
+  id             String @id @default(cuid())
+  organizationId String
+
+  reference String
+  title     String
+
+  description String?
+  objectives  String?
+  scope       String?
+  criteria    String?
+
+  source EnterpriseAuditSource @default(MANUAL)
+  status EnterpriseAuditStatus @default(DRAFT)
+
+  auditType AuditType @default(INTERNAL)
+
+  programId  String?
+  scheduleId String?
+  protocolId String?
+
+  siteId       String
+  departmentId String?
+
+  leadAuditorId String?
+  ownerId       String?
+
+  scheduledAt DateTime?
+  dueDate     DateTime?
+  startedAt   DateTime?
+  submittedAt DateTime?
+  completedAt DateTime?
+  closedAt    DateTime?
+  cancelledAt DateTime?
+
+  cancellationReason String?
+
+  totalQuestionCount     Int @default(0)
+  answeredQuestionCount  Int @default(0)
+  compliantQuestionCount Int @default(0)
+  failedQuestionCount    Int @default(0)
+  notApplicableCount     Int @default(0)
+
+  maximumPossibleScore Decimal? @db.Decimal(12, 2)
+  achievedScore        Decimal? @db.Decimal(12, 2)
+  scorePercentage      Decimal? @db.Decimal(8, 2)
+
+  findingCount         Int @default(0)
+  openFindingCount     Int @default(0)
+  highRiskFindingCount Int @default(0)
+
+  overallRiskLevel EnterpriseAuditSeverity?
+  overallOpinion   String?
+
+  executiveSummary  String?
+  positivePractices String?
+  majorConcerns     String?
+  recommendations   String?
+
+  reminderSentAt    DateTime?
+  overdueNotifiedAt DateTime?
+
+  generatedByScheduleKey String?
+
+  createdById String?
+  updatedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation("EnterpriseAuditOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  program AuditProgram? @relation("EnterpriseAuditProgram", fields: [programId], references: [id], onDelete: SetNull)
+
+  schedule AuditSchedule? @relation("EnterpriseAuditSchedule", fields: [scheduleId], references: [id], onDelete: SetNull)
+
+  protocol AuditProtocol? @relation("EnterpriseAuditProtocol", fields: [protocolId], references: [id], onDelete: SetNull)
+
+  site Site @relation("EnterpriseAuditSite", fields: [siteId], references: [id], onDelete: Restrict)
+
+  department Department? @relation("EnterpriseAuditDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
+
+  leadAuditor User? @relation("EnterpriseAuditLeadAuditor", fields: [leadAuditorId], references: [id], onDelete: SetNull)
+
+  owner User? @relation("EnterpriseAuditOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  createdBy User? @relation("EnterpriseAuditCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  updatedBy User? @relation("EnterpriseAuditUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  teamMembers EnterpriseAuditTeamMember[]
+  sections    EnterpriseAuditSection[]
+  questions   EnterpriseAuditQuestion[]
+  responses   EnterpriseAuditResponse[]
+  evidence    EnterpriseAuditEvidence[]
+  findings    EnterpriseAuditFinding[]
+  history     EnterpriseAuditHistory[]
+
+  @@unique([organizationId, reference])
+  @@unique([scheduleId, generatedByScheduleKey])
+  @@index([organizationId, status])
+  @@index([organizationId, auditType, status])
+  @@index([programId])
+  @@index([scheduleId])
+  @@index([protocolId])
+  @@index([siteId, status])
+  @@index([departmentId, status])
+  @@index([leadAuditorId])
+  @@index([ownerId])
+  @@index([scheduledAt])
+  @@index([dueDate, status])
+  @@index([completedAt])
+  @@index([overallRiskLevel])
+}
+
+model EnterpriseAuditTeamMember {
+  id      String @id @default(cuid())
+  auditId String
+  userId  String
+
+  role EnterpriseAuditTeamRole @default(AUDITOR)
+
+  isRequired Boolean @default(true)
+  canEdit    Boolean @default(true)
+  canReview  Boolean @default(false)
+
+  assignedAt DateTime  @default(now())
+  acceptedAt DateTime?
+  declinedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  audit EnterpriseAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  user User @relation("EnterpriseAuditTeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([auditId, userId])
+  @@index([userId])
+  @@index([auditId, role])
+}
+
+model EnterpriseAuditSection {
+  id      String @id @default(cuid())
+  auditId String
+
+  sourceProtocolSectionId String?
+
+  title       String
+  description String?
+  guidance    String?
+  standardRef String?
+
+  sequence Int
+  weight   Int @default(1)
+
+  status EnterpriseAuditSectionStatus @default(NOT_STARTED)
+
+  isRequired Boolean @default(true)
+  isActive   Boolean @default(true)
+
+  totalQuestionCount    Int @default(0)
+  answeredQuestionCount Int @default(0)
+  failedQuestionCount   Int @default(0)
+
+  maximumPossibleScore Decimal? @db.Decimal(12, 2)
+  achievedScore        Decimal? @db.Decimal(12, 2)
+  scorePercentage      Decimal? @db.Decimal(8, 2)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  audit EnterpriseAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  sourceProtocolSection AuditProtocolSection? @relation("EnterpriseAuditSourceProtocolSection", fields: [sourceProtocolSectionId], references: [id], onDelete: SetNull)
+
+  questions EnterpriseAuditQuestion[]
+
+  @@unique([auditId, sequence])
+  @@index([auditId, status])
+  @@index([sourceProtocolSectionId])
+}
+
+model EnterpriseAuditQuestion {
+  id        String @id @default(cuid())
+  auditId   String
+  sectionId String
+
+  sourceProtocolQuestionId String?
+
+  questionText String
+  description  String?
+  guidance     String?
+
+  standardClause String?
+  regulatoryRef  String?
+
+  responseType EnterpriseAuditQuestionResponseType
+
+  sequence Int
+  weight   Int @default(1)
+
+  isRequired Boolean @default(true)
+  isActive   Boolean @default(true)
+
+  allowNotApplicable Boolean @default(true)
+  requireComment     Boolean @default(false)
+  requireEvidence    Boolean @default(false)
+  requirePhoto       Boolean @default(false)
+
+  minimumNumericValue Decimal? @db.Decimal(18, 4)
+  maximumNumericValue Decimal? @db.Decimal(18, 4)
+
+  minimumPassingScore Decimal? @db.Decimal(8, 2)
+  maximumScore        Decimal? @db.Decimal(8, 2)
+
+  findingTrigger  EnterpriseAuditFindingTrigger @default(MANUAL_REVIEW)
+  defaultSeverity EnterpriseAuditSeverity?
+
+  automaticallyCreateFinding Boolean @default(false)
+  automaticallySuggestCapa   Boolean @default(false)
+  automaticallySuggestRisk   Boolean @default(false)
+
+  findingTitleTemplate       String?
+  findingDescriptionTemplate String?
+
+  aiGuidance String?
+
+  status EnterpriseAuditQuestionStatus @default(NOT_ASSESSED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  audit EnterpriseAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  section EnterpriseAuditSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  sourceProtocolQuestion AuditProtocolQuestion? @relation("EnterpriseAuditSourceProtocolQuestion", fields: [sourceProtocolQuestionId], references: [id], onDelete: SetNull)
+
+  options  EnterpriseAuditQuestionOptionSnapshot[]
+  response EnterpriseAuditResponse?
+  evidence EnterpriseAuditEvidence[]
+  findings EnterpriseAuditFinding[]
+
+  @@unique([sectionId, sequence])
+  @@index([auditId, status])
+  @@index([sourceProtocolQuestionId])
+  @@index([responseType])
+  @@index([findingTrigger])
+}
+
+model EnterpriseAuditQuestionOptionSnapshot {
+  id         String @id @default(cuid())
+  questionId String
+
+  sourceOptionId String?
+
+  label       String
+  value       String
+  description String?
+
+  sequence Int
+
+  scoreValue Decimal? @db.Decimal(8, 2)
+
+  isPassing       Boolean?
+  triggersFinding Boolean  @default(false)
+
+  findingSeverity EnterpriseAuditSeverity?
+
+  createdAt DateTime @default(now())
+
+  question EnterpriseAuditQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  sourceOption AuditQuestionOption? @relation("EnterpriseAuditSourceQuestionOption", fields: [sourceOptionId], references: [id], onDelete: SetNull)
+
+  @@unique([questionId, value])
+  @@unique([questionId, sequence])
+  @@index([sourceOptionId])
+}
+
+model EnterpriseAuditResponse {
+  id         String @id @default(cuid())
+  auditId    String
+  questionId String @unique
+
+  answeredById String?
+
+  result EnterpriseAuditResponseResult @default(NOT_ASSESSED)
+
+  responseText String?
+  numericValue Decimal? @db.Decimal(18, 4)
+  booleanValue Boolean?
+
+  selectedOptionValues Json?
+
+  comments String?
+
+  scoreAwarded Decimal? @db.Decimal(8, 2)
+  maximumScore Decimal? @db.Decimal(8, 2)
+
+  isCompliant      Boolean?
+  requiresFollowUp Boolean  @default(false)
+
+  answeredAt   DateTime?
+  reviewedAt   DateTime?
+  reviewedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  audit EnterpriseAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  question EnterpriseAuditQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  answeredBy User? @relation("EnterpriseAuditResponseAnsweredBy", fields: [answeredById], references: [id], onDelete: SetNull)
+
+  reviewedBy User? @relation("EnterpriseAuditResponseReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  evidence EnterpriseAuditEvidence[]
+  findings EnterpriseAuditFinding[]
+
+  @@index([auditId, result])
+  @@index([answeredById])
+  @@index([reviewedById])
+  @@index([isCompliant])
+  @@index([requiresFollowUp])
+}
+
+model EnterpriseAuditEvidence {
+  id             String @id @default(cuid())
+  organizationId String
+  auditId        String
+
+  questionId String?
+  responseId String?
+  findingId  String?
+
+  evidenceType EnterpriseAuditEvidenceType
+
+  title       String
+  description String?
+
+  fileName String?
+  fileUrl  String?
+  mimeType String?
+  fileSize Int?
+
+  externalUrl String?
+
+  capturedAt   DateTime?
+  capturedById String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation("EnterpriseAuditEvidenceOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  audit EnterpriseAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  question EnterpriseAuditQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  response EnterpriseAuditResponse? @relation(fields: [responseId], references: [id], onDelete: SetNull)
+
+  finding EnterpriseAuditFinding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+
+  capturedBy User? @relation("EnterpriseAuditEvidenceCapturedBy", fields: [capturedById], references: [id], onDelete: SetNull)
+
+  findingEvidenceLinks EnterpriseAuditFindingEvidence[]
+
+  @@index([organizationId, evidenceType])
+  @@index([auditId])
+  @@index([questionId])
+  @@index([responseId])
+  @@index([findingId])
+  @@index([capturedById])
+}
+
+model EnterpriseAuditFinding {
+  id             String @id @default(cuid())
+  organizationId String
+  auditId        String
+
+  questionId String?
+  responseId String?
+
+  reference String
+  title     String
+
+  findingType EnterpriseAuditFindingType     @default(NONCONFORMITY)
+  category    EnterpriseAuditFindingCategory @default(OTHER)
+  severity    EnterpriseAuditSeverity        @default(MEDIUM)
+  status      EnterpriseAuditFindingStatus   @default(DRAFT)
+
+  description       String?
+  objectiveEvidence String?
+  standardClause    String?
+  regulatoryRef     String?
+
+  immediateCorrection String?
+  containmentAction   String?
+  rootCause           String?
+  rootCauseCategory   String?
+
+  ownerId String?
+
+  dueDate DateTime?
+
+  isRepeatFinding          Boolean @default(false)
+  previousFindingReference String?
+
+  recurrenceCount Int @default(0)
+
+  requiresCapa       Boolean @default(false)
+  requiresRiskReview Boolean @default(false)
+
+  capaSuggestedAt DateTime?
+  riskSuggestedAt DateTime?
+
+  submittedAt DateTime?
+  acceptedAt  DateTime?
+  completedAt DateTime?
+  verifiedAt  DateTime?
+  closedAt    DateTime?
+  reopenedAt  DateTime?
+
+  closureSummary String?
+
+  createdById String?
+  updatedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation("EnterpriseAuditFindingOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  audit EnterpriseAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  question EnterpriseAuditQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  response EnterpriseAuditResponse? @relation(fields: [responseId], references: [id], onDelete: SetNull)
+
+  owner User? @relation("EnterpriseAuditFindingOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  createdBy User? @relation("EnterpriseAuditFindingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  updatedBy User? @relation("EnterpriseAuditFindingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  evidence              EnterpriseAuditEvidence[]
+  evidenceLinks         EnterpriseAuditFindingEvidence[]
+  verifications         EnterpriseAuditFindingVerification[]
+  correctiveActionLinks EnterpriseAuditFindingActionLink[]
+  riskLinks             EnterpriseAuditFindingRiskLink[]
+  history               EnterpriseAuditFindingHistory[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status])
+  @@index([auditId, status])
+  @@index([questionId])
+  @@index([responseId])
+  @@index([ownerId, status])
+  @@index([severity, dueDate])
+  @@index([category])
+  @@index([isRepeatFinding])
+  @@index([requiresCapa, requiresRiskReview])
+}
+
+model EnterpriseAuditFindingEvidence {
+  id         String @id @default(cuid())
+  findingId  String
+  evidenceId String
+
+  relationshipNote String?
+
+  createdAt DateTime @default(now())
+
+  finding EnterpriseAuditFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  evidence EnterpriseAuditEvidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@unique([findingId, evidenceId])
+  @@index([evidenceId])
+}
+
+model EnterpriseAuditFindingVerification {
+  id        String @id @default(cuid())
+  findingId String
+
+  status EnterpriseAuditVerificationStatus @default(PENDING)
+
+  verifiedById String?
+
+  verificationMethod   String?
+  verificationEvidence String?
+  comments             String?
+
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  finding EnterpriseAuditFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  verifiedBy User? @relation("EnterpriseAuditFindingVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@index([findingId, status])
+  @@index([verifiedById])
+}
+
+model EnterpriseAuditFindingActionLink {
+  id        String @id @default(cuid())
+  findingId String
+
+  correctiveActionId String?
+
+  status EnterpriseAuditLinkStatus @default(PROPOSED)
+
+  recommendationTitle       String?
+  recommendationDescription String?
+
+  suggestedOwnerId String?
+  suggestedDueDate DateTime?
+
+  rationale String?
+
+  createdById  String?
+  reviewedById String?
+
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  finding EnterpriseAuditFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  correctiveAction CorrectiveAction? @relation("EnterpriseAuditFindingCorrectiveAction", fields: [correctiveActionId], references: [id], onDelete: SetNull)
+
+  suggestedOwner User? @relation("EnterpriseAuditFindingActionSuggestedOwner", fields: [suggestedOwnerId], references: [id], onDelete: SetNull)
+
+  createdBy User? @relation("EnterpriseAuditFindingActionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  reviewedBy User? @relation("EnterpriseAuditFindingActionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([findingId, correctiveActionId])
+  @@index([correctiveActionId])
+  @@index([status])
+  @@index([suggestedOwnerId])
+}
+
+model EnterpriseAuditFindingRiskLink {
+  id        String @id @default(cuid())
+  findingId String
+
+  riskId String?
+
+  status EnterpriseAuditLinkStatus @default(PROPOSED)
+
+  proposedRiskTitle       String?
+  proposedRiskDescription String?
+  proposedHazard          String?
+  proposedConsequence     String?
+
+  proposedLikelihood RiskLikelihood?
+  proposedImpact     RiskImpact?
+
+  rationale String?
+
+  createdById  String?
+  reviewedById String?
+
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  finding EnterpriseAuditFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  risk Risk? @relation("EnterpriseAuditFindingRisk", fields: [riskId], references: [id], onDelete: SetNull)
+
+  createdBy User? @relation("EnterpriseAuditFindingRiskCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  reviewedBy User? @relation("EnterpriseAuditFindingRiskReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([findingId, riskId])
+  @@index([riskId])
+  @@index([status])
+}
+
+model EnterpriseAuditHistory {
+  id             String @id @default(cuid())
+  organizationId String
+  auditId        String
+
+  userId String?
+
+  action EnterpriseAuditHistoryAction
+
+  entityType String
+  entityId   String?
+
+  title       String
+  description String?
+
+  previousValue Json?
+  newValue      Json?
+  metadata      Json?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation("EnterpriseAuditHistoryOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  audit EnterpriseAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  user User? @relation("EnterpriseAuditHistoryUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([auditId, createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([action])
+}
+
+model EnterpriseAuditFindingHistory {
+  id        String @id @default(cuid())
+  findingId String
+
+  userId String?
+
+  action EnterpriseAuditHistoryAction
+
+  title       String
+  description String?
+
+  previousValue Json?
+  newValue      Json?
+  metadata      Json?
+
+  createdAt DateTime @default(now())
+
+  finding EnterpriseAuditFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  user User? @relation("EnterpriseAuditFindingHistoryUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([findingId, createdAt])
+  @@index([userId])
+  @@index([action])
 }
 
 model Inspection {
@@ -779,11 +2290,303 @@ model TrainingRecord {
   updatedAt DateTime @updatedAt
 }
 
+model Risk {
+  id          String @id @default(cuid())
+  reference   String
+  title       String
+  description String
+
+  category   RiskCategory
+  hazardType String?
+  process    String?
+  status     RiskStatus   @default(DRAFT)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  siteId String?
+  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  ownerId String?
+  owner   User?   @relation("RiskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  initialLikelihood RiskLikelihood
+  initialImpact     RiskImpact
+  initialScore      Int
+  initialRiskLevel  RiskLevel
+
+  currentLikelihood RiskLikelihood
+  currentImpact     RiskImpact
+  currentScore      Int
+  currentRiskLevel  RiskLevel
+
+  residualLikelihood RiskLikelihood
+  residualImpact     RiskImpact
+  residualScore      Int
+  residualRiskLevel  RiskLevel
+
+  reviewFrequency RiskReviewFrequency @default(ANNUAL)
+  lastReviewedAt  DateTime?
+  nextReviewDate  DateTime?
+
+  controls RiskControl[]
+  reviews  RiskReview[]
+  links    RiskLink[]
+  mocLinks MocRiskLink[]
+
+  enterpriseAuditFindingLinks EnterpriseAuditFindingRiskLink[] @relation("EnterpriseAuditFindingRisk")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status])
+  @@index([organizationId, category])
+  @@index([siteId, status])
+  @@index([departmentId])
+  @@index([ownerId])
+  @@index([currentRiskLevel, nextReviewDate])
+  @@index([residualRiskLevel, nextReviewDate])
+}
+
+model RiskControl {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  controlType   RiskControlType
+  hierarchy     RiskControlHierarchy
+  effectiveness RiskControlEffectiveness @default(NOT_ASSESSED)
+
+  status Status @default(OPEN)
+
+  ownerId String?
+  owner   User?   @relation("RiskControlOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  dueDate            DateTime?
+  implementedAt      DateTime?
+  verificationDate   DateTime?
+  verificationMethod String?
+  verificationResult String?
+
+  riskId String
+  risk   Risk   @relation(fields: [riskId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([riskId, controlType])
+  @@index([riskId, status])
+  @@index([ownerId])
+  @@index([effectiveness])
+  @@index([dueDate])
+}
+
+model RiskReview {
+  id String @id @default(cuid())
+
+  reviewDate DateTime @default(now())
+  notes      String?
+
+  likelihood RiskLikelihood
+  impact     RiskImpact
+  score      Int
+  riskLevel  RiskLevel
+
+  controlEffectiveness RiskControlEffectiveness?
+  trend                String?
+  nextReviewDate       DateTime?
+
+  riskId String
+  risk   Risk   @relation(fields: [riskId], references: [id], onDelete: Cascade)
+
+  completedById String?
+  completedBy   User?   @relation("RiskReviewCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([riskId, reviewDate])
+  @@index([completedById])
+  @@index([riskLevel])
+}
+
+model RiskLink {
+  id String @id @default(cuid())
+
+  entityType RiskLinkedEntityType
+  entityId   String
+  label      String?
+
+  riskId String
+  risk   Risk   @relation(fields: [riskId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([riskId, entityType, entityId])
+  @@index([entityType, entityId])
+}
+
+model ManagementOfChange {
+  id                    String @id @default(cuid())
+  reference             String
+  title                 String
+  description           String
+  businessJustification String
+
+  changeType     MocChangeType
+  changeDuration MocChangeDuration
+  priority       MocPriority       @default(MEDIUM)
+  status         MocStatus         @default(DRAFT)
+
+  emergencyJustification  String?
+  temporaryExpirationDate DateTime?
+
+  affectedProcess     String?
+  affectedEquipment   String?
+  affectedSystems     String?
+  affectedMaterials   String?
+  operationalImpact   String?
+  regulatoryImpact    String?
+  environmentalImpact String?
+  safetyImpact        String?
+  qualityImpact       String?
+
+  initialLikelihood RiskLikelihood
+  initialImpact     RiskImpact
+  initialScore      Int
+  initialRiskLevel  RiskLevel
+
+  residualLikelihood RiskLikelihood
+  residualImpact     RiskImpact
+  residualScore      Int
+  residualRiskLevel  RiskLevel
+
+  proposedStartDate     DateTime?
+  plannedCompletionDate DateTime?
+  actualStartDate       DateTime?
+  implementedAt         DateTime?
+  verifiedAt            DateTime?
+  closedAt              DateTime?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Restrict)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  requestorId String
+  requestor   User   @relation("MocRequestor", fields: [requestorId], references: [id], onDelete: Restrict)
+
+  ownerId String?
+  owner   User?   @relation("MocOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  approvals MocApproval[]
+  tasks     MocTask[]
+  riskLinks MocRiskLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status])
+  @@index([organizationId, changeType])
+  @@index([siteId, status])
+  @@index([departmentId])
+  @@index([requestorId])
+  @@index([ownerId])
+  @@index([priority, status])
+  @@index([residualRiskLevel, status])
+  @@index([plannedCompletionDate, status])
+}
+
+model MocApproval {
+  id String @id @default(cuid())
+
+  role     MocApprovalRole
+  status   MocApprovalStatus @default(PENDING)
+  sequence Int
+
+  comments    String?
+  requestedAt DateTime  @default(now())
+  decidedAt   DateTime?
+
+  mocId String
+  moc   ManagementOfChange @relation(fields: [mocId], references: [id], onDelete: Cascade)
+
+  approverId String?
+  approver   User?   @relation("MocApprover", fields: [approverId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([mocId, role, sequence])
+  @@index([mocId, status])
+  @@index([approverId])
+}
+
+model MocTask {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+
+  taskType MocTaskType
+  status   MocTaskStatus @default(NOT_STARTED)
+  sequence Int?
+
+  isRequired Boolean @default(true)
+
+  dueDate      DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  verifiedAt   DateTime?
+  evidenceNote String?
+
+  mocId String
+  moc   ManagementOfChange @relation(fields: [mocId], references: [id], onDelete: Cascade)
+
+  assignedToId String?
+  assignedTo   User?   @relation("MocTaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  verifiedById String?
+  verifiedBy   User?   @relation("MocTaskVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([mocId, status])
+  @@index([mocId, taskType])
+  @@index([assignedToId])
+  @@index([dueDate, status])
+}
+
+model MocRiskLink {
+  id String @id @default(cuid())
+
+  relationshipNote String?
+
+  mocId String
+  moc   ManagementOfChange @relation(fields: [mocId], references: [id], onDelete: Cascade)
+
+  riskId String
+  risk   Risk   @relation(fields: [riskId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([mocId, riskId])
+  @@index([riskId])
+}
+
 model RolePermission {
   id         String        @id @default(cuid())
   role       UserRole
   permission PermissionKey
-  
 
   createdAt DateTime @default(now())
 

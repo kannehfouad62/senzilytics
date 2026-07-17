@@ -17,6 +17,10 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  ShieldAlert,
+  Gauge,
+  FileText,
+  Workflow,
 } from "lucide-react";
 
 const primaryNavItems = [
@@ -68,6 +72,29 @@ const ehsNavItems = [
     href: "/capa",
     icon: BarChart3,
   },
+  {
+    label: "Risk Register",
+    href: "/risks",
+    icon: ShieldAlert,
+  },
+  {
+    label: "Risk Report",
+    href: "/risks/report",
+    icon: FileText,
+  },
+  {
+    label: "Risk Dashboard",
+    href: "/risks/dashboard",
+    icon: Gauge,
+  },
+
+  {
+    label: "Management of Change",
+    href: "/moc",
+    icon: Workflow,
+  },
+
+
   {
     label: "Audits",
     href: "/audits",

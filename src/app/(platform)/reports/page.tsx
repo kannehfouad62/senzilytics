@@ -4,6 +4,9 @@ import type {
 import { getExecutiveReportData } from "@/core/analytics/executive-report.service";
 import { ExecutiveReportCharts } from "@/features/reports/executive-report-charts";
 import { PrintReportButton } from "@/features/reports/print-report-button";
+import { ExecutiveReportAiInsights } from "@/features/reports/executive-report-ai-insights";
+import { getRiskAnalyticsData } from "@/core/analytics/risk-analytics.service";
+import { ExecutiveRiskSummary } from "@/features/reports/executive-risk-summary";
 import { requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
@@ -134,23 +137,26 @@ export default async function ReportsPage({
     params.siteId?.trim() ||
     null;
 
-  const [sites, report] =
-    await Promise.all([
+    const [
+      sites,
+      report,
+      riskAnalytics,
+    ] = await Promise.all([
       prisma.site.findMany({
         where: {
           organizationId,
         },
-
+    
         select: {
           id: true,
           name: true,
         },
-
+    
         orderBy: {
           name: "asc",
         },
       }),
-
+    
       getExecutiveReportData({
         organizationId,
         userId: user.id,
@@ -158,6 +164,10 @@ export default async function ReportsPage({
         to,
         siteId,
       }),
+    
+      getRiskAnalyticsData(
+        organizationId
+      ),
     ]);
 
   return (
@@ -264,9 +274,16 @@ export default async function ReportsPage({
             Generate Report
           </button>
         </div>
-      </form>
+        </form>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5 print:grid-cols-5">
+<ExecutiveReportAiInsights
+  from={formatInputDate(from)}
+  to={formatInputDate(to)}
+  siteId={report.filters.siteId}
+  siteName={report.filters.siteName}
+/>
+
+<div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5 print:grid-cols-5">
         <SummaryCard
           label="Incidents"
           value={
@@ -455,6 +472,10 @@ export default async function ReportsPage({
           }
         />
       </div>
+
+      <ExecutiveRiskSummary
+  analytics={riskAnalytics}
+/>
 
       <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6 print:break-before-page print:border-slate-300 print:bg-white">
         <div className="flex items-center gap-3">
