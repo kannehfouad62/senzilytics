@@ -4,6 +4,10 @@
     {
       "path": "/api/workflows/process-sla",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/audit-schedules",
+      "schedule": "0 * * * *"
     }
   ]
 }

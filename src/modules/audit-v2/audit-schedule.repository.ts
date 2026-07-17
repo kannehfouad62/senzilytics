@@ -1099,6 +1099,7 @@ export async function getScheduleGenerationContext(
       requireTeam: true,
       requireLeadAuditor: true,
       generationCount: true,
+      intervalValue: true,
 
       program: {
         select: {
