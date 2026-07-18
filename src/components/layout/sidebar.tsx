@@ -119,26 +119,6 @@ const auditNavItems = [
     href: "/audits/dashboard",
     icon: BarChart3,
   },
-  {
-    label: "Create Audit",
-    href: "/audits/new",
-    icon: ClipboardList,
-  },
-  {
-    label: "Audit Programs",
-    href: "/audits/programs",
-    icon: CalendarCheck,
-  },
-  {
-    label: "Audit Protocols",
-    href: "/audits/protocols",
-    icon: ListChecks,
-  },
-  {
-    label: "Audit Schedules",
-    href: "/audits/schedules",
-    icon: CalendarCheck,
-  },
 ];
 
 const complianceNavItems = [
@@ -185,17 +165,11 @@ type NavigationItem = {
 
 export function Sidebar() {
   return (
-    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 overflow-y-auto border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:block">
-      <div className="mb-10 flex items-center gap-3">
+    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:flex">
+      <div className="mb-8 flex shrink-0 items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/15 text-cyan-300">
           <Activity size={24} />
         </div>
-
-        <NavigationSection
-          label="Audit Management 2.0"
-          items={auditNavItems}
-          featured
-        />
 
         <div>
           <h1 className="text-xl font-bold tracking-tight">
@@ -208,7 +182,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="space-y-7">
+      <nav className="min-h-0 flex-1 space-y-7 overflow-y-auto pr-2">
         <NavigationSection
           label="Platform"
           items={primaryNavItems}
@@ -217,6 +191,12 @@ export function Sidebar() {
         <NavigationSection
           label="EHS Management"
           items={ehsNavItems}
+        />
+
+        <NavigationSection
+          label="Audit Management 2.0"
+          items={auditNavItems}
+          featured
         />
 
         <div>

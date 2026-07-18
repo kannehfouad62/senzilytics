@@ -77,7 +77,7 @@ export async function Topbar() {
   }
 
   return (
-    <header className="flex min-h-20 items-center justify-between gap-3 border-b border-white/10 bg-slate-950/50 px-4 py-3 backdrop-blur-xl sm:px-8">
+    <header className="relative z-40 flex min-h-20 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-slate-950/90 px-4 py-3 backdrop-blur-xl sm:px-8">
       <div>
         <p className="text-sm text-cyan-300">AI Command Center</p>
         <h2 className="text-xl font-semibold">Enterprise Risk Overview</h2>
@@ -90,9 +90,6 @@ export async function Topbar() {
             <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Audit Management 2.0</p>
             <MobileLink href="/audits" label="Audit Workspace" icon={<SearchCheck size={17} />} />
             <MobileLink href="/audits/dashboard" label="Audit Analytics" icon={<BarChart3 size={17} />} />
-            <MobileLink href="/audits/programs" label="Audit Programs" icon={<ClipboardList size={17} />} />
-            <MobileLink href="/audits/protocols" label="Audit Protocols" icon={<ClipboardList size={17} />} />
-            <MobileLink href="/audits/schedules" label="Audit Schedules" icon={<ClipboardList size={17} />} />
           </div>
         </details>
         <div className="hidden items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 md:flex">
