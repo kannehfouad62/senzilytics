@@ -16,11 +16,19 @@ import {
   AuditResponseResult,
   AuditTeamRole,
   AuditType,
+  EnterpriseAuditResponseResult,
   PermissionKey,
+  Prisma,
   RiskLevel,
   Status,
 } from "@prisma/client";
 import { redirect } from "next/navigation";
+
+import {
+  saveEnterpriseAuditResponseService,
+} from "@/modules/audit-v2/audit-execution.service";
+
+import { revalidatePath } from "next/cache";
 
 function getRequiredString(
   formData: FormData,
@@ -144,6 +152,260 @@ function isStatus(
   return Object.values(
     Status
   ).includes(value as Status);
+}
+
+export type AuditExecutionActionResult<
+  T = undefined,
+> = {
+  success: boolean;
+  message: string;
+  data?: T;
+  fieldErrors?: Record<string, string>;
+};
+
+export type SavedAuditResponseActionData = {
+  responseId: string;
+  auditId: string;
+  questionId: string;
+  sectionId: string;
+  result: EnterpriseAuditResponseResult;
+  scoreAwarded: string | null;
+  maximumScore: string | null;
+  isCompliant: boolean | null;
+  requiresFollowUp: boolean;
+  automaticFindingId: string | null;
+
+  sectionProgress: {
+    status: string;
+    answeredQuestionCount: number;
+    failedQuestionCount: number;
+    achievedScore: string | null;
+    maximumPossibleScore: string | null;
+    scorePercentage: string | null;
+  };
+
+  auditProgress: {
+    status: string;
+    answeredQuestionCount: number;
+    failedQuestionCount: number;
+    achievedScore: string | null;
+    maximumPossibleScore: string | null;
+    scorePercentage: string | null;
+  };
+};
+
+function auditExecutionSuccessResult<T>(
+  message: string,
+  data: T
+): AuditExecutionActionResult<T> {
+  return {
+    success: true,
+    message,
+    data,
+  };
+}
+
+function auditExecutionErrorResult<T>(
+  error: unknown,
+  fallbackMessage: string
+): AuditExecutionActionResult<T> {
+  console.error(fallbackMessage, error);
+
+  return {
+    success: false,
+    message:
+      error instanceof Error &&
+      error.message.trim()
+        ? error.message
+        : fallbackMessage,
+  };
+}
+
+function getAuditExecutionRequiredString(
+  formData: FormData,
+  fieldName: string,
+  label: string
+) {
+  const value = String(
+    formData.get(fieldName) ?? ""
+  ).trim();
+
+  if (!value) {
+    throw new Error(`${label} is required.`);
+  }
+
+  return value;
+}
+
+function getAuditExecutionOptionalString(
+  formData: FormData,
+  fieldName: string
+) {
+  const value = String(
+    formData.get(fieldName) ?? ""
+  ).trim();
+
+  return value || null;
+}
+
+function getAuditExecutionEnumValue<
+  TEnum extends Record<string, string>,
+>(
+  formData: FormData,
+  fieldName: string,
+  enumObject: TEnum,
+  label: string
+): TEnum[keyof TEnum] {
+  const value =
+    getAuditExecutionRequiredString(
+      formData,
+      fieldName,
+      label
+    );
+
+  const allowedValues = Object.values(
+    enumObject
+  );
+
+  if (!allowedValues.includes(value)) {
+    throw new Error(
+      `${label} contains an invalid value.`
+    );
+  }
+
+  return value as TEnum[keyof TEnum];
+}
+
+function getAuditExecutionNullableBoolean(
+  formData: FormData,
+  fieldName: string
+): boolean | null {
+  if (!formData.has(fieldName)) {
+    return null;
+  }
+
+  const value = String(
+    formData.get(fieldName) ?? ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!value) {
+    return null;
+  }
+
+  if (
+    ["true", "1", "yes", "on"].includes(
+      value
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    ["false", "0", "no", "off"].includes(
+      value
+    )
+  ) {
+    return false;
+  }
+
+  throw new Error(
+    "Boolean response contains an invalid value."
+  );
+}
+
+function getAuditExecutionSelectedOptions(
+  formData: FormData
+) {
+  const submittedValues = formData
+    .getAll("selectedOptionValues")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+
+  if (submittedValues.length > 1) {
+    return Array.from(
+      new Set(submittedValues)
+    );
+  }
+
+  const singleValue =
+    submittedValues[0] ?? null;
+
+  if (!singleValue) {
+    return [];
+  }
+
+  if (
+    singleValue.startsWith("[") &&
+    singleValue.endsWith("]")
+  ) {
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(singleValue);
+    } catch {
+      throw new Error(
+        "Selected audit options contain invalid JSON."
+      );
+    }
+
+    if (
+      !Array.isArray(parsed) ||
+      !parsed.every(
+        (value) => typeof value === "string"
+      )
+    ) {
+      throw new Error(
+        "Selected audit options must be an array of strings."
+      );
+    }
+
+    return Array.from(
+      new Set(
+        parsed
+          .map((value) => value.trim())
+          .filter(Boolean)
+      )
+    );
+  }
+
+  return [singleValue];
+}
+
+function auditExecutionDecimalToString(
+  value: Prisma.Decimal | null
+) {
+  return value?.toString() ?? null;
+}
+
+function revalidateAuditExecutionPaths(
+  auditId: string,
+  sectionId?: string | null,
+  findingId?: string | null
+) {
+  revalidatePath("/audits");
+  revalidatePath(`/audits/${auditId}`);
+
+  revalidatePath("/audit-management");
+  revalidatePath(
+    "/audit-management/audits"
+  );
+  revalidatePath(
+    `/audit-management/audits/${auditId}`
+  );
+
+  if (sectionId) {
+    revalidatePath(
+      `/audit-management/audits/${auditId}/sections/${sectionId}`
+    );
+  }
+
+  if (findingId) {
+    revalidatePath(
+      `/audit-management/audits/${auditId}/findings/${findingId}`
+    );
+  }
 }
 
 export async function createAudit(
@@ -627,4 +889,180 @@ export async function convertAuditFindingToCorrectiveAction(
   });
 
   redirect(`/audits/${auditId}`);
+}
+
+export async function saveEnterpriseAuditResponse(
+  formData: FormData
+): Promise<
+  AuditExecutionActionResult<SavedAuditResponseActionData>
+> {
+  try {
+    await requirePermission(
+      PermissionKey.MANAGE_AUDITS
+    );
+
+    const { organizationId, user } =
+      await getCurrentUserTenant();
+
+    const auditId =
+      getAuditExecutionRequiredString(
+        formData,
+        "auditId",
+        "Enterprise audit"
+      );
+
+    const questionId =
+      getAuditExecutionRequiredString(
+        formData,
+        "questionId",
+        "Audit question"
+      );
+
+    const result =
+      getAuditExecutionEnumValue(
+        formData,
+        "result",
+        EnterpriseAuditResponseResult,
+        "Audit response result"
+      );
+
+    const saved =
+      await saveEnterpriseAuditResponseService({
+        organizationId,
+        auditId,
+        questionId,
+        userId: user.id,
+        result,
+        responseText:
+          getAuditExecutionOptionalString(
+            formData,
+            "responseText"
+          ),
+        numericValue:
+          getAuditExecutionOptionalString(
+            formData,
+            "numericValue"
+          ),
+        booleanValue:
+          getAuditExecutionNullableBoolean(
+            formData,
+            "booleanValue"
+          ),
+        selectedOptionValues:
+          getAuditExecutionSelectedOptions(
+            formData
+          ),
+        comments:
+          getAuditExecutionOptionalString(
+            formData,
+            "comments"
+          ),
+      });
+
+    revalidateAuditExecutionPaths(
+      saved.auditId,
+      saved.sectionId,
+      saved.automaticFindingId
+    );
+
+    return auditExecutionSuccessResult(
+      saved.automaticFindingId
+        ? "Audit response saved and a finding was created automatically."
+        : "Audit response saved successfully.",
+      {
+        responseId: saved.responseId,
+        auditId: saved.auditId,
+        questionId: saved.questionId,
+        sectionId: saved.sectionId,
+        result: saved.result,
+
+        scoreAwarded:
+          auditExecutionDecimalToString(
+            saved.scoreAwarded
+          ),
+
+        maximumScore:
+          auditExecutionDecimalToString(
+            saved.maximumScore
+          ),
+
+        isCompliant: saved.isCompliant,
+
+        requiresFollowUp:
+          saved.requiresFollowUp,
+
+        automaticFindingId:
+          saved.automaticFindingId,
+
+        sectionProgress: {
+          status:
+            saved.sectionProgress.status,
+
+          answeredQuestionCount:
+            saved.sectionProgress
+              .answeredQuestionCount,
+
+          failedQuestionCount:
+            saved.sectionProgress
+              .failedQuestionCount,
+
+          achievedScore:
+            auditExecutionDecimalToString(
+              saved.sectionProgress
+                .achievedScore
+            ),
+
+          maximumPossibleScore:
+            auditExecutionDecimalToString(
+              saved.sectionProgress
+                .maximumPossibleScore
+            ),
+
+          scorePercentage:
+            auditExecutionDecimalToString(
+              saved.sectionProgress
+                .scorePercentage
+            ),
+        },
+
+        auditProgress: {
+          status:
+            saved.auditProgress.status,
+
+          answeredQuestionCount:
+            saved.auditProgress
+              .answeredQuestionCount,
+
+          failedQuestionCount:
+            saved.auditProgress
+              .failedQuestionCount,
+
+          achievedScore:
+            auditExecutionDecimalToString(
+              saved.auditProgress
+                .achievedScore
+            ),
+
+          maximumPossibleScore:
+            auditExecutionDecimalToString(
+              saved.auditProgress
+                .maximumPossibleScore
+            ),
+
+          scorePercentage:
+            auditExecutionDecimalToString(
+              saved.auditProgress
+                .scorePercentage
+            ),
+        },
+      }
+    );
+  } catch (error) {
+    return auditExecutionErrorResult<
+      SavedAuditResponseActionData
+    >(
+      error,
+      "The audit response could not be saved."
+    );
+  }
 }

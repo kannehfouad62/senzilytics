@@ -1387,7 +1387,7 @@ async function notifyGeneratedAudit(input: {
         type: NotificationType.ASSIGNMENT,
         title: "Enterprise audit assigned",
         message: `You have been assigned to ${input.auditReference}: ${input.auditTitle}.`,
-        link: `/audit-management/audits/${input.auditId}`,
+        link: `/audit-management/audit/${input.auditId}`,
       })
     )
   );
