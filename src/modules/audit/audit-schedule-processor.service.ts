@@ -89,8 +89,8 @@ export async function processAuditSchedules(now = new Date()) {
 
       const nextOccurrence = advanceAuditScheduleDate(occurrence, schedule.frequency, schedule.intervalValue);
       const isExpired = !nextOccurrence || Boolean(schedule.endDate && nextOccurrence > schedule.endDate);
-      await prisma.auditSchedule.update({
-        where: { id: schedule.id },
+      const advancement = await prisma.auditSchedule.updateMany({
+        where: { id: schedule.id, nextRunAt: occurrence },
         data: {
           nextRunAt: isExpired ? null : nextOccurrence,
           lastRunAt: occurrence,
@@ -99,11 +99,21 @@ export async function processAuditSchedules(now = new Date()) {
           status: isExpired ? EnterpriseAuditScheduleStatus.COMPLETED : EnterpriseAuditScheduleStatus.ACTIVE,
         },
       });
-      result.advanced += 1;
-      if (isExpired) result.expired += 1;
+      if (advancement.count > 0) {
+        result.advanced += 1;
+        if (isExpired) result.expired += 1;
+      }
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         result.alreadyGenerated += 1;
+        const existing = await prisma.enterpriseAudit.findFirst({ where: { scheduleId: schedule.id, generatedByScheduleKey: generationKey }, select: { id: true } });
+        const nextOccurrence = advanceAuditScheduleDate(occurrence, schedule.frequency, schedule.intervalValue);
+        const isExpired = !nextOccurrence || Boolean(schedule.endDate && nextOccurrence > schedule.endDate);
+        const advancement = await prisma.auditSchedule.updateMany({
+          where: { id: schedule.id, nextRunAt: occurrence },
+          data: { nextRunAt: isExpired ? null : nextOccurrence, lastRunAt: occurrence, lastGenerationKey: generationKey, generationCount: { increment: existingGenerationIncrement(existing?.id ?? null, schedule.lastGenerationKey, generationKey) }, status: isExpired ? EnterpriseAuditScheduleStatus.COMPLETED : EnterpriseAuditScheduleStatus.ACTIVE },
+        });
+        if (advancement.count > 0) { result.advanced += 1; if (isExpired) result.expired += 1; }
         continue;
       }
       result.failed += 1;

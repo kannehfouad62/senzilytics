@@ -159,3 +159,12 @@ export async function completeAuditService(input: { organizationId: string; user
   const recipients = await prisma.enterpriseAuditTeamMember.findMany({ where: { auditId: audit.id }, select: { userId: true } });
   await Promise.all(recipients.map(({ userId }) => createNotification({ organizationId: input.organizationId, userId, type: NotificationType.SUCCESS, title: "Audit completed", message: `${audit.reference} — ${audit.title} has been completed.`, link: `/audits/${audit.id}` }).catch(() => undefined)));
 }
+
+export async function saveAuditConclusionService(input: { organizationId: string; userId: string; userRole: UserRole; auditId: string; executiveSummary: string | null; overallOpinion: string | null; positivePractices: string | null; majorConcerns: string | null; recommendations: string | null }) {
+  const audit = await getAuthorizedAudit({ ...input, review: true });
+  if (audit.status === EnterpriseAuditStatus.CANCELLED || audit.status === EnterpriseAuditStatus.CLOSED) throw new Error("A closed or cancelled Audit conclusion cannot be changed.");
+  await prisma.$transaction([
+    prisma.enterpriseAudit.update({ where: { id: audit.id }, data: { executiveSummary: input.executiveSummary, overallOpinion: input.overallOpinion, positivePractices: input.positivePractices, majorConcerns: input.majorConcerns, recommendations: input.recommendations, updatedById: input.userId } }),
+    prisma.enterpriseAuditHistory.create({ data: { organizationId: input.organizationId, auditId: audit.id, userId: input.userId, action: "UPDATED", entityType: "EnterpriseAudit", entityId: audit.id, title: "Audit executive conclusion updated" } }),
+  ]);
+}

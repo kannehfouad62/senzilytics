@@ -1,12 +1,12 @@
 import { addAuditTeamMember, removeAuditTeamMember } from "@/features/audits/schedule.actions";
 import { AuditFindingManagement } from "@/features/audits/audit-finding-management";
-import { completeAudit, recordAuditResponse, startAuditExecution, submitAuditForReview } from "@/features/audits/execution.actions";
+import { completeAudit, recordAuditResponse, saveAuditConclusion, startAuditExecution, submitAuditForReview } from "@/features/audits/execution.actions";
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { findTenantAuditById } from "@/modules/audit/audit.repository";
 import { findTenantAuditUsers } from "@/modules/audit/audit-schedule.repository";
 import { EnterpriseAuditResponseResult, EnterpriseAuditStatus, EnterpriseAuditTeamRole, PermissionKey } from "@prisma/client";
-import { ArrowLeft, CalendarDays, CircleAlert, ClipboardList, History, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, CircleAlert, ClipboardList, FileText, History, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -39,6 +39,7 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
           <p className="mt-2 max-w-3xl text-slate-400">{audit.description || "No audit description provided."}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Link href={`/audits/${audit.id}/report`} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold"><FileText size={16} /> Report</Link>
           <StatusBadge status={audit.status} />
           {startableStatuses.has(audit.status) && <form action={startAuditExecution}><input type="hidden" name="auditId" value={audit.id} /><button className="rounded-2xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950">Start Execution</button></form>}
           {audit.status === EnterpriseAuditStatus.IN_PROGRESS && <form action={submitAuditForReview}><input type="hidden" name="auditId" value={audit.id} /><button className="rounded-2xl bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950">Submit for Review</button></form>}
@@ -85,6 +86,9 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
         </div>
 
         <div className="space-y-6">
+          <Panel title="Executive conclusion" icon={<FileText size={18} />}>
+            <form action={saveAuditConclusion} className="space-y-4"><input type="hidden" name="auditId" value={audit.id} /><ExecutionField label="Executive summary"><textarea name="executiveSummary" rows={3} defaultValue={audit.executiveSummary ?? ""} className={executionInputClass} /></ExecutionField><ExecutionField label="Overall opinion"><textarea name="overallOpinion" rows={2} defaultValue={audit.overallOpinion ?? ""} className={executionInputClass} /></ExecutionField><ExecutionField label="Positive practices"><textarea name="positivePractices" rows={2} defaultValue={audit.positivePractices ?? ""} className={executionInputClass} /></ExecutionField><ExecutionField label="Major concerns"><textarea name="majorConcerns" rows={2} defaultValue={audit.majorConcerns ?? ""} className={executionInputClass} /></ExecutionField><ExecutionField label="Recommendations"><textarea name="recommendations" rows={3} defaultValue={audit.recommendations ?? ""} className={executionInputClass} /></ExecutionField><button className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950">Save Conclusion</button></form>
+          </Panel>
           <Panel title="Audit team" icon={<Users size={18} />}>
             {audit.teamMembers.length === 0 ? <Empty text="No audit team members assigned." /> : <div className="space-y-3">{audit.teamMembers.map((member) => <div key={member.id} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-950/40 p-4"><div><p className="font-medium">{member.user.name}</p><p className="mt-1 text-xs text-slate-500">{pretty(member.role)}{member.user.jobTitle ? ` · ${member.user.jobTitle}` : ""}{member.canReview ? " · Reviewer" : ""}</p></div>{member.userId !== audit.leadAuditorId && <form action={removeAuditTeamMember}><input type="hidden" name="auditId" value={audit.id} /><input type="hidden" name="memberId" value={member.userId} /><button className="text-xs text-red-300">Remove</button></form>}</div>)}</div>}
             <form action={addAuditTeamMember} className="mt-5 space-y-4 rounded-2xl border border-white/10 p-4">

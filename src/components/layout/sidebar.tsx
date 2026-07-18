@@ -115,6 +115,11 @@ const auditNavItems = [
     icon: SearchCheck,
   },
   {
+    label: "Audit Analytics",
+    href: "/audits/dashboard",
+    icon: SearchCheck,
+  },
+  {
     label: "Create Audit",
     href: "/audits/new",
     icon: ClipboardList,

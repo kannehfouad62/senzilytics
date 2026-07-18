@@ -2,7 +2,7 @@ import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { findTenantAudits } from "@/modules/audit/audit.repository";
 import { EnterpriseAuditStatus, PermissionKey } from "@prisma/client";
-import { CalendarClock, CircleAlert, ClipboardCheck, FileCheck2, Plus, ShieldCheck, Target } from "lucide-react";
+import { BarChart3, CalendarClock, CircleAlert, ClipboardCheck, FileCheck2, Plus, ShieldCheck, Target } from "lucide-react";
 import Link from "next/link";
 
 const closedStatuses = new Set<EnterpriseAuditStatus>([
@@ -35,6 +35,7 @@ export default async function AuditsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <Link href="/audits/dashboard" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><BarChart3 size={17} /> Analytics</Link>
           <Link href="/audits/programs" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><Target size={17} /> Programs</Link>
           <Link href="/audits/protocols" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><FileCheck2 size={17} /> Protocols</Link>
           <Link href="/audits/schedules" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><CalendarClock size={17} /> Schedules</Link>

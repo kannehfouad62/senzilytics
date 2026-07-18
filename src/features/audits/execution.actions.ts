@@ -5,6 +5,7 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import {
   completeAuditService,
   recordAuditResponseService,
+  saveAuditConclusionService,
   startAuditExecutionService,
   submitAuditForReviewService,
 } from "@/modules/audit/audit-execution.service";
@@ -39,4 +40,10 @@ export async function completeAudit(formData: FormData) {
   await requirePermission(PermissionKey.VIEW_AUDITS); const { organizationId, user } = await getCurrentUserTenant(); const auditId = required(formData, "auditId");
   await completeAuditService({ organizationId, userId: user.id, userRole: user.role, auditId });
   revalidatePath(`/audits/${auditId}`);
+}
+
+export async function saveAuditConclusion(formData: FormData) {
+  await requirePermission(PermissionKey.VIEW_AUDITS); const { organizationId, user } = await getCurrentUserTenant(); const auditId = required(formData, "auditId");
+  await saveAuditConclusionService({ organizationId, userId: user.id, userRole: user.role, auditId, executiveSummary: optional(formData, "executiveSummary"), overallOpinion: optional(formData, "overallOpinion"), positivePractices: optional(formData, "positivePractices"), majorConcerns: optional(formData, "majorConcerns"), recommendations: optional(formData, "recommendations") });
+  revalidatePath(`/audits/${auditId}`); revalidatePath(`/audits/${auditId}/report`);
 }
