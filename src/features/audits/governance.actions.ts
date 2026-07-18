@@ -3,6 +3,7 @@
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import {
+  activateAuditProgramService,
   activateAuditProtocolService,
   addAuditProtocolQuestionService,
   addAuditProtocolSectionService,
@@ -110,4 +111,13 @@ export async function activateAuditProtocol(formData: FormData) {
   await activateAuditProtocolService({ organizationId, userId: user.id, protocolId });
   revalidatePath(`/audits/protocols/${protocolId}`);
   revalidatePath("/audits/protocols");
+}
+
+export async function activateAuditProgram(formData: FormData) {
+  await requirePermission(PermissionKey.MANAGE_AUDITS);
+  const { organizationId, user } = await getCurrentUserTenant();
+  const programId = required(formData, "programId");
+  await activateAuditProgramService({ organizationId, userId: user.id, programId });
+  revalidatePath(`/audits/programs/${programId}`);
+  revalidatePath("/audits/programs");
 }

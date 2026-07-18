@@ -118,6 +118,28 @@ export async function createAuditProtocolService(input: {
   return protocol;
 }
 
+export async function activateAuditProgramService(input: {
+  organizationId: string;
+  userId: string;
+  programId: string;
+}) {
+  const program = await prisma.auditProgram.findFirst({
+    where: { id: input.programId, organizationId: input.organizationId },
+    include: { sites: true, defaultProtocol: true },
+  });
+  if (!program) throw new Error("Audit program not found.");
+  if (program.sites.length === 0) throw new Error("Select at least one site before activating the program.");
+  if (!program.defaultProtocol || program.defaultProtocol.status !== EnterpriseAuditProtocolStatus.ACTIVE) {
+    throw new Error("Select an active default protocol before activating the program.");
+  }
+  const updated = await prisma.auditProgram.update({
+    where: { id: program.id },
+    data: { status: EnterpriseAuditProgramStatus.ACTIVE, isActive: true },
+  });
+  await logActivity({ organizationId: input.organizationId, userId: input.userId, action: ActivityAction.STATUS_CHANGE, entityType: "AuditProgram", entityId: program.id, title: "Audit program activated", description: program.name });
+  return updated;
+}
+
 export async function addAuditProtocolSectionService(input: {
   organizationId: string;
   userId: string;

@@ -37,6 +37,7 @@ export default async function AuditsPage() {
         <div className="flex flex-wrap gap-3">
           <Link href="/audits/programs" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><Target size={17} /> Programs</Link>
           <Link href="/audits/protocols" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><FileCheck2 size={17} /> Protocols</Link>
+          <Link href="/audits/schedules" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><CalendarClock size={17} /> Schedules</Link>
           <Link href="/audits/new" className="inline-flex items-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"><Plus size={17} /> Create Audit</Link>
         </div>
       </div>
