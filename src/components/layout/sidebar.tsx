@@ -110,14 +110,14 @@ const inspectionNavItems = [
 
 const auditNavItems = [
   {
-    label: "Enterprise Audits",
+    label: "Audit Workspace",
     href: "/audits",
     icon: SearchCheck,
   },
   {
     label: "Audit Analytics",
     href: "/audits/dashboard",
-    icon: SearchCheck,
+    icon: BarChart3,
   },
   {
     label: "Create Audit",
@@ -185,11 +185,17 @@ type NavigationItem = {
 
 export function Sidebar() {
   return (
-    <aside className="hidden min-h-screen w-72 border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:block">
+    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 overflow-y-auto border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:block">
       <div className="mb-10 flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/15 text-cyan-300">
           <Activity size={24} />
         </div>
+
+        <NavigationSection
+          label="Audit Management 2.0"
+          items={auditNavItems}
+          featured
+        />
 
         <div>
           <h1 className="text-xl font-bold tracking-tight">
@@ -237,11 +243,6 @@ export function Sidebar() {
         </div>
 
         <NavigationSection
-          label="Audits"
-          items={auditNavItems}
-        />
-
-        <NavigationSection
           label="Governance"
           items={complianceNavItems}
         />
@@ -253,9 +254,11 @@ export function Sidebar() {
 function NavigationSection({
   label,
   items,
+  featured = false,
 }: {
   label: string;
   items: NavigationItem[];
+  featured?: boolean;
 }) {
   return (
     <div>
@@ -263,7 +266,7 @@ function NavigationSection({
         {label}
       </p>
 
-      <div className="space-y-2">
+      <div className={`space-y-2 ${featured ? "rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.04] p-2" : ""}`}>
         {items.map((item) => {
           const Icon = item.icon;
 

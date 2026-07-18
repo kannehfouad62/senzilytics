@@ -1,6 +1,6 @@
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Bell, ClipboardList, LogOut, Search, Sparkles } from "lucide-react";
+import { BarChart3, Bell, ClipboardList, LogOut, Menu, Search, SearchCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -77,13 +77,24 @@ export async function Topbar() {
   }
 
   return (
-    <header className="flex h-20 items-center justify-between border-b border-white/10 bg-slate-950/50 px-8 backdrop-blur-xl">
+    <header className="flex min-h-20 items-center justify-between gap-3 border-b border-white/10 bg-slate-950/50 px-4 py-3 backdrop-blur-xl sm:px-8">
       <div>
         <p className="text-sm text-cyan-300">AI Command Center</p>
         <h2 className="text-xl font-semibold">Enterprise Risk Overview</h2>
       </div>
 
       <div className="flex items-center gap-4">
+        <details className="relative lg:hidden">
+          <summary className="flex cursor-pointer list-none items-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-300" title="Open navigation"><Menu size={20} /></summary>
+          <div className="absolute right-0 z-50 mt-3 w-64 rounded-2xl border border-white/10 bg-slate-950 p-3 shadow-2xl">
+            <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Audit Management 2.0</p>
+            <MobileLink href="/audits" label="Audit Workspace" icon={<SearchCheck size={17} />} />
+            <MobileLink href="/audits/dashboard" label="Audit Analytics" icon={<BarChart3 size={17} />} />
+            <MobileLink href="/audits/programs" label="Audit Programs" icon={<ClipboardList size={17} />} />
+            <MobileLink href="/audits/protocols" label="Audit Protocols" icon={<ClipboardList size={17} />} />
+            <MobileLink href="/audits/schedules" label="Audit Schedules" icon={<ClipboardList size={17} />} />
+          </div>
+        </details>
         <div className="hidden items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 md:flex">
           <Search size={18} className="text-slate-400" />
           <span className="text-sm text-slate-400">
@@ -146,4 +157,8 @@ export async function Topbar() {
       </div>
     </header>
   );
+}
+
+function MobileLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
+  return <Link href={href} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-300 transition hover:bg-cyan-400/10 hover:text-cyan-200">{icon}{label}</Link>;
 }
