@@ -108,6 +108,19 @@ const inspectionNavItems = [
   },
 ];
 
+const auditNavItems = [
+  {
+    label: "Enterprise Audits",
+    href: "/audits",
+    icon: SearchCheck,
+  },
+  {
+    label: "Create Audit",
+    href: "/audits/new",
+    icon: ClipboardList,
+  },
+];
+
 const complianceNavItems = [
   {
     label: "Compliance",
@@ -202,6 +215,11 @@ export function Sidebar() {
             })}
           </div>
         </div>
+
+        <NavigationSection
+          label="Audits"
+          items={auditNavItems}
+        />
 
         <NavigationSection
           label="Governance"
