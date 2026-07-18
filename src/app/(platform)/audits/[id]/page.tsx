@@ -1,6 +1,7 @@
 import { addAuditTeamMember, removeAuditTeamMember } from "@/features/audits/schedule.actions";
 import { AuditFindingManagement } from "@/features/audits/audit-finding-management";
 import { AuditActionForm } from "@/features/audits/audit-action-form";
+import { AuditAiAssistant } from "@/features/audits/audit-ai-assistant";
 import { AuditEvidenceUpload } from "@/features/audits/audit-evidence-upload";
 import { completeAudit, recordAuditResponse, saveAuditConclusion, startAuditExecution, submitAuditForReviewWithFeedback } from "@/features/audits/execution.actions";
 import { requirePermission } from "@/lib/permissions";
@@ -106,6 +107,9 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
             {audit.history.length === 0 ? <Empty text="No history recorded." /> : <div className="space-y-4">{audit.history.map((entry) => <div key={entry.id} className="border-l border-cyan-400/30 pl-4"><p className="text-sm font-medium">{entry.title}</p><p className="mt-1 text-xs text-slate-500">{entry.user?.name || "System"} · {entry.createdAt.toLocaleString()}</p></div>)}</div>}
           </Panel>
         </div>
+      </div>
+      <div className="mt-8">
+        <AuditAiAssistant auditId={audit.id} reference={audit.reference} />
       </div>
       <div className="mt-8">
         <Panel title="Audit Findings, CAPA, and Risk" icon={<CircleAlert size={18} />}>

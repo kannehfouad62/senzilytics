@@ -145,13 +145,16 @@ export type ExecutiveReportData = {
     ExecutiveReportAttentionItem[];
 };
 
-const CLOSED_STATUSES: Status[] = [
+const CLOSED_STATUSES: string[] = [
   Status.COMPLETED,
   Status.CLOSED,
+  "CANCELLED",
+  "REJECTED",
+  "ARCHIVED",
 ];
 
 function isClosedStatus(
-  status: Status
+  status: string
 ) {
   return CLOSED_STATUSES.includes(
     status
@@ -475,7 +478,7 @@ export async function getExecutiveReportData(
     incidents,
     investigations,
     correctiveActions,
-    audits,
+    enterpriseAudits,
     inspections,
     workflowInstances,
     overdueWorkflowSteps,
@@ -699,8 +702,9 @@ export async function getExecutiveReportData(
       ],
     }),
 
-    prisma.audit.findMany({
+    prisma.enterpriseAudit.findMany({
       where: {
+        organizationId: input.organizationId,
         siteId: {
           in: siteIds,
         },
@@ -716,6 +720,7 @@ export async function getExecutiveReportData(
         title: true,
         status: true,
         scheduledAt: true,
+        dueDate: true,
         completedAt: true,
         createdAt: true,
 
@@ -738,7 +743,7 @@ export async function getExecutiveReportData(
             title: true,
             description: true,
             status: true,
-            riskLevel: true,
+            severity: true,
             dueDate: true,
           },
         },
@@ -924,6 +929,8 @@ export async function getExecutiveReportData(
       }),
       ]);
 
+  const audits = enterpriseAudits.map((audit) => ({ ...audit, findings: audit.findings.map((finding) => ({ ...finding, riskLevel: finding.severity === "CRITICAL" ? RiskLevel.CRITICAL : finding.severity === "HIGH" ? RiskLevel.HIGH : finding.severity === "MEDIUM" ? RiskLevel.MEDIUM : RiskLevel.LOW })) }));
+
   const activeIncidents =
     incidents.filter(
       (incident) =>
@@ -1007,8 +1014,8 @@ export async function getExecutiveReportData(
           audit.status
         ) &&
         Boolean(
-          audit.scheduledAt &&
-            audit.scheduledAt <
+          audit.dueDate &&
+            audit.dueDate <
               now
         )
     );
@@ -1468,7 +1475,7 @@ export async function getExecutiveReportData(
       riskLevel: null,
       status: audit.status,
       dueDate:
-        audit.scheduledAt,
+        audit.dueDate,
       siteName:
         audit.site.name,
       ownerName:
