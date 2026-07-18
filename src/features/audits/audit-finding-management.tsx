@@ -5,6 +5,8 @@ import {
   createAuditFinding,
   createCapaFromAuditFindingWithFeedback,
   createRiskFromAuditFinding,
+  reviewCapaProposal,
+  reviewRiskProposal,
   transitionAuditFinding,
   verifyAuditFinding,
 } from "@/features/audits/finding.actions";
@@ -14,6 +16,7 @@ import {
   EnterpriseAuditFindingCategory,
   EnterpriseAuditFindingStatus,
   EnterpriseAuditFindingType,
+  EnterpriseAuditLinkStatus,
   EnterpriseAuditSeverity,
   RiskCategory,
   RiskImpact,
@@ -46,6 +49,7 @@ export function AuditFindingManagement({ audit, users }: { audit: Audit; users: 
       {finding.correctiveActionLinks.every((link) => !link.correctiveAction) && <details className={detailClass}><summary className={summaryClass}>Create linked CAPA</summary><AuditActionForm action={createCapaFromAuditFindingWithFeedback} className="mt-4 space-y-4"><Hidden auditId={audit.id} findingId={finding.id} /><Field label="Action title"><input name="title" required defaultValue={`Corrective action — ${finding.title}`} className={inputClass} /></Field><Field label="Description"><textarea name="description" rows={2} defaultValue={finding.description ?? ""} className={inputClass} /></Field><UserSelect label="Assigned to" name="assignedToId" users={users} required /><Field label="Due date (must be in the future)"><input type="date" name="dueDate" required className={inputClass} /></Field><Button>Create CAPA</Button></AuditActionForm></details>}
       {finding.riskLinks.every((link) => !link.risk) && <details className={detailClass}><summary className={summaryClass}>Create linked risk</summary><form action={createRiskFromAuditFinding} className="mt-4 space-y-4"><Hidden auditId={audit.id} findingId={finding.id} /><Field label="Risk title"><input name="title" required defaultValue={finding.title} className={inputClass} /></Field><Field label="Risk description"><textarea name="description" required rows={2} defaultValue={finding.description ?? finding.title} className={inputClass} /></Field><EnumSelect label="Category" name="riskCategory" values={Object.values(RiskCategory)} defaultValue={RiskCategory.SAFETY} /><Field label="Hazard type"><input name="hazardType" className={inputClass} /></Field><UserSelect label="Risk owner" name="ownerId" users={users} /><div className="grid gap-4 md:grid-cols-2"><EnumSelect label="Likelihood" name="likelihood" values={Object.values(RiskLikelihood)} defaultValue={RiskLikelihood.POSSIBLE} /><EnumSelect label="Impact" name="impact" values={Object.values(RiskImpact)} defaultValue={RiskImpact.MODERATE} /></div><Field label="Next review"><input type="date" name="nextReviewDate" className={inputClass} /></Field><Button>Create Risk</Button></form></details>}</div>
       {(finding.correctiveActionLinks.some((link) => link.correctiveAction) || finding.riskLinks.some((link) => link.risk)) && <div className="mt-5 flex flex-wrap gap-2">{finding.correctiveActionLinks.map((link) => link.correctiveAction && <span key={link.id} className="rounded-full bg-amber-400/10 px-3 py-1 text-xs text-amber-200">CAPA: {link.correctiveAction.title} · {pretty(link.correctiveAction.status)}</span>)}{finding.riskLinks.map((link) => link.risk && <a key={link.id} href={`/risks/${link.risk.id}`} className="rounded-full bg-purple-400/10 px-3 py-1 text-xs text-purple-200">Risk: {link.risk.reference} · {pretty(link.risk.status)}</a>)}</div>}
+      {(finding.correctiveActionLinks.some((link) => link.status === EnterpriseAuditLinkStatus.PROPOSED) || finding.riskLinks.some((link) => link.status === EnterpriseAuditLinkStatus.PROPOSED)) && <div className="mt-5 space-y-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4"><p className="text-sm font-semibold text-amber-200">Recommendations awaiting authorized review</p>{finding.correctiveActionLinks.filter((link) => link.status === EnterpriseAuditLinkStatus.PROPOSED).map((link) => <Proposal key={link.id} auditId={audit.id} findingId={finding.id} linkId={link.id} title={link.recommendationTitle || "CAPA recommendation"} kind="CAPA" action={reviewCapaProposal} />)}{finding.riskLinks.filter((link) => link.status === EnterpriseAuditLinkStatus.PROPOSED).map((link) => <Proposal key={link.id} auditId={audit.id} findingId={finding.id} linkId={link.id} title={link.proposedRiskTitle || "Risk recommendation"} kind="RISK" action={reviewRiskProposal} />)}</div>}
     </article>)}
   </div>;
 }
@@ -59,3 +63,4 @@ function UserSelect({ label, name, users, required = false, defaultValue = "" }:
 function Check({ name, label }: { name: string; label: string }) { return <label className="flex gap-2"><input type="checkbox" name={name} />{label}</label>; }
 function Button({ children }: { children: React.ReactNode }) { return <button className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950">{children}</button>; }
 function Info({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-white/[0.03] p-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-sm">{value}</p></div>; }
+function Proposal({ auditId, findingId, linkId, title, kind, action }: { auditId: string; findingId: string; linkId: string; title: string; kind: string; action: (formData: FormData) => Promise<void> }) { return <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-950/50 p-3"><div><p className="text-sm font-medium">{title}</p><p className="text-xs text-slate-500">{kind} proposal</p></div><form action={action} className="flex gap-2"><Hidden auditId={auditId} findingId={findingId} /><input type="hidden" name="linkId" value={linkId} /><button name="decision" value="REJECT" className="rounded-lg border border-red-400/30 px-3 py-1 text-xs text-red-200">Reject</button><button name="decision" value="APPROVE" className="rounded-lg bg-emerald-400 px-3 py-1 text-xs font-semibold text-slate-950">Approve</button></form></div>; }

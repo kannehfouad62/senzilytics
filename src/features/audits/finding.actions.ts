@@ -6,8 +6,10 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import {
   addAuditFindingEvidenceService,
   createAuditFindingService,
-  createCapaFromAuditFindingService,
-  createRiskFromAuditFindingService,
+  proposeCapaFromAuditFindingService,
+  proposeRiskFromAuditFindingService,
+  reviewCapaProposalService,
+  reviewRiskProposalService,
   transitionAuditFindingService,
   verifyAuditFindingService,
 } from "@/modules/audit/audit-finding.service";
@@ -56,16 +58,19 @@ export async function verifyAuditFinding(formData: FormData) {
 
 export async function createCapaFromAuditFinding(formData: FormData) {
   await requirePermission(PermissionKey.CREATE_CAPA); const { organizationId, user } = await getCurrentUserTenant(); const auditId = required(formData, "auditId"); const dueDate = date(formData, "dueDate", true); if (!dueDate) throw new Error("dueDate is required.");
-  await createCapaFromAuditFindingService({ organizationId, userId: user.id, auditId, findingId: required(formData, "findingId"), title: required(formData, "title"), description: optional(formData, "description"), assignedToId: required(formData, "assignedToId"), dueDate });
+  await proposeCapaFromAuditFindingService({ organizationId, userId: user.id, auditId, findingId: required(formData, "findingId"), title: required(formData, "title"), description: optional(formData, "description"), assignedToId: required(formData, "assignedToId"), dueDate });
   revalidatePath(`/audits/${auditId}`); revalidatePath("/capa"); revalidatePath("/actions");
 }
 export async function createCapaFromAuditFindingWithFeedback(_state: AuditActionFeedback, formData: FormData): Promise<AuditActionFeedback> {
-  try { await createCapaFromAuditFinding(formData); return { status: "success", message: "CAPA created and linked to the finding." }; }
+  try { await createCapaFromAuditFinding(formData); return { status: "success", message: "CAPA recommendation submitted for approval." }; }
   catch (error) { return auditActionError(error, "The CAPA could not be created."); }
 }
 
 export async function createRiskFromAuditFinding(formData: FormData) {
   await requirePermission(PermissionKey.MANAGE_RISKS); const { organizationId, user } = await getCurrentUserTenant(); const auditId = required(formData, "auditId");
-  await createRiskFromAuditFindingService({ organizationId, userId: user.id, auditId, findingId: required(formData, "findingId"), title: required(formData, "title"), description: required(formData, "description"), category: enumValue(RiskCategory, required(formData, "riskCategory"), "A valid risk category is required."), hazardType: optional(formData, "hazardType"), ownerId: optional(formData, "ownerId"), likelihood: enumValue(RiskLikelihood, required(formData, "likelihood"), "A valid likelihood is required."), impact: enumValue(RiskImpact, required(formData, "impact"), "A valid impact is required."), nextReviewDate: date(formData, "nextReviewDate") });
+  await proposeRiskFromAuditFindingService({ organizationId, userId: user.id, auditId, findingId: required(formData, "findingId"), title: required(formData, "title"), description: required(formData, "description"), category: enumValue(RiskCategory, required(formData, "riskCategory"), "A valid risk category is required."), hazardType: optional(formData, "hazardType"), ownerId: optional(formData, "ownerId"), likelihood: enumValue(RiskLikelihood, required(formData, "likelihood"), "A valid likelihood is required."), impact: enumValue(RiskImpact, required(formData, "impact"), "A valid impact is required."), nextReviewDate: date(formData, "nextReviewDate") });
   revalidatePath(`/audits/${auditId}`); revalidatePath("/risks");
 }
+
+export async function reviewCapaProposal(formData: FormData) { await requirePermission(PermissionKey.CREATE_CAPA); const { organizationId, user } = await getCurrentUserTenant(); const auditId = required(formData, "auditId"); await reviewCapaProposalService({ organizationId, userId: user.id, auditId, findingId: required(formData, "findingId"), linkId: required(formData, "linkId"), approve: required(formData, "decision") === "APPROVE" }); revalidatePath(`/audits/${auditId}`); revalidatePath("/capa"); revalidatePath("/actions"); }
+export async function reviewRiskProposal(formData: FormData) { await requirePermission(PermissionKey.MANAGE_RISKS); const { organizationId, user } = await getCurrentUserTenant(); const auditId = required(formData, "auditId"); await reviewRiskProposalService({ organizationId, userId: user.id, auditId, findingId: required(formData, "findingId"), linkId: required(formData, "linkId"), approve: required(formData, "decision") === "APPROVE" }); revalidatePath(`/audits/${auditId}`); revalidatePath("/risks"); }
