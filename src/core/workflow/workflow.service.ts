@@ -30,7 +30,7 @@ function getEntityLink(
       return "/actions";
 
     case WorkflowEntityType.AUDIT:
-      return "/audits";
+      return "/workflows";
 
     case WorkflowEntityType.INSPECTION:
       return "/inspections";

@@ -4,6 +4,7 @@ import { processIncidentEscalations } from "@/core/notifications/incident-escala
 import { processInspectionSlaNotifications } from "@/core/notifications/inspection-sla.service";
 import { processInvestigationSlaNotifications } from "@/core/notifications/investigation-sla.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
+import { processAuditSchedules } from "@/modules/audit/audit-schedule-processor.service";
 import {
   NextRequest,
   NextResponse,
@@ -65,6 +66,7 @@ export async function GET(
       investigationResult,
       auditResult,
       inspectionResult,
+      auditScheduleResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
 
@@ -77,6 +79,8 @@ export async function GET(
       processAuditSlaNotifications(),
 
       processInspectionSlaNotifications(),
+
+      processAuditSchedules(),
     ]);
 
     return NextResponse.json({
@@ -103,6 +107,9 @@ export async function GET(
       inspections:
         inspectionResult,
 
+      auditSchedules:
+        auditScheduleResult,
+
       totals: {
         checked:
           workflowResult.checked +
@@ -110,7 +117,8 @@ export async function GET(
           incidentEscalationResult.checked +
           investigationResult.checked +
           auditResult.checked +
-          inspectionResult.checked,
+          inspectionResult.checked +
+          auditScheduleResult.checked,
 
         remindersSent:
           workflowResult.remindersSent +
@@ -172,7 +180,9 @@ export async function GET(
           incidentEscalationResult.skipped +
           investigationResult.skipped +
           auditResult.skipped +
-          inspectionResult.skipped,
+          inspectionResult.skipped +
+          auditScheduleResult.skipped +
+          auditScheduleResult.failed,
       },
     });
   } catch (error) {

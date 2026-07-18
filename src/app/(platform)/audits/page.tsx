@@ -1,283 +1,95 @@
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { findTenantAudits } from "@/modules/audit/audit.repository";
-import {
-  AuditResponseResult,
-  PermissionKey,
-  RiskLevel,
-  Status,
-} from "@prisma/client";
-import {
-  CircleAlert,
-  ClipboardCheck,
-  Plus,
-  SearchCheck,
-  Users,
-} from "lucide-react";
+import { EnterpriseAuditStatus, PermissionKey } from "@prisma/client";
+import { BarChart3, CalendarClock, CircleAlert, ClipboardCheck, FileCheck2, Plus, ShieldCheck, Target } from "lucide-react";
 import Link from "next/link";
 
+const closedStatuses = new Set<EnterpriseAuditStatus>([
+  EnterpriseAuditStatus.COMPLETED,
+  EnterpriseAuditStatus.CLOSED,
+  EnterpriseAuditStatus.CANCELLED,
+]);
+
 export default async function AuditsPage() {
-  await requirePermission(
-    PermissionKey.VIEW_AUDITS
-  );
-
-  const { organizationId } =
-    await getCurrentUserTenant();
-
-  const audits =
-    await findTenantAudits(
-      organizationId
-    );
-
-  const openAudits =
-    audits.filter(
-      (audit) =>
-        audit.status !==
-          Status.COMPLETED &&
-        audit.status !==
-          Status.CLOSED
-    ).length;
-
-  const totalFindings =
-    audits.reduce(
-      (total, audit) =>
-        total +
-        audit.findings.length,
-      0
-    );
-
-  const highRiskFindings =
-    audits.reduce(
-      (total, audit) =>
-        total +
-        audit.findings.filter(
-          (finding) =>
-            finding.riskLevel ===
-              RiskLevel.HIGH ||
-            finding.riskLevel ===
-              RiskLevel.CRITICAL
-        ).length,
-      0
-    );
+  await requirePermission(PermissionKey.VIEW_AUDITS);
+  const { organizationId } = await getCurrentUserTenant();
+  const audits = await findTenantAudits(organizationId);
+  const today = new Date();
+  const open = audits.filter((audit) => !closedStatuses.has(audit.status)).length;
+  const overdue = audits.filter(
+    (audit) => audit.dueDate && audit.dueDate < today && !closedStatuses.has(audit.status)
+  ).length;
+  const findings = audits.reduce((total, audit) => total + audit.openFindingCount, 0);
 
   return (
     <div>
       <div className="mb-8 flex flex-wrap items-start justify-between gap-5">
         <div>
           <p className="flex items-center gap-2 text-sm text-cyan-300">
-            <SearchCheck size={16} />
-            Audit Management
+            <ShieldCheck size={16} /> Audit Management
           </p>
-
-          <h1 className="mt-2 text-4xl font-bold tracking-tight">
-            Audits
-          </h1>
-
-          <p className="mt-2 max-w-2xl text-slate-400">
-            Plan, execute, score, and
-            close enterprise audits
-            across every operating site.
+          <h1 className="mt-2 text-4xl font-bold tracking-tight">Enterprise Audits</h1>
+          <p className="mt-2 max-w-3xl text-slate-400">
+            Plan, execute, review, and close risk-based audits with controlled protocols and full traceability.
           </p>
         </div>
-
-        <Link
-          href="/audits/new"
-          className="inline-flex items-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950"
-        >
-          <Plus size={17} />
-          Create Audit
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/audits/dashboard" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><BarChart3 size={17} /> Analytics</Link>
+          <Link href="/audits/programs" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><Target size={17} /> Programs</Link>
+          <Link href="/audits/protocols" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><FileCheck2 size={17} /> Protocols</Link>
+          <Link href="/audits/schedules" className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/30"><CalendarClock size={17} /> Schedules</Link>
+          <Link href="/audits/new" className="inline-flex items-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"><Plus size={17} /> Create Audit</Link>
+        </div>
       </div>
 
       <div className="mb-8 grid gap-4 md:grid-cols-3">
-        <SummaryCard
-          label="Open audits"
-          value={openAudits}
-          icon={<ClipboardCheck />}
-        />
-
-        <SummaryCard
-          label="Total findings"
-          value={totalFindings}
-          icon={<SearchCheck />}
-        />
-
-        <SummaryCard
-          label="High-risk findings"
-          value={highRiskFindings}
-          icon={<CircleAlert />}
-        />
+        <Summary label="Open audits" value={open} icon={<ClipboardCheck size={20} />} />
+        <Summary label="Overdue audits" value={overdue} icon={<CalendarClock size={20} />} />
+        <Summary label="Open findings" value={findings} icon={<CircleAlert size={20} />} />
       </div>
 
       <div className="grid gap-5">
-        {audits.map((audit) => {
-          const answeredItems =
-            audit.checklistItems.filter(
-              (item) =>
-                item.response &&
-                item.response.result !==
-                  AuditResponseResult.NOT_ASSESSED
-            ).length;
-
-          const checklistProgress =
-            audit.checklistItems.length >
-            0
-              ? Math.round(
-                  (answeredItems /
-                    audit
-                      .checklistItems
-                      .length) *
-                    100
-                )
-              : 0;
-
-          return (
-            <Link
-              key={audit.id}
-              href={`/audits/${audit.id}`}
-              className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-cyan-400/30"
-            >
-              <div className="flex flex-wrap justify-between gap-4">
-                <div>
-                  <p className="text-xs text-cyan-300">
-                    {audit.reference ||
-                      "No reference"}{" "}
-                    ·{" "}
-                    {audit.type.replaceAll(
-                      "_",
-                      " "
-                    )}
-                  </p>
-
-                  <h2 className="mt-2 text-xl font-semibold text-white">
-                    {audit.title}
-                  </h2>
-
-                  <p className="mt-2 text-sm text-slate-400">
-                    {audit.scope ||
-                      "No scope provided."}
-                  </p>
-                </div>
-
-                <StatusBadge
-                  status={audit.status}
-                />
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-4">
-                <InfoCard
-                  label="Site"
-                  value={audit.site.name}
-                />
-
-                <InfoCard
-                  label="Lead auditor"
-                  value={
-                    audit.leadAuditor
-                      ?.name ||
-                    "Not assigned"
-                  }
-                />
-
-                <InfoCard
-                  label="Audit team"
-                  value={`${audit.teamMembers.length} members`}
-                  icon={<Users size={15} />}
-                />
-
-                <InfoCard
-                  label="Checklist"
-                  value={
-                    audit
-                      .checklistTemplate
-                      ? `${checklistProgress}% complete`
-                      : "No checklist"
-                  }
-                />
-              </div>
-
-              {audit.checklistItems
-                .length > 0 && (
-                <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-900">
-                  <div
-                    className="h-full rounded-full bg-cyan-300"
-                    style={{
-                      width: `${checklistProgress}%`,
-                    }}
-                  />
-                </div>
-              )}
-            </Link>
-          );
-        })}
-
-        {audits.length === 0 && (
-          <div className="rounded-3xl border border-dashed border-white/15 p-12 text-center text-slate-400">
-            No audits found.
+        {audits.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-white/15 bg-white/[0.03] p-12 text-center">
+            <ShieldCheck className="mx-auto text-slate-500" size={34} />
+            <h2 className="mt-4 text-xl font-semibold">No enterprise audits yet</h2>
+            <p className="mt-2 text-sm text-slate-400">Create the first audit and optionally snapshot an active protocol for execution.</p>
           </div>
-        )}
+        ) : audits.map((audit) => (
+          <Link key={audit.id} href={`/audits/${audit.id}`} className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-cyan-400/30">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-medium text-cyan-300">{audit.reference} · {label(audit.auditType)}</p>
+                <h2 className="mt-2 text-xl font-semibold text-white">{audit.title}</h2>
+                <p className="mt-2 max-w-3xl text-sm text-slate-400">{audit.description || audit.scope || "No description or scope provided."}</p>
+              </div>
+              <StatusBadge status={audit.status} />
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-4">
+              <Info label="Site" value={audit.site.name} />
+              <Info label="Lead auditor" value={audit.leadAuditor?.name || "Not assigned"} />
+              <Info label="Protocol" value={audit.protocol ? `${audit.protocol.name} v${audit.protocol.version}` : "Not selected"} />
+              <Info label="Progress" value={`${audit.answeredQuestionCount}/${audit.totalQuestionCount} answered`} />
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   );
 }
 
-function SummaryCard({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-      <div className="flex justify-between text-cyan-300">
-        <p className="text-sm text-slate-400">
-          {label}
-        </p>
+function label(value: string) { return value.replaceAll("_", " "); }
 
-        {icon}
-      </div>
-
-      <p className="mt-3 text-3xl font-semibold text-white">
-        {value}
-      </p>
-    </div>
-  );
+function Summary({ label: text, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
+  return <div className="rounded-3xl border border-white/10 bg-white/5 p-5"><div className="flex items-center justify-between text-slate-400"><p className="text-sm">{text}</p><span className="text-cyan-300">{icon}</span></div><p className="mt-3 text-3xl font-bold">{value}</p></div>;
 }
 
-function InfoCard({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-      <p className="flex items-center gap-2 text-xs text-slate-500">
-        {icon}
-        {label}
-      </p>
-
-      <p className="mt-1 text-sm font-medium text-white">
-        {value}
-      </p>
-    </div>
-  );
+function Info({ label: text, value }: { label: string; value: string }) {
+  return <div className="rounded-2xl bg-slate-950/40 p-4"><p className="text-xs uppercase tracking-wide text-slate-500">{text}</p><p className="mt-2 text-sm text-slate-200">{value}</p></div>;
 }
 
-function StatusBadge({
-  status,
-}: {
-  status: Status;
-}) {
-  return (
-    <span className="h-fit rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-300">
-      {status.replaceAll("_", " ")}
-    </span>
-  );
+function StatusBadge({ status }: { status: EnterpriseAuditStatus }) {
+  const tone = status === EnterpriseAuditStatus.OVERDUE ? "border-red-400/30 bg-red-400/10 text-red-200" : status === EnterpriseAuditStatus.CLOSED || status === EnterpriseAuditStatus.COMPLETED ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-cyan-400/30 bg-cyan-400/10 text-cyan-200";
+  return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}>{label(status)}</span>;
 }

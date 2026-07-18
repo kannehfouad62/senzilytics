@@ -1,0 +1,25 @@
+import { PrintAuditReportButton } from "@/features/audits/print-audit-report-button";
+import { requirePermission } from "@/lib/permissions";
+import { getCurrentUserTenant } from "@/lib/tenant";
+import { findTenantAuditById } from "@/modules/audit/audit.repository";
+import { PermissionKey } from "@prisma/client";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+export default async function AuditReportPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePermission(PermissionKey.VIEW_AUDITS); const [{ id }, { organizationId }] = await Promise.all([params, getCurrentUserTenant()]); const audit = await findTenantAuditById(id, organizationId); if (!audit) notFound();
+  return <article className="mx-auto max-w-5xl print:max-w-none print:text-black"><div className="mb-8 flex justify-between print:hidden"><Link href={`/audits/${id}`} className="inline-flex items-center gap-2 text-sm text-slate-400"><ArrowLeft size={16}/> Audit record</Link><PrintAuditReportButton/></div>
+    <header className="border-b border-white/15 pb-6 print:border-black"><p className="text-sm font-semibold uppercase tracking-widest text-cyan-500">Controlled audit report</p><h1 className="mt-2 text-4xl font-bold">{audit.title}</h1><p className="mt-2 text-slate-400 print:text-slate-700">{audit.reference} · {pretty(audit.auditType)} · {pretty(audit.status)}</p></header>
+    <section className="grid grid-cols-2 gap-4 py-6 md:grid-cols-4"><Fact label="Site" value={audit.site.name}/><Fact label="Lead auditor" value={audit.leadAuditor?.name || "Unassigned"}/><Fact label="Scheduled" value={date(audit.scheduledAt)}/><Fact label="Completed" value={date(audit.completedAt)}/><Fact label="Score" value={audit.scorePercentage == null ? "Not scored" : `${Number(audit.scorePercentage)}%`}/><Fact label="Questions" value={`${audit.answeredQuestionCount}/${audit.totalQuestionCount}`}/><Fact label="Findings" value={String(audit.findingCount)}/><Fact label="Open findings" value={String(audit.openFindingCount)}/></section>
+    <Section title="Scope and criteria"><Text label="Objectives" value={audit.objectives}/><Text label="Scope" value={audit.scope}/><Text label="Criteria" value={audit.criteria}/></Section>
+    <Section title="Executive conclusion"><Text label="Executive summary" value={audit.executiveSummary}/><Text label="Overall opinion" value={audit.overallOpinion}/><Text label="Positive practices" value={audit.positivePractices}/><Text label="Major concerns" value={audit.majorConcerns}/><Text label="Recommendations" value={audit.recommendations}/></Section>
+    <Section title="Assessment results">{audit.sections.map((section)=><div key={section.id} className="mb-6 break-inside-avoid"><h3 className="font-semibold">{section.sequence}. {section.title}</h3><div className="mt-2 divide-y divide-white/10 print:divide-slate-300">{section.questions.map((q)=><div key={q.id} className="grid grid-cols-[1fr_auto] gap-4 py-3 text-sm"><div><p>{q.sequence}. {q.questionText}</p>{q.response?.comments && <p className="mt-1 text-slate-500">{q.response.comments}</p>}{q.evidence.length > 0 && <p className="mt-1 text-xs text-slate-500">Evidence: {q.evidence.map((e)=>e.title).join(", ")}</p>}</div><b>{q.response ? pretty(q.response.result) : "NOT ASSESSED"}</b></div>)}</div></div>)}</Section>
+    <Section title="Findings register">{audit.findings.length ? <div className="space-y-4">{audit.findings.map((f)=><div key={f.id} className="break-inside-avoid rounded-xl border border-white/10 p-4 print:border-slate-400"><div className="flex justify-between gap-4"><b>{f.reference} · {f.title}</b><span>{pretty(f.severity)} / {pretty(f.status)}</span></div><p className="mt-2 text-sm text-slate-500">{f.description || "No description."}</p><p className="mt-2 text-xs">Owner: {f.owner?.name || "Unassigned"} · Due: {date(f.dueDate)} · CAPA links: {f.correctiveActionLinks.length} · Risk links: {f.riskLinks.length}{f.isRepeatFinding ? " · REPEAT FINDING" : ""}</p></div>)}</div>:<p>No findings recorded.</p>}</Section>
+    <footer className="mt-8 border-t border-white/15 pt-4 text-xs text-slate-500 print:border-black">Generated {new Date().toLocaleString()} from the controlled Senzilytics audit record. Record history contains {audit.history.length} recent event(s).</footer>
+  </article>;
+}
+function pretty(v:string){return v.replaceAll("_"," ")} function date(v:Date|null){return v?v.toLocaleDateString():"Not set"}
+function Fact({label,value}:{label:string;value:string}){return <div><p className="text-xs uppercase text-slate-500">{label}</p><p className="mt-1 text-sm font-medium">{value}</p></div>}
+function Section({title,children}:{title:string;children:React.ReactNode}){return <section className="border-t border-white/15 py-6 print:border-slate-400"><h2 className="mb-4 text-xl font-bold">{title}</h2>{children}</section>}
+function Text({label,value}:{label:string;value:string|null}){return <div className="mb-4"><h3 className="text-xs font-semibold uppercase text-slate-500">{label}</h3><p className="mt-1 whitespace-pre-wrap text-sm">{value||"Not recorded."}</p></div>}

@@ -119,6 +119,19 @@ function getActionSource(input: {
         };
       }
     | null;
+
+  enterpriseAuditFindingLink:
+    | {
+        finding: {
+          id: string;
+          title: string;
+          audit: {
+            id: string;
+            title: string;
+          };
+        };
+      }
+    | null;
 }): {
   sourceType: CapaSourceType;
   sourceTitle: string;
@@ -152,6 +165,16 @@ function getActionSource(input: {
           .inspection.title,
       sourceLink:
         `/inspections/${input.inspectionFinding.inspection.id}`,
+    };
+  }
+
+  if (input.enterpriseAuditFindingLink) {
+    return {
+      sourceType: "AUDIT",
+      sourceTitle:
+        input.enterpriseAuditFindingLink.finding.audit.title,
+      sourceLink:
+        `/audits/${input.enterpriseAuditFindingLink.finding.audit.id}`,
     };
   }
 
@@ -245,6 +268,16 @@ export async function getCapaDashboardData(
           },
 
           {
+            enterpriseAuditFindingLinks: {
+              some: {
+                finding: {
+                  organizationId,
+                },
+              },
+            },
+          },
+
+          {
             assignedTo: {
               organizationId,
             },
@@ -299,6 +332,24 @@ export async function getCapaDashboardData(
             },
           },
         },
+
+        enterpriseAuditFindingLinks: {
+          select: {
+            finding: {
+              select: {
+                id: true,
+                title: true,
+                audit: {
+                  select: {
+                    id: true,
+                    title: true,
+                  },
+                },
+              },
+            },
+          },
+          take: 1,
+        },
       },
 
       orderBy: [
@@ -325,6 +376,9 @@ export async function getCapaDashboardData(
 
             inspectionFinding:
               action.inspectionFinding,
+
+            enterpriseAuditFindingLink:
+              action.enterpriseAuditFindingLinks[0] ?? null,
           });
 
         return {

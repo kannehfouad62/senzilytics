@@ -93,13 +93,6 @@ const ehsNavItems = [
     href: "/moc",
     icon: Workflow,
   },
-
-
-  {
-    label: "Audits",
-    href: "/audits",
-    icon: SearchCheck,
-  },
 ];
 
 const inspectionNavItems = [
@@ -112,6 +105,39 @@ const inspectionNavItems = [
     label: "Inspection Checklists",
     href: "/inspections/checklists",
     icon: ListChecks,
+  },
+];
+
+const auditNavItems = [
+  {
+    label: "Enterprise Audits",
+    href: "/audits",
+    icon: SearchCheck,
+  },
+  {
+    label: "Audit Analytics",
+    href: "/audits/dashboard",
+    icon: SearchCheck,
+  },
+  {
+    label: "Create Audit",
+    href: "/audits/new",
+    icon: ClipboardList,
+  },
+  {
+    label: "Audit Programs",
+    href: "/audits/programs",
+    icon: CalendarCheck,
+  },
+  {
+    label: "Audit Protocols",
+    href: "/audits/protocols",
+    icon: ListChecks,
+  },
+  {
+    label: "Audit Schedules",
+    href: "/audits/schedules",
+    icon: CalendarCheck,
   },
 ];
 
@@ -209,6 +235,11 @@ export function Sidebar() {
             })}
           </div>
         </div>
+
+        <NavigationSection
+          label="Audits"
+          items={auditNavItems}
+        />
 
         <NavigationSection
           label="Governance"
