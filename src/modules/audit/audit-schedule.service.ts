@@ -111,6 +111,21 @@ export async function removeAuditScheduleTeamMemberService(input: { organization
   await logActivity({ organizationId: input.organizationId, userId: input.userId, action: ActivityAction.UPDATE, entityType: "AuditSchedule", entityId: schedule.id, title: "Schedule team member removed", description: input.memberId });
 }
 
+export async function changeAuditScheduleStatusService(input: { organizationId: string; userId: string; scheduleId: string; status: EnterpriseAuditScheduleStatus }) {
+  const schedule = await prisma.auditSchedule.findFirst({ where: { id: input.scheduleId, organizationId: input.organizationId } });
+  if (!schedule) throw new Error("Audit schedule not found.");
+  const allowed: Record<EnterpriseAuditScheduleStatus, EnterpriseAuditScheduleStatus[]> = {
+    ACTIVE: [EnterpriseAuditScheduleStatus.PAUSED, EnterpriseAuditScheduleStatus.CANCELLED],
+    PAUSED: [EnterpriseAuditScheduleStatus.ACTIVE, EnterpriseAuditScheduleStatus.CANCELLED],
+    COMPLETED: [], CANCELLED: [], EXPIRED: [],
+  };
+  if (!allowed[schedule.status].includes(input.status)) throw new Error(`Schedule cannot move from ${schedule.status} to ${input.status}.`);
+  if (input.status === EnterpriseAuditScheduleStatus.ACTIVE && schedule.endDate && schedule.endDate < new Date()) throw new Error("This schedule cannot resume because its end date has passed.");
+  const updated = await prisma.auditSchedule.update({ where: { id: schedule.id }, data: { status: input.status, nextRunAt: input.status === EnterpriseAuditScheduleStatus.CANCELLED ? null : schedule.nextRunAt, updatedById: input.userId } });
+  await logActivity({ organizationId: input.organizationId, userId: input.userId, action: ActivityAction.STATUS_CHANGE, entityType: "AuditSchedule", entityId: schedule.id, title: `Audit schedule ${input.status.toLowerCase()}`, description: schedule.name });
+  return updated;
+}
+
 export async function addAuditTeamMemberService(input: { organizationId: string; userId: string; auditId: string; memberId: string; role: EnterpriseAuditTeamRole; canEdit: boolean; canReview: boolean }) {
   const [audit, member] = await Promise.all([prisma.enterpriseAudit.findFirst({ where: { id: input.auditId, organizationId: input.organizationId } }), prisma.user.findFirst({ where: { id: input.memberId, organizationId: input.organizationId } })]);
   if (!audit || !member) throw new Error("Audit or team member not found.");

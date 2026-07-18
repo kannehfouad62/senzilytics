@@ -10,12 +10,17 @@ import {
   addAuditProtocolSectionService,
   createAuditProgramService,
   createAuditProtocolService,
+  changeAuditProgramStatusService,
+  removeAuditProtocolQuestionService,
+  removeAuditProtocolSectionService,
+  reviseAuditProtocolService,
 } from "@/modules/audit/audit-governance.service";
 import {
   EnterpriseAuditFindingTrigger,
   EnterpriseAuditFrequency,
   EnterpriseAuditQuestionResponseType,
   EnterpriseAuditRiskPriority,
+  EnterpriseAuditProgramStatus,
   EnterpriseAuditSeverity,
   PermissionKey,
 } from "@prisma/client";
@@ -125,4 +130,21 @@ export async function activateAuditProgram(formData: FormData) {
 export async function activateAuditProgramWithFeedback(_state: AuditActionFeedback, formData: FormData): Promise<AuditActionFeedback> {
   try { await activateAuditProgram(formData); return { status: "success", message: "Audit program activated." }; }
   catch (error) { return auditActionError(error, "The Audit program could not be activated."); }
+}
+
+export async function changeAuditProgramStatusWithFeedback(_state: AuditActionFeedback, formData: FormData): Promise<AuditActionFeedback> {
+  try { const programId = required(formData, "programId"); const status = enumValue(EnterpriseAuditProgramStatus, required(formData, "status"), "A valid program status is required."); await requirePermission(PermissionKey.MANAGE_AUDITS); const { organizationId, user } = await getCurrentUserTenant(); await changeAuditProgramStatusService({ organizationId, userId: user.id, programId, status }); revalidatePath(`/audits/programs/${programId}`); revalidatePath("/audits/programs"); return { status: "success", message: `Audit program changed to ${status.replaceAll("_", " ").toLowerCase()}.` }; }
+  catch (error) { return auditActionError(error, "The Audit program status could not be changed."); }
+}
+
+export async function reviseAuditProtocol(formData: FormData) {
+  await requirePermission(PermissionKey.MANAGE_AUDITS); const { organizationId, user } = await getCurrentUserTenant(); const revised = await reviseAuditProtocolService({ organizationId, userId: user.id, protocolId: required(formData, "protocolId") }); redirect(`/audits/protocols/${revised.id}`);
+}
+
+export async function removeAuditProtocolSection(formData: FormData) {
+  await requirePermission(PermissionKey.MANAGE_AUDITS); const { organizationId, user } = await getCurrentUserTenant(); const protocolId = required(formData, "protocolId"); await removeAuditProtocolSectionService({ organizationId, userId: user.id, protocolId, sectionId: required(formData, "sectionId") }); revalidatePath(`/audits/protocols/${protocolId}`);
+}
+
+export async function removeAuditProtocolQuestion(formData: FormData) {
+  await requirePermission(PermissionKey.MANAGE_AUDITS); const { organizationId, user } = await getCurrentUserTenant(); const protocolId = required(formData, "protocolId"); await removeAuditProtocolQuestionService({ organizationId, userId: user.id, protocolId, questionId: required(formData, "questionId") }); revalidatePath(`/audits/protocols/${protocolId}`);
 }

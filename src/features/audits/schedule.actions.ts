@@ -6,12 +6,14 @@ import {
   addAuditScheduleTeamMemberService,
   addAuditTeamMemberService,
   createAuditScheduleService,
+  changeAuditScheduleStatusService,
   removeAuditScheduleTeamMemberService,
   removeAuditTeamMemberService,
 } from "@/modules/audit/audit-schedule.service";
 import {
   EnterpriseAuditFrequency,
   EnterpriseAuditScheduleTeamRole,
+  EnterpriseAuditScheduleStatus,
   EnterpriseAuditTeamRole,
   PermissionKey,
 } from "@prisma/client";
@@ -77,4 +79,9 @@ export async function removeAuditTeamMember(formData: FormData) {
   await requirePermission(PermissionKey.MANAGE_AUDITS); const { organizationId, user } = await getCurrentUserTenant(); const auditId = required(formData, "auditId");
   await removeAuditTeamMemberService({ organizationId, userId: user.id, auditId, memberId: required(formData, "memberId") });
   revalidatePath(`/audits/${auditId}`);
+}
+
+export async function changeAuditScheduleStatusWithFeedback(_state: import("./audit-action-feedback").AuditActionFeedback, formData: FormData): Promise<import("./audit-action-feedback").AuditActionFeedback> {
+  try { await requirePermission(PermissionKey.MANAGE_AUDITS); const { organizationId, user } = await getCurrentUserTenant(); const scheduleId = required(formData, "scheduleId"); const status = enumValue(EnterpriseAuditScheduleStatus, required(formData, "status"), "A valid schedule status is required."); await changeAuditScheduleStatusService({ organizationId, userId: user.id, scheduleId, status }); revalidatePath(`/audits/schedules/${scheduleId}`); revalidatePath("/audits/schedules"); return { status: "success", message: `Schedule changed to ${status.replaceAll("_", " ").toLowerCase()}.` }; }
+  catch (error) { const { auditActionError } = await import("./audit-action-feedback"); return auditActionError(error, "The schedule status could not be changed."); }
 }
