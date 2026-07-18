@@ -7,13 +7,14 @@ import {
   EnterpriseAuditHistoryAction,
   EnterpriseAuditSource,
   EnterpriseAuditStatus,
+  EnterpriseAuditTeamRole,
   NotificationType,
 } from "@prisma/client";
 import { createTenantAudit } from "./audit.repository";
 
 type CreateAuditInput = {
   organizationId: string;
-  userId: string;
+  userId?: string | null;
   title: string;
   reference?: string | null;
   description?: string | null;
@@ -29,6 +30,15 @@ type CreateAuditInput = {
   ownerId?: string | null;
   scheduledAt?: Date | null;
   dueDate?: Date | null;
+  source?: EnterpriseAuditSource;
+  scheduleId?: string | null;
+  generatedByScheduleKey?: string | null;
+  teamMembers?: Array<{
+    userId: string;
+    role: EnterpriseAuditTeamRole;
+    canEdit?: boolean;
+    canReview?: boolean;
+  }>;
 };
 
 function buildAuditReference() {
@@ -38,7 +48,8 @@ function buildAuditReference() {
 }
 
 export async function createAuditService(input: CreateAuditInput) {
-  const [site, department, program, protocol, leadAuditor, owner] =
+  const requestedTeamIds = [...new Set((input.teamMembers ?? []).map((member) => member.userId))];
+  const [site, department, program, protocol, leadAuditor, owner, schedule, teamUsers] =
     await Promise.all([
       prisma.site.findFirst({ where: { id: input.siteId, organizationId: input.organizationId } }),
       input.departmentId
@@ -75,6 +86,13 @@ export async function createAuditService(input: CreateAuditInput) {
       input.ownerId
         ? prisma.user.findFirst({ where: { id: input.ownerId, organizationId: input.organizationId } })
         : null,
+      input.scheduleId
+        ? prisma.auditSchedule.findFirst({ where: { id: input.scheduleId, organizationId: input.organizationId } })
+        : null,
+      prisma.user.findMany({
+        where: { id: { in: requestedTeamIds }, organizationId: input.organizationId },
+        select: { id: true },
+      }),
     ]);
 
   if (!site) throw new Error("The selected site is not available to your organization.");
@@ -85,6 +103,8 @@ export async function createAuditService(input: CreateAuditInput) {
   if (input.protocolId && !protocol) throw new Error("The selected audit protocol is invalid.");
   if (input.leadAuditorId && !leadAuditor) throw new Error("The selected lead auditor is invalid.");
   if (input.ownerId && !owner) throw new Error("The selected audit owner is invalid.");
+  if (input.scheduleId && !schedule) throw new Error("The selected audit schedule is invalid.");
+  if (teamUsers.length !== requestedTeamIds.length) throw new Error("One or more audit team members are invalid.");
   if (input.dueDate && input.scheduledAt && input.dueDate < input.scheduledAt) {
     throw new Error("The due date cannot be before the scheduled date.");
   }
@@ -102,10 +122,11 @@ export async function createAuditService(input: CreateAuditInput) {
       objectives: input.objectives,
       scope: input.scope,
       criteria: input.criteria,
-      source: EnterpriseAuditSource.MANUAL,
+      source: input.source ?? EnterpriseAuditSource.MANUAL,
       status: input.scheduledAt ? EnterpriseAuditStatus.SCHEDULED : EnterpriseAuditStatus.DRAFT,
       auditType: input.auditType,
       programId: input.programId,
+      scheduleId: input.scheduleId,
       protocolId: input.protocolId,
       siteId: input.siteId,
       departmentId: input.departmentId,
@@ -113,6 +134,7 @@ export async function createAuditService(input: CreateAuditInput) {
       ownerId: input.ownerId,
       scheduledAt: input.scheduledAt,
       dueDate: input.dueDate,
+      generatedByScheduleKey: input.generatedByScheduleKey,
       totalQuestionCount,
       createdById: input.userId,
       updatedById: input.userId,
@@ -185,9 +207,25 @@ export async function createAuditService(input: CreateAuditInput) {
       }
     }
 
+    const requestedTeam = input.teamMembers ?? [];
+    const teamByUserId = new Map(requestedTeam.map((member) => [member.userId, member]));
     if (input.leadAuditorId) {
-      await tx.enterpriseAuditTeamMember.create({
-        data: { auditId: created.id, userId: input.leadAuditorId, role: "LEAD_AUDITOR", canReview: true },
+      teamByUserId.set(input.leadAuditorId, {
+        userId: input.leadAuditorId,
+        role: EnterpriseAuditTeamRole.LEAD_AUDITOR,
+        canEdit: true,
+        canReview: true,
+      });
+    }
+    if (teamByUserId.size > 0) {
+      await tx.enterpriseAuditTeamMember.createMany({
+        data: Array.from(teamByUserId.values()).map((member) => ({
+          auditId: created.id,
+          userId: member.userId,
+          role: member.role,
+          canEdit: member.canEdit ?? true,
+          canReview: member.canReview ?? false,
+        })),
       });
     }
 
@@ -201,7 +239,7 @@ export async function createAuditService(input: CreateAuditInput) {
         entityId: created.id,
         title: "Audit created",
         description: protocol
-          ? `Audit created from ${protocol.name} version ${protocol.version}.`
+          ? `Audit created from ${protocol.name} version ${protocol.version}${input.scheduleId ? " by an automated schedule" : ""}.`
           : "Audit created without a protocol.",
       },
     });

@@ -33,7 +33,17 @@ export function findTenantAuditById(
       },
       sections: {
         include: {
-          questions: { select: { id: true, status: true, isRequired: true } },
+          questions: {
+            include: {
+              options: { orderBy: { sequence: "asc" } },
+              response: true,
+              evidence: {
+                select: { id: true, evidenceType: true, title: true, externalUrl: true },
+                orderBy: { createdAt: "desc" },
+              },
+            },
+            orderBy: { sequence: "asc" },
+          },
         },
         orderBy: { sequence: "asc" },
       },

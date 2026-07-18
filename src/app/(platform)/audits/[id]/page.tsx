@@ -1,12 +1,19 @@
 import { addAuditTeamMember, removeAuditTeamMember } from "@/features/audits/schedule.actions";
+import { completeAudit, recordAuditResponse, startAuditExecution, submitAuditForReview } from "@/features/audits/execution.actions";
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { findTenantAuditById } from "@/modules/audit/audit.repository";
 import { findTenantAuditUsers } from "@/modules/audit/audit-schedule.repository";
-import { EnterpriseAuditStatus, EnterpriseAuditTeamRole, PermissionKey } from "@prisma/client";
+import { EnterpriseAuditResponseResult, EnterpriseAuditStatus, EnterpriseAuditTeamRole, PermissionKey } from "@prisma/client";
 import { ArrowLeft, CalendarDays, CircleAlert, ClipboardList, History, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+const startableStatuses = new Set<EnterpriseAuditStatus>([
+  EnterpriseAuditStatus.DRAFT,
+  EnterpriseAuditStatus.PLANNED,
+  EnterpriseAuditStatus.SCHEDULED,
+]);
 
 export default async function AuditDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePermission(PermissionKey.VIEW_AUDITS);
@@ -30,7 +37,12 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
           <h1 className="mt-2 text-4xl font-bold tracking-tight">{audit.title}</h1>
           <p className="mt-2 max-w-3xl text-slate-400">{audit.description || "No audit description provided."}</p>
         </div>
-        <StatusBadge status={audit.status} />
+        <div className="flex flex-wrap items-center gap-3">
+          <StatusBadge status={audit.status} />
+          {startableStatuses.has(audit.status) && <form action={startAuditExecution}><input type="hidden" name="auditId" value={audit.id} /><button className="rounded-2xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950">Start Execution</button></form>}
+          {audit.status === EnterpriseAuditStatus.IN_PROGRESS && <form action={submitAuditForReview}><input type="hidden" name="auditId" value={audit.id} /><button className="rounded-2xl bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950">Submit for Review</button></form>}
+          {audit.status === EnterpriseAuditStatus.PENDING_REVIEW && <form action={completeAudit}><input type="hidden" name="auditId" value={audit.id} /><button className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950">Complete Audit</button></form>}
+        </div>
       </div>
 
       <div className="mt-8 grid gap-4 md:grid-cols-4">
@@ -63,9 +75,9 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
 
           <Panel title="Execution sections" icon={<ClipboardList size={18} />}>
             {audit.sections.length === 0 ? <Empty text="No protocol snapshot is attached to this audit." /> : (
-              <div className="space-y-3">{audit.sections.map((section) => {
+              <div className="space-y-5">{audit.sections.map((section) => {
                 const answered = section.questions.filter((question) => question.status === "ANSWERED" || question.status === "NOT_APPLICABLE").length;
-                return <div key={section.id} className="rounded-2xl bg-slate-950/40 p-4"><div className="flex items-center justify-between gap-4"><div><p className="font-medium text-white">{section.sequence}. {section.title}</p><p className="mt-1 text-xs text-slate-500">{answered} of {section.questions.length} questions answered</p></div><span className="text-xs font-medium text-cyan-300">{pretty(section.status)}</span></div></div>;
+                return <section key={section.id} className="rounded-2xl border border-white/10 bg-slate-950/30 p-5"><div className="flex items-center justify-between gap-4"><div><p className="font-medium text-white">{section.sequence}. {section.title}</p><p className="mt-1 text-xs text-slate-500">{answered} of {section.questions.length} questions answered</p></div><span className="text-xs font-medium text-cyan-300">{pretty(section.status)}</span></div>{section.guidance && <p className="mt-3 text-sm text-slate-400">{section.guidance}</p>}<div className="mt-5 space-y-4">{section.questions.map((question) => <div key={question.id} className="rounded-2xl bg-slate-950/60 p-4"><div className="flex flex-wrap justify-between gap-3"><div><p className="text-sm font-medium">{question.sequence}. {question.questionText}</p>{question.guidance && <p className="mt-2 text-xs text-slate-500">{question.guidance}</p>}</div><span className="text-xs text-cyan-300">{pretty(question.status)}</span></div>{audit.status === EnterpriseAuditStatus.IN_PROGRESS ? <form action={recordAuditResponse} className="mt-4 space-y-4"><input type="hidden" name="auditId" value={audit.id} /><input type="hidden" name="questionId" value={question.id} /><div className="grid gap-4 md:grid-cols-2"><ExecutionField label="Assessment result"><select name="result" required defaultValue={question.response?.result ?? ""} className={executionInputClass}><option value="" disabled>Select result</option>{Object.values(EnterpriseAuditResponseResult).filter((result) => result !== EnterpriseAuditResponseResult.NOT_ASSESSED).map((result) => <option key={result} value={result}>{pretty(result)}</option>)}</select></ExecutionField><ExecutionField label="Numeric value"><input type="number" step="any" name="numericValue" defaultValue={question.response?.numericValue?.toString() ?? ""} className={executionInputClass} /></ExecutionField></div>{question.options.length > 0 && <fieldset className="rounded-xl border border-white/10 p-3"><legend className="px-2 text-xs text-slate-400">Response options</legend><div className="flex flex-wrap gap-4">{question.options.map((option) => <label key={option.id} className="flex gap-2 text-sm"><input type="checkbox" name="selectedOptionValues" value={option.value} defaultChecked={Array.isArray(question.response?.selectedOptionValues) && question.response.selectedOptionValues.includes(option.value)} />{option.label}</label>)}</div></fieldset>}<ExecutionField label="Response narrative"><textarea name="responseText" rows={2} defaultValue={question.response?.responseText ?? ""} className={executionInputClass} /></ExecutionField><ExecutionField label={`Comments${question.requireComment ? " (required)" : ""}`}><textarea name="comments" required={question.requireComment} rows={2} defaultValue={question.response?.comments ?? ""} className={executionInputClass} /></ExecutionField><div className="grid gap-4 md:grid-cols-2"><ExecutionField label={`Evidence note${question.requireEvidence ? " (required if no URL)" : ""}`}><input name="evidenceNote" className={executionInputClass} /></ExecutionField><ExecutionField label={`Evidence or photo URL${question.requirePhoto ? " (required)" : ""}`}><input type="url" name="evidenceUrl" required={question.requirePhoto} className={executionInputClass} /></ExecutionField></div>{question.evidence.length > 0 && <p className="text-xs text-emerald-300">{question.evidence.length} evidence record(s) attached</p>}<div className="flex justify-end"><button className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950">Save Response</button></div></form> : question.response && <div className="mt-4 rounded-xl border border-white/5 p-3 text-sm"><p><span className="text-slate-500">Result:</span> {pretty(question.response.result)}</p>{question.response.comments && <p className="mt-2 text-slate-400">{question.response.comments}</p>}</div>}</div>)}</div></section>;
               })}</div>
             )}
           </Panel>
@@ -103,3 +115,5 @@ function Info({ label, value }: { label: string; value: string }) { return <div 
 function TextBlock({ label, value }: { label: string; value: string | null }) { return <div className="mb-5 last:mb-0"><p className="text-xs uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{value || "Not provided."}</p></div>; }
 function Empty({ text }: { text: string }) { return <p className="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-slate-500">{text}</p>; }
 const teamInputClass = "mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-sm outline-none";
+const executionInputClass = "mt-2 w-full rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm outline-none focus:border-cyan-400/50";
+function ExecutionField({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block text-xs font-medium text-slate-400">{label}{children}</label>; }
