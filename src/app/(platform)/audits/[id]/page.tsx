@@ -1,6 +1,7 @@
 import { addAuditTeamMember, removeAuditTeamMember } from "@/features/audits/schedule.actions";
 import { AuditFindingManagement } from "@/features/audits/audit-finding-management";
 import { AuditActionForm } from "@/features/audits/audit-action-form";
+import { AuditEvidenceUpload } from "@/features/audits/audit-evidence-upload";
 import { completeAudit, recordAuditResponse, saveAuditConclusion, startAuditExecution, submitAuditForReviewWithFeedback } from "@/features/audits/execution.actions";
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
@@ -87,6 +88,7 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
         </div>
 
         <div className="space-y-6">
+          <Panel title="Audit evidence" icon={<FileText size={18} />}><AuditEvidenceUpload auditId={audit.id} />{audit.evidence.length > 0 && <div className="mt-4 space-y-2">{audit.evidence.map((evidence) => <a key={evidence.id} href={evidence.fileUrl ? `/api/audits/evidence/${evidence.id}` : evidence.externalUrl || "#"} target="_blank" rel="noreferrer" className="block rounded-xl bg-slate-950/40 p-3 text-sm text-cyan-300">{evidence.title}{evidence.fileName ? ` — ${evidence.fileName}` : ""}</a>)}</div>}</Panel>
           <Panel title="Executive conclusion" icon={<FileText size={18} />}>
             <form action={saveAuditConclusion} className="space-y-4"><input type="hidden" name="auditId" value={audit.id} /><ExecutionField label="Executive summary"><textarea name="executiveSummary" rows={3} defaultValue={audit.executiveSummary ?? ""} className={executionInputClass} /></ExecutionField><ExecutionField label="Overall opinion"><textarea name="overallOpinion" rows={2} defaultValue={audit.overallOpinion ?? ""} className={executionInputClass} /></ExecutionField><ExecutionField label="Positive practices"><textarea name="positivePractices" rows={2} defaultValue={audit.positivePractices ?? ""} className={executionInputClass} /></ExecutionField><ExecutionField label="Major concerns"><textarea name="majorConcerns" rows={2} defaultValue={audit.majorConcerns ?? ""} className={executionInputClass} /></ExecutionField><ExecutionField label="Recommendations"><textarea name="recommendations" rows={3} defaultValue={audit.recommendations ?? ""} className={executionInputClass} /></ExecutionField><button className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950">Save Conclusion</button></form>
           </Panel>
