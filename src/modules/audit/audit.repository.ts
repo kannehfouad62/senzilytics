@@ -48,7 +48,15 @@ export function findTenantAuditById(
         orderBy: { sequence: "asc" },
       },
       findings: {
-        select: { id: true, title: true, severity: true, status: true, dueDate: true },
+        include: {
+          owner: { select: { id: true, name: true, email: true, jobTitle: true } },
+          question: { select: { id: true, questionText: true, standardClause: true } },
+          evidence: { select: { id: true, evidenceType: true, title: true, description: true, externalUrl: true }, orderBy: { createdAt: "desc" } },
+          verifications: { include: { verifiedBy: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } },
+          correctiveActionLinks: { include: { correctiveAction: { include: { assignedTo: { select: { id: true, name: true } } } } }, orderBy: { createdAt: "desc" } },
+          riskLinks: { include: { risk: { select: { id: true, reference: true, title: true, status: true, currentRiskLevel: true } } }, orderBy: { createdAt: "desc" } },
+          history: { include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" }, take: 10 },
+        },
         orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
       },
       history: {

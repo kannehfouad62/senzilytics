@@ -1,4 +1,5 @@
 import { addAuditTeamMember, removeAuditTeamMember } from "@/features/audits/schedule.actions";
+import { AuditFindingManagement } from "@/features/audits/audit-finding-management";
 import { completeAudit, recordAuditResponse, startAuditExecution, submitAuditForReview } from "@/features/audits/execution.actions";
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
@@ -94,13 +95,15 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
               <button className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950">Assign Team Member</button>
             </form>
           </Panel>
-          <Panel title="Findings" icon={<CircleAlert size={18} />}>
-            {audit.findings.length === 0 ? <Empty text="No findings recorded." /> : <div className="space-y-3">{audit.findings.map((finding) => <div key={finding.id} className="rounded-2xl bg-slate-950/40 p-4"><div className="flex justify-between gap-3"><p className="font-medium">{finding.title}</p><span className="text-xs text-cyan-300">{pretty(finding.severity)}</span></div><p className="mt-1 text-xs text-slate-500">{pretty(finding.status)} · Due {formatDate(finding.dueDate)}</p></div>)}</div>}
-          </Panel>
           <Panel title="Recent history" icon={<History size={18} />}>
             {audit.history.length === 0 ? <Empty text="No history recorded." /> : <div className="space-y-4">{audit.history.map((entry) => <div key={entry.id} className="border-l border-cyan-400/30 pl-4"><p className="text-sm font-medium">{entry.title}</p><p className="mt-1 text-xs text-slate-500">{entry.user?.name || "System"} · {entry.createdAt.toLocaleString()}</p></div>)}</div>}
           </Panel>
         </div>
+      </div>
+      <div className="mt-8">
+        <Panel title="Audit Findings, CAPA, and Risk" icon={<CircleAlert size={18} />}>
+          <AuditFindingManagement audit={audit} users={users} />
+        </Panel>
       </div>
     </div>
   );
