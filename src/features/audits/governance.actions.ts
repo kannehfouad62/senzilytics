@@ -1,4 +1,5 @@
 "use server";
+import { auditActionError, type AuditActionFeedback } from "@/features/audits/audit-action-feedback";
 
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
@@ -120,4 +121,8 @@ export async function activateAuditProgram(formData: FormData) {
   await activateAuditProgramService({ organizationId, userId: user.id, programId });
   revalidatePath(`/audits/programs/${programId}`);
   revalidatePath("/audits/programs");
+}
+export async function activateAuditProgramWithFeedback(_state: AuditActionFeedback, formData: FormData): Promise<AuditActionFeedback> {
+  try { await activateAuditProgram(formData); return { status: "success", message: "Audit program activated." }; }
+  catch (error) { return auditActionError(error, "The Audit program could not be activated."); }
 }

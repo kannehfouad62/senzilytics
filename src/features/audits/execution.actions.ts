@@ -1,4 +1,5 @@
 "use server";
+import { auditActionError, type AuditActionFeedback } from "@/features/audits/audit-action-feedback";
 
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
@@ -34,6 +35,10 @@ export async function submitAuditForReview(formData: FormData) {
   await requirePermission(PermissionKey.VIEW_AUDITS); const { organizationId, user } = await getCurrentUserTenant(); const auditId = required(formData, "auditId");
   await submitAuditForReviewService({ organizationId, userId: user.id, userRole: user.role, auditId });
   revalidatePath(`/audits/${auditId}`);
+}
+export async function submitAuditForReviewWithFeedback(_state: AuditActionFeedback, formData: FormData): Promise<AuditActionFeedback> {
+  try { await submitAuditForReview(formData); return { status: "success", message: "Audit submitted for review." }; }
+  catch (error) { return auditActionError(error, "The Audit could not be submitted for review."); }
 }
 
 export async function completeAudit(formData: FormData) {

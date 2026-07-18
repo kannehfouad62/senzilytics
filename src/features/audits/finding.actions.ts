@@ -1,4 +1,5 @@
 "use server";
+import { auditActionError, type AuditActionFeedback } from "@/features/audits/audit-action-feedback";
 
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
@@ -57,6 +58,10 @@ export async function createCapaFromAuditFinding(formData: FormData) {
   await requirePermission(PermissionKey.CREATE_CAPA); const { organizationId, user } = await getCurrentUserTenant(); const auditId = required(formData, "auditId"); const dueDate = date(formData, "dueDate", true); if (!dueDate) throw new Error("dueDate is required.");
   await createCapaFromAuditFindingService({ organizationId, userId: user.id, auditId, findingId: required(formData, "findingId"), title: required(formData, "title"), description: optional(formData, "description"), assignedToId: required(formData, "assignedToId"), dueDate });
   revalidatePath(`/audits/${auditId}`); revalidatePath("/capa"); revalidatePath("/actions");
+}
+export async function createCapaFromAuditFindingWithFeedback(_state: AuditActionFeedback, formData: FormData): Promise<AuditActionFeedback> {
+  try { await createCapaFromAuditFinding(formData); return { status: "success", message: "CAPA created and linked to the finding." }; }
+  catch (error) { return auditActionError(error, "The CAPA could not be created."); }
 }
 
 export async function createRiskFromAuditFinding(formData: FormData) {

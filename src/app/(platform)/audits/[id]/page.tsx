@@ -1,6 +1,7 @@
 import { addAuditTeamMember, removeAuditTeamMember } from "@/features/audits/schedule.actions";
 import { AuditFindingManagement } from "@/features/audits/audit-finding-management";
-import { completeAudit, recordAuditResponse, saveAuditConclusion, startAuditExecution, submitAuditForReview } from "@/features/audits/execution.actions";
+import { AuditActionForm } from "@/features/audits/audit-action-form";
+import { completeAudit, recordAuditResponse, saveAuditConclusion, startAuditExecution, submitAuditForReviewWithFeedback } from "@/features/audits/execution.actions";
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { findTenantAuditById } from "@/modules/audit/audit.repository";
@@ -42,7 +43,7 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
           <Link href={`/audits/${audit.id}/report`} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold"><FileText size={16} /> Report</Link>
           <StatusBadge status={audit.status} />
           {startableStatuses.has(audit.status) && <form action={startAuditExecution}><input type="hidden" name="auditId" value={audit.id} /><button className="rounded-2xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950">Start Execution</button></form>}
-          {audit.status === EnterpriseAuditStatus.IN_PROGRESS && <form action={submitAuditForReview}><input type="hidden" name="auditId" value={audit.id} /><button className="rounded-2xl bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950">Submit for Review</button></form>}
+          {audit.status === EnterpriseAuditStatus.IN_PROGRESS && <AuditActionForm action={submitAuditForReviewWithFeedback}><input type="hidden" name="auditId" value={audit.id} /><button className="rounded-2xl bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950">Submit for Review</button></AuditActionForm>}
           {audit.status === EnterpriseAuditStatus.PENDING_REVIEW && <form action={completeAudit}><input type="hidden" name="auditId" value={audit.id} /><button className="rounded-2xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950">Complete Audit</button></form>}
         </div>
       </div>
