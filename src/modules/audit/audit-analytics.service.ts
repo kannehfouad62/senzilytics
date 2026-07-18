@@ -23,18 +23,23 @@ export async function getAuditAnalytics(organizationId: string) {
   const [audits, findings] = await Promise.all([
     prisma.enterpriseAudit.findMany({
       where: { organizationId },
-      select: { id: true, reference: true, title: true, status: true, auditType: true, scheduledAt: true, dueDate: true, completedAt: true, scorePercentage: true, overallRiskLevel: true, openFindingCount: true, site: { select: { id: true, name: true } } },
+      select: { id: true, reference: true, title: true, status: true, auditType: true, scheduledAt: true, dueDate: true, completedAt: true, scorePercentage: true, overallRiskLevel: true, openFindingCount: true, scheduleId: true, site: { select: { id: true, name: true } }, department: { select: { id: true, name: true } }, leadAuditor: { select: { id: true, name: true } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.enterpriseAuditFinding.findMany({
       where: { organizationId },
-      select: { status: true, severity: true, category: true, isRepeatFinding: true, dueDate: true },
+      select: { status: true, severity: true, category: true, isRepeatFinding: true, dueDate: true, createdAt: true, closedAt: true, requiresCapa: true, correctiveActionLinks: { select: { correctiveActionId: true } } },
     }),
   ]);
   const completed = audits.filter((audit) => audit.status === EnterpriseAuditStatus.COMPLETED || audit.status === EnterpriseAuditStatus.CLOSED);
   const overdue = audits.filter((audit) => audit.dueDate && audit.dueDate < now && !terminal.has(audit.status));
   const openFindings = findings.filter((finding) => !closedFindings.has(finding.status));
   const scored = completed.flatMap((audit) => audit.scorePercentage == null ? [] : [Number(audit.scorePercentage)]);
+  const completedThisMonth = completed.filter((audit) => audit.completedAt && audit.completedAt.getFullYear() === now.getFullYear() && audit.completedAt.getMonth() === now.getMonth()).length;
+  const overdueFindings = openFindings.filter((finding) => finding.dueDate && finding.dueDate < now).length;
+  const closureDays = findings.flatMap((finding) => finding.closedAt ? [(finding.closedAt.getTime() - finding.createdAt.getTime()) / 86_400_000] : []);
+  const capaRequired = findings.filter((finding) => finding.requiresCapa); const capaConverted = capaRequired.filter((finding) => finding.correctiveActionLinks.some((link) => link.correctiveActionId));
+  const dueScheduled = audits.filter((audit) => audit.scheduleId && audit.dueDate && audit.dueDate <= now); const onTimeScheduled = dueScheduled.filter((audit) => audit.completedAt && audit.dueDate && audit.completedAt <= audit.dueDate);
   const months = Array.from({ length: 12 }, (_, index) => new Date(start.getFullYear(), start.getMonth() + index, 1));
   const trend: AuditTrend[] = months.map((month) => {
     const next = new Date(month.getFullYear(), month.getMonth() + 1, 1);
@@ -45,9 +50,11 @@ export async function getAuditAnalytics(organizationId: string) {
   audits.forEach((audit) => { const row = siteMap.get(audit.site.id) ?? { siteName: audit.site.name, total: 0, completed: 0, overdue: 0, findings: 0 }; row.total++; row.findings += audit.openFindingCount; if (completed.includes(audit)) row.completed++; if (overdue.includes(audit)) row.overdue++; siteMap.set(audit.site.id, row); });
   return {
     generatedAt: now,
-    summary: { total: audits.length, active: audits.filter((a) => !terminal.has(a.status)).length, completed: completed.length, overdue: overdue.length, completionRate: audits.length ? Math.round((completed.length / audits.length) * 100) : 0, averageScore: scored.length ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length) : 0, openFindings: openFindings.length, highRiskFindings: openFindings.filter((f) => f.severity === "HIGH" || f.severity === "CRITICAL").length, repeatFindings: findings.filter((f) => f.isRepeatFinding).length },
+    summary: { total: audits.length, active: audits.filter((a) => !terminal.has(a.status)).length, completed: completed.length, completedThisMonth, overdue: overdue.length, completionRate: audits.length ? Math.round((completed.length / audits.length) * 100) : 0, averageScore: scored.length ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length) : 0, openFindings: openFindings.length, overdueFindings, highRiskFindings: openFindings.filter((f) => f.severity === "HIGH" || f.severity === "CRITICAL").length, repeatFindings: findings.filter((f) => f.isRepeatFinding).length, averageFindingClosureDays: closureDays.length ? Math.round(closureDays.reduce((a,b)=>a+b,0)/closureDays.length) : 0, capaConversionRate: capaRequired.length ? Math.round(capaConverted.length/capaRequired.length*100) : 0, scheduleAdherence: dueScheduled.length ? Math.round(onTimeScheduled.length/dueScheduled.length*100) : 100 },
     statusDistribution: distribution(audits.map((a) => a.status)), typeDistribution: distribution(audits.map((a) => a.auditType)), riskDistribution: distribution(audits.map((a) => a.overallRiskLevel ?? "NOT RATED")), findingStatusDistribution: distribution(findings.map((f) => f.status)), findingSeverityDistribution: distribution(findings.map((f) => f.severity)), findingCategoryDistribution: distribution(findings.map((f) => f.category)), trend,
     sitePerformance: [...siteMap.values()].sort((a, b) => b.overdue - a.overdue || b.findings - a.findings),
+    departmentPerformance: distribution(audits.filter((a) => a.department).map((a) => a.department!.name)),
+    auditorWorkload: [...new Map(audits.filter((a) => a.leadAuditor && !terminal.has(a.status)).map((a) => [a.leadAuditor!.id, a.leadAuditor!.name])).entries()].map(([id, name]) => ({ id, name, activeAudits: audits.filter((a) => a.leadAuditor?.id === id && !terminal.has(a.status)).length, overdueAudits: overdue.filter((a) => a.leadAuditor?.id === id).length })).sort((a,b)=>b.activeAudits-a.activeAudits),
     attention: overdue.slice(0, 8).map((a) => ({ id: a.id, reference: a.reference, title: a.title, siteName: a.site.name, dueDate: a.dueDate! })),
   };
 }
