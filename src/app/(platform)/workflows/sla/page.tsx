@@ -369,7 +369,7 @@ function getEntityLink(entityType: string, entityId: string) {
       return "/actions";
 
     case "AUDIT":
-      return "/audits";
+      return "/workflows";
 
     case "INSPECTION":
       return "/inspections";

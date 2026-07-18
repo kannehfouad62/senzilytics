@@ -93,13 +93,6 @@ const ehsNavItems = [
     href: "/moc",
     icon: Workflow,
   },
-
-
-  {
-    label: "Audits",
-    href: "/audits",
-    icon: SearchCheck,
-  },
 ];
 
 const inspectionNavItems = [
