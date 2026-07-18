@@ -119,6 +119,16 @@ const auditNavItems = [
     href: "/audits/new",
     icon: ClipboardList,
   },
+  {
+    label: "Audit Programs",
+    href: "/audits/programs",
+    icon: CalendarCheck,
+  },
+  {
+    label: "Audit Protocols",
+    href: "/audits/protocols",
+    icon: ListChecks,
+  },
 ];
 
 const complianceNavItems = [
