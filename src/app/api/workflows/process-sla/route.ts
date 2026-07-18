@@ -4,7 +4,7 @@ import { processIncidentEscalations } from "@/core/notifications/incident-escala
 import { processInspectionSlaNotifications } from "@/core/notifications/inspection-sla.service";
 import { processInvestigationSlaNotifications } from "@/core/notifications/investigation-sla.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
-import { processAuditSchedules } from "@/modules/audit/audit-schedule-processor.service";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import {
   NextRequest,
   NextResponse,
@@ -14,39 +14,20 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function isAuthorizedCronRequest(
-  request: NextRequest
-) {
-  const cronSecret =
-    process.env.CRON_SECRET?.trim();
-
-  if (!cronSecret) {
-    console.error(
-      "SLA Cron configuration error: CRON_SECRET is missing."
-    );
-
-    return false;
-  }
-
-  const authorizationHeader =
-    request.headers.get(
-      "authorization"
-    );
-
-  return (
-    authorizationHeader ===
-    `Bearer ${cronSecret}`
-  );
-}
-
 export async function GET(
   request: NextRequest
 ) {
   if (
     !isAuthorizedCronRequest(
-      request
+      request.headers.get("authorization")
     )
   ) {
+    if (!process.env.CRON_SECRET?.trim()) {
+      console.error(
+        "SLA Cron configuration error: CRON_SECRET is missing."
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -66,7 +47,6 @@ export async function GET(
       investigationResult,
       auditResult,
       inspectionResult,
-      auditScheduleResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
 
@@ -80,7 +60,6 @@ export async function GET(
 
       processInspectionSlaNotifications(),
 
-      processAuditSchedules(),
     ]);
 
     return NextResponse.json({
@@ -107,9 +86,6 @@ export async function GET(
       inspections:
         inspectionResult,
 
-      auditSchedules:
-        auditScheduleResult,
-
       totals: {
         checked:
           workflowResult.checked +
@@ -117,8 +93,7 @@ export async function GET(
           incidentEscalationResult.checked +
           investigationResult.checked +
           auditResult.checked +
-          inspectionResult.checked +
-          auditScheduleResult.checked,
+          inspectionResult.checked,
 
         remindersSent:
           workflowResult.remindersSent +
@@ -180,9 +155,7 @@ export async function GET(
           incidentEscalationResult.skipped +
           investigationResult.skipped +
           auditResult.skipped +
-          inspectionResult.skipped +
-          auditScheduleResult.skipped +
-          auditScheduleResult.failed,
+          inspectionResult.skipped,
       },
     });
   } catch (error) {

@@ -1,5 +1,6 @@
 import { processMocSlaNotifications } from "@/core/notifications/moc-sla.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import {
   NextRequest,
   NextResponse,
@@ -9,39 +10,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function isAuthorizedCronRequest(
-  request: NextRequest
-) {
-  const cronSecret =
-    process.env.CRON_SECRET?.trim();
-
-  if (!cronSecret) {
-    console.error(
-      "CRON_SECRET is missing."
-    );
-
-    return false;
-  }
-
-  const authorization =
-    request.headers.get(
-      "authorization"
-    );
-
-  return (
-    authorization ===
-    `Bearer ${cronSecret}`
-  );
-}
-
 export async function GET(
   request: NextRequest
 ) {
   if (
     !isAuthorizedCronRequest(
-      request
+      request.headers.get("authorization")
     )
   ) {
+    if (!process.env.CRON_SECRET?.trim()) {
+      console.error("CRON_SECRET is missing.");
+    }
+
     return NextResponse.json(
       {
         success: false,

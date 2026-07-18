@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   ListChecks,
   SearchCheck,
-  Settings,
   ShieldCheck,
   Users,
   ShieldAlert,
@@ -146,11 +145,6 @@ const complianceNavItems = [
     label: "Notifications",
     href: "/notifications",
     icon: Bell,
-  },
-  {
-    label: "Settings",
-    href: "/settings",
-    icon: Settings,
   },
 ];
 

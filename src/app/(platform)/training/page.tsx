@@ -1,8 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { GraduationCap } from "lucide-react";
 import { getCurrentUserTenant } from "@/lib/tenant";
+import { requirePermission } from "@/lib/permissions";
+import { PermissionKey } from "@prisma/client";
 
 export default async function TrainingPage() {
+  await requirePermission(PermissionKey.VIEW_TRAINING);
   const { organizationId } = await getCurrentUserTenant();
 
 const records = await prisma.trainingRecord.findMany({

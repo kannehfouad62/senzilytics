@@ -8,6 +8,7 @@
     "permissions:moc": "tsx --env-file=.env prisma/grant-moc-permissions.ts",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --import tsx --test tests/**/*.test.ts",
     "postinstall": "prisma generate",
     "repair:workflows": "tsx prisma/repair-workflows.ts"
   },
