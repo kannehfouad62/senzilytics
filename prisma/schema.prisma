@@ -934,6 +934,7 @@ model User {
   invitedAt       DateTime?
   activatedAt     DateTime?
   lastLoginAt     DateTime?
+  sessionVersion  Int       @default(0)
 
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
@@ -973,6 +974,7 @@ model User {
   uploadedDocuments         Document[]
   sentTenantInvitations     TenantInvitation[]          @relation("TenantInvitationSender")
   acceptedTenantInvitations TenantInvitation[]          @relation("TenantInvitationAcceptor")
+  passwordResetTokens       PasswordResetToken[]
 
   ownedRisks           Risk[]        @relation("RiskOwner")
   ownedRiskControls    RiskControl[] @relation("RiskControlOwner")
@@ -1038,6 +1040,18 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
 }
 
 model OrganizationIdentityProvider {

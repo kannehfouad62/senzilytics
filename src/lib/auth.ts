@@ -45,6 +45,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           email: user.email,
           role: user.role,
+          sessionVersion: user.sessionVersion,
         };
       },
     }),
@@ -67,12 +68,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!providerType) return false;
       const issuer = String(profile?.iss || "").replace(/\/$/, "");
       const directoryId = String((profile as Record<string, unknown> | undefined)?.tid || "");
-      return internal.organization.identityProviders.some((configuration) => configuration.isEnabled && configuration.type === providerType && (providerType === "MICROSOFT_ENTRA" ? configuration.directoryId === directoryId : configuration.issuer.replace(/\/$/, "") === issuer));
+      const allowed = internal.organization.identityProviders.some((configuration) => configuration.isEnabled && configuration.type === providerType && (providerType === "MICROSOFT_ENTRA" ? configuration.directoryId === directoryId : configuration.issuer.replace(/\/$/, "") === issuer));
+      if (allowed) {
+        user.id = internal.id;
+        user.role = internal.role;
+        user.sessionVersion = internal.sessionVersion;
+      }
+      return allowed;
     },
     async jwt({ token, user }) {
       if (user) {
         token.role = user.role;
+        token.sessionVersion = user.sessionVersion;
         await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+      }
+
+      if (token.sub) {
+        const current = await prisma.user.findUnique({ where: { id: token.sub }, select: { isActive: true, sessionVersion: true } });
+        token.sessionValid = Boolean(current?.isActive && current.sessionVersion === token.sessionVersion);
       }
 
       return token;
@@ -82,6 +95,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.sub!;
         session.user.role = token.role as string;
+        session.user.sessionValid = token.sessionValid !== false;
       }
 
       return session;

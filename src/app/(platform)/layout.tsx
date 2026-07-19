@@ -9,7 +9,7 @@ export default async function PlatformLayout({
 }) {
   const session = await auth();
 
-  if (!session?.user) {
+  if (!session?.user || !session.user.sessionValid) {
     redirect("/login");
   }
 

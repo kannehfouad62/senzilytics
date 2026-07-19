@@ -1,5 +1,6 @@
 import { signIn } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   async function login(formData: FormData) {
@@ -48,6 +49,7 @@ export default function LoginPage() {
           >
             Sign In
           </button>
+          <Link href="/forgot-password" className="block text-center text-sm text-cyan-300">Forgot password?</Link>
         </div>
       </form>
       <div className="fixed bottom-8 flex gap-3">{process.env.AUTH_MICROSOFT_ENTRA_ID_ID&&<form action={microsoftLogin}><button className="rounded-xl border border-white/15 bg-white/5 px-5 py-3">Sign in with Microsoft</button></form>}{process.env.AUTH_OKTA_ID&&<form action={oktaLogin}><button className="rounded-xl border border-white/15 bg-white/5 px-5 py-3">Sign in with Okta</button></form>}</div>
