@@ -2356,15 +2356,19 @@ model TrainingRecord {
   user   User   @relation("TrainingRecordLearner", fields: [userId], references: [id])
 
   courseId          String?
-  course            TrainingCourse? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  course            TrainingCourse?      @relation(fields: [courseId], references: [id], onDelete: SetNull)
   assignedById      String?
-  assignedBy        User?           @relation("TrainingRecordAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
-  assignedAt        DateTime        @default(now())
+  assignedBy        User?                @relation("TrainingRecordAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedAt        DateTime             @default(now())
   expiresAt         DateTime?
   provider          String?
   certificateNumber String?
   score             Float?
   notes             String?
+  requirementId     String?
+  requirement       TrainingRequirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+  generationKey     String?              @unique
+  reminderSentAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2372,6 +2376,7 @@ model TrainingRecord {
   @@index([courseId, status])
   @@index([userId, dueDate])
   @@index([expiresAt])
+  @@index([requirementId, status])
 }
 
 model TrainingCourse {
@@ -2396,20 +2401,22 @@ model TrainingCourse {
 }
 
 model TrainingRequirement {
-  id             String         @id @default(cuid())
-  organizationId String
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  courseId       String
-  course         TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  role           UserRole?
-  siteId         String?
-  site           Site?          @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  departmentId   String?
-  department     Department?    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  dueWithinDays  Int            @default(30)
-  isActive       Boolean        @default(true)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id              String           @id @default(cuid())
+  organizationId  String
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  courseId        String
+  course          TrainingCourse   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  role            UserRole?
+  siteId          String?
+  site            Site?            @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId    String?
+  department      Department?      @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  dueWithinDays   Int              @default(30)
+  renewalLeadDays Int              @default(30)
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  records         TrainingRecord[]
 
   @@index([organizationId, isActive])
   @@index([courseId])

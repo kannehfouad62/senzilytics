@@ -33,7 +33,7 @@ const records = await prisma.trainingRecord.findMany({
           Training Management
         </p>
         </div>
-        <div className="flex gap-3"><Link href="/training/courses" className="rounded-xl border border-white/10 px-4 py-2">Course Catalog</Link><Link href="/training/assign" className="rounded-xl bg-cyan-300 px-4 py-2 font-semibold text-slate-950">Assign Training</Link></div>
+        <div className="flex flex-wrap gap-3"><Link href="/training/dashboard" className="rounded-xl border border-white/10 px-4 py-2">Analytics</Link><Link href="/training/requirements" className="rounded-xl border border-white/10 px-4 py-2">Requirements</Link><Link href="/training/courses" className="rounded-xl border border-white/10 px-4 py-2">Course Catalog</Link><Link href="/training/assign" className="rounded-xl bg-cyan-300 px-4 py-2 font-semibold text-slate-950">Assign Training</Link></div>
 
         <h1 className="mt-2 text-4xl font-bold tracking-tight">Training</h1>
 
