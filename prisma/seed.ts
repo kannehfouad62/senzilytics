@@ -146,6 +146,8 @@ async function main() {
       PermissionKey.CREATE_OBSERVATION,
       PermissionKey.VIEW_OBSERVATIONS,
       PermissionKey.MANAGE_OBSERVATIONS,
+      PermissionKey.VIEW_CHEMICALS,
+      PermissionKey.MANAGE_CHEMICALS,
     ],
 
     EHS_MANAGER: [
@@ -168,6 +170,8 @@ async function main() {
       PermissionKey.CREATE_OBSERVATION,
       PermissionKey.VIEW_OBSERVATIONS,
       PermissionKey.MANAGE_OBSERVATIONS,
+      PermissionKey.VIEW_CHEMICALS,
+      PermissionKey.MANAGE_CHEMICALS,
     ],
 
     SUPERVISOR: [
@@ -183,12 +187,14 @@ async function main() {
       PermissionKey.CREATE_OBSERVATION,
       PermissionKey.VIEW_OBSERVATIONS,
       PermissionKey.MANAGE_OBSERVATIONS,
+      PermissionKey.VIEW_CHEMICALS,
     ],
 
     EMPLOYEE: [
       PermissionKey.VIEW_DASHBOARD,
       PermissionKey.CREATE_OBSERVATION,
       PermissionKey.VIEW_OBSERVATIONS,
+      PermissionKey.VIEW_CHEMICALS,
       PermissionKey.CREATE_INCIDENT,
       PermissionKey.VIEW_INCIDENT,
       PermissionKey.VIEW_TRAINING,
@@ -203,6 +209,7 @@ async function main() {
       PermissionKey.VIEW_COMPLIANCE,
       PermissionKey.VIEW_REPORTS,
       PermissionKey.VIEW_OBSERVATIONS,
+      PermissionKey.VIEW_CHEMICALS,
     ],
   };
 

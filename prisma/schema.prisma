@@ -73,6 +73,8 @@ enum PermissionKey {
   CREATE_OBSERVATION
   VIEW_OBSERVATIONS
   MANAGE_OBSERVATIONS
+  VIEW_CHEMICALS
+  MANAGE_CHEMICALS
 }
 
 enum SafetyObservationType {
@@ -118,6 +120,21 @@ enum PermitStatus {
   EXPIRED
   SUSPENDED
   CLOSED
+}
+
+enum ChemicalApprovalStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  RESTRICTED
+  PROHIBITED
+  ARCHIVED
+}
+
+enum ChemicalSignalWord {
+  DANGER
+  WARNING
+  NONE
 }
 
 enum AuditType {
@@ -220,6 +237,7 @@ enum WorkflowEntityType {
   TRAINING
   DOCUMENT
   PERMIT
+  CHEMICAL
   MOC
   OBSERVATION
   RISK
@@ -275,6 +293,7 @@ enum DocumentEntityType {
   RISK_CONTROL
   MOC
   PERMIT
+  CHEMICAL
 }
 
 enum DocumentCategory {
@@ -724,6 +743,7 @@ model Organization {
   trainingCourses          TrainingCourse[]
   trainingRequirements     TrainingRequirement[]
   permits                  Permit[]
+  chemicals                Chemical[]
 }
 
 model Site {
@@ -754,6 +774,7 @@ model Site {
   safetyObservations   SafetyObservation[]
   trainingRequirements TrainingRequirement[]
   permits              Permit[]
+  chemicalInventories  ChemicalInventory[]
 }
 
 model Department {
@@ -807,6 +828,7 @@ model User {
   ownedComplianceItems      ComplianceItem[]       @relation("ComplianceItemOwner")
   ownedPermits              Permit[]               @relation("PermitOwner")
   complianceEvaluations     ComplianceEvaluation[] @relation("ComplianceEvaluationUser")
+  reviewedChemicals         Chemical[]             @relation("ChemicalReviewedBy")
   activityLogs              ActivityLog[]
   notifications             Notification[]
   uploadedDocuments         Document[]
@@ -2446,6 +2468,61 @@ model Permit {
   @@index([organizationId, status])
   @@index([siteId, expirationDate])
   @@index([ownerId, status])
+}
+
+model Chemical {
+  id                    String                 @id @default(cuid())
+  organizationId        String
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  productName           String
+  productCode           String?
+  manufacturer          String?
+  supplier              String?
+  casNumber             String?
+  description           String?
+  status                ChemicalApprovalStatus @default(DRAFT)
+  signalWord            ChemicalSignalWord     @default(NONE)
+  hazardClassifications String?
+  pictograms            String?
+  exposureLimits        String?
+  requiredPpe           String?
+  firstAidMeasures      String?
+  spillResponse         String?
+  storageRequirements   String?
+  incompatibilities     String?
+  sdsRevisionDate       DateTime?
+  sdsReviewDueDate      DateTime?
+  reviewedById          String?
+  reviewedBy            User?                  @relation("ChemicalReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt            DateTime?
+  inventories           ChemicalInventory[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@unique([organizationId, productCode])
+  @@index([organizationId, status])
+  @@index([organizationId, casNumber])
+  @@index([sdsReviewDueDate])
+}
+
+model ChemicalInventory {
+  id              String   @id @default(cuid())
+  chemicalId      String
+  chemical        Chemical @relation(fields: [chemicalId], references: [id], onDelete: Cascade)
+  siteId          String
+  site            Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  storageLocation String
+  quantity        Float
+  unit            String
+  maximumAllowed  Float?
+  containerType   String?
+  storageNotes    String?
+  inventoriedAt   DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([chemicalId, siteId, storageLocation])
+  @@index([siteId, inventoriedAt])
 }
 
 model TrainingRecord {

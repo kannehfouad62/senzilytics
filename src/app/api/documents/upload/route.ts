@@ -310,6 +310,11 @@ async function validateRelatedEntity(input: {
       return Boolean(record);
     }
 
+    case DocumentEntityType.CHEMICAL: {
+      const record = await prisma.chemical.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } });
+      return Boolean(record);
+    }
+
     case DocumentEntityType.WORKFLOW: {
       const record = await prisma.workflowInstance.findFirst({
         where: {

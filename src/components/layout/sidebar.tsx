@@ -19,6 +19,7 @@ import {
   ShieldAlert,
   Gauge,
   FileText,
+  FlaskConical,
   Workflow,
   Eye,
 } from "lucide-react";
@@ -127,6 +128,11 @@ const auditNavItems = [
 ];
 
 const complianceNavItems = [
+  {
+    label: "Chemicals & SDS",
+    href: "/chemicals",
+    icon: FlaskConical,
+  },
   {
     label: "Compliance",
     href: "/compliance",

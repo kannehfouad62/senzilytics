@@ -1,0 +1,17 @@
+ALTER TYPE "PermissionKey" ADD VALUE 'VIEW_CHEMICALS';
+ALTER TYPE "PermissionKey" ADD VALUE 'MANAGE_CHEMICALS';
+ALTER TYPE "DocumentEntityType" ADD VALUE 'CHEMICAL';
+CREATE TYPE "ChemicalApprovalStatus" AS ENUM ('DRAFT','UNDER_REVIEW','APPROVED','RESTRICTED','PROHIBITED','ARCHIVED');
+CREATE TYPE "ChemicalSignalWord" AS ENUM ('DANGER','WARNING','NONE');
+CREATE TABLE "Chemical" ("id" TEXT NOT NULL,"organizationId" TEXT NOT NULL,"productName" TEXT NOT NULL,"productCode" TEXT,"manufacturer" TEXT,"supplier" TEXT,"casNumber" TEXT,"description" TEXT,"status" "ChemicalApprovalStatus" NOT NULL DEFAULT 'DRAFT',"signalWord" "ChemicalSignalWord" NOT NULL DEFAULT 'NONE',"hazardClassifications" TEXT,"pictograms" TEXT,"exposureLimits" TEXT,"requiredPpe" TEXT,"firstAidMeasures" TEXT,"spillResponse" TEXT,"storageRequirements" TEXT,"incompatibilities" TEXT,"sdsRevisionDate" TIMESTAMP(3),"sdsReviewDueDate" TIMESTAMP(3),"reviewedById" TEXT,"reviewedAt" TIMESTAMP(3),"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "Chemical_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "ChemicalInventory" ("id" TEXT NOT NULL,"chemicalId" TEXT NOT NULL,"siteId" TEXT NOT NULL,"storageLocation" TEXT NOT NULL,"quantity" DOUBLE PRECISION NOT NULL,"unit" TEXT NOT NULL,"maximumAllowed" DOUBLE PRECISION,"containerType" TEXT,"storageNotes" TEXT,"inventoriedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "ChemicalInventory_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "Chemical_organizationId_productCode_key" ON "Chemical"("organizationId","productCode");
+CREATE INDEX "Chemical_organizationId_status_idx" ON "Chemical"("organizationId","status");
+CREATE INDEX "Chemical_organizationId_casNumber_idx" ON "Chemical"("organizationId","casNumber");
+CREATE INDEX "Chemical_sdsReviewDueDate_idx" ON "Chemical"("sdsReviewDueDate");
+CREATE UNIQUE INDEX "ChemicalInventory_chemicalId_siteId_storageLocation_key" ON "ChemicalInventory"("chemicalId","siteId","storageLocation");
+CREATE INDEX "ChemicalInventory_siteId_inventoriedAt_idx" ON "ChemicalInventory"("siteId","inventoriedAt");
+ALTER TABLE "Chemical" ADD CONSTRAINT "Chemical_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Chemical" ADD CONSTRAINT "Chemical_reviewedById_fkey" FOREIGN KEY ("reviewedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ChemicalInventory" ADD CONSTRAINT "ChemicalInventory_chemicalId_fkey" FOREIGN KEY ("chemicalId") REFERENCES "Chemical"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ChemicalInventory" ADD CONSTRAINT "ChemicalInventory_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
