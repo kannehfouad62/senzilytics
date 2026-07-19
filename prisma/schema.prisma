@@ -692,6 +692,8 @@ model Organization {
 
   enterpriseAuditHistoryV2 EnterpriseAuditHistory[] @relation("EnterpriseAuditHistoryOrganization")
   safetyObservations       SafetyObservation[]
+  trainingCourses          TrainingCourse[]
+  trainingRequirements     TrainingRequirement[]
 }
 
 model Site {
@@ -717,9 +719,10 @@ model Site {
 
   auditProgramScopesV2 AuditProgramSite[] @relation("AuditProgramSiteScope")
 
-  auditSchedulesV2   AuditSchedule[]     @relation("AuditScheduleSite")
-  enterpriseAuditsV2 EnterpriseAudit[]   @relation("EnterpriseAuditSite")
-  safetyObservations SafetyObservation[]
+  auditSchedulesV2     AuditSchedule[]       @relation("AuditScheduleSite")
+  enterpriseAuditsV2   EnterpriseAudit[]     @relation("EnterpriseAuditSite")
+  safetyObservations   SafetyObservation[]
+  trainingRequirements TrainingRequirement[]
 }
 
 model Department {
@@ -734,9 +737,10 @@ model Department {
 
   auditProgramScopesV2 AuditProgramDepartment[] @relation("AuditProgramDepartmentScope")
 
-  auditSchedulesV2   AuditSchedule[]     @relation("AuditScheduleDepartment")
-  enterpriseAuditsV2 EnterpriseAudit[]   @relation("EnterpriseAuditDepartment")
-  safetyObservations SafetyObservation[]
+  auditSchedulesV2     AuditSchedule[]       @relation("AuditScheduleDepartment")
+  enterpriseAuditsV2   EnterpriseAudit[]     @relation("EnterpriseAuditDepartment")
+  safetyObservations   SafetyObservation[]
+  trainingRequirements TrainingRequirement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -766,7 +770,9 @@ model User {
   leadInspections           Inspection[]           @relation("InspectionLeadInspector")
   inspectionTeamMemberships InspectionTeamMember[]
   inspectionResponses       InspectionResponse[]   @relation("InspectionResponseAnsweredBy")
-  trainingRecords           TrainingRecord[]
+  trainingRecords           TrainingRecord[]       @relation("TrainingRecordLearner")
+  assignedTrainingRecords   TrainingRecord[]       @relation("TrainingRecordAssignedBy")
+  createdTrainingCourses    TrainingCourse[]       @relation("TrainingCourseCreatedBy")
   activityLogs              ActivityLog[]
   notifications             Notification[]
   uploadedDocuments         Document[]
@@ -2347,10 +2353,66 @@ model TrainingRecord {
   completedAt DateTime?
 
   userId String
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation("TrainingRecordLearner", fields: [userId], references: [id])
+
+  courseId          String?
+  course            TrainingCourse? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  assignedById      String?
+  assignedBy        User?           @relation("TrainingRecordAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedAt        DateTime        @default(now())
+  expiresAt         DateTime?
+  provider          String?
+  certificateNumber String?
+  score             Float?
+  notes             String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([courseId, status])
+  @@index([userId, dueDate])
+  @@index([expiresAt])
+}
+
+model TrainingCourse {
+  id             String                @id @default(cuid())
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code           String
+  name           String
+  description    String?
+  provider       String?
+  validityMonths Int?
+  isActive       Boolean               @default(true)
+  createdById    String?
+  createdBy      User?                 @relation("TrainingCourseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  requirements   TrainingRequirement[]
+  records        TrainingRecord[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, isActive])
+}
+
+model TrainingRequirement {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  courseId       String
+  course         TrainingCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  role           UserRole?
+  siteId         String?
+  site           Site?          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId   String?
+  department     Department?    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  dueWithinDays  Int            @default(30)
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organizationId, isActive])
+  @@index([courseId])
 }
 
 model Risk {
