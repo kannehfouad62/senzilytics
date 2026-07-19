@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getPlatformAdministrator } from "@/lib/platform-admin";
 import {
   Activity,
   AlertTriangle,
@@ -186,7 +187,19 @@ type NavigationItem = {
   }>;
 };
 
-export function Sidebar() {
+export async function Sidebar() {
+  const platformAdministrator = await getPlatformAdministrator();
+  const platformNavItems = platformAdministrator
+    ? [
+        ...primaryNavItems,
+        {
+          label: "Tenant Provisioning",
+          href: "/platform/tenants",
+          icon: Building2,
+        },
+      ]
+    : primaryNavItems;
+
   return (
     <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:flex">
       <div className="mb-8 flex shrink-0 items-center gap-3">
@@ -208,7 +221,7 @@ export function Sidebar() {
       <nav className="min-h-0 flex-1 space-y-7 overflow-y-auto pr-2">
         <NavigationSection
           label="Platform"
-          items={primaryNavItems}
+          items={platformNavItems}
         />
 
         <NavigationSection
