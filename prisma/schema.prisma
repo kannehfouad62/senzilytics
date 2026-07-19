@@ -92,6 +92,34 @@ enum SafetyObservationStatus {
   CLOSED
 }
 
+enum ComplianceObligationType {
+  LEGAL
+  REGULATORY
+  PERMIT_CONDITION
+  STANDARD
+  CONTRACTUAL
+  INTERNAL
+  OTHER
+}
+
+enum ComplianceRecurrence {
+  ONE_TIME
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+  CUSTOM
+}
+
+enum PermitStatus {
+  DRAFT
+  ACTIVE
+  EXPIRING
+  EXPIRED
+  SUSPENDED
+  CLOSED
+}
+
 enum AuditType {
   INTERNAL
   EXTERNAL
@@ -694,6 +722,7 @@ model Organization {
   safetyObservations       SafetyObservation[]
   trainingCourses          TrainingCourse[]
   trainingRequirements     TrainingRequirement[]
+  permits                  Permit[]
 }
 
 model Site {
@@ -723,6 +752,7 @@ model Site {
   enterpriseAuditsV2   EnterpriseAudit[]     @relation("EnterpriseAuditSite")
   safetyObservations   SafetyObservation[]
   trainingRequirements TrainingRequirement[]
+  permits              Permit[]
 }
 
 model Department {
@@ -773,6 +803,8 @@ model User {
   trainingRecords           TrainingRecord[]       @relation("TrainingRecordLearner")
   assignedTrainingRecords   TrainingRecord[]       @relation("TrainingRecordAssignedBy")
   createdTrainingCourses    TrainingCourse[]       @relation("TrainingCourseCreatedBy")
+  ownedComplianceItems      ComplianceItem[]       @relation("ComplianceItemOwner")
+  ownedPermits              Permit[]               @relation("PermitOwner")
   activityLogs              ActivityLog[]
   notifications             Notification[]
   uploadedDocuments         Document[]
@@ -2332,17 +2364,64 @@ model InspectionFinding {
 }
 
 model ComplianceItem {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  status      Status   @default(OPEN)
-  dueDate     DateTime
+  id               String                   @id @default(cuid())
+  title            String
+  description      String?
+  status           Status                   @default(OPEN)
+  dueDate          DateTime
+  reference        String?
+  obligationType   ComplianceObligationType @default(REGULATORY)
+  authority        String?
+  jurisdiction     String?
+  legalReference   String?
+  applicability    String?
+  recurrence       ComplianceRecurrence     @default(ONE_TIME)
+  intervalValue    Int                      @default(1)
+  evidenceRequired String?
+  ownerId          String?
+  owner            User?                    @relation("ComplianceItemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  completedAt      DateTime?
+  lastEvaluatedAt  DateTime?
+  evaluationNotes  String?
 
   siteId String
   site   Site   @relation(fields: [siteId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([ownerId, status])
+  @@index([siteId, dueDate])
+}
+
+model Permit {
+  id                    String       @id @default(cuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  siteId                String
+  site                  Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  ownerId               String?
+  owner                 User?        @relation("PermitOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  number                String
+  name                  String
+  description           String?
+  authority             String?
+  permitType            String?
+  status                PermitStatus @default(DRAFT)
+  effectiveDate         DateTime?
+  expirationDate        DateTime?
+  renewalDueDate        DateTime?
+  conditions            String?
+  limits                String?
+  reportingRequirements String?
+  notes                 String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status])
+  @@index([siteId, expirationDate])
+  @@index([ownerId, status])
 }
 
 model TrainingRecord {
