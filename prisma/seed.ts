@@ -150,6 +150,8 @@ async function main() {
       PermissionKey.MANAGE_CHEMICALS,
       PermissionKey.VIEW_ENVIRONMENTAL,
       PermissionKey.MANAGE_ENVIRONMENTAL,
+      PermissionKey.VIEW_ESG,
+      PermissionKey.MANAGE_ESG,
     ],
 
     EHS_MANAGER: [
@@ -176,6 +178,8 @@ async function main() {
       PermissionKey.MANAGE_CHEMICALS,
       PermissionKey.VIEW_ENVIRONMENTAL,
       PermissionKey.MANAGE_ENVIRONMENTAL,
+      PermissionKey.VIEW_ESG,
+      PermissionKey.MANAGE_ESG,
     ],
 
     SUPERVISOR: [
@@ -193,6 +197,7 @@ async function main() {
       PermissionKey.MANAGE_OBSERVATIONS,
       PermissionKey.VIEW_CHEMICALS,
       PermissionKey.VIEW_ENVIRONMENTAL,
+      PermissionKey.VIEW_ESG,
     ],
 
     EMPLOYEE: [

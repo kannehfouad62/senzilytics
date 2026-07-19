@@ -77,6 +77,8 @@ enum PermissionKey {
   MANAGE_CHEMICALS
   VIEW_ENVIRONMENTAL
   MANAGE_ENVIRONMENTAL
+  VIEW_ESG
+  MANAGE_ESG
 }
 
 enum SafetyObservationType {
@@ -173,6 +175,37 @@ enum EnvironmentalReportingFrequency {
   QUARTERLY
   SEMIANNUAL
   ANNUAL
+}
+
+enum EsgPillar {
+  ENVIRONMENTAL
+  SOCIAL
+  GOVERNANCE
+}
+
+enum EsgDisclosureStatus {
+  DRAFT
+  DATA_COLLECTION
+  UNDER_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum EsgDataQuality {
+  VERIFIED
+  MEASURED
+  CALCULATED
+  ESTIMATED
+  EXTERNAL_SOURCE
+}
+
+enum EsgInitiativeStatus {
+  PLANNED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
 }
 
 enum AuditType {
@@ -334,6 +367,7 @@ enum DocumentEntityType {
   PERMIT
   CHEMICAL
   ENVIRONMENTAL
+  ESG
 }
 
 enum DocumentCategory {
@@ -787,6 +821,10 @@ model Organization {
   chemicals                Chemical[]
   environmentalMetrics     EnvironmentalMetricDefinition[]
   environmentalTargets     EnvironmentalTarget[]
+  esgFrameworks            EsgFramework[]
+  esgMetrics               EsgMetricDefinition[]
+  esgDisclosurePeriods     EsgDisclosurePeriod[]
+  esgInitiatives           EsgInitiative[]
 }
 
 model Site {
@@ -876,6 +914,9 @@ model User {
   enteredEnvironmentalData  EnvironmentalDataPoint[]    @relation("EnvironmentalDataEnteredBy")
   approvedEnvironmentalData EnvironmentalDataPoint[]    @relation("EnvironmentalDataApprovedBy")
   environmentalRevisions    EnvironmentalDataRevision[] @relation("EnvironmentalRevisionChangedBy")
+  enteredEsgData            EsgDataPoint[]              @relation("EsgDataEnteredBy")
+  approvedEsgPeriods        EsgDisclosurePeriod[]       @relation("EsgPeriodApprovedBy")
+  ownedEsgInitiatives       EsgInitiative[]             @relation("EsgInitiativeOwner")
   activityLogs              ActivityLog[]
   notifications             Notification[]
   uploadedDocuments         Document[]
@@ -2607,6 +2648,7 @@ model EnvironmentalMetricDefinition {
   isActive              Boolean                         @default(true)
   dataPoints            EnvironmentalDataPoint[]
   targets               EnvironmentalTarget[]
+  esgMetrics            EsgMetricDefinition[]
   createdAt             DateTime                        @default(now())
   updatedAt             DateTime                        @updatedAt
 
@@ -2679,6 +2721,122 @@ model EnvironmentalTarget {
 
   @@index([organizationId, isActive])
   @@index([metricId, targetYear])
+}
+
+model EsgFramework {
+  id             String                @id @default(cuid())
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code           String
+  name           String
+  version        String?
+  description    String?
+  isActive       Boolean               @default(true)
+  metrics        EsgMetricDefinition[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, isActive])
+}
+
+model EsgMetricDefinition {
+  id                    String                         @id @default(cuid())
+  organizationId        String
+  organization          Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  frameworkId           String?
+  framework             EsgFramework?                  @relation(fields: [frameworkId], references: [id], onDelete: SetNull)
+  environmentalMetricId String?
+  environmentalMetric   EnvironmentalMetricDefinition? @relation(fields: [environmentalMetricId], references: [id], onDelete: SetNull)
+  code                  String
+  name                  String
+  pillar                EsgPillar
+  unit                  String
+  disclosureReference   String?
+  methodology           String?
+  isActive              Boolean                        @default(true)
+  dataPoints            EsgDataPoint[]
+  targets               EsgTarget[]
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, pillar, isActive])
+}
+
+model EsgDisclosurePeriod {
+  id                  String              @id @default(cuid())
+  organizationId      String
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                String
+  periodStart         DateTime
+  periodEnd           DateTime
+  boundaryDescription String
+  status              EsgDisclosureStatus @default(DRAFT)
+  approvedById        String?
+  approvedBy          User?               @relation("EsgPeriodApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt          DateTime?
+  dataPoints          EsgDataPoint[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId, status, periodEnd])
+}
+
+model EsgDataPoint {
+  id                String              @id @default(cuid())
+  periodId          String
+  period            EsgDisclosurePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  metricId          String
+  metric            EsgMetricDefinition @relation(fields: [metricId], references: [id], onDelete: Cascade)
+  value             Float
+  quality           EsgDataQuality
+  evidenceSummary   String?
+  sourceDescription String?
+  enteredById       String
+  enteredBy         User                @relation("EsgDataEnteredBy", fields: [enteredById], references: [id])
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([periodId, metricId])
+  @@index([metricId, periodId])
+}
+
+model EsgTarget {
+  id            String              @id @default(cuid())
+  metricId      String
+  metric        EsgMetricDefinition @relation(fields: [metricId], references: [id], onDelete: Cascade)
+  baselineYear  Int
+  baselineValue Float
+  targetYear    Int
+  targetValue   Float
+  description   String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([metricId, targetYear])
+}
+
+model EsgInitiative {
+  id              String              @id @default(cuid())
+  organizationId  String
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  pillar          EsgPillar
+  status          EsgInitiativeStatus @default(PLANNED)
+  ownerId         String?
+  owner           User?               @relation("EsgInitiativeOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  startDate       DateTime?
+  targetDate      DateTime?
+  budget          Float?
+  expectedOutcome String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([organizationId, pillar, status])
+  @@index([ownerId, status])
 }
 
 model TrainingRecord {

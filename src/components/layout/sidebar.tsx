@@ -21,6 +21,7 @@ import {
   FileText,
   FlaskConical,
   Leaf,
+  Sprout,
   Workflow,
   Eye,
 } from "lucide-react";
@@ -129,6 +130,11 @@ const auditNavItems = [
 ];
 
 const complianceNavItems = [
+  {
+    label: "Sustainability & ESG",
+    href: "/esg",
+    icon: Sprout,
+  },
   {
     label: "Environmental Metrics",
     href: "/environmental",
