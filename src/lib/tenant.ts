@@ -27,6 +27,10 @@ export async function getCurrentUserTenant() {
     redirect("/login");
   }
 
+  if (!user.isActive || user.organization?.status === "SUSPENDED") {
+    redirect("/unauthorized");
+  }
+
   if (!user.organizationId) {
     throw new Error("User is not assigned to an organization.");
   }

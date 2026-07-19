@@ -15,6 +15,23 @@ enum UserRole {
   AUDITOR
 }
 
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum IdentityProviderType {
+  MICROSOFT_ENTRA
+  OKTA
+}
+
+enum TenantInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 enum RiskLevel {
   LOW
   MEDIUM
@@ -799,12 +816,14 @@ enum EnterpriseAuditHistoryAction {
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  industry  String?
-  address   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String             @id @default(cuid())
+  name                String
+  industry            String?
+  address             String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  status              OrganizationStatus @default(ACTIVE)
+  allowedEmailDomains String[]
 
   sites                        Site[]
   users                        User[]
@@ -843,6 +862,8 @@ model Organization {
   esgDisclosurePeriods     EsgDisclosurePeriod[]
   esgInitiatives           EsgInitiative[]
   jobSafetyAnalyses        JobSafetyAnalysis[]
+  identityProviders        OrganizationIdentityProvider[]
+  tenantInvitations        TenantInvitation[]
 }
 
 model Site {
@@ -901,13 +922,18 @@ model Department {
 }
 
 model User {
-  id       String   @id @default(cuid())
-  name     String
-  email    String   @unique
-  password String?
-  role     UserRole @default(EMPLOYEE)
-  jobTitle String?
-  phone    String?
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  password        String?
+  role            UserRole  @default(EMPLOYEE)
+  jobTitle        String?
+  phone           String?
+  isActive        Boolean   @default(true)
+  isPlatformAdmin Boolean   @default(false)
+  invitedAt       DateTime?
+  activatedAt     DateTime?
+  lastLoginAt     DateTime?
 
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
@@ -945,6 +971,8 @@ model User {
   activityLogs              ActivityLog[]
   notifications             Notification[]
   uploadedDocuments         Document[]
+  sentTenantInvitations     TenantInvitation[]          @relation("TenantInvitationSender")
+  acceptedTenantInvitations TenantInvitation[]          @relation("TenantInvitationAcceptor")
 
   ownedRisks           Risk[]        @relation("RiskOwner")
   ownedRiskControls    RiskControl[] @relation("RiskControlOwner")
@@ -1010,6 +1038,46 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model OrganizationIdentityProvider {
+  id             String               @id @default(cuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type           IdentityProviderType
+  issuer         String
+  directoryId    String?
+  emailDomain    String?
+  isEnabled      Boolean              @default(true)
+  enforceSso     Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([type, issuer])
+  @@index([organizationId, type, isEnabled])
+}
+
+model TenantInvitation {
+  id             String                 @id @default(cuid())
+  organizationId String
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  name           String
+  role           UserRole
+  departmentId   String?
+  tokenHash      String                 @unique
+  status         TenantInvitationStatus @default(PENDING)
+  expiresAt      DateTime
+  invitedById    String
+  invitedBy      User                   @relation("TenantInvitationSender", fields: [invitedById], references: [id])
+  acceptedById   String?
+  acceptedBy     User?                  @relation("TenantInvitationAcceptor", fields: [acceptedById], references: [id])
+  acceptedAt     DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([organizationId, status, expiresAt])
+  @@index([email, status])
 }
 
 model Incident {

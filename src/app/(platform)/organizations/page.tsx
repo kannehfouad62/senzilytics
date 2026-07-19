@@ -3,6 +3,7 @@ import { Building2, MapPin, Users } from "lucide-react";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { PermissionKey } from "@prisma/client";
+import { configureTenantIdentityProvider } from "@/features/identity/tenant.actions";
 
 export default async function OrganizationsPage() {
   await requirePermission(PermissionKey.MANAGE_ORGANIZATION);
@@ -39,6 +40,7 @@ const organizations = await prisma.organization.findMany({
           Manage organizations, sites, departments, and operational structure.
         </p>
       </div>
+      <form action={configureTenantIdentityProvider} className="mb-8 grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 md:grid-cols-2 xl:grid-cols-5"><select name="type" className="rounded-xl bg-slate-950 px-4 py-3"><option value="MICROSOFT_ENTRA">Microsoft Entra ID</option><option value="OKTA">Okta</option></select><input name="issuer" required placeholder="OIDC issuer URL" className="rounded-xl bg-slate-950 px-4 py-3"/><input name="directoryId" placeholder="Microsoft directory ID" className="rounded-xl bg-slate-950 px-4 py-3"/><input name="emailDomain" placeholder="company.com" className="rounded-xl bg-slate-950 px-4 py-3"/><button className="rounded-xl bg-cyan-300 px-4 py-3 font-semibold text-slate-950">Configure SSO</button><label className="text-sm"><input type="checkbox" name="enforceSso" className="mr-2"/>Require SSO for this tenant</label></form>
 
       <div className="grid gap-6">
         {organizations.map((org) => (

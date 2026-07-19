@@ -13,6 +13,8 @@ export default function LoginPage() {
 
     redirect("/dashboard");
   }
+  async function microsoftLogin(){"use server";await signIn("microsoft-entra-id",{redirectTo:"/dashboard"})}
+  async function oktaLogin(){"use server";await signIn("okta",{redirectTo:"/dashboard"})}
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-white">
@@ -28,7 +30,7 @@ export default function LoginPage() {
             name="email"
             type="email"
             required
-            defaultValue="admin@senzilytics.com"
+            placeholder="you@company.com"
             className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-400"
           />
 
@@ -36,7 +38,7 @@ export default function LoginPage() {
             name="password"
             type="password"
             required
-            defaultValue="Admin@12345"
+            placeholder="Password"
             className="w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-400"
           />
 
@@ -48,6 +50,7 @@ export default function LoginPage() {
           </button>
         </div>
       </form>
+      <div className="fixed bottom-8 flex gap-3">{process.env.AUTH_MICROSOFT_ENTRA_ID_ID&&<form action={microsoftLogin}><button className="rounded-xl border border-white/15 bg-white/5 px-5 py-3">Sign in with Microsoft</button></form>}{process.env.AUTH_OKTA_ID&&<form action={oktaLogin}><button className="rounded-xl border border-white/15 bg-white/5 px-5 py-3">Sign in with Okta</button></form>}</div>
     </main>
   );
 }

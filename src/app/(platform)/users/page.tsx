@@ -3,13 +3,15 @@ import { Users } from "lucide-react";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { PermissionKey } from "@prisma/client";
+import { UserRole } from "@prisma/client";
+import { inviteTenantUser, setTenantUserActive } from "@/features/identity/tenant.actions";
 
 
 export default async function UsersPage() {
   await requirePermission(PermissionKey.VIEW_USERS);
   const { organizationId } = await getCurrentUserTenant();
 
-  const users = await prisma.user.findMany({
+  const [users, departments] = await Promise.all([prisma.user.findMany({
   where: {
     organizationId,
   },
@@ -22,7 +24,7 @@ export default async function UsersPage() {
       },
     },
   },
-});
+}), prisma.department.findMany({where:{site:{organizationId}},include:{site:true},orderBy:{name:"asc"}})]);
 
   return (
     <div>
@@ -39,6 +41,10 @@ export default async function UsersPage() {
         </p>
       </div>
 
+      <form action={inviteTenantUser} className="mb-8 grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 md:grid-cols-2 xl:grid-cols-5">
+        <input name="name" required placeholder="Full name" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3"/><input name="email" type="email" required placeholder="Email" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3"/><select name="role" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3">{Object.values(UserRole).filter(x=>x!==UserRole.SUPER_ADMIN).map(x=><option key={x}>{x}</option>)}</select><select name="departmentId" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3"><option value="">No department</option>{departments.map(x=><option key={x.id} value={x.id}>{x.site.name} — {x.name}</option>)}</select><button className="rounded-xl bg-cyan-300 px-4 py-3 font-semibold text-slate-950">Invite User</button>
+      </form>
+
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
         <table className="w-full border-collapse text-left text-sm">
           <thead className="border-b border-white/10 bg-white/5 text-slate-300">
@@ -49,6 +55,7 @@ export default async function UsersPage() {
               <th className="px-6 py-4 font-medium">Organization</th>
               <th className="px-6 py-4 font-medium">Site</th>
               <th className="px-6 py-4 font-medium">Department</th>
+              <th className="px-6 py-4 font-medium">Access</th>
             </tr>
           </thead>
 
@@ -84,6 +91,7 @@ export default async function UsersPage() {
                 <td className="px-6 py-5 text-slate-300">
                   {user.department?.name || "N/A"}
                 </td>
+                <td className="px-6 py-5"><form action={setTenantUserActive}><input type="hidden" name="id" value={user.id}/><input type="hidden" name="active" value={user.isActive?"false":"true"}/><button className={user.isActive?"text-emerald-300":"text-red-300"}>{user.isActive?"Active · Suspend":"Suspended · Restore"}</button></form></td>
               </tr>
             ))}
           </tbody>

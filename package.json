@@ -12,6 +12,7 @@
     "check": "npm run lint && npm test && npm run build",
     "verify:production": "tsx --env-file=.env scripts/verify-production-env.ts",
     "db:deploy": "prisma migrate deploy",
+    "platform:grant": "tsx --env-file=.env scripts/grant-platform-admin.ts",
     "postinstall": "prisma generate",
     "repair:workflows": "tsx prisma/repair-workflows.ts"
   },
