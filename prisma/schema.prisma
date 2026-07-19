@@ -402,6 +402,7 @@ enum RiskLinkedEntityType {
   COMPLIANCE
   WORKFLOW
   DOCUMENT
+  CHEMICAL
 }
 
 enum MocStatus {
@@ -2492,10 +2493,14 @@ model Chemical {
   incompatibilities     String?
   sdsRevisionDate       DateTime?
   sdsReviewDueDate      DateTime?
+  regulatoryLists       String?
+  regulatoryNotes       String?
+  sdsReminderSentAt     DateTime?
   reviewedById          String?
   reviewedBy            User?                  @relation("ChemicalReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   reviewedAt            DateTime?
   inventories           ChemicalInventory[]
+  mocLinks              ChemicalMocLink[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -2506,23 +2511,37 @@ model Chemical {
 }
 
 model ChemicalInventory {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   chemicalId      String
-  chemical        Chemical @relation(fields: [chemicalId], references: [id], onDelete: Cascade)
+  chemical        Chemical  @relation(fields: [chemicalId], references: [id], onDelete: Cascade)
   siteId          String
-  site            Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  site            Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
   storageLocation String
   quantity        Float
   unit            String
   maximumAllowed  Float?
   containerType   String?
   storageNotes    String?
-  inventoriedAt   DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  limitNotifiedAt DateTime?
+  inventoriedAt   DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@unique([chemicalId, siteId, storageLocation])
   @@index([siteId, inventoriedAt])
+}
+
+model ChemicalMocLink {
+  id               String             @id @default(cuid())
+  chemicalId       String
+  chemical         Chemical           @relation(fields: [chemicalId], references: [id], onDelete: Cascade)
+  mocId            String
+  moc              ManagementOfChange @relation(fields: [mocId], references: [id], onDelete: Cascade)
+  relationshipNote String?
+  createdAt        DateTime           @default(now())
+
+  @@unique([chemicalId, mocId])
+  @@index([mocId])
 }
 
 model TrainingRecord {
@@ -2799,9 +2818,10 @@ model ManagementOfChange {
   ownerId String?
   owner   User?   @relation("MocOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 
-  approvals MocApproval[]
-  tasks     MocTask[]
-  riskLinks MocRiskLink[]
+  approvals     MocApproval[]
+  tasks         MocTask[]
+  riskLinks     MocRiskLink[]
+  chemicalLinks ChemicalMocLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

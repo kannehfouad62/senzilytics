@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/compliance-monitor",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/chemical-monitor",
+      "schedule": "0 7 * * *"
     }
   ]
 }

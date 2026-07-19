@@ -1,0 +1,10 @@
+ALTER TYPE "RiskLinkedEntityType" ADD VALUE 'CHEMICAL';
+ALTER TABLE "Chemical" ADD COLUMN "regulatoryLists" TEXT;
+ALTER TABLE "Chemical" ADD COLUMN "regulatoryNotes" TEXT;
+ALTER TABLE "Chemical" ADD COLUMN "sdsReminderSentAt" TIMESTAMP(3);
+ALTER TABLE "ChemicalInventory" ADD COLUMN "limitNotifiedAt" TIMESTAMP(3);
+CREATE TABLE "ChemicalMocLink" ("id" TEXT NOT NULL,"chemicalId" TEXT NOT NULL,"mocId" TEXT NOT NULL,"relationshipNote" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "ChemicalMocLink_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "ChemicalMocLink_chemicalId_mocId_key" ON "ChemicalMocLink"("chemicalId","mocId");
+CREATE INDEX "ChemicalMocLink_mocId_idx" ON "ChemicalMocLink"("mocId");
+ALTER TABLE "ChemicalMocLink" ADD CONSTRAINT "ChemicalMocLink_chemicalId_fkey" FOREIGN KEY ("chemicalId") REFERENCES "Chemical"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ChemicalMocLink" ADD CONSTRAINT "ChemicalMocLink_mocId_fkey" FOREIGN KEY ("mocId") REFERENCES "ManagementOfChange"("id") ON DELETE CASCADE ON UPDATE CASCADE;
