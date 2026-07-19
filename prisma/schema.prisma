@@ -916,6 +916,7 @@ model User {
   environmentalRevisions    EnvironmentalDataRevision[] @relation("EnvironmentalRevisionChangedBy")
   enteredEsgData            EsgDataPoint[]              @relation("EsgDataEnteredBy")
   approvedEsgPeriods        EsgDisclosurePeriod[]       @relation("EsgPeriodApprovedBy")
+  publishedEsgPeriods       EsgDisclosurePeriod[]       @relation("EsgPeriodPublishedBy")
   ownedEsgInitiatives       EsgInitiative[]             @relation("EsgInitiativeOwner")
   activityLogs              ActivityLog[]
   notifications             Notification[]
@@ -2776,6 +2777,9 @@ model EsgDisclosurePeriod {
   approvedById        String?
   approvedBy          User?               @relation("EsgPeriodApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt          DateTime?
+  publishedById       String?
+  publishedBy         User?               @relation("EsgPeriodPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  publishedAt         DateTime?
   dataPoints          EsgDataPoint[]
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
@@ -2794,6 +2798,8 @@ model EsgDataPoint {
   quality           EsgDataQuality
   evidenceSummary   String?
   sourceDescription String?
+  isAutoCalculated  Boolean             @default(false)
+  sourceRecordCount Int                 @default(0)
   enteredById       String
   enteredBy         User                @relation("EsgDataEnteredBy", fields: [enteredById], references: [id])
   createdAt         DateTime            @default(now())
