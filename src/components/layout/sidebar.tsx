@@ -20,6 +20,7 @@ import {
   Gauge,
   FileText,
   FlaskConical,
+  Leaf,
   Workflow,
   Eye,
 } from "lucide-react";
@@ -128,6 +129,11 @@ const auditNavItems = [
 ];
 
 const complianceNavItems = [
+  {
+    label: "Environmental Metrics",
+    href: "/environmental",
+    icon: Leaf,
+  },
   {
     label: "Chemicals & SDS",
     href: "/chemicals",

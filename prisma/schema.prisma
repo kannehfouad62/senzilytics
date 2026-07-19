@@ -75,6 +75,8 @@ enum PermissionKey {
   MANAGE_OBSERVATIONS
   VIEW_CHEMICALS
   MANAGE_CHEMICALS
+  VIEW_ENVIRONMENTAL
+  MANAGE_ENVIRONMENTAL
 }
 
 enum SafetyObservationType {
@@ -135,6 +137,35 @@ enum ChemicalSignalWord {
   DANGER
   WARNING
   NONE
+}
+
+enum EnvironmentalMetricType {
+  ENERGY
+  ELECTRICITY
+  FUEL
+  WATER
+  WASTE
+  GHG_SCOPE_1
+  GHG_SCOPE_2
+  GHG_SCOPE_3
+  AIR_EMISSION
+  WASTEWATER
+  SPILL
+  OTHER
+}
+
+enum EnvironmentalDataStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum EnvironmentalDataQuality {
+  MEASURED
+  CALCULATED
+  ESTIMATED
+  SUPPLIER_PROVIDED
 }
 
 enum AuditType {
@@ -238,6 +269,7 @@ enum WorkflowEntityType {
   DOCUMENT
   PERMIT
   CHEMICAL
+  ENVIRONMENTAL
   MOC
   OBSERVATION
   RISK
@@ -294,6 +326,7 @@ enum DocumentEntityType {
   MOC
   PERMIT
   CHEMICAL
+  ENVIRONMENTAL
 }
 
 enum DocumentCategory {
@@ -739,12 +772,14 @@ model Organization {
 
   enterpriseAuditFindingsV2 EnterpriseAuditFinding[] @relation("EnterpriseAuditFindingOrganization")
 
-  enterpriseAuditHistoryV2 EnterpriseAuditHistory[] @relation("EnterpriseAuditHistoryOrganization")
+  enterpriseAuditHistoryV2 EnterpriseAuditHistory[]        @relation("EnterpriseAuditHistoryOrganization")
   safetyObservations       SafetyObservation[]
   trainingCourses          TrainingCourse[]
   trainingRequirements     TrainingRequirement[]
   permits                  Permit[]
   chemicals                Chemical[]
+  environmentalMetrics     EnvironmentalMetricDefinition[]
+  environmentalTargets     EnvironmentalTarget[]
 }
 
 model Site {
@@ -770,12 +805,13 @@ model Site {
 
   auditProgramScopesV2 AuditProgramSite[] @relation("AuditProgramSiteScope")
 
-  auditSchedulesV2     AuditSchedule[]       @relation("AuditScheduleSite")
-  enterpriseAuditsV2   EnterpriseAudit[]     @relation("EnterpriseAuditSite")
+  auditSchedulesV2     AuditSchedule[]          @relation("AuditScheduleSite")
+  enterpriseAuditsV2   EnterpriseAudit[]        @relation("EnterpriseAuditSite")
   safetyObservations   SafetyObservation[]
   trainingRequirements TrainingRequirement[]
   permits              Permit[]
   chemicalInventories  ChemicalInventory[]
+  environmentalData    EnvironmentalDataPoint[]
 }
 
 model Department {
@@ -814,22 +850,24 @@ model User {
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
-  reportedIncidents         Incident[]             @relation("ReportedIncidents")
-  assignedInvestigations    Investigation[]        @relation("InvestigationAssignedUser")
+  reportedIncidents         Incident[]               @relation("ReportedIncidents")
+  assignedInvestigations    Investigation[]          @relation("InvestigationAssignedUser")
   assignedActions           CorrectiveAction[]
-  leadAudits                Audit[]                @relation("AuditLeadAuditor")
+  leadAudits                Audit[]                  @relation("AuditLeadAuditor")
   auditTeamMemberships      AuditTeamMember[]
-  auditResponses            AuditResponse[]        @relation("AuditResponseAnsweredBy")
-  leadInspections           Inspection[]           @relation("InspectionLeadInspector")
+  auditResponses            AuditResponse[]          @relation("AuditResponseAnsweredBy")
+  leadInspections           Inspection[]             @relation("InspectionLeadInspector")
   inspectionTeamMemberships InspectionTeamMember[]
-  inspectionResponses       InspectionResponse[]   @relation("InspectionResponseAnsweredBy")
-  trainingRecords           TrainingRecord[]       @relation("TrainingRecordLearner")
-  assignedTrainingRecords   TrainingRecord[]       @relation("TrainingRecordAssignedBy")
-  createdTrainingCourses    TrainingCourse[]       @relation("TrainingCourseCreatedBy")
-  ownedComplianceItems      ComplianceItem[]       @relation("ComplianceItemOwner")
-  ownedPermits              Permit[]               @relation("PermitOwner")
-  complianceEvaluations     ComplianceEvaluation[] @relation("ComplianceEvaluationUser")
-  reviewedChemicals         Chemical[]             @relation("ChemicalReviewedBy")
+  inspectionResponses       InspectionResponse[]     @relation("InspectionResponseAnsweredBy")
+  trainingRecords           TrainingRecord[]         @relation("TrainingRecordLearner")
+  assignedTrainingRecords   TrainingRecord[]         @relation("TrainingRecordAssignedBy")
+  createdTrainingCourses    TrainingCourse[]         @relation("TrainingCourseCreatedBy")
+  ownedComplianceItems      ComplianceItem[]         @relation("ComplianceItemOwner")
+  ownedPermits              Permit[]                 @relation("PermitOwner")
+  complianceEvaluations     ComplianceEvaluation[]   @relation("ComplianceEvaluationUser")
+  reviewedChemicals         Chemical[]               @relation("ChemicalReviewedBy")
+  enteredEnvironmentalData  EnvironmentalDataPoint[] @relation("EnvironmentalDataEnteredBy")
+  approvedEnvironmentalData EnvironmentalDataPoint[] @relation("EnvironmentalDataApprovedBy")
   activityLogs              ActivityLog[]
   notifications             Notification[]
   uploadedDocuments         Document[]
@@ -2542,6 +2580,75 @@ model ChemicalMocLink {
 
   @@unique([chemicalId, mocId])
   @@index([mocId])
+}
+
+model EnvironmentalMetricDefinition {
+  id               String                   @id @default(cuid())
+  organizationId   String
+  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code             String
+  name             String
+  description      String?
+  type             EnvironmentalMetricType
+  sourceUnit       String
+  reportingUnit    String
+  conversionFactor Float                    @default(1)
+  methodology      String?
+  isActive         Boolean                  @default(true)
+  dataPoints       EnvironmentalDataPoint[]
+  targets          EnvironmentalTarget[]
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, type, isActive])
+}
+
+model EnvironmentalDataPoint {
+  id              String                        @id @default(cuid())
+  metricId        String
+  metric          EnvironmentalMetricDefinition @relation(fields: [metricId], references: [id], onDelete: Cascade)
+  siteId          String
+  site            Site                          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  periodStart     DateTime
+  periodEnd       DateTime
+  value           Float
+  normalizedValue Float
+  quality         EnvironmentalDataQuality      @default(MEASURED)
+  status          EnvironmentalDataStatus       @default(DRAFT)
+  evidenceSummary String?
+  notes           String?
+  enteredById     String
+  enteredBy       User                          @relation("EnvironmentalDataEnteredBy", fields: [enteredById], references: [id])
+  approvedById    String?
+  approvedBy      User?                         @relation("EnvironmentalDataApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+
+  @@unique([metricId, siteId, periodStart, periodEnd])
+  @@index([siteId, periodEnd, status])
+  @@index([metricId, periodEnd])
+}
+
+model EnvironmentalTarget {
+  id             String                        @id @default(cuid())
+  organizationId String
+  organization   Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  metricId       String
+  metric         EnvironmentalMetricDefinition @relation(fields: [metricId], references: [id], onDelete: Cascade)
+  name           String
+  baselineYear   Int
+  baselineValue  Float
+  targetYear     Int
+  targetValue    Float
+  description    String?
+  isActive       Boolean                       @default(true)
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+
+  @@index([organizationId, isActive])
+  @@index([metricId, targetYear])
 }
 
 model TrainingRecord {

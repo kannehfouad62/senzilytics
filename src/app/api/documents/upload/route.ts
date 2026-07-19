@@ -315,6 +315,11 @@ async function validateRelatedEntity(input: {
       return Boolean(record);
     }
 
+    case DocumentEntityType.ENVIRONMENTAL: {
+      const record = await prisma.environmentalDataPoint.findFirst({ where: { id: input.entityId, metric: { organizationId: input.organizationId } }, select: { id: true } });
+      return Boolean(record);
+    }
+
     case DocumentEntityType.WORKFLOW: {
       const record = await prisma.workflowInstance.findFirst({
         where: {
