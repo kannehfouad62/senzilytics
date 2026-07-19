@@ -1,6 +1,6 @@
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Bell, Building2, ClipboardList, LogOut, Menu, Search, Sparkles } from "lucide-react";
+import { Bell, Building2, ClipboardList, LogOut, Search, Sparkles } from "lucide-react";
 import Link from "next/link";
 import {
   auditNavItems,
@@ -11,6 +11,7 @@ import {
   type NavigationItem,
 } from "./sidebar";
 import { isApprovedPlatformAdministrator } from "@/lib/platform-admin";
+import { MobileNavigationMenu } from "./mobile-navigation-menu";
 
 export const dynamic = "force-dynamic";
 
@@ -116,9 +117,7 @@ export async function Topbar() {
       </div>
 
       <div className="flex items-center gap-4">
-        <details className="relative lg:hidden">
-          <summary className="flex cursor-pointer list-none items-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-300" title="Open navigation"><Menu size={20} /></summary>
-          <div className="fixed inset-x-3 top-20 z-50 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl border border-white/10 bg-slate-950 p-3 shadow-2xl">
+        <MobileNavigationMenu>
             {mobileSections.map((section) => (
               <div key={section.label} className="mb-4 last:mb-0">
                 <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{section.label}</p>
@@ -130,8 +129,7 @@ export async function Topbar() {
                 </div>
               </div>
             ))}
-          </div>
-        </details>
+        </MobileNavigationMenu>
         <div className="hidden items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 md:flex">
           <Search size={18} className="text-slate-400" />
           <span className="text-sm text-slate-400">
