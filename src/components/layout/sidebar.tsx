@@ -27,7 +27,7 @@ import {
   Eye,
 } from "lucide-react";
 
-const primaryNavItems = [
+export const primaryNavItems = [
   {
     label: "Dashboard",
     href: "/dashboard",
@@ -60,7 +60,7 @@ const primaryNavItems = [
   },
 ];
 
-const ehsNavItems = [
+export const ehsNavItems = [
   {
     label: "Safety Observations",
     href: "/observations",
@@ -109,7 +109,7 @@ const ehsNavItems = [
   },
 ];
 
-const inspectionNavItems = [
+export const inspectionNavItems = [
   {
     label: "All Inspections",
     href: "/inspections",
@@ -122,7 +122,7 @@ const inspectionNavItems = [
   },
 ];
 
-const auditNavItems = [
+export const auditNavItems = [
   {
     label: "Audit Workspace",
     href: "/audits",
@@ -135,7 +135,7 @@ const auditNavItems = [
   },
 ];
 
-const complianceNavItems = [
+export const complianceNavItems = [
   {
     label: "Sustainability & ESG",
     href: "/esg",
@@ -178,7 +178,7 @@ const complianceNavItems = [
   },
 ];
 
-type NavigationItem = {
+export type NavigationItem = {
   label: string;
   href: string;
   icon: React.ComponentType<{

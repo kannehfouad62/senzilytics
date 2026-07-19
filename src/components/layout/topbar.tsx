@@ -1,7 +1,16 @@
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { BarChart3, Bell, ClipboardList, LogOut, Menu, Search, SearchCheck, Sparkles } from "lucide-react";
+import { Bell, Building2, ClipboardList, LogOut, Menu, Search, Sparkles } from "lucide-react";
 import Link from "next/link";
+import {
+  auditNavItems,
+  complianceNavItems,
+  ehsNavItems,
+  inspectionNavItems,
+  primaryNavItems,
+  type NavigationItem,
+} from "./sidebar";
+import { isApprovedPlatformAdministrator } from "@/lib/platform-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +26,9 @@ export async function Topbar() {
           id: true,
           name: true,
           role: true,
+          email: true,
+          isActive: true,
+          isPlatformAdmin: true,
           organizationId: true,
         },
       })
@@ -68,6 +80,26 @@ export async function Topbar() {
       })
     : 0;
 
+  const platformItems: NavigationItem[] =
+    currentUser && isApprovedPlatformAdministrator(currentUser)
+      ? [
+          ...primaryNavItems,
+          {
+            label: "Tenant Provisioning",
+            href: "/platform/tenants",
+            icon: Building2,
+          },
+        ]
+      : primaryNavItems;
+
+  const mobileSections = [
+    { label: "Platform", items: platformItems },
+    { label: "EHS Management", items: ehsNavItems },
+    { label: "Audit Management 2.0", items: auditNavItems },
+    { label: "Inspections", items: inspectionNavItems },
+    { label: "Governance", items: complianceNavItems },
+  ];
+
   async function logout() {
     "use server";
 
@@ -86,10 +118,18 @@ export async function Topbar() {
       <div className="flex items-center gap-4">
         <details className="relative lg:hidden">
           <summary className="flex cursor-pointer list-none items-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-300" title="Open navigation"><Menu size={20} /></summary>
-          <div className="absolute right-0 z-50 mt-3 w-64 rounded-2xl border border-white/10 bg-slate-950 p-3 shadow-2xl">
-            <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Audit Management 2.0</p>
-            <MobileLink href="/audits" label="Audit Workspace" icon={<SearchCheck size={17} />} />
-            <MobileLink href="/audits/dashboard" label="Audit Analytics" icon={<BarChart3 size={17} />} />
+          <div className="fixed inset-x-3 top-20 z-50 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl border border-white/10 bg-slate-950 p-3 shadow-2xl">
+            {mobileSections.map((section) => (
+              <div key={section.label} className="mb-4 last:mb-0">
+                <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{section.label}</p>
+                <div className="space-y-1">
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    return <MobileLink key={item.href} href={item.href} label={item.label} icon={<Icon size={17} />} />;
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </details>
         <div className="hidden items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 md:flex">
