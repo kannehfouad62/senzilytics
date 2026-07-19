@@ -70,6 +70,26 @@ enum PermissionKey {
   MANAGE_RISKS
   VIEW_MOC
   MANAGE_MOC
+  CREATE_OBSERVATION
+  VIEW_OBSERVATIONS
+  MANAGE_OBSERVATIONS
+}
+
+enum SafetyObservationType {
+  UNSAFE_ACT
+  UNSAFE_CONDITION
+  POSITIVE_PRACTICE
+  ENVIRONMENTAL
+  QUALITY
+  OTHER
+}
+
+enum SafetyObservationStatus {
+  REPORTED
+  UNDER_REVIEW
+  ACTION_REQUIRED
+  RESOLVED
+  CLOSED
 }
 
 enum AuditType {
@@ -671,6 +691,7 @@ model Organization {
   enterpriseAuditFindingsV2 EnterpriseAuditFinding[] @relation("EnterpriseAuditFindingOrganization")
 
   enterpriseAuditHistoryV2 EnterpriseAuditHistory[] @relation("EnterpriseAuditHistoryOrganization")
+  safetyObservations       SafetyObservation[]
 }
 
 model Site {
@@ -696,8 +717,9 @@ model Site {
 
   auditProgramScopesV2 AuditProgramSite[] @relation("AuditProgramSiteScope")
 
-  auditSchedulesV2   AuditSchedule[]   @relation("AuditScheduleSite")
-  enterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditSite")
+  auditSchedulesV2   AuditSchedule[]     @relation("AuditScheduleSite")
+  enterpriseAuditsV2 EnterpriseAudit[]   @relation("EnterpriseAuditSite")
+  safetyObservations SafetyObservation[]
 }
 
 model Department {
@@ -712,8 +734,9 @@ model Department {
 
   auditProgramScopesV2 AuditProgramDepartment[] @relation("AuditProgramDepartmentScope")
 
-  auditSchedulesV2   AuditSchedule[]   @relation("AuditScheduleDepartment")
-  enterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditDepartment")
+  auditSchedulesV2   AuditSchedule[]     @relation("AuditScheduleDepartment")
+  enterpriseAuditsV2 EnterpriseAudit[]   @relation("EnterpriseAuditDepartment")
+  safetyObservations SafetyObservation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -807,6 +830,8 @@ model User {
   enterpriseAuditHistoryV2 EnterpriseAuditHistory[] @relation("EnterpriseAuditHistoryUser")
 
   enterpriseAuditFindingHistoryV2 EnterpriseAuditFindingHistory[] @relation("EnterpriseAuditFindingHistoryUser")
+  reportedSafetyObservations      SafetyObservation[]             @relation("SafetyObservationReporter")
+  assignedSafetyObservations      SafetyObservation[]             @relation("SafetyObservationAssignee")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -828,11 +853,49 @@ model Incident {
   reportedById String
   reportedBy   User   @relation("ReportedIncidents", fields: [reportedById], references: [id])
 
-  investigation Investigation?
-  actions       CorrectiveAction[]
+  investigation      Investigation?
+  actions            CorrectiveAction[]
+  sourceObservations SafetyObservation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model SafetyObservation {
+  id              String                  @id @default(cuid())
+  reference       String
+  title           String
+  description     String
+  type            SafetyObservationType
+  status          SafetyObservationStatus @default(REPORTED)
+  riskLevel       RiskLevel               @default(LOW)
+  location        String?
+  observedAt      DateTime
+  immediateAction String?
+  isAnonymous     Boolean                 @default(false)
+  reviewNotes     String?
+  resolvedAt      DateTime?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  siteId         String
+  site           Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId   String?
+  department     Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  reportedById   String
+  reportedBy     User         @relation("SafetyObservationReporter", fields: [reportedById], references: [id])
+  assignedToId   String?
+  assignedTo     User?        @relation("SafetyObservationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  incidentId     String?
+  incident       Incident?    @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status])
+  @@index([siteId, observedAt])
+  @@index([assignedToId, status])
 }
 
 model Investigation {

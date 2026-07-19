@@ -20,6 +20,7 @@ import {
   Gauge,
   FileText,
   Workflow,
+  Eye,
 } from "lucide-react";
 
 const primaryNavItems = [
@@ -56,6 +57,11 @@ const primaryNavItems = [
 ];
 
 const ehsNavItems = [
+  {
+    label: "Safety Observations",
+    href: "/observations",
+    icon: Eye,
+  },
   {
     label: "Incidents",
     href: "/incidents",

@@ -143,6 +143,9 @@ async function main() {
       PermissionKey.VIEW_ACTIVITY_LOG,
       PermissionKey.MANAGE_NOTIFICATIONS,
       PermissionKey.MANAGE_DOCUMENTS,
+      PermissionKey.CREATE_OBSERVATION,
+      PermissionKey.VIEW_OBSERVATIONS,
+      PermissionKey.MANAGE_OBSERVATIONS,
     ],
 
     EHS_MANAGER: [
@@ -162,6 +165,9 @@ async function main() {
       PermissionKey.VIEW_TRAINING,
       PermissionKey.USE_AI,
       PermissionKey.VIEW_ACTIVITY_LOG,
+      PermissionKey.CREATE_OBSERVATION,
+      PermissionKey.VIEW_OBSERVATIONS,
+      PermissionKey.MANAGE_OBSERVATIONS,
     ],
 
     SUPERVISOR: [
@@ -174,10 +180,15 @@ async function main() {
       PermissionKey.VIEW_INSPECTIONS,
       PermissionKey.MANAGE_INSPECTIONS,
       PermissionKey.VIEW_TRAINING,
+      PermissionKey.CREATE_OBSERVATION,
+      PermissionKey.VIEW_OBSERVATIONS,
+      PermissionKey.MANAGE_OBSERVATIONS,
     ],
 
     EMPLOYEE: [
       PermissionKey.VIEW_DASHBOARD,
+      PermissionKey.CREATE_OBSERVATION,
+      PermissionKey.VIEW_OBSERVATIONS,
       PermissionKey.CREATE_INCIDENT,
       PermissionKey.VIEW_INCIDENT,
       PermissionKey.VIEW_TRAINING,
@@ -191,6 +202,7 @@ async function main() {
       PermissionKey.VIEW_INSPECTIONS,
       PermissionKey.VIEW_COMPLIANCE,
       PermissionKey.VIEW_REPORTS,
+      PermissionKey.VIEW_OBSERVATIONS,
     ],
   };
 
