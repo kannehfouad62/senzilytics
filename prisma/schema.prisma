@@ -208,6 +208,23 @@ enum EsgInitiativeStatus {
   CANCELLED
 }
 
+enum JsaStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  ACTIVE
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum JsaControlHierarchy {
+  ELIMINATION
+  SUBSTITUTION
+  ENGINEERING
+  ADMINISTRATIVE
+  PPE
+}
+
 enum AuditType {
   INTERNAL
   EXTERNAL
@@ -825,6 +842,7 @@ model Organization {
   esgMetrics               EsgMetricDefinition[]
   esgDisclosurePeriods     EsgDisclosurePeriod[]
   esgInitiatives           EsgInitiative[]
+  jobSafetyAnalyses        JobSafetyAnalysis[]
 }
 
 model Site {
@@ -854,6 +872,7 @@ model Site {
   enterpriseAuditsV2   EnterpriseAudit[]        @relation("EnterpriseAuditSite")
   safetyObservations   SafetyObservation[]
   trainingRequirements TrainingRequirement[]
+  jobSafetyAnalyses    JobSafetyAnalysis[]
   permits              Permit[]
   chemicalInventories  ChemicalInventory[]
   environmentalData    EnvironmentalDataPoint[]
@@ -876,8 +895,9 @@ model Department {
   safetyObservations   SafetyObservation[]
   trainingRequirements TrainingRequirement[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  jobSafetyAnalyses JobSafetyAnalysis[]
 }
 
 model User {
@@ -918,6 +938,10 @@ model User {
   approvedEsgPeriods        EsgDisclosurePeriod[]       @relation("EsgPeriodApprovedBy")
   publishedEsgPeriods       EsgDisclosurePeriod[]       @relation("EsgPeriodPublishedBy")
   ownedEsgInitiatives       EsgInitiative[]             @relation("EsgInitiativeOwner")
+  createdJsas               JobSafetyAnalysis[]         @relation("JsaCreatedBy")
+  ownedJsas                 JobSafetyAnalysis[]         @relation("JsaOwner")
+  approvedJsas              JobSafetyAnalysis[]         @relation("JsaApprovedBy")
+  jsaAcknowledgments        JsaAcknowledgment[]
   activityLogs              ActivityLog[]
   notifications             Notification[]
   uploadedDocuments         Document[]
@@ -2845,6 +2869,105 @@ model EsgInitiative {
   @@index([ownerId, status])
 }
 
+model JobSafetyAnalysis {
+  id                    String              @id @default(cuid())
+  organizationId        String
+  organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  siteId                String
+  site                  Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId          String?
+  department            Department?         @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  reference             String
+  title                 String
+  jobDescription        String
+  workLocation          String?
+  requiredCompetency    String?
+  requiredPpe           String?
+  emergencyRequirements String?
+  version               Int                 @default(1)
+  status                JsaStatus           @default(DRAFT)
+  ownerId               String?
+  owner                 User?               @relation("JsaOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdById           String
+  createdBy             User                @relation("JsaCreatedBy", fields: [createdById], references: [id])
+  approvedById          String?
+  approvedBy            User?               @relation("JsaApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt            DateTime?
+  effectiveDate         DateTime?
+  reviewDueDate         DateTime?
+  steps                 JsaStep[]
+  acknowledgments       JsaAcknowledgment[]
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@unique([organizationId, reference, version])
+  @@index([organizationId, status])
+  @@index([siteId, status])
+  @@index([ownerId, reviewDueDate])
+}
+
+model JsaStep {
+  id        String            @id @default(cuid())
+  jsaId     String
+  jsa       JobSafetyAnalysis @relation(fields: [jsaId], references: [id], onDelete: Cascade)
+  sequence  Int
+  taskStep  String
+  hazards   JsaHazard[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([jsaId, sequence])
+}
+
+model JsaHazard {
+  id                   String         @id @default(cuid())
+  stepId               String
+  step                 JsaStep        @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  hazard               String
+  potentialConsequence String
+  initialLikelihood    RiskLikelihood
+  initialImpact        RiskImpact
+  initialScore         Int
+  residualLikelihood   RiskLikelihood
+  residualImpact       RiskImpact
+  residualScore        Int
+  riskId               String?
+  risk                 Risk?          @relation(fields: [riskId], references: [id], onDelete: SetNull)
+  controls             JsaControl[]
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([stepId])
+  @@index([riskId])
+}
+
+model JsaControl {
+  id                   String              @id @default(cuid())
+  hazardId             String
+  hazard               JsaHazard           @relation(fields: [hazardId], references: [id], onDelete: Cascade)
+  hierarchy            JsaControlHierarchy
+  description          String
+  responsibleRole      String?
+  verificationRequired Boolean             @default(false)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([hazardId, hierarchy])
+}
+
+model JsaAcknowledgment {
+  id             String            @id @default(cuid())
+  jsaId          String
+  jsa            JobSafetyAnalysis @relation(fields: [jsaId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  acknowledgedAt DateTime          @default(now())
+  statement      String?
+
+  @@unique([jsaId, userId])
+  @@index([userId, acknowledgedAt])
+}
+
 model TrainingRecord {
   id          String    @id @default(cuid())
   courseName  String
@@ -2970,6 +3093,7 @@ model Risk {
   mocLinks MocRiskLink[]
 
   enterpriseAuditFindingLinks EnterpriseAuditFindingRiskLink[] @relation("EnterpriseAuditFindingRisk")
+  jsaHazards                  JsaHazard[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

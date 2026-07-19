@@ -86,6 +86,11 @@ const ehsNavItems = [
     icon: ShieldAlert,
   },
   {
+    label: "JSA / JHA",
+    href: "/risks/jsa",
+    icon: ListChecks,
+  },
+  {
     label: "Risk Report",
     href: "/risks/report",
     icon: FileText,
