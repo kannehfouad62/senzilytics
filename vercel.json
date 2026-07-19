@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/chemical-monitor",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/environmental-monitor",
+      "schedule": "30 7 * * *"
     }
   ]
 }

@@ -168,6 +168,13 @@ enum EnvironmentalDataQuality {
   SUPPLIER_PROVIDED
 }
 
+enum EnvironmentalReportingFrequency {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
 enum AuditType {
   INTERNAL
   EXTERNAL
@@ -850,24 +857,25 @@ model User {
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
-  reportedIncidents         Incident[]               @relation("ReportedIncidents")
-  assignedInvestigations    Investigation[]          @relation("InvestigationAssignedUser")
+  reportedIncidents         Incident[]                  @relation("ReportedIncidents")
+  assignedInvestigations    Investigation[]             @relation("InvestigationAssignedUser")
   assignedActions           CorrectiveAction[]
-  leadAudits                Audit[]                  @relation("AuditLeadAuditor")
+  leadAudits                Audit[]                     @relation("AuditLeadAuditor")
   auditTeamMemberships      AuditTeamMember[]
-  auditResponses            AuditResponse[]          @relation("AuditResponseAnsweredBy")
-  leadInspections           Inspection[]             @relation("InspectionLeadInspector")
+  auditResponses            AuditResponse[]             @relation("AuditResponseAnsweredBy")
+  leadInspections           Inspection[]                @relation("InspectionLeadInspector")
   inspectionTeamMemberships InspectionTeamMember[]
-  inspectionResponses       InspectionResponse[]     @relation("InspectionResponseAnsweredBy")
-  trainingRecords           TrainingRecord[]         @relation("TrainingRecordLearner")
-  assignedTrainingRecords   TrainingRecord[]         @relation("TrainingRecordAssignedBy")
-  createdTrainingCourses    TrainingCourse[]         @relation("TrainingCourseCreatedBy")
-  ownedComplianceItems      ComplianceItem[]         @relation("ComplianceItemOwner")
-  ownedPermits              Permit[]                 @relation("PermitOwner")
-  complianceEvaluations     ComplianceEvaluation[]   @relation("ComplianceEvaluationUser")
-  reviewedChemicals         Chemical[]               @relation("ChemicalReviewedBy")
-  enteredEnvironmentalData  EnvironmentalDataPoint[] @relation("EnvironmentalDataEnteredBy")
-  approvedEnvironmentalData EnvironmentalDataPoint[] @relation("EnvironmentalDataApprovedBy")
+  inspectionResponses       InspectionResponse[]        @relation("InspectionResponseAnsweredBy")
+  trainingRecords           TrainingRecord[]            @relation("TrainingRecordLearner")
+  assignedTrainingRecords   TrainingRecord[]            @relation("TrainingRecordAssignedBy")
+  createdTrainingCourses    TrainingCourse[]            @relation("TrainingCourseCreatedBy")
+  ownedComplianceItems      ComplianceItem[]            @relation("ComplianceItemOwner")
+  ownedPermits              Permit[]                    @relation("PermitOwner")
+  complianceEvaluations     ComplianceEvaluation[]      @relation("ComplianceEvaluationUser")
+  reviewedChemicals         Chemical[]                  @relation("ChemicalReviewedBy")
+  enteredEnvironmentalData  EnvironmentalDataPoint[]    @relation("EnvironmentalDataEnteredBy")
+  approvedEnvironmentalData EnvironmentalDataPoint[]    @relation("EnvironmentalDataApprovedBy")
+  environmentalRevisions    EnvironmentalDataRevision[] @relation("EnvironmentalRevisionChangedBy")
   activityLogs              ActivityLog[]
   notifications             Notification[]
   uploadedDocuments         Document[]
@@ -2583,22 +2591,24 @@ model ChemicalMocLink {
 }
 
 model EnvironmentalMetricDefinition {
-  id               String                   @id @default(cuid())
-  organizationId   String
-  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  code             String
-  name             String
-  description      String?
-  type             EnvironmentalMetricType
-  sourceUnit       String
-  reportingUnit    String
-  conversionFactor Float                    @default(1)
-  methodology      String?
-  isActive         Boolean                  @default(true)
-  dataPoints       EnvironmentalDataPoint[]
-  targets          EnvironmentalTarget[]
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
+  id                    String                          @id @default(cuid())
+  organizationId        String
+  organization          Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code                  String
+  name                  String
+  description           String?
+  type                  EnvironmentalMetricType
+  sourceUnit            String
+  reportingUnit         String
+  conversionFactor      Float                           @default(1)
+  methodology           String?
+  reportingFrequency    EnvironmentalReportingFrequency @default(MONTHLY)
+  missingDataNotifiedAt DateTime?
+  isActive              Boolean                         @default(true)
+  dataPoints            EnvironmentalDataPoint[]
+  targets               EnvironmentalTarget[]
+  createdAt             DateTime                        @default(now())
+  updatedAt             DateTime                        @updatedAt
 
   @@unique([organizationId, code])
   @@index([organizationId, type, isActive])
@@ -2623,12 +2633,32 @@ model EnvironmentalDataPoint {
   approvedById    String?
   approvedBy      User?                         @relation("EnvironmentalDataApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt      DateTime?
+  revisions       EnvironmentalDataRevision[]
   createdAt       DateTime                      @default(now())
   updatedAt       DateTime                      @updatedAt
 
   @@unique([metricId, siteId, periodStart, periodEnd])
   @@index([siteId, periodEnd, status])
   @@index([metricId, periodEnd])
+}
+
+model EnvironmentalDataRevision {
+  id              String                   @id @default(cuid())
+  dataPointId     String
+  dataPoint       EnvironmentalDataPoint   @relation(fields: [dataPointId], references: [id], onDelete: Cascade)
+  value           Float
+  normalizedValue Float
+  quality         EnvironmentalDataQuality
+  status          EnvironmentalDataStatus
+  evidenceSummary String?
+  notes           String?
+  reason          String
+  changedById     String
+  changedBy       User                     @relation("EnvironmentalRevisionChangedBy", fields: [changedById], references: [id])
+  createdAt       DateTime                 @default(now())
+
+  @@index([dataPointId, createdAt])
+  @@index([changedById])
 }
 
 model EnvironmentalTarget {
