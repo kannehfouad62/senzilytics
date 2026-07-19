@@ -29,7 +29,7 @@ import {
 
 export const primaryNavItems = [
   {
-    label: "Dashboard",
+    label: "Global Executive Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
