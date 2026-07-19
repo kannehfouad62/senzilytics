@@ -274,6 +274,7 @@ enum DocumentEntityType {
   RISK
   RISK_CONTROL
   MOC
+  PERMIT
 }
 
 enum DocumentCategory {
@@ -805,6 +806,7 @@ model User {
   createdTrainingCourses    TrainingCourse[]       @relation("TrainingCourseCreatedBy")
   ownedComplianceItems      ComplianceItem[]       @relation("ComplianceItemOwner")
   ownedPermits              Permit[]               @relation("PermitOwner")
+  complianceEvaluations     ComplianceEvaluation[] @relation("ComplianceEvaluationUser")
   activityLogs              ActivityLog[]
   notifications             Notification[]
   uploadedDocuments         Document[]
@@ -2364,25 +2366,28 @@ model InspectionFinding {
 }
 
 model ComplianceItem {
-  id               String                   @id @default(cuid())
-  title            String
-  description      String?
-  status           Status                   @default(OPEN)
-  dueDate          DateTime
-  reference        String?
-  obligationType   ComplianceObligationType @default(REGULATORY)
-  authority        String?
-  jurisdiction     String?
-  legalReference   String?
-  applicability    String?
-  recurrence       ComplianceRecurrence     @default(ONE_TIME)
-  intervalValue    Int                      @default(1)
-  evidenceRequired String?
-  ownerId          String?
-  owner            User?                    @relation("ComplianceItemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  completedAt      DateTime?
-  lastEvaluatedAt  DateTime?
-  evaluationNotes  String?
+  id                String                   @id @default(cuid())
+  title             String
+  description       String?
+  status            Status                   @default(OPEN)
+  dueDate           DateTime
+  reference         String?
+  obligationType    ComplianceObligationType @default(REGULATORY)
+  authority         String?
+  jurisdiction      String?
+  legalReference    String?
+  applicability     String?
+  recurrence        ComplianceRecurrence     @default(ONE_TIME)
+  intervalValue     Int                      @default(1)
+  evidenceRequired  String?
+  ownerId           String?
+  owner             User?                    @relation("ComplianceItemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  completedAt       DateTime?
+  lastEvaluatedAt   DateTime?
+  evaluationNotes   String?
+  reminderSentAt    DateTime?
+  overdueNotifiedAt DateTime?
+  evaluations       ComplianceEvaluation[]
 
   siteId String
   site   Site   @relation(fields: [siteId], references: [id])
@@ -2392,6 +2397,23 @@ model ComplianceItem {
 
   @@index([ownerId, status])
   @@index([siteId, dueDate])
+}
+
+model ComplianceEvaluation {
+  id               String         @id @default(cuid())
+  complianceItemId String
+  complianceItem   ComplianceItem @relation(fields: [complianceItemId], references: [id], onDelete: Cascade)
+  evaluatedById    String
+  evaluatedBy      User           @relation("ComplianceEvaluationUser", fields: [evaluatedById], references: [id])
+  evaluatedAt      DateTime       @default(now())
+  isCompliant      Boolean
+  findings         String?
+  evidenceSummary  String?
+  nextDueDate      DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([complianceItemId, evaluatedAt])
+  @@index([evaluatedById])
 }
 
 model Permit {
@@ -2415,6 +2437,8 @@ model Permit {
   limits                String?
   reportingRequirements String?
   notes                 String?
+  reminderSentAt        DateTime?
+  overdueNotifiedAt     DateTime?
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
 

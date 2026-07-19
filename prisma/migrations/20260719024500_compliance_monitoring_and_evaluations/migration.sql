@@ -1,0 +1,10 @@
+ALTER TYPE "DocumentEntityType" ADD VALUE 'PERMIT';
+ALTER TABLE "ComplianceItem" ADD COLUMN "reminderSentAt" TIMESTAMP(3);
+ALTER TABLE "ComplianceItem" ADD COLUMN "overdueNotifiedAt" TIMESTAMP(3);
+ALTER TABLE "Permit" ADD COLUMN "reminderSentAt" TIMESTAMP(3);
+ALTER TABLE "Permit" ADD COLUMN "overdueNotifiedAt" TIMESTAMP(3);
+CREATE TABLE "ComplianceEvaluation" ("id" TEXT NOT NULL,"complianceItemId" TEXT NOT NULL,"evaluatedById" TEXT NOT NULL,"evaluatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"isCompliant" BOOLEAN NOT NULL,"findings" TEXT,"evidenceSummary" TEXT,"nextDueDate" TIMESTAMP(3),"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "ComplianceEvaluation_pkey" PRIMARY KEY ("id"));
+CREATE INDEX "ComplianceEvaluation_complianceItemId_evaluatedAt_idx" ON "ComplianceEvaluation"("complianceItemId","evaluatedAt");
+CREATE INDEX "ComplianceEvaluation_evaluatedById_idx" ON "ComplianceEvaluation"("evaluatedById");
+ALTER TABLE "ComplianceEvaluation" ADD CONSTRAINT "ComplianceEvaluation_complianceItemId_fkey" FOREIGN KEY ("complianceItemId") REFERENCES "ComplianceItem"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ComplianceEvaluation" ADD CONSTRAINT "ComplianceEvaluation_evaluatedById_fkey" FOREIGN KEY ("evaluatedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
