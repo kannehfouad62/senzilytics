@@ -1,5 +1,7 @@
 import { ExecutiveDashboardCharts } from "@/core/analytics/executive-dashboard-charts";
 import { getExecutiveDashboardData } from "@/core/analytics/dashboard.service";
+import { getGlobalExecutivePortfolio } from "@/core/analytics/global-executive-dashboard.service";
+import { GlobalExecutivePortfolio } from "@/core/analytics/global-executive-portfolio";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { OperationalDashboardCharts } from "@/core/analytics/operational-dashboard-charts";
 import { PerformanceDashboardCharts } from "@/core/analytics/performance-dashboard-charts";
@@ -22,10 +24,10 @@ export default async function DashboardPage() {
   const { organizationId, user } =
     await getCurrentUserTenant();
 
-  const dashboard =
-    await getExecutiveDashboardData({
-      organizationId,
-    });
+  const [dashboard, portfolio] = await Promise.all([
+    getExecutiveDashboardData({ organizationId }),
+    getGlobalExecutivePortfolio(organizationId),
+  ]);
 
   const stats = [
     {
@@ -138,6 +140,8 @@ export default async function DashboardPage() {
           );
         })}
       </div>
+
+      <GlobalExecutivePortfolio modules={portfolio.modules} attentionCount={portfolio.attentionCount} />
 
       <ExecutiveDashboardCharts
         monthlyTrend={dashboard.charts.monthlyTrend}
