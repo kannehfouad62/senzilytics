@@ -9,6 +9,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --import tsx --test tests/**/*.test.ts",
+    "check": "npm run lint && npm test && npm run build",
+    "verify:production": "tsx --env-file=.env scripts/verify-production-env.ts",
+    "db:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate",
     "repair:workflows": "tsx prisma/repair-workflows.ts"
   },

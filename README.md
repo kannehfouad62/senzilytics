@@ -1,38 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Senzilytics
 
-## Getting Started
+Senzilytics is a multi-tenant EHS and ESG compliance, risk, and operational-governance platform built with Next.js, Prisma, and PostgreSQL.
 
-First, run the development server:
+## Local development
 
 ```bash
+npm ci
+npx prisma generate
+npx prisma migrate deploy
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Required local variables are stored in `.env` and must never be committed. At minimum configure `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, and `APP_URL`. Document uploads require `BLOB_READ_WRITE_TOKEN`; email delivery requires the configured provider credentials; AI features require `OPENAI_API_KEY`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Production release
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Take a verified database backup and record the currently deployed commit.
+2. Configure production secrets. Generate independent random values of at least 32 characters for `AUTH_SECRET` and `CRON_SECRET`.
+3. Run `npm run verify:production` against the intended production environment.
+4. Run `npm ci`, `npx prisma generate`, `npm test`, and `npm run build`.
+5. Review pending migrations, then run `npm run db:deploy` once against the production database.
+6. Deploy the exact validated commit. Never run `prisma migrate dev` in production.
+7. Confirm `/api/health` returns HTTP 200 and `status: ready`.
+8. Verify login, tenant isolation, role access, uploads, email, and one non-destructive scheduled-job invocation.
+9. Monitor deployment logs, database connections, scheduled jobs, and error rates during the release window.
 
-## Learn More
+## Scheduled jobs
 
-To learn more about Next.js, take a look at the following resources:
+Vercel schedules are defined in `vercel.json`. Every cron request must send `Authorization: Bearer $CRON_SECRET`; handlers fail closed when the secret is absent. Monitor non-2xx results for audit generation, workflow SLA, training, compliance, chemical, and environmental processing.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Rollback
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Roll back application code to the recorded prior commit first. Prisma migrations are forward-only by default; do not manually reverse a production migration unless a reviewed recovery migration exists. Restore the pre-release database backup only when data compatibility requires it and the operational owner has approved the data-loss window.
 
-## Deploy on Vercel
+## Quality gate
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run check
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# senzilytics
-# senzilytics
+This runs linting, automated tests, and the optimized production build.
