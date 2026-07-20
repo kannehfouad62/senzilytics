@@ -105,6 +105,42 @@ enum PermissionKey {
   MANAGE_ESG
 }
 
+enum ConfigurableFormModule {
+  OBSERVATION
+  INCIDENT
+  AUDIT
+  INSPECTION
+  CAPA
+  RISK
+  MOC
+  COMPLIANCE
+  TRAINING
+  CONTRACTOR
+  PERMIT_TO_WORK
+  GENERAL
+}
+
+enum ConfigurableFormVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ConfigurableFieldType {
+  SHORT_TEXT
+  LONG_TEXT
+  NUMBER
+  DATE
+  DATETIME
+  BOOLEAN
+  SINGLE_SELECT
+  MULTI_SELECT
+  EMAIL
+  PHONE
+  FILE
+  SIGNATURE
+}
+
 enum SafetyObservationType {
   UNSAFE_ACT
   UNSAFE_CONDITION
@@ -860,6 +896,7 @@ model Organization {
   activityLogs                 ActivityLog[]
   notifications                Notification[]
   workflowTemplates            WorkflowTemplate[]
+  configurableForms            ConfigurableFormDefinition[]
   workflowInstances            WorkflowInstance[]
   documents                    Document[]
   auditChecklistTemplates      AuditChecklistTemplate[]
@@ -1048,6 +1085,9 @@ model User {
   startedWorkflowInstances WorkflowInstance[]
   assignedWorkflowSteps    WorkflowInstanceStep[] @relation("WorkflowAssignedUser")
   completedWorkflowSteps   WorkflowInstanceStep[] @relation("WorkflowCompletedBy")
+  configurableFormsCreated ConfigurableFormDefinition[] @relation("ConfigurableFormCreatedBy")
+  configurableFormVersionsCreated ConfigurableFormVersion[] @relation("ConfigurableFormVersionCreatedBy")
+  configurableFormVersionsPublished ConfigurableFormVersion[] @relation("ConfigurableFormVersionPublishedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -3641,6 +3681,70 @@ model Notification {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ConfigurableFormDefinition {
+  id             String                 @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  description    String?
+  module         ConfigurableFormModule
+  isActive       Boolean                @default(true)
+  createdById    String
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("ConfigurableFormCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  versions     ConfigurableFormVersion[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, module, isActive])
+}
+
+model ConfigurableFormVersion {
+  id             String                        @id @default(cuid())
+  definitionId   String
+  version        Int
+  status         ConfigurableFormVersionStatus @default(DRAFT)
+  instructions   String?
+  createdById    String
+  publishedById  String?
+  publishedAt    DateTime?
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+
+  definition  ConfigurableFormDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  createdBy   User                       @relation("ConfigurableFormVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedBy User?                      @relation("ConfigurableFormVersionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  fields      ConfigurableFormField[]
+
+  @@unique([definitionId, version])
+  @@index([definitionId, status])
+}
+
+model ConfigurableFormField {
+  id             String                @id @default(cuid())
+  versionId      String
+  key            String
+  label          String
+  description    String?
+  placeholder    String?
+  fieldType      ConfigurableFieldType
+  sequence       Int
+  isRequired     Boolean               @default(false)
+  options        Json?
+  validation     Json?
+  visibilityRule Json?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  version ConfigurableFormVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, key])
+  @@unique([versionId, sequence])
+  @@index([versionId, fieldType])
 }
 
 model WorkflowTemplate {

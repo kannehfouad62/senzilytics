@@ -30,6 +30,7 @@ import {
   Eye,
   WifiOff,
   Network,
+  FileCog,
 } from "lucide-react";
 
 export const primaryNavItems = [
@@ -62,6 +63,11 @@ export const primaryNavItems = [
     label: "Workflows",
     href: "/workflows",
     icon: GitBranch,
+  },
+  {
+    label: "Form Studio",
+    href: "/form-studio",
+    icon: FileCog,
   },
   {
     label: "Organizations",
