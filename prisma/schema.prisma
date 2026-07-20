@@ -907,7 +907,8 @@ model PricingInquiry {
   company        String
   jobTitle       String
   workEmail      String
-  phoneNumber    String
+  phoneNumber    String?
+  country        String
   requestedPlan  SubscriptionPlan
   createdAt      DateTime         @default(now())
 
