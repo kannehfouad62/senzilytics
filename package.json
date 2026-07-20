@@ -14,6 +14,7 @@
     "db:deploy": "prisma migrate deploy",
     "platform:grant": "tsx --env-file=.env scripts/grant-platform-admin.ts",
     "password:reset": "tsx --env-file=.env scripts/reset-user-password.ts",
+    "demo:seed": "tsx --env-file=.env scripts/seed-public-demo.ts",
     "postinstall": "prisma generate",
     "repair:workflows": "tsx prisma/repair-workflows.ts"
   },

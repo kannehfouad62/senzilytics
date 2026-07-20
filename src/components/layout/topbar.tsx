@@ -12,6 +12,7 @@ import {
 } from "./sidebar";
 import { isApprovedPlatformAdministrator } from "@/lib/platform-admin";
 import { MobileNavigationMenu } from "./mobile-navigation-menu";
+import { UserRole } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -91,14 +92,18 @@ export async function Topbar() {
             icon: Building2,
           },
         ]
-      : primaryNavItems;
+      : currentUser?.role === UserRole.DEMO_VIEWER
+        ? primaryNavItems.filter((item) => item.href === "/dashboard")
+        : primaryNavItems;
+
+  const demoMode = currentUser?.role === UserRole.DEMO_VIEWER;
 
   const mobileSections = [
     { label: "Platform", items: platformItems },
     { label: "EHS Management", items: ehsNavItems },
     { label: "Audit Management 2.0", items: auditNavItems },
     { label: "Inspections", items: inspectionNavItems },
-    { label: "Governance", items: complianceNavItems },
+    { label: "Governance", items: demoMode ? complianceNavItems.filter((item) => item.href !== "/notifications") : complianceNavItems },
   ];
 
   async function logout() {
@@ -141,7 +146,7 @@ export async function Topbar() {
           <Sparkles size={20} />
         </button>
 
-        <Link
+        {!demoMode && <Link
           href="/tasks"
           className="relative rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10"
           title="My Tasks"
@@ -157,9 +162,9 @@ export async function Topbar() {
               {overdueTaskCount > 0 ? overdueTaskCount : taskCount}
             </span>
           )}
-        </Link>
+        </Link>}
 
-        <Link
+        {!demoMode && <Link
           href="/notifications"
           className="relative rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10"
           title="Notifications"
@@ -171,7 +176,7 @@ export async function Topbar() {
               {unreadCount}
             </span>
           )}
-        </Link>
+        </Link>}
 
         <div className="hidden text-right md:block">
           <p className="text-sm font-medium text-white">{currentUser?.name}</p>

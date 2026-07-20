@@ -13,6 +13,7 @@ enum UserRole {
   SUPERVISOR
   EMPLOYEE
   AUDITOR
+  DEMO_VIEWER
 }
 
 enum OrganizationStatus {
@@ -824,6 +825,7 @@ model Organization {
   updatedAt           DateTime           @updatedAt
   status              OrganizationStatus @default(ACTIVE)
   allowedEmailDomains String[]
+  isDemo              Boolean            @default(false)
 
   sites                        Site[]
   users                        User[]
@@ -864,6 +866,7 @@ model Organization {
   jobSafetyAnalyses        JobSafetyAnalysis[]
   identityProviders        OrganizationIdentityProvider[]
   tenantInvitations        TenantInvitation[]
+  demoLeads                DemoLead[]
 }
 
 model Site {
@@ -935,6 +938,7 @@ model User {
   activatedAt     DateTime?
   lastLoginAt     DateTime?
   sessionVersion  Int       @default(0)
+  demoExpiresAt   DateTime?
 
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
@@ -975,6 +979,7 @@ model User {
   sentTenantInvitations     TenantInvitation[]          @relation("TenantInvitationSender")
   acceptedTenantInvitations TenantInvitation[]          @relation("TenantInvitationAcceptor")
   passwordResetTokens       PasswordResetToken[]
+  demoLead                  DemoLead?
 
   ownedRisks           Risk[]        @relation("RiskOwner")
   ownedRiskControls    RiskControl[] @relation("RiskControlOwner")
@@ -1040,6 +1045,26 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model DemoLead {
+  id            String   @id @default(cuid())
+  name          String
+  workEmail     String
+  company       String
+  jobTitle      String?
+  consentedAt   DateTime
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  lastActiveAt  DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String       @unique
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workEmail, createdAt])
+  @@index([organizationId, expiresAt])
 }
 
 model PasswordResetToken {

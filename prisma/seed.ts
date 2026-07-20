@@ -223,6 +223,22 @@ async function main() {
       PermissionKey.VIEW_CHEMICALS,
       PermissionKey.VIEW_ENVIRONMENTAL,
     ],
+    DEMO_VIEWER: [
+      PermissionKey.VIEW_DASHBOARD,
+      PermissionKey.VIEW_REPORTS,
+      PermissionKey.VIEW_INCIDENT,
+      PermissionKey.VIEW_AUDITS,
+      PermissionKey.VIEW_INSPECTIONS,
+      PermissionKey.VIEW_COMPLIANCE,
+      PermissionKey.VIEW_TRAINING,
+      PermissionKey.VIEW_ACTIVITY_LOG,
+      PermissionKey.VIEW_RISKS,
+      PermissionKey.VIEW_MOC,
+      PermissionKey.VIEW_OBSERVATIONS,
+      PermissionKey.VIEW_CHEMICALS,
+      PermissionKey.VIEW_ENVIRONMENTAL,
+      PermissionKey.VIEW_ESG,
+    ],
   };
 
   for (const [role, permissions] of Object.entries(rolePermissions)) {

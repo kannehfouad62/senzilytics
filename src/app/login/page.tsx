@@ -50,8 +50,12 @@ export default function LoginPage() {
             Sign In
           </button>
           <Link href="/forgot-password" className="block text-center text-sm text-cyan-300">Forgot password?</Link>
+          <div className="border-t border-white/10 pt-5 text-center text-sm text-slate-400">
+            Evaluating Senzilytics? <Link href="/demo" className="font-medium text-cyan-300">Try the interactive demo</Link>
+          </div>
         </div>
       </form>
+      <Link href="/" className="fixed left-6 top-6 text-sm text-slate-400 hover:text-cyan-300">← Senzilytics home</Link>
       <div className="fixed bottom-8 flex gap-3">{process.env.AUTH_MICROSOFT_ENTRA_ID_ID&&<form action={microsoftLogin}><button className="rounded-xl border border-white/15 bg-white/5 px-5 py-3">Sign in with Microsoft</button></form>}{process.env.AUTH_OKTA_ID&&<form action={oktaLogin}><button className="rounded-xl border border-white/15 bg-white/5 px-5 py-3">Sign in with Okta</button></form>}</div>
     </main>
   );

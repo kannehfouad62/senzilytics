@@ -34,6 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
 
         if (!user || !user.password || !user.isActive || user.organization?.status === "SUSPENDED") return null;
+        if (user.demoExpiresAt && user.demoExpiresAt <= new Date()) return null;
         if (user.organization?.identityProviders.some((provider) => provider.isEnabled && provider.enforceSso)) return null;
 
         const validPassword = await bcrypt.compare(password, user.password);
@@ -84,8 +85,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (token.sub) {
-        const current = await prisma.user.findUnique({ where: { id: token.sub }, select: { isActive: true, sessionVersion: true } });
-        token.sessionValid = Boolean(current?.isActive && current.sessionVersion === token.sessionVersion);
+        const current = await prisma.user.findUnique({ where: { id: token.sub }, select: { isActive: true, sessionVersion: true, demoExpiresAt: true } });
+        token.sessionValid = Boolean(
+          current?.isActive &&
+          current.sessionVersion === token.sessionVersion &&
+          (!current.demoExpiresAt || current.demoExpiresAt > new Date())
+        );
       }
 
       return token;

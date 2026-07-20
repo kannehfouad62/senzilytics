@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getPlatformAdministrator } from "@/lib/platform-admin";
+import { getCurrentUserTenant } from "@/lib/tenant";
+import { UserRole } from "@prisma/client";
 import {
   Activity,
   AlertTriangle,
@@ -188,7 +190,8 @@ export type NavigationItem = {
 };
 
 export async function Sidebar() {
-  const platformAdministrator = await getPlatformAdministrator();
+  const [platformAdministrator, { user }] = await Promise.all([getPlatformAdministrator(), getCurrentUserTenant()]);
+  const isDemo = user.role === UserRole.DEMO_VIEWER;
   const platformNavItems = platformAdministrator
     ? [
         ...primaryNavItems,
@@ -198,7 +201,12 @@ export async function Sidebar() {
           icon: Building2,
         },
       ]
-    : primaryNavItems;
+    : isDemo
+      ? primaryNavItems.filter((item) => item.href === "/dashboard")
+      : primaryNavItems;
+  const governanceItems = isDemo
+    ? complianceNavItems.filter((item) => item.href !== "/notifications")
+    : complianceNavItems;
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:flex">
@@ -260,7 +268,7 @@ export async function Sidebar() {
 
         <NavigationSection
           label="Governance"
-          items={complianceNavItems}
+          items={governanceItems}
         />
       </nav>
     </aside>

@@ -5,6 +5,7 @@ import { processInspectionSlaNotifications } from "@/core/notifications/inspecti
 import { processInvestigationSlaNotifications } from "@/core/notifications/investigation-sla.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
+import { cleanupExpiredDemoUsers } from "@/features/demo/cleanup.service";
 import {
   NextRequest,
   NextResponse,
@@ -47,6 +48,7 @@ export async function GET(
       investigationResult,
       auditResult,
       inspectionResult,
+      demoResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
 
@@ -59,6 +61,8 @@ export async function GET(
       processAuditSlaNotifications(),
 
       processInspectionSlaNotifications(),
+
+      cleanupExpiredDemoUsers(),
 
     ]);
 
@@ -85,6 +89,9 @@ export async function GET(
 
       inspections:
         inspectionResult,
+
+      demoCleanup:
+        demoResult,
 
       totals: {
         checked:

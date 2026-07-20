@@ -17,8 +17,10 @@ import {
   IncidentType,
   RiskLevel,
   Status,
+  PermissionKey,
 } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { requirePermission } from "@/lib/permissions";
 
 function getRequiredString(
   formData: FormData,
@@ -95,6 +97,7 @@ function isStatus(
 export async function createIncident(
   formData: FormData
 ) {
+  await requirePermission(PermissionKey.CREATE_INCIDENT);
   const {
     organizationId,
     user,
@@ -153,6 +156,7 @@ export async function createIncident(
 export async function createCorrectiveAction(
   formData: FormData
 ) {
+  await requirePermission(PermissionKey.CREATE_CAPA);
   const {
     organizationId,
     user,
@@ -286,6 +290,7 @@ export async function createCorrectiveAction(
 export async function upsertInvestigation(
   formData: FormData
 ) {
+  await requirePermission(PermissionKey.UPDATE_INCIDENT);
   const {
     organizationId,
     user,
@@ -330,6 +335,7 @@ export async function upsertInvestigation(
 export async function updateIncidentStatus(
   formData: FormData
 ) {
+  await requirePermission(PermissionKey.UPDATE_INCIDENT);
   const {
     organizationId,
     user,
@@ -368,6 +374,7 @@ export async function updateIncidentStatus(
 export async function updateCorrectiveActionStatus(
   formData: FormData
 ) {
+  await requirePermission(PermissionKey.UPDATE_CAPA);
   const {
     organizationId,
     user,

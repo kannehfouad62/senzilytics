@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { getCurrentUserTenant } from "@/lib/tenant";
 
 export default async function PlatformLayout({
   children,
@@ -13,5 +14,7 @@ export default async function PlatformLayout({
     redirect("/login");
   }
 
-  return <AppShell>{children}</AppShell>;
+  const { organization } = await getCurrentUserTenant();
+
+  return <AppShell isDemo={organization?.isDemo ?? false}>{children}</AppShell>;
 }
