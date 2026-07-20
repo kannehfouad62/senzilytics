@@ -391,6 +391,40 @@ async function validateRelatedEntity(input: {
       return Boolean(record);
     }
 
+    case DocumentEntityType.RISK: {
+      const record =
+        await prisma.risk.findFirst({
+          where: {
+            id: input.entityId,
+            organizationId:
+              input.organizationId,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+      return Boolean(record);
+    }
+
+    case DocumentEntityType.MOC: {
+      const record =
+        await prisma.managementOfChange.findFirst(
+          {
+            where: {
+              id: input.entityId,
+              organizationId:
+                input.organizationId,
+            },
+            select: {
+              id: true,
+            },
+          }
+        );
+
+      return Boolean(record);
+    }
+
     case DocumentEntityType.OTHER:
       return true;
 
@@ -537,29 +571,43 @@ async function requireDocumentUploadPermission(
       payload.entityType
     );
 
-  const allowed =
-    formModule ===
-    ConfigurableFormModule.OBSERVATION
-      ? permissions.includes(
+  let allowed = false;
+
+  switch (formModule) {
+    case ConfigurableFormModule.OBSERVATION:
+      allowed =
+        permissions.includes(
           PermissionKey.CREATE_OBSERVATION
         ) ||
         permissions.includes(
           PermissionKey.MANAGE_OBSERVATIONS
-        )
-      : formModule ===
-          ConfigurableFormModule.INCIDENT
-        ? permissions.includes(
-            PermissionKey.CREATE_INCIDENT
-          ) ||
-          permissions.includes(
-            PermissionKey.UPDATE_INCIDENT
-          )
-        : formModule ===
-            ConfigurableFormModule.INSPECTION
-          ? permissions.includes(
-              PermissionKey.MANAGE_INSPECTIONS
-            )
-          : false;
+        );
+      break;
+    case ConfigurableFormModule.INCIDENT:
+      allowed =
+        permissions.includes(
+          PermissionKey.CREATE_INCIDENT
+        ) ||
+        permissions.includes(
+          PermissionKey.UPDATE_INCIDENT
+        );
+      break;
+    case ConfigurableFormModule.INSPECTION:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_INSPECTIONS
+      );
+      break;
+    case ConfigurableFormModule.RISK:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_RISKS
+      );
+      break;
+    case ConfigurableFormModule.MOC:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_MOC
+      );
+      break;
+  }
 
   if (!allowed) {
     throw new Error(

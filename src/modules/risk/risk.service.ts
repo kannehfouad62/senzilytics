@@ -2,6 +2,7 @@ import { logActivity } from "@/core/activity-log/activity-log.service";
 import { prisma } from "@/lib/prisma";
 import {
   ActivityAction,
+  ConfigurableFormModule,
   RiskCategory,
   RiskControlEffectiveness,
   RiskControlHierarchy,
@@ -13,6 +14,10 @@ import {
   RiskStatus,
   Status,
 } from "@prisma/client";
+import {
+  createPreparedSubmissions,
+  type PreparedSubmission,
+} from "@/modules/forms/runtime-form.service";
 import {
   calculateRiskRating,
 } from "./risk-scoring";
@@ -40,6 +45,7 @@ export async function createRiskService(input: {
   residualImpact: RiskImpact;
   reviewFrequency: RiskReviewFrequency;
   nextReviewDate?: Date | null;
+  customSubmissions?: PreparedSubmission[];
 }) {
   const [
     site,
@@ -166,101 +172,128 @@ export async function createRiskService(input: {
   ]);
 
   const risk =
-    await prisma.risk.create({
-      data: {
-        reference,
-        title: input.title,
-        description:
-          input.description,
-        category:
-          input.category,
-        hazardType:
-          input.hazardType,
-        process:
-          input.process,
-        status:
-          RiskStatus.DRAFT,
+    await prisma.$transaction(
+      async (tx) => {
+        const created =
+          await tx.risk.create({
+            data: {
+              reference,
+              title: input.title,
+              description:
+                input.description,
+              category:
+                input.category,
+              hazardType:
+                input.hazardType,
+              process:
+                input.process,
+              status:
+                RiskStatus.DRAFT,
 
-        organizationId:
-          input.organizationId,
+              organizationId:
+                input.organizationId,
 
-        siteId:
-          input.siteId,
-        departmentId:
-          input.departmentId,
-        ownerId:
-          input.ownerId,
+              siteId:
+                input.siteId,
+              departmentId:
+                input.departmentId,
+              ownerId:
+                input.ownerId,
 
-        initialLikelihood:
-          input.initialLikelihood,
-        initialImpact:
-          input.initialImpact,
-        initialScore:
-          initialRating.score,
-        initialRiskLevel:
-          initialRating.riskLevel,
+              initialLikelihood:
+                input.initialLikelihood,
+              initialImpact:
+                input.initialImpact,
+              initialScore:
+                initialRating.score,
+              initialRiskLevel:
+                initialRating.riskLevel,
 
-        currentLikelihood:
-          input.currentLikelihood,
-        currentImpact:
-          input.currentImpact,
-        currentScore:
-          currentRating.score,
-        currentRiskLevel:
-          currentRating.riskLevel,
+              currentLikelihood:
+                input.currentLikelihood,
+              currentImpact:
+                input.currentImpact,
+              currentScore:
+                currentRating.score,
+              currentRiskLevel:
+                currentRating.riskLevel,
 
-        residualLikelihood:
-          input.residualLikelihood,
-        residualImpact:
-          input.residualImpact,
-        residualScore:
-          residualRating.score,
-        residualRiskLevel:
-          residualRating.riskLevel,
+              residualLikelihood:
+                input.residualLikelihood,
+              residualImpact:
+                input.residualImpact,
+              residualScore:
+                residualRating.score,
+              residualRiskLevel:
+                residualRating.riskLevel,
 
-        reviewFrequency:
-          input.reviewFrequency,
-        nextReviewDate:
-          input.nextReviewDate,
-      },
-    });
+              reviewFrequency:
+                input.reviewFrequency,
+              nextReviewDate:
+                input.nextReviewDate,
+            },
+          });
 
-  await logActivity({
-    organizationId:
-      input.organizationId,
-    userId: input.userId,
-    action:
-      ActivityAction.CREATE,
-    entityType: "Risk",
-    entityId: risk.id,
-    title: "Risk created",
-    description:
-      `${risk.reference}: ${risk.title}`,
-    metadata: {
-      category:
-        risk.category,
-      status:
-        risk.status,
-      siteId:
-        risk.siteId,
-      departmentId:
-        risk.departmentId,
-      ownerId:
-        risk.ownerId,
-      initialScore:
-        risk.initialScore,
-      initialRiskLevel:
-        risk.initialRiskLevel,
-      currentScore:
-        risk.currentScore,
-      currentRiskLevel:
-        risk.currentRiskLevel,
-      residualScore:
-        risk.residualScore,
-      residualRiskLevel:
-        risk.residualRiskLevel,
-    },
-  });
+        await createPreparedSubmissions(
+          tx,
+          {
+            organizationId:
+              input.organizationId,
+            userId: input.userId,
+            module:
+              ConfigurableFormModule.RISK,
+            entityId: created.id,
+            submissions:
+              input.customSubmissions ??
+              [],
+          }
+        );
+
+        await tx.activityLog.create({
+          data: {
+            organizationId:
+              input.organizationId,
+            userId: input.userId,
+            action:
+              ActivityAction.CREATE,
+            entityType: "Risk",
+            entityId: created.id,
+            title: "Risk created",
+            description:
+              `${created.reference}: ${created.title}`,
+            metadata: {
+              category:
+                created.category,
+              status:
+                created.status,
+              siteId:
+                created.siteId,
+              departmentId:
+                created.departmentId,
+              ownerId:
+                created.ownerId,
+              initialScore:
+                created.initialScore,
+              initialRiskLevel:
+                created.initialRiskLevel,
+              currentScore:
+                created.currentScore,
+              currentRiskLevel:
+                created.currentRiskLevel,
+              residualScore:
+                created.residualScore,
+              residualRiskLevel:
+                created.residualRiskLevel,
+              customFormCount:
+                input.customSubmissions
+                  ?.length ?? 0,
+            },
+          },
+        });
+
+        return created;
+      }
+    );
 
   return risk;
 }

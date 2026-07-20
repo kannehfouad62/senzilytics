@@ -1,9 +1,11 @@
-import { createMoc } from "@/features/moc/actions";
+import { MocCreateForm } from "@/features/moc/moc-create-form";
 import { RiskMatrix } from "@/features/risks/risk-matrix";
 import { requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
+import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import {
+  ConfigurableFormModule,
   MocChangeDuration,
   MocChangeType,
   MocPriority,
@@ -36,6 +38,7 @@ export default async function NewMocPage() {
     sites,
     departments,
     users,
+    forms,
   ] = await Promise.all([
     prisma.site.findMany({
       where: {
@@ -99,6 +102,11 @@ export default async function NewMocPage() {
         name: "asc",
       },
     }),
+
+    getPublishedRuntimeForms(
+      organizationId,
+      ConfigurableFormModule.MOC
+    ),
   ]);
 
   return (
@@ -130,9 +138,8 @@ export default async function NewMocPage() {
         </p>
       </div>
 
-      <form
-        action={createMoc}
-        className="mt-8 space-y-8"
+      <MocCreateForm
+        forms={forms}
       >
         <section className={sectionClass}>
           <SectionHeading
@@ -542,22 +549,7 @@ export default async function NewMocPage() {
           </div>
         </section>
 
-        <div className="flex flex-wrap justify-end gap-3">
-          <Link
-            href="/moc"
-            className="rounded-2xl border border-white/10 px-5 py-3 text-sm text-slate-300 transition hover:bg-white/5"
-          >
-            Cancel
-          </Link>
-
-          <button
-            type="submit"
-            className="rounded-2xl bg-cyan-300 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
-          >
-            Create Change
-          </button>
-        </div>
-      </form>
+      </MocCreateForm>
     </div>
   );
 }

@@ -7,12 +7,19 @@ import {
     updateRiskControlStatus,
   } from "@/features/risks/actions";
   import { RiskMatrix } from "@/features/risks/risk-matrix";
-  import { requirePermission } from "@/lib/permissions";
+  import { EntityCustomFormSubmissions } from "@/features/forms/entity-custom-form-submissions";
+  import {
+    getCurrentUserPermissions,
+    requirePermission,
+  } from "@/lib/permissions";
   import { prisma } from "@/lib/prisma";
+  import { hasSubscriptionFeature } from "@/lib/subscription";
   import { getCurrentUserTenant } from "@/lib/tenant";
   import { RiskAiAdvisor } from "@/features/risks/risk-ai-advisor";
   import { findTenantRiskById } from "@/modules/risk/risk.repository";
   import {
+    ConfigurableFormModule,
+    DocumentEntityType,
     PermissionKey,
     RiskCategory,
     RiskControlEffectiveness,
@@ -28,7 +35,6 @@ import {
   } from "@prisma/client";
   import {
     ArrowLeft,
-    CalendarClock,
     CheckCircle2,
     ClipboardCheck,
     ExternalLink,
@@ -38,7 +44,6 @@ import {
     Plus,
     ShieldAlert,
     Trash2,
-    UserRoundCheck,
   } from "lucide-react";
   import Link from "next/link";
   import { notFound } from "next/navigation";
@@ -58,7 +63,7 @@ import {
   
     const { id } = await params;
   
-    const { organizationId } =
+    const { organizationId, user } =
       await getCurrentUserTenant();
   
     const [
@@ -66,6 +71,8 @@ import {
       sites,
       departments,
       users,
+      permissions,
+      documentUploadEnabled,
     ] = await Promise.all([
       findTenantRiskById({
         organizationId,
@@ -127,6 +134,13 @@ import {
           name: "asc",
         },
       }),
+
+      getCurrentUserPermissions(),
+
+      hasSubscriptionFeature(
+        organizationId,
+        "DOCUMENT_UPLOAD"
+      ),
     ]);
   
     if (!risk) {
@@ -161,6 +175,12 @@ import {
             RiskStatus.CLOSED &&
           risk.status !==
             RiskStatus.ARCHIVED
+      );
+
+    const canUploadCustomFiles =
+      documentUploadEnabled &&
+      permissions.includes(
+        PermissionKey.MANAGE_RISKS
       );
   
     return (
@@ -326,6 +346,22 @@ import {
             />
           </div>
         </section>
+
+        <EntityCustomFormSubmissions
+          organizationId={organizationId}
+          userId={user.id}
+          module={
+            ConfigurableFormModule.RISK
+          }
+          entityType={
+            DocumentEntityType.RISK
+          }
+          entityId={risk.id}
+          canUpload={
+            canUploadCustomFiles
+          }
+          className="mt-8 space-y-6"
+        />
 
         <div className="mt-8">
   <RiskAiAdvisor

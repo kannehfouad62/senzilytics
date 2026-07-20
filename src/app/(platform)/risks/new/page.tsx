@@ -1,9 +1,11 @@
-import { createRisk } from "@/features/risks/actions";
+import { RiskCreateForm } from "@/features/risks/risk-create-form";
 import { RiskMatrix } from "@/features/risks/risk-matrix";
 import { requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
+import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import {
+  ConfigurableFormModule,
   PermissionKey,
   RiskCategory,
   RiskImpact,
@@ -34,6 +36,7 @@ export default async function NewRiskPage() {
     sites,
     departments,
     users,
+    forms,
   ] = await Promise.all([
     prisma.site.findMany({
       where: {
@@ -97,6 +100,11 @@ export default async function NewRiskPage() {
         name: "asc",
       },
     }),
+
+    getPublishedRuntimeForms(
+      organizationId,
+      ConfigurableFormModule.RISK
+    ),
   ]);
 
   return (
@@ -127,9 +135,8 @@ export default async function NewRiskPage() {
         </p>
       </div>
 
-      <form
-        action={createRisk}
-        className="mt-8 space-y-8"
+      <RiskCreateForm
+        forms={forms}
       >
         <section className={sectionClass}>
           <SectionHeading
@@ -420,22 +427,7 @@ export default async function NewRiskPage() {
           </div>
         </section>
 
-        <div className="flex flex-wrap justify-end gap-3">
-          <Link
-            href="/risks"
-            className="rounded-2xl border border-white/10 px-5 py-3 text-sm text-slate-300 transition hover:bg-white/5"
-          >
-            Cancel
-          </Link>
-
-          <button
-            type="submit"
-            className="rounded-2xl bg-cyan-300 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
-          >
-            Create Risk
-          </button>
-        </div>
-      </form>
+      </RiskCreateForm>
     </div>
   );
 }

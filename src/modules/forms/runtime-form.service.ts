@@ -30,6 +30,10 @@ export function configurableFormModuleForDocumentEntity(
       return ConfigurableFormModule.INCIDENT;
     case DocumentEntityType.INSPECTION:
       return ConfigurableFormModule.INSPECTION;
+    case DocumentEntityType.RISK:
+      return ConfigurableFormModule.RISK;
+    case DocumentEntityType.MOC:
+      return ConfigurableFormModule.MOC;
     default:
       return null;
   }

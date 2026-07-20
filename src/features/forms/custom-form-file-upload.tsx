@@ -25,7 +25,9 @@ const ACCEPTED_TYPES =
 type SupportedEntityType =
   | typeof DocumentEntityType.SAFETY_OBSERVATION
   | typeof DocumentEntityType.INCIDENT
-  | typeof DocumentEntityType.INSPECTION;
+  | typeof DocumentEntityType.INSPECTION
+  | typeof DocumentEntityType.RISK
+  | typeof DocumentEntityType.MOC;
 
 function entityFolder(
   entityType: SupportedEntityType
@@ -37,6 +39,10 @@ function entityFolder(
       return "incidents";
     case DocumentEntityType.INSPECTION:
       return "inspections";
+    case DocumentEntityType.RISK:
+      return "risks";
+    case DocumentEntityType.MOC:
+      return "moc";
   }
 }
 

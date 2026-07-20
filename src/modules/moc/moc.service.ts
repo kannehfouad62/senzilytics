@@ -4,6 +4,7 @@ import { calculateRiskRating } from "@/modules/risk/risk-scoring";
 import { createNotification } from "@/core/notifications/notifications.service";
 import {
   ActivityAction,
+  ConfigurableFormModule,
   MocApprovalRole,
   MocApprovalStatus,
   MocChangeDuration,
@@ -16,6 +17,10 @@ import {
   RiskImpact,
   RiskLikelihood,
 } from "@prisma/client";
+import {
+  createPreparedSubmissions,
+  type PreparedSubmission,
+} from "@/modules/forms/runtime-form.service";
 import {
   findTenantMocById,
   getNextMocReference,
@@ -204,6 +209,7 @@ export async function createMocService(input: {
   siteId: string;
   departmentId?: string | null;
   ownerId?: string | null;
+  customSubmissions?: PreparedSubmission[];
 }) {
   await validateMocScope({
     organizationId:
@@ -274,123 +280,150 @@ export async function createMocService(input: {
   ]);
 
   const moc =
-    await prisma.managementOfChange.create({
-      data: {
-        reference,
-        title: input.title,
-        description:
-          input.description,
-        businessJustification:
-          input.businessJustification,
+    await prisma.$transaction(
+      async (tx) => {
+        const created =
+          await tx.managementOfChange.create({
+            data: {
+              reference,
+              title: input.title,
+              description:
+                input.description,
+              businessJustification:
+                input.businessJustification,
 
-        changeType:
-          input.changeType,
-        changeDuration:
-          input.changeDuration,
-        priority:
-          input.priority,
-        status:
-          MocStatus.DRAFT,
+              changeType:
+                input.changeType,
+              changeDuration:
+                input.changeDuration,
+              priority:
+                input.priority,
+              status:
+                MocStatus.DRAFT,
 
-        emergencyJustification:
-          input.emergencyJustification,
-        temporaryExpirationDate:
-          input.temporaryExpirationDate,
+              emergencyJustification:
+                input.emergencyJustification,
+              temporaryExpirationDate:
+                input.temporaryExpirationDate,
 
-        affectedProcess:
-          input.affectedProcess,
-        affectedEquipment:
-          input.affectedEquipment,
-        affectedSystems:
-          input.affectedSystems,
-        affectedMaterials:
-          input.affectedMaterials,
+              affectedProcess:
+                input.affectedProcess,
+              affectedEquipment:
+                input.affectedEquipment,
+              affectedSystems:
+                input.affectedSystems,
+              affectedMaterials:
+                input.affectedMaterials,
 
-        operationalImpact:
-          input.operationalImpact,
-        regulatoryImpact:
-          input.regulatoryImpact,
-        environmentalImpact:
-          input.environmentalImpact,
-        safetyImpact:
-          input.safetyImpact,
-        qualityImpact:
-          input.qualityImpact,
+              operationalImpact:
+                input.operationalImpact,
+              regulatoryImpact:
+                input.regulatoryImpact,
+              environmentalImpact:
+                input.environmentalImpact,
+              safetyImpact:
+                input.safetyImpact,
+              qualityImpact:
+                input.qualityImpact,
 
-        initialLikelihood:
-          input.initialLikelihood,
-        initialImpact:
-          input.initialImpact,
-        initialScore:
-          initialRating.score,
-        initialRiskLevel:
-          initialRating.riskLevel,
+              initialLikelihood:
+                input.initialLikelihood,
+              initialImpact:
+                input.initialImpact,
+              initialScore:
+                initialRating.score,
+              initialRiskLevel:
+                initialRating.riskLevel,
 
-        residualLikelihood:
-          input.residualLikelihood,
-        residualImpact:
-          input.residualImpact,
-        residualScore:
-          residualRating.score,
-        residualRiskLevel:
-          residualRating.riskLevel,
+              residualLikelihood:
+                input.residualLikelihood,
+              residualImpact:
+                input.residualImpact,
+              residualScore:
+                residualRating.score,
+              residualRiskLevel:
+                residualRating.riskLevel,
 
-        proposedStartDate:
-          input.proposedStartDate,
-        plannedCompletionDate:
-          input.plannedCompletionDate,
+              proposedStartDate:
+                input.proposedStartDate,
+              plannedCompletionDate:
+                input.plannedCompletionDate,
 
-        organizationId:
-          input.organizationId,
-        siteId:
-          input.siteId,
-        departmentId:
-          input.departmentId,
-        requestorId:
-          input.userId,
-        ownerId:
-          input.ownerId,
-      },
-    });
+              organizationId:
+                input.organizationId,
+              siteId:
+                input.siteId,
+              departmentId:
+                input.departmentId,
+              requestorId:
+                input.userId,
+              ownerId:
+                input.ownerId,
+            },
+          });
 
-  await logActivity({
-    organizationId:
-      input.organizationId,
-    userId: input.userId,
-    action:
-      ActivityAction.CREATE,
-    entityType:
-      "ManagementOfChange",
-    entityId: moc.id,
-    title:
-      "Management of change created",
-    description:
-      `${moc.reference}: ${moc.title}`,
-    metadata: {
-      changeType:
-        moc.changeType,
-      changeDuration:
-        moc.changeDuration,
-      priority:
-        moc.priority,
-      status:
-        moc.status,
-      siteId:
-        moc.siteId,
-      departmentId:
-        moc.departmentId,
-      ownerId:
-        moc.ownerId,
-      initialScore:
-        moc.initialScore,
-      initialRiskLevel:
-        moc.initialRiskLevel,
-      residualScore:
-        moc.residualScore,
-      residualRiskLevel:
-        moc.residualRiskLevel,
-    },
-  });
+        await createPreparedSubmissions(
+          tx,
+          {
+            organizationId:
+              input.organizationId,
+            userId: input.userId,
+            module:
+              ConfigurableFormModule.MOC,
+            entityId: created.id,
+            submissions:
+              input.customSubmissions ??
+              [],
+          }
+        );
+
+        await tx.activityLog.create({
+          data: {
+            organizationId:
+              input.organizationId,
+            userId: input.userId,
+            action:
+              ActivityAction.CREATE,
+            entityType:
+              "ManagementOfChange",
+            entityId: created.id,
+            title:
+              "Management of change created",
+            description:
+              `${created.reference}: ${created.title}`,
+            metadata: {
+              changeType:
+                created.changeType,
+              changeDuration:
+                created.changeDuration,
+              priority:
+                created.priority,
+              status:
+                created.status,
+              siteId:
+                created.siteId,
+              departmentId:
+                created.departmentId,
+              ownerId:
+                created.ownerId,
+              initialScore:
+                created.initialScore,
+              initialRiskLevel:
+                created.initialRiskLevel,
+              residualScore:
+                created.residualScore,
+              residualRiskLevel:
+                created.residualRiskLevel,
+              customFormCount:
+                input.customSubmissions
+                  ?.length ?? 0,
+            },
+          },
+        });
+
+        return created;
+      }
+    );
 
   return moc;
 }

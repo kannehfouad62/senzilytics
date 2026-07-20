@@ -11,7 +11,9 @@ import {
 type SupportedEntityType =
   | typeof DocumentEntityType.SAFETY_OBSERVATION
   | typeof DocumentEntityType.INCIDENT
-  | typeof DocumentEntityType.INSPECTION;
+  | typeof DocumentEntityType.INSPECTION
+  | typeof DocumentEntityType.RISK
+  | typeof DocumentEntityType.MOC;
 
 function displayValue(
   value: unknown

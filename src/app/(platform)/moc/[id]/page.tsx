@@ -3,14 +3,18 @@ import {
     createMocTask,
     decideMocApproval,
     linkRiskToMoc,
-    transitionMocStatus,
     unlinkRiskFromMoc,
     updateMoc,
     updateMocTask,
   } from "@/features/moc/actions";
   import { RiskMatrix } from "@/features/risks/risk-matrix";
-  import { requirePermission } from "@/lib/permissions";
+  import { EntityCustomFormSubmissions } from "@/features/forms/entity-custom-form-submissions";
+  import {
+    getCurrentUserPermissions,
+    requirePermission,
+  } from "@/lib/permissions";
   import { prisma } from "@/lib/prisma";
+  import { hasSubscriptionFeature } from "@/lib/subscription";
   import { getCurrentUserTenant } from "@/lib/tenant";
   import { MocAiAssistant } from "@/features/moc/moc-ai-assistant";
   import { findTenantMocById } from "@/modules/moc/moc.repository";
@@ -18,6 +22,8 @@ import {
     MocStatusTransitionForm,
   } from "@/features/moc/moc-status-transition-form";
   import {
+    ConfigurableFormModule,
+    DocumentEntityType,
     MocApprovalRole,
     MocApprovalStatus,
     MocChangeDuration,
@@ -34,17 +40,13 @@ import {
   import {
     AlertTriangle,
     ArrowLeft,
-    CalendarClock,
     CheckCircle2,
     ClipboardCheck,
     Factory,
-    Gauge,
     Link2,
     ListChecks,
     Plus,
-    ShieldAlert,
     Trash2,
-    UserRoundCheck,
     Workflow,
   } from "lucide-react";
   import Link from "next/link";
@@ -78,6 +80,8 @@ import {
       departments,
       users,
       risks,
+      permissions,
+      documentUploadEnabled,
     ] = await Promise.all([
       findTenantMocById({
         organizationId,
@@ -173,6 +177,13 @@ import {
           },
         ],
       }),
+
+      getCurrentUserPermissions(),
+
+      hasSubscriptionFeature(
+        organizationId,
+        "DOCUMENT_UPLOAD"
+      ),
     ]);
   
     if (!moc) {
@@ -242,6 +253,12 @@ import {
     const nextStatuses =
       getNextMocStatuses(
         moc.status
+      );
+
+    const canUploadCustomFiles =
+      documentUploadEnabled &&
+      permissions.includes(
+        PermissionKey.MANAGE_MOC
       );
   
     return (
@@ -379,6 +396,22 @@ import {
     }
   />
 </div>
+
+<EntityCustomFormSubmissions
+  organizationId={organizationId}
+  userId={user.id}
+  module={
+    ConfigurableFormModule.MOC
+  }
+  entityType={
+    DocumentEntityType.MOC
+  }
+  entityId={moc.id}
+  canUpload={
+    canUploadCustomFiles
+  }
+  className="mt-8 space-y-6"
+/>
 
 <div className="mt-8">
   <MocAiAssistant

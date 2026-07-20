@@ -17,6 +17,7 @@ import {
   updateMocTaskService,
 } from "@/modules/moc/moc.service";
 import {
+  ConfigurableFormModule,
   MocApprovalRole,
   MocApprovalStatus,
   MocChangeDuration,
@@ -30,6 +31,7 @@ import {
   RiskLikelihood,
 } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
 
 function getRequiredString(
   formData: FormData,
@@ -165,8 +167,9 @@ function isEnumValue<
 }
 
 export async function createMoc(
+  _previousState: FormActionState,
   formData: FormData
-) {
+): Promise<FormActionState> {
   await requirePermission(
     PermissionKey.MANAGE_MOC
   );
@@ -176,6 +179,10 @@ export async function createMoc(
     user,
   } =
     await getCurrentUserTenant();
+
+  let mocId: string;
+
+  try {
 
   const changeType =
     getRequiredString(
@@ -253,6 +260,14 @@ export async function createMoc(
       "One or more MOC values are invalid."
     );
   }
+
+  const customSubmissions =
+    await preparePublishedFormSubmissions({
+      organizationId,
+      module:
+        ConfigurableFormModule.MOC,
+      data: formData,
+    });
 
   const moc =
     await createMocService({
@@ -381,9 +396,21 @@ export async function createMoc(
           formData,
           "ownerId"
         ),
+      customSubmissions,
     });
 
-  redirect(`/moc/${moc.id}`);
+  mocId = moc.id;
+  } catch (error) {
+    return {
+      status: "ERROR",
+      message:
+        error instanceof Error
+          ? error.message
+          : "The change request could not be created.",
+    };
+  }
+
+  redirect(`/moc/${mocId}`);
 }
 
 export async function updateMoc(

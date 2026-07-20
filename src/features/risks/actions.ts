@@ -1,7 +1,9 @@
 "use server";
 
+import type { FormActionState } from "@/core/actions/action-state";
 import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
+import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
 import {
   createRiskControlService,
   createRiskLinkService,
@@ -12,6 +14,7 @@ import {
   updateRiskService,
 } from "@/modules/risk/risk.service";
 import {
+  ConfigurableFormModule,
   PermissionKey,
   RiskCategory,
   RiskControlEffectiveness,
@@ -101,8 +104,9 @@ function isEnumValue<
 }
 
 export async function createRisk(
+  _previousState: FormActionState,
   formData: FormData
-) {
+): Promise<FormActionState> {
   await requirePermission(
     PermissionKey.MANAGE_RISKS
   );
@@ -112,6 +116,10 @@ export async function createRisk(
     user,
   } =
     await getCurrentUserTenant();
+
+  let riskId: string;
+
+  try {
 
   const category =
     getRequiredString(
@@ -200,6 +208,14 @@ export async function createRisk(
     );
   }
 
+  const customSubmissions =
+    await preparePublishedFormSubmissions({
+      organizationId,
+      module:
+        ConfigurableFormModule.RISK,
+      data: formData,
+    });
+
   const risk =
     await createRiskService({
       organizationId,
@@ -253,11 +269,21 @@ export async function createRisk(
           formData,
           "nextReviewDate"
         ),
+      customSubmissions,
     });
 
-  redirect(
-    `/risks/${risk.id}`
-  );
+  riskId = risk.id;
+  } catch (error) {
+    return {
+      status: "ERROR",
+      message:
+        error instanceof Error
+          ? error.message
+          : "The risk could not be created.",
+    };
+  }
+
+  redirect(`/risks/${riskId}`);
 }
 
 export async function updateRisk(
