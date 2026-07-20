@@ -13,7 +13,9 @@ type SupportedEntityType =
   | typeof DocumentEntityType.INCIDENT
   | typeof DocumentEntityType.INSPECTION
   | typeof DocumentEntityType.RISK
-  | typeof DocumentEntityType.MOC;
+  | typeof DocumentEntityType.MOC
+  | typeof DocumentEntityType.CORRECTIVE_ACTION
+  | typeof DocumentEntityType.COMPLIANCE;
 
 function displayValue(
   value: unknown

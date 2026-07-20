@@ -27,7 +27,9 @@ type SupportedEntityType =
   | typeof DocumentEntityType.INCIDENT
   | typeof DocumentEntityType.INSPECTION
   | typeof DocumentEntityType.RISK
-  | typeof DocumentEntityType.MOC;
+  | typeof DocumentEntityType.MOC
+  | typeof DocumentEntityType.CORRECTIVE_ACTION
+  | typeof DocumentEntityType.COMPLIANCE;
 
 function entityFolder(
   entityType: SupportedEntityType
@@ -43,6 +45,10 @@ function entityFolder(
       return "risks";
     case DocumentEntityType.MOC:
       return "moc";
+    case DocumentEntityType.CORRECTIVE_ACTION:
+      return "capa";
+    case DocumentEntityType.COMPLIANCE:
+      return "compliance";
   }
 }
 

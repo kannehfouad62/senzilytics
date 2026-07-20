@@ -27,11 +27,9 @@ export async function processCorrectiveActionSlaNotifications() {
       dueDate: {
         lte: reminderWindowEnd,
       },
-      incident: {
-        site: {
-          organizationId: {
-            not: "",
-          },
+      assignedTo: {
+        organizationId: {
+          not: null,
         },
       },
     },
@@ -41,17 +39,13 @@ export async function processCorrectiveActionSlaNotifications() {
           id: true,
           name: true,
           email: true,
+          organizationId: true,
         },
       },
       incident: {
         select: {
           id: true,
           title: true,
-          site: {
-            select: {
-              organizationId: true,
-            },
-          },
         },
       },
     },
@@ -66,15 +60,9 @@ export async function processCorrectiveActionSlaNotifications() {
 
   for (const action of actions) {
     const incident = action.incident;
-
-    if (!incident?.site.organizationId) {
-      skipped += 1;
-      continue;
-    }
-
     const assignee = action.assignedTo;
 
-    if (!assignee) {
+    if (!assignee?.organizationId) {
       skipped += 1;
       continue;
     }
@@ -91,12 +79,12 @@ export async function processCorrectiveActionSlaNotifications() {
       continue;
     }
 
-    const link = `/incidents/${incident.id}`;
+    const link = `/actions/${action.id}`;
 
     try {
       await createNotification({
         organizationId:
-          incident.site.organizationId,
+          assignee.organizationId,
         userId: assignee.id,
         type: NotificationType.DUE_DATE,
         title: isOverdue
@@ -119,10 +107,11 @@ export async function processCorrectiveActionSlaNotifications() {
         await sendCorrectiveActionSlaEmail({
           recipientEmail: assignee.email,
           recipientName: assignee.name,
+          actionId: action.id,
           actionTitle: action.title,
           actionDescription: action.description,
-          incidentId: incident.id,
-          incidentTitle: incident.title,
+          incidentId: incident?.id,
+          incidentTitle: incident?.title,
           dueDate: action.dueDate,
           riskLevel: action.riskLevel,
           notificationKind: isOverdue

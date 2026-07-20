@@ -212,10 +212,9 @@ async function validateRelatedEntity(input: {
       const record = await prisma.correctiveAction.findFirst({
         where: {
           id: input.entityId,
-          incident: {
-            site: {
-              organizationId: input.organizationId,
-            },
+          assignedTo: {
+            organizationId:
+              input.organizationId,
           },
         },
         select: {
@@ -605,6 +604,20 @@ async function requireDocumentUploadPermission(
     case ConfigurableFormModule.MOC:
       allowed = permissions.includes(
         PermissionKey.MANAGE_MOC
+      );
+      break;
+    case ConfigurableFormModule.CAPA:
+      allowed =
+        permissions.includes(
+          PermissionKey.CREATE_CAPA
+        ) ||
+        permissions.includes(
+          PermissionKey.UPDATE_CAPA
+        );
+      break;
+    case ConfigurableFormModule.COMPLIANCE:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_COMPLIANCE
       );
       break;
   }

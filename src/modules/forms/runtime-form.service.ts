@@ -34,6 +34,10 @@ export function configurableFormModuleForDocumentEntity(
       return ConfigurableFormModule.RISK;
     case DocumentEntityType.MOC:
       return ConfigurableFormModule.MOC;
+    case DocumentEntityType.CORRECTIVE_ACTION:
+      return ConfigurableFormModule.CAPA;
+    case DocumentEntityType.COMPLIANCE:
+      return ConfigurableFormModule.COMPLIANCE;
     default:
       return null;
   }

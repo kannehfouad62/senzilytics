@@ -93,6 +93,7 @@ type WorkflowSlaEmailInput = {
 type CorrectiveActionSlaEmailInput = {
   recipientEmail: string;
   recipientName: string;
+  actionId: string;
   actionTitle: string;
   actionDescription?: string | null;
   incidentId?: string | null;
@@ -304,10 +305,7 @@ export async function sendCorrectiveActionAssignmentEmail(
   input: CorrectiveActionAssignmentEmailInput
 ) {
   const applicationUrl = getApplicationUrl();
-
-  const actionUrl = input.incidentId
-    ? `${applicationUrl}/incidents/${input.incidentId}`
-    : `${applicationUrl}/actions`;
+  const actionUrl = `${applicationUrl}/actions/${input.actionId}`;
 
   const result = await sendEmail({
     to: input.recipientEmail,
@@ -376,10 +374,7 @@ export async function sendCorrectiveActionStatusEmail(
   input: CorrectiveActionStatusEmailInput
 ) {
   const applicationUrl = getApplicationUrl();
-
-  const actionUrl = input.incidentId
-    ? `${applicationUrl}/incidents/${input.incidentId}`
-    : `${applicationUrl}/actions`;
+  const actionUrl = `${applicationUrl}/actions/${input.actionId}`;
 
   const result = await sendEmail({
     to: input.recipientEmail,
@@ -626,10 +621,7 @@ export async function sendCorrectiveActionSlaEmail(
   input: CorrectiveActionSlaEmailInput
 ) {
   const applicationUrl = getApplicationUrl();
-
-  const actionUrl = input.incidentId
-    ? `${applicationUrl}/incidents/${input.incidentId}`
-    : `${applicationUrl}/actions`;
+  const actionUrl = `${applicationUrl}/actions/${input.actionId}`;
 
   const isOverdue =
     input.notificationKind === "OVERDUE";

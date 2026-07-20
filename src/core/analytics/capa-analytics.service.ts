@@ -238,54 +238,9 @@ export async function getCapaDashboardData(
   const correctiveActions =
     await prisma.correctiveAction.findMany({
       where: {
-        OR: [
-          {
-            incident: {
-              site: {
-                organizationId,
-              },
-            },
-          },
-
-          {
-            auditFinding: {
-              audit: {
-                site: {
-                  organizationId,
-                },
-              },
-            },
-          },
-
-          {
-            inspectionFinding: {
-              inspection: {
-                site: {
-                  organizationId,
-                },
-              },
-            },
-          },
-
-          {
-            enterpriseAuditFindingLinks: {
-              some: {
-                finding: {
-                  organizationId,
-                },
-              },
-            },
-          },
-
-          {
-            assignedTo: {
-              organizationId,
-            },
-            incidentId: null,
-            auditFindingId: null,
-            inspectionFindingId: null,
-          },
-        ],
+        assignedTo: {
+          organizationId,
+        },
       },
 
       include: {

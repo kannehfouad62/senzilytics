@@ -426,6 +426,13 @@ import {
   
         <div className="mt-4 flex justify-end">
           <Link
+            href={`/actions/${action.id}`}
+            className="mr-3 rounded-xl bg-cyan-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:bg-cyan-200"
+          >
+            Open CAPA
+          </Link>
+
+          <Link
             href={action.sourceLink}
             className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-xs font-medium text-cyan-300 transition hover:bg-cyan-400/20"
           >
