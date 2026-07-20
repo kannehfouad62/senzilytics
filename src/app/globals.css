@@ -20,3 +20,18 @@ body {
     var(--background);
   color: var(--foreground);
 }
+
+html { scroll-behavior: smooth; }
+.landing-grid { background-image: linear-gradient(rgba(34,211,238,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,.035) 1px,transparent 1px); background-size: 56px 56px; mask-image: linear-gradient(to bottom,black,transparent 92%); }
+.landing-orb { animation: landing-drift 11s ease-in-out infinite; }
+.landing-orb-reverse { animation: landing-drift 14s ease-in-out infinite reverse; }
+.landing-rise { animation: landing-rise .8s ease-out both; }
+.landing-float { animation: landing-float 7s ease-in-out infinite; }
+.landing-bar { transform-origin: bottom; animation: landing-grow .8s ease-out both; }
+.landing-card { transition: transform .3s ease,border-color .3s ease,background-color .3s ease; }
+.landing-card:hover { transform: translateY(-6px); border-color: rgba(34,211,238,.35); background-color: rgba(34,211,238,.055); }
+@keyframes landing-rise { from { opacity:0; transform:translateY(24px) } to { opacity:1; transform:translateY(0) } }
+@keyframes landing-float { 0%,100% { transform:translateY(0) rotate(.001deg) } 50% { transform:translateY(-10px) rotate(.001deg) } }
+@keyframes landing-drift { 0%,100% { transform:translate3d(0,0,0) scale(1) } 50% { transform:translate3d(35px,25px,0) scale(1.08) } }
+@keyframes landing-grow { from { transform:scaleY(0); opacity:.25 } to { transform:scaleY(1); opacity:1 } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto } .landing-orb,.landing-orb-reverse,.landing-rise,.landing-float,.landing-bar { animation:none } .landing-card { transition:none } }
