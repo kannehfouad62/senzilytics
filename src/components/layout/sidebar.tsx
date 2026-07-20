@@ -29,6 +29,7 @@ import {
   Workflow,
   Eye,
   WifiOff,
+  Network,
 } from "lucide-react";
 
 export const primaryNavItems = [
@@ -36,6 +37,11 @@ export const primaryNavItems = [
     label: "Global Executive Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    label: "Operational Assurance",
+    href: "/assurance",
+    icon: Network,
   },
   {
     label: "My Tasks",
