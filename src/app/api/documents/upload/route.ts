@@ -16,6 +16,7 @@ import {
   type HandleUploadBody,
 } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
+import { requireSubscriptionFeature } from "@/lib/subscription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -449,6 +450,8 @@ export async function POST(request: Request) {
             "Your account is not assigned to an organization."
           );
         }
+
+        await requireSubscriptionFeature(currentUser.organizationId, "DOCUMENT_UPLOAD");
 
         const payload = parseUploadPayload(clientPayload);
 

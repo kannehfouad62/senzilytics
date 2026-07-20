@@ -13,6 +13,7 @@ import {
 import { isApprovedPlatformAdministrator } from "@/lib/platform-admin";
 import { MobileNavigationMenu } from "./mobile-navigation-menu";
 import { UserRole } from "@prisma/client";
+import { planEntitlements } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +33,13 @@ export async function Topbar() {
           isActive: true,
           isPlatformAdmin: true,
           organizationId: true,
+          organization: { select: { subscriptionPlan: true } },
         },
       })
     : null;
 
-  const unreadCount = currentUser
+  const entitlements = currentUser?.organization ? planEntitlements[currentUser.organization.subscriptionPlan] : planEntitlements.PREMIUM;
+  const unreadCount = currentUser && entitlements.IN_APP_NOTIFICATIONS
     ? await prisma.notification.count({
         where: {
           userId: currentUser.id,
@@ -85,7 +88,7 @@ export async function Topbar() {
   const platformItems: NavigationItem[] =
     currentUser && isApprovedPlatformAdministrator(currentUser)
       ? [
-          ...primaryNavItems,
+          ...primaryNavItems.filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION),
           {
             label: "Tenant Provisioning",
             href: "/platform/tenants",
@@ -94,7 +97,7 @@ export async function Topbar() {
         ]
       : currentUser?.role === UserRole.DEMO_VIEWER
         ? primaryNavItems.filter((item) => item.href === "/dashboard")
-        : primaryNavItems;
+        : primaryNavItems.filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION);
 
   const demoMode = currentUser?.role === UserRole.DEMO_VIEWER;
 
@@ -103,7 +106,7 @@ export async function Topbar() {
     { label: "EHS Management", items: ehsNavItems },
     { label: "Audit Management 2.0", items: auditNavItems },
     { label: "Inspections", items: inspectionNavItems },
-    { label: "Governance", items: demoMode ? complianceNavItems.filter((item) => item.href !== "/notifications") : complianceNavItems },
+    { label: "Governance", items: demoMode ? complianceNavItems.filter((item) => item.href !== "/notifications") : complianceNavItems.filter(item => item.href !== "/notifications" || entitlements.IN_APP_NOTIFICATIONS) },
   ];
 
   async function logout() {
@@ -142,11 +145,11 @@ export async function Topbar() {
         </form>
         <Link href="/search" className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10 md:hidden" title="Search Senzilytics"><Search size={20}/></Link>
 
-        <button className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-300">
+        {entitlements.AI && <button className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-300">
           <Sparkles size={20} />
-        </button>
+        </button>}
 
-        {!demoMode && <Link
+        {!demoMode && entitlements.IN_APP_NOTIFICATIONS && <Link
           href="/tasks"
           className="relative rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10"
           title="My Tasks"

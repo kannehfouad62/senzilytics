@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPlatformAdministrator } from "@/lib/platform-admin";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { UserRole } from "@prisma/client";
+import { planEntitlements } from "@/lib/subscription";
 import {
   Activity,
   AlertTriangle,
@@ -201,11 +202,13 @@ export type NavigationItem = {
 };
 
 export async function Sidebar() {
-  const [platformAdministrator, { user }] = await Promise.all([getPlatformAdministrator(), getCurrentUserTenant()]);
+  const [platformAdministrator, { user, organization }] = await Promise.all([getPlatformAdministrator(), getCurrentUserTenant()]);
   const isDemo = user.role === UserRole.DEMO_VIEWER;
+  const entitlements = organization ? planEntitlements[organization.subscriptionPlan] : planEntitlements.PREMIUM;
+  const entitledPrimaryItems = primaryNavItems.filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION);
   const platformNavItems = platformAdministrator
     ? [
-        ...primaryNavItems,
+        ...entitledPrimaryItems,
         {
           label: "Tenant Provisioning",
           href: "/platform/tenants",
@@ -214,10 +217,10 @@ export async function Sidebar() {
       ]
     : isDemo
       ? primaryNavItems.filter((item) => item.href === "/dashboard")
-      : primaryNavItems;
+      : entitledPrimaryItems;
   const governanceItems = isDemo
     ? complianceNavItems.filter((item) => item.href !== "/notifications")
-    : complianceNavItems;
+    : complianceNavItems.filter(item => item.href !== "/notifications" || entitlements.IN_APP_NOTIFICATIONS);
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:flex">

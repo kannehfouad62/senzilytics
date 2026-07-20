@@ -4,6 +4,7 @@ import { PermissionKey, RiskLevel, SafetyObservationType, UserRole } from "@pris
 import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireSubscriptionFeature } from "@/lib/subscription";
 
 const itemSchema = z.object({
   id: z.string().uuid(), type: z.literal("SAFETY_OBSERVATION"), capturedAt: z.string().datetime(),
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid offline submission", details: parsed.error.flatten() }, { status: 400 });
   const organizationId = currentUser.organizationId, userId = currentUser.id;
+  try { await requireSubscriptionFeature(organizationId, "OFFLINE_COLLECTION"); } catch { return NextResponse.json({ error: "Offline collection is not included in this subscription." }, { status: 403 }); }
   const results: Array<{ id: string; status: string; recordId?: string; error?: string }> = [];
   for (const item of parsed.data.items) {
     const existing = await prisma.offlineSubmission.findUnique({ where: { id: item.id } });

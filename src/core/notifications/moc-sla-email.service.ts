@@ -1,6 +1,6 @@
 import {
     getApplicationUrl,
-    sendEmail,
+    sendTenantNotificationEmail as sendEmail,
   } from "@/core/email/email.service";
   import { createSenzilyticsEmailTemplate } from "@/core/email/email-template";
   

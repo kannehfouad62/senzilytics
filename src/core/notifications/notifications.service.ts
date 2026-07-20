@@ -1,5 +1,6 @@
 import { NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { planEntitlements } from "@/lib/subscription";
 
 type CreateNotificationInput = {
   organizationId: string;
@@ -11,6 +12,8 @@ type CreateNotificationInput = {
 };
 
 export async function createNotification(input: CreateNotificationInput) {
+  const organization = await prisma.organization.findUnique({ where: { id: input.organizationId }, select: { subscriptionPlan: true } });
+  if (!organization || !planEntitlements[organization.subscriptionPlan].IN_APP_NOTIFICATIONS) return null;
   return prisma.notification.create({
     data: {
       organizationId: input.organizationId,

@@ -21,6 +21,12 @@ enum OrganizationStatus {
   SUSPENDED
 }
 
+enum SubscriptionPlan {
+  ESSENTIAL
+  ENTERPRISE
+  PREMIUM
+}
+
 enum IdentityProviderType {
   MICROSOFT_ENTRA
   OKTA
@@ -845,6 +851,9 @@ model Organization {
   status              OrganizationStatus @default(ACTIVE)
   allowedEmailDomains String[]
   isDemo              Boolean            @default(false)
+  subscriptionPlan    SubscriptionPlan   @default(PREMIUM)
+  contractedUserMinimum Int?
+  subscriptionNotes   String?
 
   sites                        Site[]
   users                        User[]
@@ -889,6 +898,24 @@ model Organization {
   complianceCalendarTasks  ComplianceCalendarTask[]
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
   offlineSubmissions         OfflineSubmission[]
+  pricingInquiries           PricingInquiry[]
+}
+
+model PricingInquiry {
+  id             String           @id @default(cuid())
+  fullName       String
+  company        String
+  jobTitle       String
+  workEmail      String
+  phoneNumber    String
+  requestedPlan  SubscriptionPlan
+  createdAt      DateTime         @default(now())
+
+  organizationId String?
+  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([workEmail, createdAt])
+  @@index([requestedPlan, createdAt])
 }
 
 model Site {

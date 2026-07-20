@@ -2,9 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { Bell, CheckCircle2 } from "lucide-react";
 import { markNotificationRead } from "@/core/notifications/notifications.actions";
+import { hasSubscriptionFeature } from "@/lib/subscription";
+import { redirect } from "next/navigation";
 
 export default async function NotificationsPage() {
   const { organizationId, user } = await getCurrentUserTenant();
+  if (!await hasSubscriptionFeature(organizationId, "IN_APP_NOTIFICATIONS")) redirect("/subscription?feature=notifications");
 
   const notifications = await prisma.notification.findMany({
     where: {

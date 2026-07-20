@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-type SendEmailInput = {
+export type SendEmailInput = {
   to: string | string[];
   subject: string;
   html: string;
@@ -8,7 +8,7 @@ type SendEmailInput = {
   replyTo?: string;
 };
 
-type SendEmailResult = {
+export type SendEmailResult = {
   success: boolean;
   messageId: string | null;
   error: string | null;
@@ -24,6 +24,17 @@ function getRequiredEnvironmentVariable(name: string) {
   }
 
   return value;
+}
+
+export async function sendTenantNotificationEmail(input: SendEmailInput): Promise<SendEmailResult> {
+  const { prisma } = await import("@/lib/prisma");
+  const { planEntitlements } = await import("@/lib/subscription");
+  const recipients = Array.isArray(input.to) ? input.to : [input.to];
+  const users = await prisma.user.findMany({ where: { email: { in: recipients.map(email => email.toLowerCase()) }, organizationId: { not: null } }, select: { email: true, organization: { select: { subscriptionPlan: true } } } });
+  const blocked = new Set(users.filter(user => user.organization && !planEntitlements[user.organization.subscriptionPlan].EMAIL_NOTIFICATIONS).map(user => user.email.toLowerCase()));
+  const allowedRecipients = recipients.filter(email => !blocked.has(email.toLowerCase()));
+  if (!allowedRecipients.length) return { success: true, messageId: null, error: null };
+  return sendEmail({ ...input, to: Array.isArray(input.to) ? allowedRecipients : allowedRecipients[0] });
 }
 
 function getResendClient() {

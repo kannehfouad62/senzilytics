@@ -17,6 +17,7 @@ import {
   PermissionKey,
   Prisma,
 } from "@prisma/client";
+import { hasSubscriptionFeature } from "@/lib/subscription";
 import {
   Archive,
   Download,
@@ -51,6 +52,7 @@ export default async function DocumentCenterPage({
   } = await getCurrentUserTenant();
 
   const filters = await searchParams;
+  const canUploadDocuments = await hasSubscriptionFeature(organizationId, "DOCUMENT_UPLOAD");
 
   const query = filters.q?.trim() || "";
 
@@ -387,7 +389,7 @@ export default async function DocumentCenterPage({
                     Download
                   </a>
 
-                  {document.status ===
+                  {canUploadDocuments && document.status ===
                     DocumentStatus.ACTIVE && (
                     <ReplaceDocumentUpload
                       documentId={document.id}
