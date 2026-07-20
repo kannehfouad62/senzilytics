@@ -17,6 +17,7 @@ import {
 } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { requireSubscriptionFeature } from "@/lib/subscription";
+import { isRuntimeFieldVisible, runtimeRequiredFileIds } from "@/modules/forms/runtime-form.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +50,8 @@ type UploadPayload = {
   sizeBytes: number;
   checksum: string;
   replacedDocumentId: string | null;
+  configurableSubmissionId: string | null;
+  configurableFieldId: string | null;
 };
 
 function isDocumentEntityType(
@@ -145,6 +148,14 @@ function parseUploadPayload(
       payload.replacedDocumentId.trim()
         ? payload.replacedDocumentId.trim()
         : null,
+    configurableSubmissionId:
+      typeof payload.configurableSubmissionId === "string" && payload.configurableSubmissionId.trim()
+        ? payload.configurableSubmissionId.trim()
+        : null,
+    configurableFieldId:
+      typeof payload.configurableFieldId === "string" && payload.configurableFieldId.trim()
+        ? payload.configurableFieldId.trim()
+        : null,
   };
 }
 
@@ -154,6 +165,10 @@ async function validateRelatedEntity(input: {
   entityId: string;
 }) {
   switch (input.entityType) {
+    case DocumentEntityType.SAFETY_OBSERVATION: {
+      const record = await prisma.safetyObservation.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } });
+      return Boolean(record);
+    }
     case DocumentEntityType.INCIDENT: {
       const record = await prisma.incident.findFirst({
         where: {
@@ -379,6 +394,28 @@ async function validateRelatedEntity(input: {
   }
 }
 
+async function validateCustomFormFileTarget(payload: UploadPayload) {
+  if (!payload.configurableSubmissionId && !payload.configurableFieldId) return;
+  if (!payload.configurableSubmissionId || !payload.configurableFieldId || payload.entityType !== DocumentEntityType.SAFETY_OBSERVATION) throw new Error("Custom-form file information is incomplete.");
+  const submission = await prisma.configurableFormSubmission.findFirst({ where: { id: payload.configurableSubmissionId, organizationId: payload.organizationId, entityType: "OBSERVATION", entityId: payload.entityId, version: { fields: { some: { id: payload.configurableFieldId, fieldType: "FILE" } } } }, include: { version: { include: { fields: { where: { id: payload.configurableFieldId } } } }, answers: { include: { field: true } }, fileAnswers: { where: { fieldId: payload.configurableFieldId }, select: { id: true } } } });
+  if (!submission) throw new Error("The custom-form attachment field is not valid for this observation.");
+  const targetField=submission.version.fields[0],values=new Map(submission.answers.map(answer=>[answer.field.key,answer.value]));
+  if(!targetField||!isRuntimeFieldVisible(targetField.visibilityRule,values))throw new Error("This custom-form attachment field is not applicable to the submitted answers.");
+  if (submission.fileAnswers.length) throw new Error("This custom-form attachment field already has a file.");
+}
+
+async function completeCustomFormFileTarget(payload: UploadPayload, documentId: string) {
+  if (!payload.configurableSubmissionId || !payload.configurableFieldId) return;
+  await prisma.$transaction(async tx => {
+    await tx.configurableFormFileAnswer.upsert({ where: { submissionId_fieldId: { submissionId: payload.configurableSubmissionId!, fieldId: payload.configurableFieldId! } }, update: { documentId }, create: { submissionId: payload.configurableSubmissionId!, fieldId: payload.configurableFieldId!, documentId } });
+    const submission = await tx.configurableFormSubmission.findUnique({ where: { id: payload.configurableSubmissionId! }, include: { version: { include: { fields: true } }, answers: { include: { field: true } }, fileAnswers: { select: { fieldId: true } } } });
+    if (!submission) throw new Error("The custom-form submission was not found.");
+    const linked = new Set(submission.fileAnswers.map(answer => answer.fieldId));
+    const values=new Map(submission.answers.map(answer=>[answer.field.key,answer.value]));
+    if (runtimeRequiredFileIds(submission.version.fields,values).every(fieldId => linked.has(fieldId))) await tx.configurableFormSubmission.update({ where: { id: submission.id }, data: { status: "SUBMITTED" } });
+  });
+}
+
 export async function POST(request: Request) {
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
 
@@ -431,9 +468,8 @@ export async function POST(request: Request) {
           );
         }
 
-        await requirePermission(
-          PermissionKey.MANAGE_DOCUMENTS
-        );
+        const payload = parseUploadPayload(clientPayload);
+        await requirePermission(payload.entityType === DocumentEntityType.SAFETY_OBSERVATION && payload.configurableSubmissionId && payload.configurableFieldId ? PermissionKey.CREATE_OBSERVATION : PermissionKey.MANAGE_DOCUMENTS);
 
         const currentUser = await prisma.user.findUnique({
           where: {
@@ -452,8 +488,6 @@ export async function POST(request: Request) {
         }
 
         await requireSubscriptionFeature(currentUser.organizationId, "DOCUMENT_UPLOAD");
-
-        const payload = parseUploadPayload(clientPayload);
 
         if (payload.userId !== currentUser.id) {
           throw new Error("The upload user is invalid.");
@@ -489,6 +523,8 @@ export async function POST(request: Request) {
             "The related record does not exist in your organization."
           );
         }
+
+        await validateCustomFormFileTarget(payload);
 
         if (payload.replacedDocumentId) {
           const documentBeingReplaced =
@@ -610,6 +646,7 @@ export async function POST(request: Request) {
           });
 
         if (existingBlobDocument) {
+          await completeCustomFormFileTarget(payload, existingBlobDocument.id);
           return;
         }
 
@@ -633,7 +670,7 @@ export async function POST(request: Request) {
           return;
         }
 
-        await registerDocument({
+        const document = await registerDocument({
           organizationId: payload.organizationId,
           userId: payload.userId,
           entityType: payload.entityType,
@@ -650,6 +687,7 @@ export async function POST(request: Request) {
           sizeBytes: payload.sizeBytes,
           checksum: payload.checksum,
         });
+        await completeCustomFormFileTarget(payload, document.id);
       },
     });
 
