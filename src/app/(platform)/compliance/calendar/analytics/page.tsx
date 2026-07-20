@@ -1,0 +1,14 @@
+import { requirePermission } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserTenant } from "@/lib/tenant";
+import { ComplianceCalendarOccurrenceStatus, PermissionKey } from "@prisma/client";
+import Link from "next/link";
+
+export default async function ComplianceCalendarAnalyticsPage() {
+  await requirePermission(PermissionKey.VIEW_COMPLIANCE); const { organizationId } = await getCurrentUserTenant(); const now = new Date(); const from = new Date(now); from.setMonth(from.getMonth() - 12);
+  const items = await prisma.complianceCalendarOccurrence.findMany({ where: { organizationId, dueAt: { gte: from } }, include: { site: true, task: true } });
+  const completed = items.filter(x => x.status === ComplianceCalendarOccurrenceStatus.COMPLETED); const due = items.filter(x => x.dueAt <= now); const overdue = items.filter(x => x.status === ComplianceCalendarOccurrenceStatus.OVERDUE); const onTime = completed.filter(x => x.completedAt && x.completedAt <= x.dueAt);
+  const siteRows = [...new Set(items.map(x=>x.site.name))].map(name => { const rows=items.filter(x=>x.site.name===name); const done=rows.filter(x=>x.status===ComplianceCalendarOccurrenceStatus.COMPLETED).length; return { name, total: rows.length, rate: rows.length ? Math.round(done/rows.length*100) : 0 }; }).sort((a,b)=>b.total-a.total);
+  return <div><div className="flex justify-between gap-4"><div><p className="text-sm text-cyan-300">Assurance Intelligence</p><h1 className="mt-2 text-4xl font-bold">Calendar Analytics</h1><p className="mt-2 text-slate-400">Rolling 12-month compliance execution performance.</p></div><Link href="/compliance/calendar" className="h-fit rounded-xl border border-white/10 px-4 py-2">Calendar</Link></div><div className="mt-8 grid gap-4 md:grid-cols-4"><Metric label="Occurrences" value={items.length}/><Metric label="Completion rate" value={`${due.length ? Math.round(completed.length/due.length*100) : 0}%`}/><Metric label="On-time rate" value={`${completed.length ? Math.round(onTime.length/completed.length*100) : 0}%`}/><Metric label="Overdue" value={overdue.length}/></div><section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6"><h2 className="text-xl font-semibold">Performance by site</h2><div className="mt-5 space-y-4">{siteRows.map(row=><div key={row.name}><div className="flex justify-between text-sm"><span>{row.name}</span><span>{row.rate}% · {row.total} tasks</span></div><div className="mt-2 h-2 rounded-full bg-slate-800"><div className="h-2 rounded-full bg-cyan-300" style={{width:`${row.rate}%`}}/></div></div>)}</div></section></div>;
+}
+function Metric({label,value}:{label:string;value:string|number}){return <div className="rounded-3xl border border-white/10 bg-white/5 p-6"><p className="text-sm text-slate-400">{label}</p><p className="mt-2 text-3xl font-bold">{value}</p></div>}

@@ -27,6 +27,7 @@ import {
   Sprout,
   Workflow,
   Eye,
+  WifiOff,
 } from "lucide-react";
 
 export const primaryNavItems = [
@@ -39,6 +40,11 @@ export const primaryNavItems = [
     label: "My Tasks",
     href: "/tasks",
     icon: ClipboardList,
+  },
+  {
+    label: "Field Collection",
+    href: "/field-collection",
+    icon: WifiOff,
   },
   {
     label: "Documents",
@@ -156,6 +162,11 @@ export const complianceNavItems = [
   {
     label: "Compliance",
     href: "/compliance",
+    icon: CalendarCheck,
+  },
+  {
+    label: "Compliance Calendar",
+    href: "/compliance/calendar",
     icon: CalendarCheck,
   },
   {

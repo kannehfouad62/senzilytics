@@ -21,6 +21,9 @@ import {
   EnterpriseAuditSeverity,
   EnterpriseAuditSource,
   EnterpriseAuditTeamRole,
+  ComplianceCalendarOccurrenceStatus,
+  ComplianceCalendarTaskStatus,
+  ComplianceRecurrence,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createAuditService } from "@/modules/audit/audit.service";
@@ -342,6 +345,19 @@ async function main() {
       sites: { create: { siteId: site.id, isPrimary: true } },
       departments: { create: { departmentId: department.id, isPrimary: true } },
     },
+  });
+
+  const calendarTask = await prisma.complianceCalendarTask.upsert({
+    where: { id: "calendar_task_public_demo_monthly" },
+    update: { status: ComplianceCalendarTaskStatus.ACTIVE, ownerId: manager.id },
+    create: {
+      id: "calendar_task_public_demo_monthly", organizationId: organization.id, siteId: site.id, departmentId: department.id, ownerId: manager.id,
+      title: "Monthly emergency equipment inspection", description: "Verify emergency showers, eyewash stations, spill kits and first-aid supplies.", instructions: "Complete the controlled inspection and attach the signed checklist or evidence reference.", category: "SAFETY", regulatoryReference: "Northstar EHS Standard 4.2", evidenceRequired: true, approvalRequired: true, recurrence: ComplianceRecurrence.MONTHLY, intervalValue: 1, startDate: days(-20), nextOccurrenceAt: days(10), reminderDaysBefore: 7, escalationDaysAfter: 2, status: ComplianceCalendarTaskStatus.ACTIVE,
+    },
+  });
+  await prisma.complianceCalendarOccurrence.upsert({
+    where: { taskId_dueAt: { taskId: calendarTask.id, dueAt: days(10) } }, update: {},
+    create: { organizationId: organization.id, taskId: calendarTask.id, siteId: site.id, departmentId: department.id, assignedToId: manager.id, dueAt: days(10), status: ComplianceCalendarOccurrenceStatus.UPCOMING },
   });
 
   const existingAudit = await prisma.enterpriseAudit.findFirst({

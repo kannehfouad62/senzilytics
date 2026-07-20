@@ -128,11 +128,30 @@ enum ComplianceObligationType {
 
 enum ComplianceRecurrence {
   ONE_TIME
+  DAILY
+  WEEKLY
   MONTHLY
   QUARTERLY
   SEMIANNUAL
   ANNUAL
   CUSTOM
+}
+
+enum ComplianceCalendarTaskStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum ComplianceCalendarOccurrenceStatus {
+  UPCOMING
+  DUE
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  REJECTED
+  OVERDUE
+  CANCELLED
 }
 
 enum PermitStatus {
@@ -867,6 +886,9 @@ model Organization {
   identityProviders        OrganizationIdentityProvider[]
   tenantInvitations        TenantInvitation[]
   demoLeads                DemoLead[]
+  complianceCalendarTasks  ComplianceCalendarTask[]
+  complianceCalendarOccurrences ComplianceCalendarOccurrence[]
+  offlineSubmissions         OfflineSubmission[]
 }
 
 model Site {
@@ -900,6 +922,8 @@ model Site {
   permits              Permit[]
   chemicalInventories  ChemicalInventory[]
   environmentalData    EnvironmentalDataPoint[]
+  complianceCalendarTasks ComplianceCalendarTask[]
+  complianceCalendarOccurrences ComplianceCalendarOccurrence[]
 }
 
 model Department {
@@ -918,6 +942,8 @@ model Department {
   enterpriseAuditsV2   EnterpriseAudit[]     @relation("EnterpriseAuditDepartment")
   safetyObservations   SafetyObservation[]
   trainingRequirements TrainingRequirement[]
+  complianceCalendarTasks ComplianceCalendarTask[]
+  complianceCalendarOccurrences ComplianceCalendarOccurrence[]
 
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -980,6 +1006,12 @@ model User {
   acceptedTenantInvitations TenantInvitation[]          @relation("TenantInvitationAcceptor")
   passwordResetTokens       PasswordResetToken[]
   demoLead                  DemoLead?
+  ownedComplianceCalendarTasks ComplianceCalendarTask[] @relation("ComplianceCalendarTaskOwner")
+  escalatedComplianceCalendarTasks ComplianceCalendarTask[] @relation("ComplianceCalendarTaskEscalation")
+  assignedComplianceOccurrences ComplianceCalendarOccurrence[] @relation("ComplianceCalendarOccurrenceAssignee")
+  completedComplianceOccurrences ComplianceCalendarOccurrence[] @relation("ComplianceCalendarOccurrenceCompleter")
+  reviewedComplianceOccurrences ComplianceCalendarOccurrence[] @relation("ComplianceCalendarOccurrenceReviewer")
+  offlineSubmissions OfflineSubmission[]
 
   ownedRisks           Risk[]        @relation("RiskOwner")
   ownedRiskControls    RiskControl[] @relation("RiskControlOwner")
@@ -2659,6 +2691,93 @@ model ComplianceEvaluation {
 
   @@index([complianceItemId, evaluatedAt])
   @@index([evaluatedById])
+}
+
+model ComplianceCalendarTask {
+  id                    String                       @id @default(cuid())
+  organizationId        String
+  organization          Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  siteId                String
+  site                  Site                         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId          String?
+  department            Department?                  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  ownerId               String
+  owner                 User                         @relation("ComplianceCalendarTaskOwner", fields: [ownerId], references: [id])
+  escalationOwnerId     String?
+  escalationOwner       User?                        @relation("ComplianceCalendarTaskEscalation", fields: [escalationOwnerId], references: [id], onDelete: SetNull)
+  title                 String
+  description           String?
+  instructions          String?
+  category              String
+  regulatoryReference   String?
+  evidenceRequired      Boolean                      @default(false)
+  approvalRequired      Boolean                      @default(false)
+  recurrence            ComplianceRecurrence
+  intervalValue         Int                          @default(1)
+  startDate             DateTime
+  endDate               DateTime?
+  dueTime               String?
+  reminderDaysBefore    Int                          @default(7)
+  escalationDaysAfter   Int                          @default(1)
+  status                ComplianceCalendarTaskStatus @default(ACTIVE)
+  nextOccurrenceAt      DateTime?
+  occurrences           ComplianceCalendarOccurrence[]
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  @@index([organizationId, status, nextOccurrenceAt])
+  @@index([siteId, departmentId])
+  @@index([ownerId, status])
+}
+
+model ComplianceCalendarOccurrence {
+  id               String                             @id @default(cuid())
+  organizationId   String
+  organization     Organization                       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  taskId           String
+  task             ComplianceCalendarTask             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  siteId           String
+  site             Site                               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId     String?
+  department       Department?                        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assignedToId     String
+  assignedTo       User                               @relation("ComplianceCalendarOccurrenceAssignee", fields: [assignedToId], references: [id])
+  dueAt            DateTime
+  status           ComplianceCalendarOccurrenceStatus @default(UPCOMING)
+  completionNotes  String?
+  evidenceUrl      String?
+  completedAt      DateTime?
+  completedById    String?
+  completedBy      User?                              @relation("ComplianceCalendarOccurrenceCompleter", fields: [completedById], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+  reviewedById     String?
+  reviewedBy       User?                              @relation("ComplianceCalendarOccurrenceReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNotes      String?
+  reminderSentAt   DateTime?
+  escalatedAt      DateTime?
+  createdAt        DateTime                           @default(now())
+  updatedAt        DateTime                           @updatedAt
+
+  @@unique([taskId, dueAt])
+  @@index([organizationId, status, dueAt])
+  @@index([assignedToId, status, dueAt])
+  @@index([siteId, departmentId, dueAt])
+}
+
+model OfflineSubmission {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recordType     String
+  recordId       String
+  capturedAt     DateTime
+  syncedAt       DateTime     @default(now())
+  payloadHash    String
+
+  @@index([organizationId, syncedAt])
+  @@index([userId, capturedAt])
 }
 
 model Permit {
