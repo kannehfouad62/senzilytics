@@ -29,8 +29,9 @@ export async function deleteDraftField(input:{organizationId:string;fieldId:stri
 }
 
 export async function publishFormVersion(input:{organizationId:string;versionId:string;userId:string}){
-  const version=await prisma.configurableFormVersion.findFirst({where:{id:input.versionId,definition:{organizationId:input.organizationId}},include:{fields:true}});
+  const version=await prisma.configurableFormVersion.findFirst({where:{id:input.versionId,definition:{organizationId:input.organizationId}},include:{fields:true,definition:true}});
   if(!version)throw new Error("Form version not found.");if(version.status!==ConfigurableFormVersionStatus.DRAFT)throw new Error("Only a draft can be published.");if(!version.fields.length)throw new Error("Add at least one field before publishing.");
+  if(version.definition.module===ConfigurableFormModule.OBSERVATION&&version.fields.some(field=>field.fieldType===ConfigurableFieldType.FILE))throw new Error("Observation forms cannot publish file fields until private-document integration is enabled for this pilot.");
   await prisma.$transaction([prisma.configurableFormVersion.updateMany({where:{definitionId:version.definitionId,status:ConfigurableFormVersionStatus.PUBLISHED},data:{status:ConfigurableFormVersionStatus.ARCHIVED}}),prisma.configurableFormVersion.update({where:{id:version.id},data:{status:ConfigurableFormVersionStatus.PUBLISHED,publishedAt:new Date(),publishedById:input.userId}})]);
   return version.definitionId;
 }

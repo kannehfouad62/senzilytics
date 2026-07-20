@@ -141,6 +141,12 @@ enum ConfigurableFieldType {
   SIGNATURE
 }
 
+enum ConfigurableSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  VOIDED
+}
+
 enum SafetyObservationType {
   UNSAFE_ACT
   UNSAFE_CONDITION
@@ -897,6 +903,7 @@ model Organization {
   notifications                Notification[]
   workflowTemplates            WorkflowTemplate[]
   configurableForms            ConfigurableFormDefinition[]
+  configurableFormSubmissions ConfigurableFormSubmission[]
   workflowInstances            WorkflowInstance[]
   documents                    Document[]
   auditChecklistTemplates      AuditChecklistTemplate[]
@@ -1088,6 +1095,7 @@ model User {
   configurableFormsCreated ConfigurableFormDefinition[] @relation("ConfigurableFormCreatedBy")
   configurableFormVersionsCreated ConfigurableFormVersion[] @relation("ConfigurableFormVersionCreatedBy")
   configurableFormVersionsPublished ConfigurableFormVersion[] @relation("ConfigurableFormVersionPublishedBy")
+  configurableFormSubmissions ConfigurableFormSubmission[] @relation("ConfigurableFormSubmittedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -3698,6 +3706,7 @@ model ConfigurableFormDefinition {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy    User         @relation("ConfigurableFormCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   versions     ConfigurableFormVersion[]
+  submissions  ConfigurableFormSubmission[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, module, isActive])
@@ -3719,6 +3728,7 @@ model ConfigurableFormVersion {
   createdBy   User                       @relation("ConfigurableFormVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   publishedBy User?                      @relation("ConfigurableFormVersionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
   fields      ConfigurableFormField[]
+  submissions ConfigurableFormSubmission[]
 
   @@unique([definitionId, version])
   @@index([definitionId, status])
@@ -3741,10 +3751,49 @@ model ConfigurableFormField {
   updatedAt      DateTime              @updatedAt
 
   version ConfigurableFormVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  answers ConfigurableFormAnswer[]
 
   @@unique([versionId, key])
   @@unique([versionId, sequence])
   @@index([versionId, fieldType])
+}
+
+model ConfigurableFormSubmission {
+  id             String                       @id @default(cuid())
+  organizationId String
+  definitionId   String
+  versionId      String
+  entityType     ConfigurableFormModule
+  entityId       String
+  status         ConfigurableSubmissionStatus @default(SUBMITTED)
+  submittedById  String
+  submittedAt    DateTime                     @default(now())
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  definition   ConfigurableFormDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  version      ConfigurableFormVersion    @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  submittedBy  User                       @relation("ConfigurableFormSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  answers      ConfigurableFormAnswer[]
+
+  @@unique([definitionId, entityType, entityId])
+  @@index([organizationId, entityType, entityId])
+  @@index([submittedById, submittedAt])
+}
+
+model ConfigurableFormAnswer {
+  id           String @id @default(cuid())
+  submissionId String
+  fieldId      String
+  value        Json
+  createdAt    DateTime @default(now())
+
+  submission ConfigurableFormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  field      ConfigurableFormField      @relation(fields: [fieldId], references: [id], onDelete: Restrict)
+
+  @@unique([submissionId, fieldId])
+  @@index([fieldId])
 }
 
 model WorkflowTemplate {

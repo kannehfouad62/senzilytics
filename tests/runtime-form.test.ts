@@ -1,0 +1,4 @@
+import assert from "node:assert/strict";import test from "node:test";import { isRuntimeFieldVisible } from "../src/modules/forms/runtime-form.service";
+test("fields without a visibility rule are shown",()=>{assert.equal(isRuntimeFieldVisible(null,new Map()),true)});
+test("conditional fields only show when the controlling answer matches",()=>{const rule={fieldKey:"event_type",operator:"EQUALS",value:"Spill"};assert.equal(isRuntimeFieldVisible(rule,new Map([["event_type","Spill"]])),true);assert.equal(isRuntimeFieldVisible(rule,new Map([["event_type","Injury"]])),false)});
+test("multi-select controlling answers satisfy matching conditional rules",()=>{const rule={fieldKey:"hazards",operator:"EQUALS",value:"Chemical"};assert.equal(isRuntimeFieldVisible(rule,new Map([["hazards",["Noise","Chemical"]]])),true)});
