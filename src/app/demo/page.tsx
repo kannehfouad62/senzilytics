@@ -1,6 +1,7 @@
 import { startDemo } from "@/features/demo/actions";
 import { ArrowLeft, CheckCircle2, Clock3, Eye, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import { countries } from "@/lib/countries";
 
 const errors: Record<string, string> = {
   invalid: "Complete all required fields and use a valid work email.",
@@ -40,7 +41,14 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
               <Field label="Work email"><input name="workEmail" type="email" required autoComplete="email" className={input}/></Field>
               <Field label="Company"><input name="company" required minLength={2} autoComplete="organization" className={input}/></Field>
               <Field label="Job title (optional)"><input name="jobTitle" autoComplete="organization-title" className={input}/></Field>
+              <Field label="Country"><select name="country" required defaultValue="" autoComplete="country-name" className={input}><option value="" disabled>Select your country</option>{countries.map((country) => <option key={country} value={country}>{country}</option>)}</select></Field>
+              <fieldset className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                <legend className="px-2 text-sm font-medium text-slate-300">Communication preferences</legend>
+                <label className="flex items-start gap-3 text-sm leading-6 text-slate-300"><input type="checkbox" name="topicUpdatesConsent" className="mt-1"/><span>I would like to receive more information about topics like this. <span className="text-slate-500">(Optional)</span></span></label>
+                <label className="flex items-start gap-3 text-sm leading-6 text-slate-300"><input type="checkbox" name="productContactConsent" required className="mt-1"/><span>We may use the data you provide to contact you with information about Senzilytics products.</span></label>
+              </fieldset>
               <label className="flex items-start gap-3 text-sm leading-6 text-slate-300"><input type="checkbox" name="consent" required className="mt-1"/><span>I agree to the demo terms and consent to Senzilytics contacting me about this product experience.</span></label>
+              <p className="rounded-xl border border-emerald-400/20 bg-emerald-400/[.06] p-4 text-sm leading-6 text-slate-300"><ShieldCheck className="mr-2 inline text-emerald-300" size={17}/>All data is protected and secure, as outlined in our <Link href="/privacy" target="_blank" className="font-semibold text-cyan-300 underline underline-offset-2">Privacy Policy</Link>.</p>
               <button className="w-full rounded-2xl bg-cyan-300 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-200">Enter Interactive Demo</button>
             </div>
             <p className="mt-5 text-xs leading-5 text-slate-500">Demo information is fictional. Administrative controls, destructive actions, outbound email and production integrations are disabled.</p>

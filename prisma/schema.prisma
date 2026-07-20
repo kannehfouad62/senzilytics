@@ -1053,6 +1053,9 @@ model DemoLead {
   workEmail     String
   company       String
   jobTitle      String?
+  country       String
+  topicUpdatesConsent Boolean @default(false)
+  productContactConsent Boolean @default(false)
   consentedAt   DateTime
   expiresAt     DateTime
   createdAt     DateTime @default(now())

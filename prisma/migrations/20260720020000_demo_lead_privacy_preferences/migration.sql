@@ -1,0 +1,6 @@
+ALTER TABLE "DemoLead"
+ADD COLUMN "country" TEXT NOT NULL DEFAULT 'Not provided',
+ADD COLUMN "topicUpdatesConsent" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "productContactConsent" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "DemoLead" ALTER COLUMN "country" DROP DEFAULT;

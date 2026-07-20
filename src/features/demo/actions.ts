@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { sendEmail } from "@/core/email/email.service";
+import { countries } from "@/lib/countries";
 
 const DEMO_ORGANIZATION_ID = "org_senzilytics_public_demo";
 const DEMO_DURATION_HOURS = 2;
@@ -17,6 +18,9 @@ const demoRequestSchema = z.object({
   workEmail: z.string().trim().toLowerCase().email().max(254),
   company: z.string().trim().min(2).max(150),
   jobTitle: z.string().trim().max(120).optional(),
+  country: z.enum(countries),
+  topicUpdatesConsent: z.boolean(),
+  productContactConsent: z.literal(true),
   consent: z.literal("on"),
 });
 
@@ -26,6 +30,9 @@ export async function startDemo(formData: FormData) {
     workEmail: formData.get("workEmail"),
     company: formData.get("company"),
     jobTitle: String(formData.get("jobTitle") || "").trim() || undefined,
+    country: formData.get("country"),
+    topicUpdatesConsent: formData.get("topicUpdatesConsent") === "on",
+    productContactConsent: formData.get("productContactConsent") === "on",
     consent: formData.get("consent"),
   });
 
@@ -70,6 +77,9 @@ export async function startDemo(formData: FormData) {
           workEmail: parsed.data.workEmail,
           company: parsed.data.company,
           jobTitle: parsed.data.jobTitle,
+          country: parsed.data.country,
+          topicUpdatesConsent: parsed.data.topicUpdatesConsent,
+          productContactConsent: parsed.data.productContactConsent,
           consentedAt: new Date(),
           expiresAt,
           organizationId: organization.id,
@@ -81,6 +91,7 @@ export async function startDemo(formData: FormData) {
   const safeName = escapeHtml(parsed.data.name);
   const safeCompany = escapeHtml(parsed.data.company);
   const safeTitle = escapeHtml(parsed.data.jobTitle || "Not provided");
+  const safeCountry = escapeHtml(parsed.data.country);
   const salesRecipient = process.env.DEMO_LEAD_RECIPIENT?.trim();
   const messages = [
     sendEmail({
@@ -94,8 +105,8 @@ export async function startDemo(formData: FormData) {
     messages.push(sendEmail({
       to: salesRecipient,
       subject: `New Senzilytics demo lead — ${safeCompany}`,
-      html: `<p><strong>Name:</strong> ${safeName}</p><p><strong>Email:</strong> ${escapeHtml(parsed.data.workEmail)}</p><p><strong>Company:</strong> ${safeCompany}</p><p><strong>Job title:</strong> ${safeTitle}</p>`,
-      text: `${parsed.data.name} (${parsed.data.workEmail}) from ${parsed.data.company} started a demo.`,
+      html: `<p><strong>Name:</strong> ${safeName}</p><p><strong>Email:</strong> ${escapeHtml(parsed.data.workEmail)}</p><p><strong>Company:</strong> ${safeCompany}</p><p><strong>Job title:</strong> ${safeTitle}</p><p><strong>Country:</strong> ${safeCountry}</p><p><strong>Topic updates:</strong> ${parsed.data.topicUpdatesConsent ? "Yes" : "No"}</p><p><strong>Product contact:</strong> Yes</p>`,
+      text: `${parsed.data.name} (${parsed.data.workEmail}) from ${parsed.data.company}, ${parsed.data.country} started a demo. Topic updates: ${parsed.data.topicUpdatesConsent ? "Yes" : "No"}. Product contact: Yes.`,
     }));
   }
   await Promise.allSettled(messages);
