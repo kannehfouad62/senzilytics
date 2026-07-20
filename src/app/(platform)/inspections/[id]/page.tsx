@@ -5,13 +5,20 @@ import {
   updateInspectionFindingStatus,
   updateInspectionStatus,
 } from "@/features/inspections/actions";
+import { EntityCustomFormSubmissions } from "@/features/forms/entity-custom-form-submissions";
 import { convertInspectionFindingToCorrectiveAction } from "@/features/inspections/inspection-capa.actions";
 import { saveInspectionResponse } from "@/features/inspections/inspection-execution.actions";
-import { requirePermission } from "@/lib/permissions";
+import {
+  getCurrentUserPermissions,
+  requirePermission,
+} from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { hasSubscriptionFeature } from "@/lib/subscription";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { findTenantInspectionById } from "@/modules/inspection/inspection.repository";
 import {
+  ConfigurableFormModule,
+  DocumentEntityType,
   InspectionResponseResult,
   InspectionTeamRole,
   PermissionKey,
@@ -43,10 +50,15 @@ export default async function InspectionDetailPage({
 
   const { id } = await params;
 
-  const { organizationId } =
+  const { organizationId, user } =
     await getCurrentUserTenant();
 
-  const [inspection, users] =
+  const [
+    inspection,
+    users,
+    permissions,
+    documentUploadEnabled,
+  ] =
     await Promise.all([
       findTenantInspectionById(
         id,
@@ -67,6 +79,13 @@ export default async function InspectionDetailPage({
           name: "asc",
         },
       }),
+
+      getCurrentUserPermissions(),
+
+      hasSubscriptionFeature(
+        organizationId,
+        "DOCUMENT_UPLOAD"
+      ),
     ]);
 
   if (!inspection) {
@@ -78,6 +97,12 @@ export default async function InspectionDetailPage({
       Status.COMPLETED ||
     inspection.status ===
       Status.CLOSED;
+
+  const canUploadCustomFiles =
+    documentUploadEnabled &&
+    permissions.includes(
+      PermissionKey.MANAGE_INSPECTIONS
+    );
 
   const answeredItems =
     inspection.checklistItems.filter(
@@ -257,6 +282,22 @@ export default async function InspectionDetailPage({
           />
         </div>
       )}
+
+      <EntityCustomFormSubmissions
+        organizationId={organizationId}
+        userId={user.id}
+        module={
+          ConfigurableFormModule.INSPECTION
+        }
+        entityType={
+          DocumentEntityType.INSPECTION
+        }
+        entityId={inspection.id}
+        canUpload={
+          canUploadCustomFiles
+        }
+        className="mt-8 space-y-6"
+      />
 
       <div className="mt-8 grid gap-7 xl:grid-cols-[1fr_380px]">
         <main className="space-y-7">

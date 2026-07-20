@@ -3,6 +3,7 @@ import {
   IncidentType,
   RiskLevel,
   Status,
+  Prisma,
 } from "@prisma/client";
 
 export async function findTenantIncidentById(
@@ -44,8 +45,8 @@ export async function createTenantIncident(input: {
   location: string;
   siteId: string;
   reportedById: string;
-}) {
-  return prisma.incident.create({
+},db:Pick<Prisma.TransactionClient,"incident">=prisma) {
+  return db.incident.create({
     data: {
       title: input.title,
       description: input.description,

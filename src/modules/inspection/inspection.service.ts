@@ -11,7 +11,12 @@ import {
   Status,
   UserRole,
   WorkflowEntityType,
+  ConfigurableFormModule,
 } from "@prisma/client";
+import {
+  createPreparedSubmissions,
+  type PreparedSubmission,
+} from "@/modules/forms/runtime-form.service";
 import {
   addTenantInspectionTeamMember,
   createInspectionChecklistSnapshot,
@@ -212,6 +217,7 @@ export async function createInspectionService(input: {
   dueDate?: Date | null;
   leadInspectorId?: string | null;
   checklistTemplateId?: string | null;
+  customSubmissions?: PreparedSubmission[];
 }) {
   const site =
     await prisma.site.findFirst({
@@ -291,78 +297,114 @@ export async function createInspectionService(input: {
   }
 
   const inspection =
-    await createTenantInspection({
-      title: input.title,
-      reference: input.reference,
-      description:
-        input.description,
-      area: input.area,
-      type: input.type,
-      siteId: site.id,
-      scheduledAt:
-        input.scheduledAt,
-      dueDate: input.dueDate,
-      leadInspectorId,
-      checklistTemplateId,
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        const created =
+          await createTenantInspection(
+            {
+              title: input.title,
+              reference:
+                input.reference,
+              description:
+                input.description,
+              area: input.area,
+              type: input.type,
+              siteId: site.id,
+              scheduledAt:
+                input.scheduledAt,
+              dueDate: input.dueDate,
+              leadInspectorId,
+              checklistTemplateId,
+            },
+            tx
+          );
 
-  if (leadInspectorId) {
-    await addTenantInspectionTeamMember({
-      inspectionId:
-        inspection.id,
-      userId:
-        leadInspectorId,
-      role:
-        InspectionTeamRole.LEAD_INSPECTOR,
-    });
-  }
+        if (leadInspectorId) {
+          await addTenantInspectionTeamMember(
+            {
+              inspectionId:
+                created.id,
+              userId:
+                leadInspectorId,
+              role:
+                InspectionTeamRole.LEAD_INSPECTOR,
+            },
+            tx
+          );
+        }
 
-  let checklistItemCount = 0;
+        let checklistItemCount = 0;
 
-  if (checklistTemplateId) {
-    const snapshot =
-      await createInspectionChecklistSnapshot({
-        inspectionId:
-          inspection.id,
-        checklistTemplateId,
-      });
+        if (checklistTemplateId) {
+          const snapshot =
+            await createInspectionChecklistSnapshot(
+              {
+                inspectionId:
+                  created.id,
+                checklistTemplateId,
+              },
+              tx
+            );
 
-    checklistItemCount =
-      snapshot.count;
-  }
+          checklistItemCount =
+            snapshot.count;
+        }
 
-  await logActivity({
-    organizationId:
-      input.organizationId,
-    userId: input.userId,
-    action: ActivityAction.CREATE,
-    entityType: "Inspection",
-    entityId: inspection.id,
-    title:
-      "Inspection created",
-    description:
-      inspection.title,
-    metadata: {
-      reference:
-        inspection.reference,
-      type:
-        inspection.type,
-      siteId: site.id,
-      area:
-        inspection.area,
-      scheduledAt:
-        inspection.scheduledAt?.toISOString() ??
-        null,
-      dueDate:
-        inspection.dueDate?.toISOString() ??
-        null,
-      leadInspectorId,
-      checklistTemplateId,
-      checklistItemCount,
-      status:
-        inspection.status,
-    },
-  });
+        await createPreparedSubmissions(
+          tx,
+          {
+            organizationId:
+              input.organizationId,
+            userId: input.userId,
+            module:
+              ConfigurableFormModule.INSPECTION,
+            entityId: created.id,
+            submissions:
+              input.customSubmissions ??
+              [],
+          }
+        );
+
+        await tx.activityLog.create({
+          data: {
+            organizationId:
+              input.organizationId,
+            userId: input.userId,
+            action:
+              ActivityAction.CREATE,
+            entityType:
+              "Inspection",
+            entityId: created.id,
+            title:
+              "Inspection created",
+            description:
+              created.title,
+            metadata: {
+              reference:
+                created.reference,
+              type: created.type,
+              siteId: site.id,
+              area: created.area,
+              scheduledAt:
+                created.scheduledAt?.toISOString() ??
+                null,
+              dueDate:
+                created.dueDate?.toISOString() ??
+                null,
+              leadInspectorId,
+              checklistTemplateId,
+              checklistItemCount,
+              status: created.status,
+              customFormCount:
+                input.customSubmissions
+                  ?.length ?? 0,
+            },
+          },
+        });
+
+        return created;
+      }
+    );
 
   try {
     await notifyInspectionCreated({
@@ -384,15 +426,22 @@ export async function createInspectionService(input: {
     );
   }
 
-  await startWorkflowForEntity({
-    organizationId:
-      input.organizationId,
-    userId: input.userId,
-    entityType:
-      WorkflowEntityType.INSPECTION,
-    entityId:
-      inspection.id,
-  });
+  try {
+    await startWorkflowForEntity({
+      organizationId:
+        input.organizationId,
+      userId: input.userId,
+      entityType:
+        WorkflowEntityType.INSPECTION,
+      entityId:
+        inspection.id,
+    });
+  } catch (error) {
+    console.error(
+      `Automatic workflow startup failed for inspection ${inspection.id}:`,
+      error
+    );
+  }
 
   return inspection;
 }

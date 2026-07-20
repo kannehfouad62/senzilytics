@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { ConfigurableFieldType, ConfigurableFormModule, ConfigurableFormVersionStatus, ConfigurableSubmissionStatus, Prisma } from "@prisma/client";
+import {
+  ConfigurableFieldType,
+  ConfigurableFormModule,
+  ConfigurableFormVersionStatus,
+  ConfigurableSubmissionStatus,
+  DocumentEntityType,
+  Prisma,
+} from "@prisma/client";
 
 type RuntimeRule={fieldKey:string;operator:"EQUALS";value:string};
 type RuntimeField={id:string;key:string;label:string;fieldType:ConfigurableFieldType;isRequired:boolean;options:Prisma.JsonValue|null;visibilityRule:Prisma.JsonValue|null};
@@ -12,6 +19,21 @@ const asRule=(value:Prisma.JsonValue|null):RuntimeRule|null=>{if(!value||Array.i
 export function isRuntimeFieldVisible(ruleValue:Prisma.JsonValue|null,answers:Map<string,unknown>){const rule=asRule(ruleValue);if(!rule)return true;const actual=answers.get(rule.fieldKey);return Array.isArray(actual)?actual.map(String).includes(rule.value):String(actual??"")===rule.value}
 export function runtimeRequiredFileIds(fields:RuntimeField[],answers:Map<string,unknown>){return fields.filter(field=>field.fieldType===ConfigurableFieldType.FILE&&field.isRequired&&isRuntimeFieldVisible(field.visibilityRule,answers)).map(field=>field.id)}
 export function runtimeSubmissionStatus(fields:RuntimeField[],answers:Map<string,unknown>){return runtimeRequiredFileIds(fields,answers).length?ConfigurableSubmissionStatus.DRAFT:ConfigurableSubmissionStatus.SUBMITTED}
+
+export function configurableFormModuleForDocumentEntity(
+  entityType: DocumentEntityType
+): ConfigurableFormModule | null {
+  switch (entityType) {
+    case DocumentEntityType.SAFETY_OBSERVATION:
+      return ConfigurableFormModule.OBSERVATION;
+    case DocumentEntityType.INCIDENT:
+      return ConfigurableFormModule.INCIDENT;
+    case DocumentEntityType.INSPECTION:
+      return ConfigurableFormModule.INSPECTION;
+    default:
+      return null;
+  }
+}
 const optionsOf=(value:Prisma.JsonValue|null)=>Array.isArray(value)?value.filter((item):item is string=>typeof item==="string"):[];
 const empty=(value:unknown)=>value===null||value===undefined||value===""||(Array.isArray(value)&&value.length===0);
 

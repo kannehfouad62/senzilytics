@@ -1,24 +1,29 @@
 import { prisma } from "@/lib/prisma";
-import { createIncident } from "@/features/incidents/actions";
-import { IncidentType, RiskLevel } from "@prisma/client";
+import { IncidentCreateForm } from "@/features/incidents/incident-create-form";
+import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
+import {
+  ConfigurableFormModule,
+  IncidentType,
+  RiskLevel,
+} from "@prisma/client";
 import { getCurrentUserTenant } from "@/lib/tenant";
 
 export default async function NewIncidentPage() {
   const { organizationId, user } = await getCurrentUserTenant();
 
-  const sites = await prisma.site.findMany({
-    where: {
-      organizationId,
-    },
-    orderBy: { name: "asc" },
-  });
-
-  const users = await prisma.user.findMany({
-    where: {
-      organizationId,
-    },
-    orderBy: { name: "asc" },
-  });
+  const [sites, forms] =
+    await Promise.all([
+      prisma.site.findMany({
+        where: {
+          organizationId,
+        },
+        orderBy: { name: "asc" },
+      }),
+      getPublishedRuntimeForms(
+        organizationId,
+        ConfigurableFormModule.INCIDENT
+      ),
+    ]);
 
   return (
     <div className="max-w-4xl">
@@ -33,9 +38,10 @@ export default async function NewIncidentPage() {
         </p>
       </div>
 
-      <form
-        action={createIncident}
-        className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl"
+      <IncidentCreateForm
+        forms={forms}
+        cancelHref="/incidents"
+        submitLabel="Submit Incident"
       >
         <input type="hidden" name="reportedById" value={user.id} />
 
@@ -133,22 +139,7 @@ export default async function NewIncidentPage() {
           />
         </div>
 
-        <div className="flex gap-4">
-          <button
-            type="submit"
-            className="rounded-2xl bg-cyan-400 px-6 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300"
-          >
-            Submit Incident
-          </button>
-
-          <a
-            href="/incidents"
-            className="rounded-2xl border border-white/10 px-6 py-3 text-slate-300 transition hover:bg-white/5"
-          >
-            Cancel
-          </a>
-        </div>
-      </form>
+      </IncidentCreateForm>
     </div>
   );
 }

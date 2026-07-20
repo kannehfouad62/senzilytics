@@ -1,8 +1,10 @@
-import { createInspection } from "@/features/inspections/actions";
+import { InspectionCreateForm } from "@/features/inspections/inspection-create-form";
 import { requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
+import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import {
+  ConfigurableFormModule,
   InspectionType,
   PermissionKey,
 } from "@prisma/client";
@@ -25,6 +27,7 @@ export default async function NewInspectionPage() {
     sites,
     users,
     checklistTemplates,
+    forms,
   ] = await Promise.all([
     prisma.site.findMany({
       where: {
@@ -85,6 +88,11 @@ export default async function NewInspectionPage() {
         },
       ],
     }),
+
+    getPublishedRuntimeForms(
+      organizationId,
+      ConfigurableFormModule.INSPECTION
+    ),
   ]);
 
   return (
@@ -115,9 +123,13 @@ export default async function NewInspectionPage() {
         </p>
       </div>
 
-      <form
-        action={createInspection}
-        className="mt-8 space-y-7 rounded-3xl border border-white/10 bg-white/5 p-7 shadow-2xl backdrop-blur-xl"
+      <InspectionCreateForm
+        forms={forms}
+        cancelHref="/inspections"
+        submitDisabled={
+          sites.length === 0
+        }
+        submitLabel="Create Inspection"
       >
         <div className="grid gap-5 md:grid-cols-2">
           <Field label="Inspection title">
@@ -311,25 +323,7 @@ export default async function NewInspectionPage() {
           </div>
         )}
 
-        <div className="flex flex-wrap justify-end gap-3 border-t border-white/10 pt-6">
-          <Link
-            href="/inspections"
-            className="rounded-2xl border border-white/10 px-5 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/5"
-          >
-            Cancel
-          </Link>
-
-          <button
-            type="submit"
-            disabled={
-              sites.length === 0
-            }
-            className="rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Create Inspection
-          </button>
-        </div>
-      </form>
+      </InspectionCreateForm>
     </div>
   );
 }

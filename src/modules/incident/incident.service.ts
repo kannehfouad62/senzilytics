@@ -8,6 +8,7 @@ import { startWorkflowForEntity } from "@/core/workflow/workflow.service";
 import { prisma } from "@/lib/prisma";
 import {
   ActivityAction,
+  ConfigurableFormModule,
   IncidentType,
   NotificationType,
   RiskLevel,
@@ -24,6 +25,10 @@ import {
   updateTenantIncidentStatus,
   upsertTenantInvestigation,
 } from "./incident.repository";
+import {
+  createPreparedSubmissions,
+  type PreparedSubmission,
+} from "@/modules/forms/runtime-form.service";
 
 type IncidentNotificationRecipient = {
   id: string;
@@ -296,6 +301,7 @@ export async function createIncidentService(input: {
   riskLevel: RiskLevel;
   siteId: string;
   location: string;
+  customSubmissions?: PreparedSubmission[];
 }) {
   const site = await prisma.site.findFirst({
     where: {
@@ -315,30 +321,70 @@ export async function createIncidentService(input: {
     );
   }
 
-  const incident = await createTenantIncident({
-    title: input.title,
-    description: input.description,
-    type: input.type,
-    riskLevel: input.riskLevel,
-    location: input.location,
-    siteId: input.siteId,
-    reportedById: input.userId,
-  });
+  const incident =
+    await prisma.$transaction(
+      async (tx) => {
+        const created =
+          await createTenantIncident(
+            {
+              title: input.title,
+              description:
+                input.description,
+              type: input.type,
+              riskLevel:
+                input.riskLevel,
+              location:
+                input.location,
+              siteId: input.siteId,
+              reportedById:
+                input.userId,
+            },
+            tx
+          );
 
-  await logActivity({
-    organizationId: input.organizationId,
-    userId: input.userId,
-    action: ActivityAction.CREATE,
-    entityType: "Incident",
-    entityId: incident.id,
-    title: "Incident created",
-    description: incident.title,
-    metadata: {
-      riskLevel: incident.riskLevel,
-      status: incident.status,
-      siteId: incident.siteId,
-    },
-  });
+        await createPreparedSubmissions(
+          tx,
+          {
+            organizationId:
+              input.organizationId,
+            userId: input.userId,
+            module:
+              ConfigurableFormModule.INCIDENT,
+            entityId: created.id,
+            submissions:
+              input.customSubmissions ??
+              [],
+          }
+        );
+
+        await tx.activityLog.create({
+          data: {
+            organizationId:
+              input.organizationId,
+            userId: input.userId,
+            action:
+              ActivityAction.CREATE,
+            entityType: "Incident",
+            entityId: created.id,
+            title:
+              "Incident created",
+            description:
+              created.title,
+            metadata: {
+              riskLevel:
+                created.riskLevel,
+              status: created.status,
+              siteId: created.siteId,
+              customFormCount:
+                input.customSubmissions
+                  ?.length ?? 0,
+            },
+          },
+        });
+
+        return created;
+      }
+    );
 
   try {
     await notifyIncidentCreated({
@@ -366,12 +412,21 @@ export async function createIncidentService(input: {
     );
   }
 
-  await startWorkflowForEntity({
-    organizationId: input.organizationId,
-    userId: input.userId,
-    entityType: WorkflowEntityType.INCIDENT,
-    entityId: incident.id,
-  });
+  try {
+    await startWorkflowForEntity({
+      organizationId:
+        input.organizationId,
+      userId: input.userId,
+      entityType:
+        WorkflowEntityType.INCIDENT,
+      entityId: incident.id,
+    });
+  } catch (error) {
+    console.error(
+      `Automatic workflow startup failed for incident ${incident.id}:`,
+      error
+    );
+  }
 
   return incident;
 }

@@ -7,6 +7,7 @@ import { MultiDocumentUpload } from "@/core/documents/multi-document-upload";
 import { ReplaceDocumentUpload } from "@/core/documents/replace-document-upload";
 import { ConfirmDocumentAction } from "@/core/documents/confirm-document-action";
 import { DocumentVersionHistory } from "@/core/documents/document-version-history";
+import { EntityCustomFormSubmissions } from "@/features/forms/entity-custom-form-submissions";
 import { IncidentInvestigationAssistant } from "@/features/incidents/incident-investigation-assistant";
 import { IncidentCapaRecommendationEngine } from "@/features/incidents/incident-capa-recommendation-engine";
 import { decideIncidentWorkflow } from "@/core/workflow/workflow.actions";
@@ -17,11 +18,15 @@ import {
   upsertInvestigation,
 } from "@/features/incidents/actions";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserPermissions } from "@/lib/permissions";
+import { hasSubscriptionFeature } from "@/lib/subscription";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import {
+  ConfigurableFormModule,
   DocumentCategory,
   DocumentEntityType,
   DocumentStatus,
+  PermissionKey,
   RiskLevel,
   Status,
   WorkflowDecision,
@@ -83,7 +88,13 @@ export default async function IncidentDetailPage({
     notFound();
   }
 
-  const [users, workflowInstance, documents] =
+  const [
+    users,
+    workflowInstance,
+    documents,
+    permissions,
+    documentUploadEnabled,
+  ] =
     await Promise.all([
       prisma.user.findMany({
         where: {
@@ -138,7 +149,23 @@ export default async function IncidentDetailPage({
           createdAt: "desc",
         },
       }),
+
+      getCurrentUserPermissions(),
+
+      hasSubscriptionFeature(
+        organizationId,
+        "DOCUMENT_UPLOAD"
+      ),
     ]);
+
+  const canUploadCustomFiles =
+    documentUploadEnabled &&
+    (permissions.includes(
+      PermissionKey.CREATE_INCIDENT
+    ) ||
+      permissions.includes(
+        PermissionKey.UPDATE_INCIDENT
+      ));
 
   const currentWorkflowStep =
     workflowInstance?.steps.find(
@@ -264,6 +291,21 @@ export default async function IncidentDetailPage({
           />
         </div>
       </section>
+
+      <EntityCustomFormSubmissions
+        organizationId={organizationId}
+        userId={currentUser.id}
+        module={
+          ConfigurableFormModule.INCIDENT
+        }
+        entityType={
+          DocumentEntityType.INCIDENT
+        }
+        entityId={incident.id}
+        canUpload={
+          canUploadCustomFiles
+        }
+      />
 
       {workflowInstance && (
         <section className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl">

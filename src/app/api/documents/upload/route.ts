@@ -4,8 +4,9 @@ import {
 } from "@/core/documents/document.service";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/permissions";
+import { getCurrentUserPermissions } from "@/lib/permissions";
 import {
+  ConfigurableFormModule,
   DocumentCategory,
   DocumentEntityType,
   DocumentStatus,
@@ -17,7 +18,11 @@ import {
 } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { requireSubscriptionFeature } from "@/lib/subscription";
-import { isRuntimeFieldVisible, runtimeRequiredFileIds } from "@/modules/forms/runtime-form.service";
+import {
+  configurableFormModuleForDocumentEntity,
+  isRuntimeFieldVisible,
+  runtimeRequiredFileIds,
+} from "@/modules/forms/runtime-form.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -395,13 +400,172 @@ async function validateRelatedEntity(input: {
 }
 
 async function validateCustomFormFileTarget(payload: UploadPayload) {
-  if (!payload.configurableSubmissionId && !payload.configurableFieldId) return;
-  if (!payload.configurableSubmissionId || !payload.configurableFieldId || payload.entityType !== DocumentEntityType.SAFETY_OBSERVATION) throw new Error("Custom-form file information is incomplete.");
-  const submission = await prisma.configurableFormSubmission.findFirst({ where: { id: payload.configurableSubmissionId, organizationId: payload.organizationId, entityType: "OBSERVATION", entityId: payload.entityId, version: { fields: { some: { id: payload.configurableFieldId, fieldType: "FILE" } } } }, include: { version: { include: { fields: { where: { id: payload.configurableFieldId } } } }, answers: { include: { field: true } }, fileAnswers: { where: { fieldId: payload.configurableFieldId }, select: { id: true } } } });
-  if (!submission) throw new Error("The custom-form attachment field is not valid for this observation.");
-  const targetField=submission.version.fields[0],values=new Map(submission.answers.map(answer=>[answer.field.key,answer.value]));
-  if(!targetField||!isRuntimeFieldVisible(targetField.visibilityRule,values))throw new Error("This custom-form attachment field is not applicable to the submitted answers.");
-  if (submission.fileAnswers.length) throw new Error("This custom-form attachment field already has a file.");
+  if (
+    !payload.configurableSubmissionId &&
+    !payload.configurableFieldId
+  ) {
+    return;
+  }
+
+  const formModule =
+    configurableFormModuleForDocumentEntity(
+      payload.entityType
+    );
+
+  if (
+    !payload.configurableSubmissionId ||
+    !payload.configurableFieldId ||
+    !formModule
+  ) {
+    throw new Error(
+      "Custom-form file information is incomplete."
+    );
+  }
+
+  const submission =
+    await prisma.configurableFormSubmission.findFirst(
+      {
+        where: {
+          id: payload.configurableSubmissionId,
+          organizationId:
+            payload.organizationId,
+          entityType: formModule,
+          entityId: payload.entityId,
+          version: {
+            fields: {
+              some: {
+                id: payload.configurableFieldId,
+                fieldType: "FILE",
+              },
+            },
+          },
+        },
+        include: {
+          version: {
+            include: {
+              fields: {
+                where: {
+                  id: payload.configurableFieldId,
+                },
+              },
+            },
+          },
+          answers: {
+            include: {
+              field: true,
+            },
+          },
+          fileAnswers: {
+            where: {
+              fieldId:
+                payload.configurableFieldId,
+            },
+            select: {
+              id: true,
+            },
+          },
+        },
+      }
+    );
+
+  if (!submission) {
+    throw new Error(
+      "The custom-form attachment field is not valid for this record."
+    );
+  }
+
+  const targetField =
+    submission.version.fields[0];
+  const values = new Map(
+    submission.answers.map(
+      (answer) => [
+        answer.field.key,
+        answer.value,
+      ]
+    )
+  );
+
+  if (
+    !targetField ||
+    !isRuntimeFieldVisible(
+      targetField.visibilityRule,
+      values
+    )
+  ) {
+    throw new Error(
+      "This custom-form attachment field is not applicable to the submitted answers."
+    );
+  }
+
+  if (
+    submission.fileAnswers.length
+  ) {
+    throw new Error(
+      "This custom-form attachment field already has a file."
+    );
+  }
+}
+
+async function requireDocumentUploadPermission(
+  payload: UploadPayload
+) {
+  const hasCustomFormTarget =
+    Boolean(
+      payload.configurableSubmissionId ||
+        payload.configurableFieldId
+    );
+
+  const permissions =
+    await getCurrentUserPermissions();
+
+  if (!hasCustomFormTarget) {
+    if (
+      !permissions.includes(
+        PermissionKey.MANAGE_DOCUMENTS
+      )
+    ) {
+      throw new Error(
+        "You do not have permission to upload documents."
+      );
+    }
+
+    return;
+  }
+
+  const formModule =
+    configurableFormModuleForDocumentEntity(
+      payload.entityType
+    );
+
+  const allowed =
+    formModule ===
+    ConfigurableFormModule.OBSERVATION
+      ? permissions.includes(
+          PermissionKey.CREATE_OBSERVATION
+        ) ||
+        permissions.includes(
+          PermissionKey.MANAGE_OBSERVATIONS
+        )
+      : formModule ===
+          ConfigurableFormModule.INCIDENT
+        ? permissions.includes(
+            PermissionKey.CREATE_INCIDENT
+          ) ||
+          permissions.includes(
+            PermissionKey.UPDATE_INCIDENT
+          )
+        : formModule ===
+            ConfigurableFormModule.INSPECTION
+          ? permissions.includes(
+              PermissionKey.MANAGE_INSPECTIONS
+            )
+          : false;
+
+  if (!allowed) {
+    throw new Error(
+      "You do not have permission to upload this custom-form attachment."
+    );
+  }
 }
 
 async function completeCustomFormFileTarget(payload: UploadPayload, documentId: string) {
@@ -469,7 +633,9 @@ export async function POST(request: Request) {
         }
 
         const payload = parseUploadPayload(clientPayload);
-        await requirePermission(payload.entityType === DocumentEntityType.SAFETY_OBSERVATION && payload.configurableSubmissionId && payload.configurableFieldId ? PermissionKey.CREATE_OBSERVATION : PermissionKey.MANAGE_DOCUMENTS);
+        await requireDocumentUploadPermission(
+          payload
+        );
 
         const currentUser = await prisma.user.findUnique({
           where: {

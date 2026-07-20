@@ -1,25 +1,253 @@
-import { CustomFormFileUpload } from "@/features/forms/custom-form-file-upload";
+import { EntityCustomFormSubmissions } from "@/features/forms/entity-custom-form-submissions";
 import { triageSafetyObservation } from "@/features/observations/actions";
-import { requirePermission } from "@/lib/permissions";
+import {
+  getCurrentUserPermissions,
+  requirePermission,
+} from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { hasSubscriptionFeature } from "@/lib/subscription";
 import { getCurrentUserTenant } from "@/lib/tenant";
-import { ConfigurableFieldType, ConfigurableFormModule, PermissionKey, SafetyObservationStatus } from "@prisma/client";
+import {
+  ConfigurableFormModule,
+  DocumentEntityType,
+  PermissionKey,
+  SafetyObservationStatus,
+} from "@prisma/client";
 import { notFound } from "next/navigation";
-import { isRuntimeFieldVisible } from "@/modules/forms/runtime-form.service";
 
-const input="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3";
-const displayValue=(value:unknown)=>Array.isArray(value)?value.join(", "):typeof value==="boolean"?(value?"Yes":"No"):String(value??"");
+const inputClassName =
+  "mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3";
 
-export default async function ObservationPage({params}:{params:Promise<{id:string}>}){
-  await requirePermission(PermissionKey.VIEW_OBSERVATIONS);
-  const[{id},{organizationId,user}]=await Promise.all([params,getCurrentUserTenant()]);
-  const[o,users,submissions,canUpload]=await Promise.all([
-    prisma.safetyObservation.findFirst({where:{id,organizationId},include:{site:true,reportedBy:true,assignedTo:true}}),
-    prisma.user.findMany({where:{organizationId},orderBy:{name:"asc"}}),
-    prisma.configurableFormSubmission.findMany({where:{organizationId,entityType:ConfigurableFormModule.OBSERVATION,entityId:id,status:{not:"VOIDED"}},include:{definition:true,version:{include:{fields:{orderBy:{sequence:"asc"}}}},answers:{include:{field:true},orderBy:{field:{sequence:"asc"}}},fileAnswers:{include:{document:true}}},orderBy:{submittedAt:"asc"}}),
-    hasSubscriptionFeature(organizationId,"DOCUMENT_UPLOAD"),
+export default async function ObservationPage({
+  params,
+}: {
+  params: Promise<{
+    id: string;
+  }>;
+}) {
+  await requirePermission(
+    PermissionKey.VIEW_OBSERVATIONS
+  );
+
+  const [{ id }, { organizationId, user }] =
+    await Promise.all([
+      params,
+      getCurrentUserTenant(),
+    ]);
+
+  const [
+    observation,
+    users,
+    documentUploadEnabled,
+    permissions,
+  ] = await Promise.all([
+    prisma.safetyObservation.findFirst({
+      where: {
+        id,
+        organizationId,
+      },
+      include: {
+        site: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+    }),
+    prisma.user.findMany({
+      where: {
+        organizationId,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    }),
+    hasSubscriptionFeature(
+      organizationId,
+      "DOCUMENT_UPLOAD"
+    ),
+    getCurrentUserPermissions(),
   ]);
-  if(!o)notFound();
-  return <div><p className="text-sm text-cyan-300">{o.reference}</p><h1 className="mt-2 text-4xl font-bold">{o.title}</h1><div className="mt-8 grid gap-6 lg:grid-cols-2"><div className="space-y-6"><section className="rounded-3xl border border-white/10 bg-white/5 p-6"><p className="whitespace-pre-wrap text-slate-300">{o.description}</p><dl className="mt-6 space-y-3 text-sm"><div>Type: {o.type.replaceAll("_"," ")}</div><div>Risk: {o.riskLevel}</div><div>Site: {o.site.name}</div><div>Reporter: {o.isAnonymous?"Anonymous":o.reportedBy.name}</div><div>Immediate action: {o.immediateAction||"None recorded"}</div><div>Follow-up due: {o.followUpDueDate?o.followUpDueDate.toLocaleDateString():"Not set"}</div></dl></section>{submissions.map(submission=>{const values=new Map(submission.answers.map(answer=>[answer.field.key,answer.value]));const fileFields=submission.version.fields.filter(field=>field.fieldType===ConfigurableFieldType.FILE&&isRuntimeFieldVisible(field.visibilityRule,values));return <section key={submission.id} className="rounded-3xl border border-cyan-400/20 bg-cyan-400/5 p-6"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-cyan-300">Custom form · Version {submission.version.version}</p><h2 className="mt-2 text-xl font-semibold">{submission.definition.name}</h2></div><span className={`rounded-full px-3 py-1 text-xs ${submission.status==="SUBMITTED"?"bg-emerald-400/10 text-emerald-300":"bg-amber-400/10 text-amber-300"}`}>{submission.status==="SUBMITTED"?"Complete":"Attachments required"}</span></div><dl className="mt-5 space-y-3">{submission.answers.map(answer=><div key={answer.id} className="rounded-xl bg-slate-950/40 p-3"><dt className="text-xs text-slate-500">{answer.field.label}</dt><dd className="mt-1 text-sm text-white">{displayValue(answer.value)}</dd></div>)}</dl>{fileFields.length>0&&<div className="mt-5 space-y-3"><p className="text-sm font-semibold">Private attachments</p>{fileFields.map(field=>{const linked=submission.fileAnswers.find(answer=>answer.fieldId===field.id);return linked?<a key={field.id} href={`/api/documents/${linked.document.id}/download`} className="block rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{field.label}: {linked.document.originalName}</a>:canUpload?<CustomFormFileUpload key={field.id} organizationId={organizationId} userId={user.id} observationId={o.id} submissionId={submission.id} fieldId={field.id} label={field.label} required={field.isRequired}/>:<p key={field.id} className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-xs text-amber-200">{field.label}: Document uploads are not included in this subscription.</p>})}</div>}<p className="mt-4 text-xs text-slate-500">Captured {submission.submittedAt.toLocaleString()}</p></section>})}</div><form action={triageSafetyObservation} className="h-fit rounded-3xl border border-white/10 bg-white/5 p-6"><input type="hidden" name="id" value={o.id}/><h2 className="text-xl font-semibold">Triage</h2><label className="mt-5 block">Status<select name="status" defaultValue={o.status} className={input}>{Object.values(SafetyObservationStatus).map(x=><option key={x}>{x}</option>)}</select></label><label className="mt-5 block">Assignee<select name="assignedToId" defaultValue={o.assignedToId||""} className={input}><option value="">Unassigned</option>{users.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label className="mt-5 block">Follow-up due date<input type="date" name="followUpDueDate" defaultValue={o.followUpDueDate?.toISOString().slice(0,10)||""} className={input}/></label><label className="mt-5 block">Review notes<textarea name="reviewNotes" defaultValue={o.reviewNotes||""} rows={5} className={input}/></label><button className="mt-5 rounded-xl bg-cyan-300 px-5 py-3 font-semibold text-slate-950">Save Triage</button></form></div></div>;
+
+  if (!observation) {
+    notFound();
+  }
+
+  const canUpload =
+    documentUploadEnabled &&
+    (permissions.includes(
+      PermissionKey.CREATE_OBSERVATION
+    ) ||
+      permissions.includes(
+        PermissionKey.MANAGE_OBSERVATIONS
+      ));
+
+  return (
+    <div>
+      <p className="text-sm text-cyan-300">
+        {observation.reference}
+      </p>
+
+      <h1 className="mt-2 text-4xl font-bold">
+        {observation.title}
+      </h1>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
+            <p className="whitespace-pre-wrap text-slate-300">
+              {observation.description}
+            </p>
+
+            <dl className="mt-6 space-y-3 text-sm">
+              <div>
+                Type: {" "}
+                {observation.type.replaceAll(
+                  "_",
+                  " "
+                )}
+              </div>
+              <div>
+                Risk: {" "}
+                {observation.riskLevel}
+              </div>
+              <div>
+                Site: {" "}
+                {observation.site.name}
+              </div>
+              <div>
+                Reporter: {" "}
+                {observation.isAnonymous
+                  ? "Anonymous"
+                  : observation
+                      .reportedBy.name}
+              </div>
+              <div>
+                Immediate action: {" "}
+                {observation.immediateAction ||
+                  "None recorded"}
+              </div>
+              <div>
+                Follow-up due: {" "}
+                {observation.followUpDueDate
+                  ? observation.followUpDueDate.toLocaleDateString()
+                  : "Not set"}
+              </div>
+            </dl>
+          </section>
+
+          <EntityCustomFormSubmissions
+            organizationId={
+              organizationId
+            }
+            userId={user.id}
+            module={
+              ConfigurableFormModule.OBSERVATION
+            }
+            entityType={
+              DocumentEntityType.SAFETY_OBSERVATION
+            }
+            entityId={observation.id}
+            canUpload={canUpload}
+            className="space-y-6"
+          />
+        </div>
+
+        <form
+          action={triageSafetyObservation}
+          className="h-fit rounded-3xl border border-white/10 bg-white/5 p-6"
+        >
+          <input
+            type="hidden"
+            name="id"
+            value={observation.id}
+          />
+
+          <h2 className="text-xl font-semibold">
+            Triage
+          </h2>
+
+          <label className="mt-5 block">
+            Status
+            <select
+              name="status"
+              defaultValue={
+                observation.status
+              }
+              className={
+                inputClassName
+              }
+            >
+              {Object.values(
+                SafetyObservationStatus
+              ).map((status) => (
+                <option key={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="mt-5 block">
+            Assignee
+            <select
+              name="assignedToId"
+              defaultValue={
+                observation.assignedToId ||
+                ""
+              }
+              className={
+                inputClassName
+              }
+            >
+              <option value="">
+                Unassigned
+              </option>
+              {users.map((item) => (
+                <option
+                  key={item.id}
+                  value={item.id}
+                >
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="mt-5 block">
+            Follow-up due date
+            <input
+              type="date"
+              name="followUpDueDate"
+              defaultValue={
+                observation.followUpDueDate
+                  ?.toISOString()
+                  .slice(0, 10) || ""
+              }
+              className={
+                inputClassName
+              }
+            />
+          </label>
+
+          <label className="mt-5 block">
+            Review notes
+            <textarea
+              name="reviewNotes"
+              defaultValue={
+                observation.reviewNotes ||
+                ""
+              }
+              rows={5}
+              className={
+                inputClassName
+              }
+            />
+          </label>
+
+          <button className="mt-5 rounded-xl bg-cyan-300 px-5 py-3 font-semibold text-slate-950">
+            Save Triage
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 }

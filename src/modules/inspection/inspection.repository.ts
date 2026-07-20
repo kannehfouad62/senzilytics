@@ -4,7 +4,10 @@ import {
   InspectionType,
   RiskLevel,
   Status,
+  Prisma,
 } from "@prisma/client";
+
+type InspectionWriteDb=Pick<Prisma.TransactionClient,"inspection"|"inspectionChecklistTemplate"|"inspectionChecklistItem"|"inspectionTeamMember">;
 
 export async function findTenantInspections(
   organizationId: string
@@ -196,8 +199,8 @@ export async function createTenantInspection(input: {
   dueDate?: Date | null;
   leadInspectorId?: string | null;
   checklistTemplateId?: string | null;
-}) {
-  return prisma.inspection.create({
+},db:InspectionWriteDb=prisma) {
+  return db.inspection.create({
     data: {
       title: input.title,
       reference: input.reference,
@@ -219,9 +222,9 @@ export async function createTenantInspection(input: {
 export async function createInspectionChecklistSnapshot(input: {
   inspectionId: string;
   checklistTemplateId: string;
-}) {
+},db:InspectionWriteDb=prisma) {
   const template =
-    await prisma.inspectionChecklistTemplate.findUnique({
+    await db.inspectionChecklistTemplate.findUnique({
       where: {
         id: input.checklistTemplateId,
       },
@@ -276,7 +279,7 @@ export async function createInspectionChecklistSnapshot(input: {
     };
   }
 
-  return prisma.inspectionChecklistItem.createMany({
+  return db.inspectionChecklistItem.createMany({
     data: checklistItems.map(
       (item, index) => ({
         inspectionId:
@@ -305,8 +308,8 @@ export async function addTenantInspectionTeamMember(input: {
   inspectionId: string;
   userId: string;
   role: InspectionTeamRole;
-}) {
-  return prisma.inspectionTeamMember.upsert({
+},db:InspectionWriteDb=prisma) {
+  return db.inspectionTeamMember.upsert({
     where: {
       inspectionId_userId: {
         inspectionId:

@@ -18,9 +18,11 @@ import {
   RiskLevel,
   Status,
   PermissionKey,
+  ConfigurableFormModule,
 } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/permissions";
+import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
 
 function getRequiredString(
   formData: FormData,
@@ -94,63 +96,95 @@ function isStatus(
   ).includes(value as Status);
 }
 
+export type IncidentCreateState = {
+  error: string | null;
+};
+
 export async function createIncident(
+  _state: IncidentCreateState,
   formData: FormData
-) {
+): Promise<IncidentCreateState> {
   await requirePermission(PermissionKey.CREATE_INCIDENT);
   const {
     organizationId,
     user,
   } = await getCurrentUserTenant();
 
-  const typeValue = getRequiredString(
-    formData,
-    "type"
-  );
+  let incidentId: string;
 
-  const riskLevelValue =
-    getRequiredString(
+  try {
+    const typeValue = getRequiredString(
       formData,
-      "riskLevel"
+      "type"
     );
 
-  if (!isIncidentType(typeValue)) {
-    throw new Error(
-      "A valid incident type is required."
-    );
-  }
-
-  if (!isRiskLevel(riskLevelValue)) {
-    throw new Error(
-      "A valid risk level is required."
-    );
-  }
-
-  await createIncidentService({
-    organizationId,
-    userId: user.id,
-    title: getRequiredString(
-      formData,
-      "title"
-    ),
-    description: getRequiredString(
-      formData,
-      "description"
-    ),
-    type: typeValue,
-    riskLevel: riskLevelValue,
-    siteId: getRequiredString(
-      formData,
-      "siteId"
-    ),
-    location:
-      getOptionalString(
+    const riskLevelValue =
+      getRequiredString(
         formData,
-        "location"
-      ) || "",
-  });
+        "riskLevel"
+      );
 
-  redirect("/incidents");
+    if (!isIncidentType(typeValue)) {
+      throw new Error(
+        "A valid incident type is required."
+      );
+    }
+
+    if (!isRiskLevel(riskLevelValue)) {
+      throw new Error(
+        "A valid risk level is required."
+      );
+    }
+
+    const customSubmissions =
+      await preparePublishedFormSubmissions({
+        organizationId,
+        module:
+          ConfigurableFormModule.INCIDENT,
+        data: formData,
+      });
+
+    const incident =
+      await createIncidentService({
+        organizationId,
+        userId: user.id,
+        title: getRequiredString(
+          formData,
+          "title"
+        ),
+        description:
+          getRequiredString(
+            formData,
+            "description"
+          ),
+        type: typeValue,
+        riskLevel:
+          riskLevelValue,
+        siteId: getRequiredString(
+          formData,
+          "siteId"
+        ),
+        location:
+          getOptionalString(
+            formData,
+            "location"
+          ) || "",
+        customSubmissions,
+      });
+
+    incidentId = incident.id;
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "The incident could not be submitted.",
+    };
+  }
+
+  redirect(
+    `/incidents/${incidentId}`
+  );
 }
 
 export async function createCorrectiveAction(

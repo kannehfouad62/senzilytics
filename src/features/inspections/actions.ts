@@ -1,6 +1,7 @@
 "use server";
 
 import { requirePermission } from "@/lib/permissions";
+import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import {
   addInspectionTeamMemberService,
@@ -11,6 +12,7 @@ import {
   updateInspectionStatusService,
 } from "@/modules/inspection/inspection.service";
 import {
+  ConfigurableFormModule,
   InspectionTeamRole,
   InspectionType,
   PermissionKey,
@@ -115,9 +117,14 @@ function isStatus(
   ).includes(value as Status);
 }
 
+export type InspectionCreateState = {
+  error: string | null;
+};
+
 export async function createInspection(
+  _state: InspectionCreateState,
   formData: FormData
-) {
+): Promise<InspectionCreateState> {
   await requirePermission(
     PermissionKey.MANAGE_INSPECTIONS
   );
@@ -127,76 +134,98 @@ export async function createInspection(
     user,
   } = await getCurrentUserTenant();
 
-  const inspectionType =
-    getRequiredString(
-      formData,
-      "type"
-    );
+  let inspectionId: string;
 
-  if (
-    !isInspectionType(
-      inspectionType
-    )
-  ) {
-    throw new Error(
-      "A valid inspection type is required."
-    );
+  try {
+    const inspectionType =
+      getRequiredString(
+        formData,
+        "type"
+      );
+
+    if (
+      !isInspectionType(
+        inspectionType
+      )
+    ) {
+      throw new Error(
+        "A valid inspection type is required."
+      );
+    }
+
+    const customSubmissions =
+      await preparePublishedFormSubmissions({
+        organizationId,
+        module:
+          ConfigurableFormModule.INSPECTION,
+        data: formData,
+      });
+
+    const inspection =
+      await createInspectionService({
+        organizationId,
+        userId: user.id,
+        title:
+          getRequiredString(
+            formData,
+            "title"
+          ),
+        reference:
+          getOptionalString(
+            formData,
+            "reference"
+          ),
+        description:
+          getOptionalString(
+            formData,
+            "description"
+          ),
+        area:
+          getOptionalString(
+            formData,
+            "area"
+          ),
+        type: inspectionType,
+        siteId:
+          getRequiredString(
+            formData,
+            "siteId"
+          ),
+        scheduledAt:
+          getOptionalDate(
+            formData,
+            "scheduledAt"
+          ),
+        dueDate:
+          getOptionalDate(
+            formData,
+            "dueDate"
+          ),
+        leadInspectorId:
+          getOptionalString(
+            formData,
+            "leadInspectorId"
+          ),
+        checklistTemplateId:
+          getOptionalString(
+            formData,
+            "checklistTemplateId"
+          ),
+        customSubmissions,
+      });
+
+    inspectionId = inspection.id;
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "The inspection could not be created.",
+    };
   }
 
-  const inspection =
-    await createInspectionService({
-      organizationId,
-      userId: user.id,
-      title:
-        getRequiredString(
-          formData,
-          "title"
-        ),
-      reference:
-        getOptionalString(
-          formData,
-          "reference"
-        ),
-      description:
-        getOptionalString(
-          formData,
-          "description"
-        ),
-      area:
-        getOptionalString(
-          formData,
-          "area"
-        ),
-      type: inspectionType,
-      siteId:
-        getRequiredString(
-          formData,
-          "siteId"
-        ),
-      scheduledAt:
-        getOptionalDate(
-          formData,
-          "scheduledAt"
-        ),
-      dueDate:
-        getOptionalDate(
-          formData,
-          "dueDate"
-        ),
-      leadInspectorId:
-        getOptionalString(
-          formData,
-          "leadInspectorId"
-        ),
-      checklistTemplateId:
-        getOptionalString(
-          formData,
-          "checklistTemplateId"
-        ),
-    });
-
   redirect(
-    `/inspections/${inspection.id}`
+    `/inspections/${inspectionId}`
   );
 }
 
