@@ -45,8 +45,11 @@ export async function triageSafetyObservation(data: FormData) {
   if (!Object.values(SafetyObservationStatus).includes(status)) throw new Error("Select a valid status.");
   const assignedToId = optional(data, "assignedToId");
   if (assignedToId && !(await prisma.user.findFirst({ where: { id: assignedToId, organizationId } }))) throw new Error("Select a valid assignee.");
+  const dueDateValue = optional(data, "followUpDueDate");
+  const followUpDueDate = dueDateValue ? new Date(`${dueDateValue}T23:59:59.999Z`) : null;
+  if (followUpDueDate && Number.isNaN(followUpDueDate.getTime())) throw new Error("Enter a valid follow-up due date.");
   const result = await prisma.safetyObservation.updateMany({ where: { id, organizationId }, data: {
-    status, assignedToId, reviewNotes: optional(data, "reviewNotes"),
+    status, assignedToId, followUpDueDate, reviewNotes: optional(data, "reviewNotes"),
     resolvedAt: status === SafetyObservationStatus.RESOLVED || status === SafetyObservationStatus.CLOSED ? new Date() : null,
   }});
   if (!result.count) throw new Error("Observation not found.");

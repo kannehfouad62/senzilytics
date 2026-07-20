@@ -842,18 +842,18 @@ enum EnterpriseAuditHistoryAction {
 }
 
 model Organization {
-  id                  String             @id @default(cuid())
-  name                String
-  industry            String?
-  address             String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  status              OrganizationStatus @default(ACTIVE)
-  allowedEmailDomains String[]
-  isDemo              Boolean            @default(false)
-  subscriptionPlan    SubscriptionPlan   @default(PREMIUM)
+  id                    String             @id @default(cuid())
+  name                  String
+  industry              String?
+  address               String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  status                OrganizationStatus @default(ACTIVE)
+  allowedEmailDomains   String[]
+  isDemo                Boolean            @default(false)
+  subscriptionPlan      SubscriptionPlan   @default(PREMIUM)
   contractedUserMinimum Int?
-  subscriptionNotes   String?
+  subscriptionNotes     String?
 
   sites                        Site[]
   users                        User[]
@@ -879,41 +879,41 @@ model Organization {
 
   enterpriseAuditFindingsV2 EnterpriseAuditFinding[] @relation("EnterpriseAuditFindingOrganization")
 
-  enterpriseAuditHistoryV2 EnterpriseAuditHistory[]        @relation("EnterpriseAuditHistoryOrganization")
-  safetyObservations       SafetyObservation[]
-  trainingCourses          TrainingCourse[]
-  trainingRequirements     TrainingRequirement[]
-  permits                  Permit[]
-  chemicals                Chemical[]
-  environmentalMetrics     EnvironmentalMetricDefinition[]
-  environmentalTargets     EnvironmentalTarget[]
-  esgFrameworks            EsgFramework[]
-  esgMetrics               EsgMetricDefinition[]
-  esgDisclosurePeriods     EsgDisclosurePeriod[]
-  esgInitiatives           EsgInitiative[]
-  jobSafetyAnalyses        JobSafetyAnalysis[]
-  identityProviders        OrganizationIdentityProvider[]
-  tenantInvitations        TenantInvitation[]
-  demoLeads                DemoLead[]
-  complianceCalendarTasks  ComplianceCalendarTask[]
+  enterpriseAuditHistoryV2      EnterpriseAuditHistory[]        @relation("EnterpriseAuditHistoryOrganization")
+  safetyObservations            SafetyObservation[]
+  trainingCourses               TrainingCourse[]
+  trainingRequirements          TrainingRequirement[]
+  permits                       Permit[]
+  chemicals                     Chemical[]
+  environmentalMetrics          EnvironmentalMetricDefinition[]
+  environmentalTargets          EnvironmentalTarget[]
+  esgFrameworks                 EsgFramework[]
+  esgMetrics                    EsgMetricDefinition[]
+  esgDisclosurePeriods          EsgDisclosurePeriod[]
+  esgInitiatives                EsgInitiative[]
+  jobSafetyAnalyses             JobSafetyAnalysis[]
+  identityProviders             OrganizationIdentityProvider[]
+  tenantInvitations             TenantInvitation[]
+  demoLeads                     DemoLead[]
+  complianceCalendarTasks       ComplianceCalendarTask[]
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
-  offlineSubmissions         OfflineSubmission[]
-  pricingInquiries           PricingInquiry[]
+  offlineSubmissions            OfflineSubmission[]
+  pricingInquiries              PricingInquiry[]
 }
 
 model PricingInquiry {
-  id             String           @id @default(cuid())
-  fullName       String
-  company        String
-  jobTitle       String
-  workEmail      String
-  phoneNumber    String?
-  country        String
-  requestedPlan  SubscriptionPlan
-  createdAt      DateTime         @default(now())
+  id            String           @id @default(cuid())
+  fullName      String
+  company       String
+  jobTitle      String
+  workEmail     String
+  phoneNumber   String?
+  country       String
+  requestedPlan SubscriptionPlan
+  createdAt     DateTime         @default(now())
 
   organizationId String?
-  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@index([workEmail, createdAt])
   @@index([requestedPlan, createdAt])
@@ -942,15 +942,15 @@ model Site {
 
   auditProgramScopesV2 AuditProgramSite[] @relation("AuditProgramSiteScope")
 
-  auditSchedulesV2     AuditSchedule[]          @relation("AuditScheduleSite")
-  enterpriseAuditsV2   EnterpriseAudit[]        @relation("EnterpriseAuditSite")
-  safetyObservations   SafetyObservation[]
-  trainingRequirements TrainingRequirement[]
-  jobSafetyAnalyses    JobSafetyAnalysis[]
-  permits              Permit[]
-  chemicalInventories  ChemicalInventory[]
-  environmentalData    EnvironmentalDataPoint[]
-  complianceCalendarTasks ComplianceCalendarTask[]
+  auditSchedulesV2              AuditSchedule[]                @relation("AuditScheduleSite")
+  enterpriseAuditsV2            EnterpriseAudit[]              @relation("EnterpriseAuditSite")
+  safetyObservations            SafetyObservation[]
+  trainingRequirements          TrainingRequirement[]
+  jobSafetyAnalyses             JobSafetyAnalysis[]
+  permits                       Permit[]
+  chemicalInventories           ChemicalInventory[]
+  environmentalData             EnvironmentalDataPoint[]
+  complianceCalendarTasks       ComplianceCalendarTask[]
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
 }
 
@@ -966,11 +966,11 @@ model Department {
 
   auditProgramScopesV2 AuditProgramDepartment[] @relation("AuditProgramDepartmentScope")
 
-  auditSchedulesV2     AuditSchedule[]       @relation("AuditScheduleDepartment")
-  enterpriseAuditsV2   EnterpriseAudit[]     @relation("EnterpriseAuditDepartment")
-  safetyObservations   SafetyObservation[]
-  trainingRequirements TrainingRequirement[]
-  complianceCalendarTasks ComplianceCalendarTask[]
+  auditSchedulesV2              AuditSchedule[]                @relation("AuditScheduleDepartment")
+  enterpriseAuditsV2            EnterpriseAudit[]              @relation("EnterpriseAuditDepartment")
+  safetyObservations            SafetyObservation[]
+  trainingRequirements          TrainingRequirement[]
+  complianceCalendarTasks       ComplianceCalendarTask[]
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
 
   createdAt         DateTime            @default(now())
@@ -1000,46 +1000,46 @@ model User {
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
-  reportedIncidents         Incident[]                  @relation("ReportedIncidents")
-  assignedInvestigations    Investigation[]             @relation("InvestigationAssignedUser")
-  assignedActions           CorrectiveAction[]
-  leadAudits                Audit[]                     @relation("AuditLeadAuditor")
-  auditTeamMemberships      AuditTeamMember[]
-  auditResponses            AuditResponse[]             @relation("AuditResponseAnsweredBy")
-  leadInspections           Inspection[]                @relation("InspectionLeadInspector")
-  inspectionTeamMemberships InspectionTeamMember[]
-  inspectionResponses       InspectionResponse[]        @relation("InspectionResponseAnsweredBy")
-  trainingRecords           TrainingRecord[]            @relation("TrainingRecordLearner")
-  assignedTrainingRecords   TrainingRecord[]            @relation("TrainingRecordAssignedBy")
-  createdTrainingCourses    TrainingCourse[]            @relation("TrainingCourseCreatedBy")
-  ownedComplianceItems      ComplianceItem[]            @relation("ComplianceItemOwner")
-  ownedPermits              Permit[]                    @relation("PermitOwner")
-  complianceEvaluations     ComplianceEvaluation[]      @relation("ComplianceEvaluationUser")
-  reviewedChemicals         Chemical[]                  @relation("ChemicalReviewedBy")
-  enteredEnvironmentalData  EnvironmentalDataPoint[]    @relation("EnvironmentalDataEnteredBy")
-  approvedEnvironmentalData EnvironmentalDataPoint[]    @relation("EnvironmentalDataApprovedBy")
-  environmentalRevisions    EnvironmentalDataRevision[] @relation("EnvironmentalRevisionChangedBy")
-  enteredEsgData            EsgDataPoint[]              @relation("EsgDataEnteredBy")
-  approvedEsgPeriods        EsgDisclosurePeriod[]       @relation("EsgPeriodApprovedBy")
-  publishedEsgPeriods       EsgDisclosurePeriod[]       @relation("EsgPeriodPublishedBy")
-  ownedEsgInitiatives       EsgInitiative[]             @relation("EsgInitiativeOwner")
-  createdJsas               JobSafetyAnalysis[]         @relation("JsaCreatedBy")
-  ownedJsas                 JobSafetyAnalysis[]         @relation("JsaOwner")
-  approvedJsas              JobSafetyAnalysis[]         @relation("JsaApprovedBy")
-  jsaAcknowledgments        JsaAcknowledgment[]
-  activityLogs              ActivityLog[]
-  notifications             Notification[]
-  uploadedDocuments         Document[]
-  sentTenantInvitations     TenantInvitation[]          @relation("TenantInvitationSender")
-  acceptedTenantInvitations TenantInvitation[]          @relation("TenantInvitationAcceptor")
-  passwordResetTokens       PasswordResetToken[]
-  demoLead                  DemoLead?
-  ownedComplianceCalendarTasks ComplianceCalendarTask[] @relation("ComplianceCalendarTaskOwner")
-  escalatedComplianceCalendarTasks ComplianceCalendarTask[] @relation("ComplianceCalendarTaskEscalation")
-  assignedComplianceOccurrences ComplianceCalendarOccurrence[] @relation("ComplianceCalendarOccurrenceAssignee")
-  completedComplianceOccurrences ComplianceCalendarOccurrence[] @relation("ComplianceCalendarOccurrenceCompleter")
-  reviewedComplianceOccurrences ComplianceCalendarOccurrence[] @relation("ComplianceCalendarOccurrenceReviewer")
-  offlineSubmissions OfflineSubmission[]
+  reportedIncidents                Incident[]                     @relation("ReportedIncidents")
+  assignedInvestigations           Investigation[]                @relation("InvestigationAssignedUser")
+  assignedActions                  CorrectiveAction[]
+  leadAudits                       Audit[]                        @relation("AuditLeadAuditor")
+  auditTeamMemberships             AuditTeamMember[]
+  auditResponses                   AuditResponse[]                @relation("AuditResponseAnsweredBy")
+  leadInspections                  Inspection[]                   @relation("InspectionLeadInspector")
+  inspectionTeamMemberships        InspectionTeamMember[]
+  inspectionResponses              InspectionResponse[]           @relation("InspectionResponseAnsweredBy")
+  trainingRecords                  TrainingRecord[]               @relation("TrainingRecordLearner")
+  assignedTrainingRecords          TrainingRecord[]               @relation("TrainingRecordAssignedBy")
+  createdTrainingCourses           TrainingCourse[]               @relation("TrainingCourseCreatedBy")
+  ownedComplianceItems             ComplianceItem[]               @relation("ComplianceItemOwner")
+  ownedPermits                     Permit[]                       @relation("PermitOwner")
+  complianceEvaluations            ComplianceEvaluation[]         @relation("ComplianceEvaluationUser")
+  reviewedChemicals                Chemical[]                     @relation("ChemicalReviewedBy")
+  enteredEnvironmentalData         EnvironmentalDataPoint[]       @relation("EnvironmentalDataEnteredBy")
+  approvedEnvironmentalData        EnvironmentalDataPoint[]       @relation("EnvironmentalDataApprovedBy")
+  environmentalRevisions           EnvironmentalDataRevision[]    @relation("EnvironmentalRevisionChangedBy")
+  enteredEsgData                   EsgDataPoint[]                 @relation("EsgDataEnteredBy")
+  approvedEsgPeriods               EsgDisclosurePeriod[]          @relation("EsgPeriodApprovedBy")
+  publishedEsgPeriods              EsgDisclosurePeriod[]          @relation("EsgPeriodPublishedBy")
+  ownedEsgInitiatives              EsgInitiative[]                @relation("EsgInitiativeOwner")
+  createdJsas                      JobSafetyAnalysis[]            @relation("JsaCreatedBy")
+  ownedJsas                        JobSafetyAnalysis[]            @relation("JsaOwner")
+  approvedJsas                     JobSafetyAnalysis[]            @relation("JsaApprovedBy")
+  jsaAcknowledgments               JsaAcknowledgment[]
+  activityLogs                     ActivityLog[]
+  notifications                    Notification[]
+  uploadedDocuments                Document[]
+  sentTenantInvitations            TenantInvitation[]             @relation("TenantInvitationSender")
+  acceptedTenantInvitations        TenantInvitation[]             @relation("TenantInvitationAcceptor")
+  passwordResetTokens              PasswordResetToken[]
+  demoLead                         DemoLead?
+  ownedComplianceCalendarTasks     ComplianceCalendarTask[]       @relation("ComplianceCalendarTaskOwner")
+  escalatedComplianceCalendarTasks ComplianceCalendarTask[]       @relation("ComplianceCalendarTaskEscalation")
+  assignedComplianceOccurrences    ComplianceCalendarOccurrence[] @relation("ComplianceCalendarOccurrenceAssignee")
+  completedComplianceOccurrences   ComplianceCalendarOccurrence[] @relation("ComplianceCalendarOccurrenceCompleter")
+  reviewedComplianceOccurrences    ComplianceCalendarOccurrence[] @relation("ComplianceCalendarOccurrenceReviewer")
+  offlineSubmissions               OfflineSubmission[]
 
   ownedRisks           Risk[]        @relation("RiskOwner")
   ownedRiskControls    RiskControl[] @relation("RiskControlOwner")
@@ -1108,23 +1108,23 @@ model User {
 }
 
 model DemoLead {
-  id            String   @id @default(cuid())
-  name          String
-  workEmail     String
-  company       String
-  jobTitle      String?
-  country       String
-  topicUpdatesConsent Boolean @default(false)
-  productContactConsent Boolean @default(false)
-  consentedAt   DateTime
-  expiresAt     DateTime
-  createdAt     DateTime @default(now())
-  lastActiveAt  DateTime @default(now())
+  id                    String   @id @default(cuid())
+  name                  String
+  workEmail             String
+  company               String
+  jobTitle              String?
+  country               String
+  topicUpdatesConsent   Boolean  @default(false)
+  productContactConsent Boolean  @default(false)
+  consentedAt           DateTime
+  expiresAt             DateTime
+  createdAt             DateTime @default(now())
+  lastActiveAt          DateTime @default(now())
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId          String       @unique
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String       @unique
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([workEmail, createdAt])
   @@index([organizationId, expiresAt])
@@ -1221,18 +1221,19 @@ model SafetyObservation {
   reviewNotes     String?
   resolvedAt      DateTime?
 
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  siteId         String
-  site           Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  departmentId   String?
-  department     Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  reportedById   String
-  reportedBy     User         @relation("SafetyObservationReporter", fields: [reportedById], references: [id])
-  assignedToId   String?
-  assignedTo     User?        @relation("SafetyObservationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  incidentId     String?
-  incident       Incident?    @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  siteId          String
+  site            Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId    String?
+  department      Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  reportedById    String
+  reportedBy      User         @relation("SafetyObservationReporter", fields: [reportedById], references: [id])
+  assignedToId    String?
+  assignedTo      User?        @relation("SafetyObservationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  followUpDueDate DateTime?
+  incidentId      String?
+  incident        Incident?    @relation(fields: [incidentId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1241,6 +1242,7 @@ model SafetyObservation {
   @@index([organizationId, status])
   @@index([siteId, observedAt])
   @@index([assignedToId, status])
+  @@index([organizationId, followUpDueDate])
 }
 
 model Investigation {
@@ -2722,36 +2724,36 @@ model ComplianceEvaluation {
 }
 
 model ComplianceCalendarTask {
-  id                    String                       @id @default(cuid())
-  organizationId        String
-  organization          Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  siteId                String
-  site                  Site                         @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  departmentId          String?
-  department            Department?                  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  ownerId               String
-  owner                 User                         @relation("ComplianceCalendarTaskOwner", fields: [ownerId], references: [id])
-  escalationOwnerId     String?
-  escalationOwner       User?                        @relation("ComplianceCalendarTaskEscalation", fields: [escalationOwnerId], references: [id], onDelete: SetNull)
-  title                 String
-  description           String?
-  instructions          String?
-  category              String
-  regulatoryReference   String?
-  evidenceRequired      Boolean                      @default(false)
-  approvalRequired      Boolean                      @default(false)
-  recurrence            ComplianceRecurrence
-  intervalValue         Int                          @default(1)
-  startDate             DateTime
-  endDate               DateTime?
-  dueTime               String?
-  reminderDaysBefore    Int                          @default(7)
-  escalationDaysAfter   Int                          @default(1)
-  status                ComplianceCalendarTaskStatus @default(ACTIVE)
-  nextOccurrenceAt      DateTime?
-  occurrences           ComplianceCalendarOccurrence[]
-  createdAt             DateTime                     @default(now())
-  updatedAt             DateTime                     @updatedAt
+  id                  String                         @id @default(cuid())
+  organizationId      String
+  organization        Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  siteId              String
+  site                Site                           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId        String?
+  department          Department?                    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  ownerId             String
+  owner               User                           @relation("ComplianceCalendarTaskOwner", fields: [ownerId], references: [id])
+  escalationOwnerId   String?
+  escalationOwner     User?                          @relation("ComplianceCalendarTaskEscalation", fields: [escalationOwnerId], references: [id], onDelete: SetNull)
+  title               String
+  description         String?
+  instructions        String?
+  category            String
+  regulatoryReference String?
+  evidenceRequired    Boolean                        @default(false)
+  approvalRequired    Boolean                        @default(false)
+  recurrence          ComplianceRecurrence
+  intervalValue       Int                            @default(1)
+  startDate           DateTime
+  endDate             DateTime?
+  dueTime             String?
+  reminderDaysBefore  Int                            @default(7)
+  escalationDaysAfter Int                            @default(1)
+  status              ComplianceCalendarTaskStatus   @default(ACTIVE)
+  nextOccurrenceAt    DateTime?
+  occurrences         ComplianceCalendarOccurrence[]
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
 
   @@index([organizationId, status, nextOccurrenceAt])
   @@index([siteId, departmentId])
@@ -2759,32 +2761,32 @@ model ComplianceCalendarTask {
 }
 
 model ComplianceCalendarOccurrence {
-  id               String                             @id @default(cuid())
-  organizationId   String
-  organization     Organization                       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  taskId           String
-  task             ComplianceCalendarTask             @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  siteId           String
-  site             Site                               @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  departmentId     String?
-  department       Department?                        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  assignedToId     String
-  assignedTo       User                               @relation("ComplianceCalendarOccurrenceAssignee", fields: [assignedToId], references: [id])
-  dueAt            DateTime
-  status           ComplianceCalendarOccurrenceStatus @default(UPCOMING)
-  completionNotes  String?
-  evidenceUrl      String?
-  completedAt      DateTime?
-  completedById    String?
-  completedBy      User?                              @relation("ComplianceCalendarOccurrenceCompleter", fields: [completedById], references: [id], onDelete: SetNull)
-  reviewedAt       DateTime?
-  reviewedById     String?
-  reviewedBy       User?                              @relation("ComplianceCalendarOccurrenceReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  reviewNotes      String?
-  reminderSentAt   DateTime?
-  escalatedAt      DateTime?
-  createdAt        DateTime                           @default(now())
-  updatedAt        DateTime                           @updatedAt
+  id              String                             @id @default(cuid())
+  organizationId  String
+  organization    Organization                       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  taskId          String
+  task            ComplianceCalendarTask             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  siteId          String
+  site            Site                               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId    String?
+  department      Department?                        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assignedToId    String
+  assignedTo      User                               @relation("ComplianceCalendarOccurrenceAssignee", fields: [assignedToId], references: [id])
+  dueAt           DateTime
+  status          ComplianceCalendarOccurrenceStatus @default(UPCOMING)
+  completionNotes String?
+  evidenceUrl     String?
+  completedAt     DateTime?
+  completedById   String?
+  completedBy     User?                              @relation("ComplianceCalendarOccurrenceCompleter", fields: [completedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  reviewedById    String?
+  reviewedBy      User?                              @relation("ComplianceCalendarOccurrenceReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNotes     String?
+  reminderSentAt  DateTime?
+  escalatedAt     DateTime?
+  createdAt       DateTime                           @default(now())
+  updatedAt       DateTime                           @updatedAt
 
   @@unique([taskId, dueAt])
   @@index([organizationId, status, dueAt])
