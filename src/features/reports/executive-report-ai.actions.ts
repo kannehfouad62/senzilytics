@@ -5,6 +5,7 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import { generateExecutiveReportAiDraftService } from "@/modules/report/executive-report-ai.service";
 import type { ExecutiveReportAiActionState } from "@/modules/report/executive-report-ai.types";
 import { PermissionKey } from "@prisma/client";
+import { unstable_rethrow } from "next/navigation";
 
 function getRequiredString(
   formData: FormData,
@@ -132,6 +133,7 @@ export async function generateExecutiveReportAiDraft(
         new Date().toISOString(),
     };
   } catch (error) {
+    unstable_rethrow(error);
     console.error(
       "AI executive-insights generation failed:",
       error

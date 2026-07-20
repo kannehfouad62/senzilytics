@@ -11,8 +11,19 @@ import {
   SafetyObservationType,
   Status,
   UserRole,
+  AuditType,
+  EnterpriseAuditFindingTrigger,
+  EnterpriseAuditFrequency,
+  EnterpriseAuditProgramStatus,
+  EnterpriseAuditProtocolStatus,
+  EnterpriseAuditQuestionResponseType,
+  EnterpriseAuditRiskPriority,
+  EnterpriseAuditSeverity,
+  EnterpriseAuditSource,
+  EnterpriseAuditTeamRole,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { createAuditService } from "@/modules/audit/audit.service";
 
 const ids = {
   organization: "org_senzilytics_public_demo",
@@ -207,6 +218,159 @@ async function main() {
       leadInspectorId: manager.id,
     },
   });
+
+  const protocol = await prisma.auditProtocol.upsert({
+    where: {
+      organizationId_name_version: {
+        organizationId: organization.id,
+        name: "ISO 45001 Internal Audit Protocol",
+        version: 1,
+      },
+    },
+    update: { status: EnterpriseAuditProtocolStatus.ACTIVE, isActive: true },
+    create: {
+      id: "protocol_public_demo_iso45001",
+      organizationId: organization.id,
+      name: "ISO 45001 Internal Audit Protocol",
+      code: "ISO45K-DEMO",
+      description: "Fictional protocol demonstrating leadership, operational control and improvement criteria.",
+      standardName: "ISO 45001",
+      standardVersion: "2018",
+      framework: "Occupational health and safety management system",
+      version: 1,
+      status: EnterpriseAuditProtocolStatus.ACTIVE,
+      isActive: true,
+      effectiveFrom: days(-120),
+      createdById: manager.id,
+      updatedById: manager.id,
+      sections: {
+        create: [
+          {
+            title: "Leadership and worker participation",
+            description: "Evaluate leadership accountability and workforce consultation.",
+            standardRef: "Clauses 5.1–5.4",
+            sequence: 1,
+            weight: 2,
+            questions: {
+              create: [
+                {
+                  questionText: "Is OH&S accountability assigned and demonstrated by top management?",
+                  guidance: "Review responsibilities, leadership meeting records and evidence of decisions.",
+                  standardClause: "5.1",
+                  responseType: EnterpriseAuditQuestionResponseType.YES_NO,
+                  sequence: 1,
+                  weight: 2,
+                  requireComment: true,
+                  requireEvidence: true,
+                  findingTrigger: EnterpriseAuditFindingTrigger.ON_NO,
+                  defaultSeverity: EnterpriseAuditSeverity.HIGH,
+                  automaticallyCreateFinding: true,
+                  automaticallySuggestCapa: true,
+                },
+                {
+                  questionText: "Are workers consulted on hazards, controls and operational changes?",
+                  guidance: "Sample committee records, pre-task planning and change consultations.",
+                  standardClause: "5.4",
+                  responseType: EnterpriseAuditQuestionResponseType.PASS_FAIL,
+                  sequence: 2,
+                  weight: 2,
+                  requireEvidence: true,
+                  findingTrigger: EnterpriseAuditFindingTrigger.ON_FAIL,
+                  defaultSeverity: EnterpriseAuditSeverity.MEDIUM,
+                  automaticallyCreateFinding: true,
+                },
+              ],
+            },
+          },
+          {
+            title: "Operational planning and control",
+            description: "Evaluate whether operational hazards are controlled in practice.",
+            standardRef: "Clause 8",
+            sequence: 2,
+            weight: 3,
+            questions: {
+              create: [
+                {
+                  questionText: "Are vehicle and pedestrian controls implemented and verified?",
+                  guidance: "Inspect route separation, crossings, visibility aids and local compliance.",
+                  standardClause: "8.1",
+                  responseType: EnterpriseAuditQuestionResponseType.PASS_FAIL,
+                  sequence: 1,
+                  weight: 3,
+                  requireComment: true,
+                  requireEvidence: true,
+                  requirePhoto: true,
+                  findingTrigger: EnterpriseAuditFindingTrigger.ON_FAIL,
+                  defaultSeverity: EnterpriseAuditSeverity.HIGH,
+                  automaticallyCreateFinding: true,
+                  automaticallySuggestCapa: true,
+                  automaticallySuggestRisk: true,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+
+  const program = await prisma.auditProgram.upsert({
+    where: {
+      organizationId_name: {
+        organizationId: organization.id,
+        name: "Annual Corporate EHS Audit Program",
+      },
+    },
+    update: { status: EnterpriseAuditProgramStatus.ACTIVE, defaultProtocolId: protocol.id },
+    create: {
+      id: "program_public_demo_ehs",
+      organizationId: organization.id,
+      name: "Annual Corporate EHS Audit Program",
+      code: "EHS-DEMO-2026",
+      description: "Risk-based demonstration program for operational EHS assurance.",
+      standardName: "ISO 45001",
+      standardVersion: "2018",
+      objectives: "Verify control implementation, leadership accountability and corrective-action effectiveness.",
+      scope: "Gulf Operations Center warehouse and receiving activities.",
+      status: EnterpriseAuditProgramStatus.ACTIVE,
+      frequency: EnterpriseAuditFrequency.ANNUAL,
+      riskPriority: EnterpriseAuditRiskPriority.HIGH,
+      effectiveFrom: days(-180),
+      effectiveTo: days(185),
+      ownerId: manager.id,
+      defaultProtocolId: protocol.id,
+      sites: { create: { siteId: site.id, isPrimary: true } },
+      departments: { create: { departmentId: department.id, isPrimary: true } },
+    },
+  });
+
+  const existingAudit = await prisma.enterpriseAudit.findFirst({
+    where: { organizationId: organization.id, reference: "AUD-DEMO-001" },
+    select: { id: true },
+  });
+  if (!existingAudit) {
+    await createAuditService({
+      organizationId: organization.id,
+      userId: manager.id,
+      reference: "AUD-DEMO-001",
+      title: "Warehouse Operational Control Audit",
+      description: "Fictional scheduled audit demonstrating protocol execution and evidence requirements.",
+      objectives: "Assess vehicle–pedestrian controls and worker participation.",
+      scope: "Warehouse receiving, staging and dispatch areas.",
+      criteria: "ISO 45001:2018 and Northstar traffic-management requirements.",
+      auditType: AuditType.INTERNAL,
+      siteId: site.id,
+      departmentId: department.id,
+      programId: program.id,
+      protocolId: protocol.id,
+      leadAuditorId: manager.id,
+      ownerId: manager.id,
+      scheduledAt: days(-1),
+      dueDate: days(10),
+      source: EnterpriseAuditSource.PROGRAM,
+      teamMembers: [{ userId: manager.id, role: EnterpriseAuditTeamRole.LEAD_AUDITOR, canEdit: true, canReview: true }],
+    });
+  }
 
   console.log("Public demo tenant and sample data are ready.");
 }

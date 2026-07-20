@@ -7,7 +7,7 @@ import { PrintReportButton } from "@/features/reports/print-report-button";
 import { ExecutiveReportAiInsights } from "@/features/reports/executive-report-ai-insights";
 import { getRiskAnalyticsData } from "@/core/analytics/risk-analytics.service";
 import { ExecutiveRiskSummary } from "@/features/reports/executive-risk-summary";
-import { requirePermission } from "@/lib/permissions";
+import { hasPermission, requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import {
@@ -118,6 +118,7 @@ export default async function ReportsPage({
     organizationId,
     user,
   } = await getCurrentUserTenant();
+  const canUseAi = await hasPermission(PermissionKey.USE_AI);
 
   const params =
     await searchParams;
@@ -276,12 +277,12 @@ export default async function ReportsPage({
         </div>
         </form>
 
-<ExecutiveReportAiInsights
+{canUseAi && <ExecutiveReportAiInsights
   from={formatInputDate(from)}
   to={formatInputDate(to)}
   siteId={report.filters.siteId}
   siteName={report.filters.siteName}
-/>
+/>}
 
 <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5 print:grid-cols-5">
         <SummaryCard
