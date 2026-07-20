@@ -135,12 +135,12 @@ export async function Topbar() {
               </div>
             ))}
         </MobileNavigationMenu>
-        <div className="hidden items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 md:flex">
+        <form action="/search" method="get" role="search" className="hidden min-w-64 items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 transition focus-within:border-cyan-400/40 focus-within:bg-white/[.07] md:flex xl:min-w-80">
           <Search size={18} className="text-slate-400" />
-          <span className="text-sm text-slate-400">
-            Search incidents, audits, actions...
-          </span>
-        </div>
+          <input type="search" name="q" required minLength={2} maxLength={100} aria-label="Search Senzilytics" placeholder="Search incidents, audits, risks..." className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500" />
+          <button type="submit" className="sr-only">Search</button>
+        </form>
+        <Link href="/search" className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10 md:hidden" title="Search Senzilytics"><Search size={20}/></Link>
 
         <button className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-300">
           <Sparkles size={20} />
