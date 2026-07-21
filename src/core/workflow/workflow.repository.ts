@@ -3,7 +3,9 @@ import {
   WorkflowDecision,
   WorkflowEntityType,
   WorkflowInstanceStatus,
+  WorkflowStepType,
   WorkflowStepStatus,
+  UserRole,
 } from "@prisma/client";
 
 export async function findActiveWorkflowTemplate(input: {
@@ -56,10 +58,10 @@ export async function createWorkflowInstanceSteps(
     instanceId: string;
     templateStepId: string;
     name: string;
-    stepType: any;
+    stepType: WorkflowStepType;
     sequence: number;
     status: WorkflowStepStatus;
-    assignedRole?: any;
+    assignedRole?: UserRole | null;
     dueAt?: Date | null;
   }[]
 ) {

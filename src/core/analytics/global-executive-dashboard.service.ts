@@ -3,11 +3,13 @@ import {
   EnterpriseAuditFindingStatus,
   EnterpriseAuditStatus,
   ChemicalApprovalStatus,
+  ContractorStatus,
   EnvironmentalDataStatus,
   EsgDisclosureStatus,
   JsaStatus,
   MocStatus,
   PermitStatus,
+  PermitToWorkStatus,
   RiskLevel,
   RiskStatus,
   SafetyObservationStatus,
@@ -18,6 +20,7 @@ const closedStatuses = [Status.COMPLETED, Status.CLOSED];
 
 export async function getGlobalExecutivePortfolio(organizationId: string) {
   const now = new Date();
+  const credentialHorizon = new Date(now.getTime() + 30 * 86400000);
   const auditClosed = [EnterpriseAuditStatus.COMPLETED, EnterpriseAuditStatus.CLOSED, EnterpriseAuditStatus.CANCELLED];
   const findingClosed = [EnterpriseAuditFindingStatus.VERIFIED, EnterpriseAuditFindingStatus.CLOSED, EnterpriseAuditFindingStatus.REJECTED, EnterpriseAuditFindingStatus.CANCELLED];
   const mocClosed = [MocStatus.CLOSED, MocStatus.REJECTED, MocStatus.CANCELLED];
@@ -33,7 +36,8 @@ export async function getGlobalExecutivePortfolio(organizationId: string) {
     activeAudits, overdueAudits, openAuditFindings, overdueInspections,
     overdueTraining, expiringTraining, overdueCompliance, expiringPermits,
     governedChemicals, pendingEnvironmentalData, openEsgPeriods, activeJsas,
-    overdueJsaReviews,
+    overdueJsaReviews, approvedContractors, expiringContractorInsurance,
+    activeWorkPermits, overdueWorkPermits,
   ] = await Promise.all([
     prisma.safetyObservation.count({ where: { organizationId, status: { notIn: [SafetyObservationStatus.RESOLVED, SafetyObservationStatus.CLOSED] } } }),
     prisma.correctiveAction.count({ where: { ...actionTenantScope, status: { notIn: closedStatuses } } }),
@@ -55,6 +59,10 @@ export async function getGlobalExecutivePortfolio(organizationId: string) {
     prisma.esgDisclosurePeriod.count({ where: { organizationId, status: { in: [EsgDisclosureStatus.DRAFT, EsgDisclosureStatus.DATA_COLLECTION, EsgDisclosureStatus.UNDER_REVIEW] } } }),
     prisma.jobSafetyAnalysis.count({ where: { organizationId, status: JsaStatus.ACTIVE } }),
     prisma.jobSafetyAnalysis.count({ where: { organizationId, status: JsaStatus.ACTIVE, reviewDueDate: { lt: now } } }),
+    prisma.contractor.count({ where: { organizationId, status: ContractorStatus.APPROVED } }),
+    prisma.contractor.count({ where: { organizationId, status: ContractorStatus.APPROVED, insuranceExpiresAt: { lte: credentialHorizon } } }),
+    prisma.permitToWork.count({ where: { organizationId, status: { in: [PermitToWorkStatus.APPROVED, PermitToWorkStatus.ACTIVE, PermitToWorkStatus.SUSPENDED] } } }),
+    prisma.permitToWork.count({ where: { organizationId, status: { in: [PermitToWorkStatus.DRAFT, PermitToWorkStatus.PENDING_APPROVAL, PermitToWorkStatus.APPROVED, PermitToWorkStatus.ACTIVE, PermitToWorkStatus.SUSPENDED] }, plannedEndAt: { lt: now } } }),
   ]);
 
   const modules = [
@@ -72,6 +80,8 @@ export async function getGlobalExecutivePortfolio(organizationId: string) {
     { label: "Environmental", value: pendingEnvironmentalData, note: "records need approval", href: "/environmental/dashboard", tone: pendingEnvironmentalData ? "warning" : "good" },
     { label: "ESG", value: openEsgPeriods, note: "disclosures in progress", href: "/esg/dashboard", tone: "neutral" },
     { label: "JSA / JHA", value: activeJsas, note: `${overdueJsaReviews} reviews overdue`, href: "/risks/jsa", tone: overdueJsaReviews ? "danger" : "neutral" },
+    { label: "Contractors", value: approvedContractors, note: `${expiringContractorInsurance} insurance credentials due`, href: "/contractors", tone: expiringContractorInsurance ? "danger" : "neutral" },
+    { label: "Permits to Work", value: activeWorkPermits, note: `${overdueWorkPermits} past authorized end`, href: "/permits-to-work", tone: overdueWorkPermits ? "danger" : "neutral" },
   ] as const;
 
   return { modules, attentionCount: modules.filter((item) => item.tone === "danger").reduce((sum, item) => sum + item.value, 0) };

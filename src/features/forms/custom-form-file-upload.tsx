@@ -33,7 +33,9 @@ type SupportedEntityType =
   | typeof DocumentEntityType.TRAINING
   | typeof DocumentEntityType.CHEMICAL
   | typeof DocumentEntityType.ENVIRONMENTAL
-  | typeof DocumentEntityType.ESG;
+  | typeof DocumentEntityType.ESG
+  | typeof DocumentEntityType.CONTRACTOR
+  | typeof DocumentEntityType.PERMIT_TO_WORK;
 
 function entityFolder(
   entityType: SupportedEntityType
@@ -61,6 +63,10 @@ function entityFolder(
       return "environmental";
     case DocumentEntityType.ESG:
       return "esg";
+    case DocumentEntityType.CONTRACTOR:
+      return "contractors";
+    case DocumentEntityType.PERMIT_TO_WORK:
+      return "permits-to-work";
   }
 }
 

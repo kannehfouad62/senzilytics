@@ -345,6 +345,16 @@ async function validateRelatedEntity(input: {
       return Boolean(record);
     }
 
+    case DocumentEntityType.CONTRACTOR: {
+      const record = await prisma.contractor.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } });
+      return Boolean(record);
+    }
+
+    case DocumentEntityType.PERMIT_TO_WORK: {
+      const record = await prisma.permitToWork.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } });
+      return Boolean(record);
+    }
+
     case DocumentEntityType.WORKFLOW: {
       const record = await prisma.workflowInstance.findFirst({
         where: {
@@ -638,6 +648,16 @@ async function requireDocumentUploadPermission(
     case ConfigurableFormModule.ESG:
       allowed = permissions.includes(
         PermissionKey.MANAGE_ESG
+      );
+      break;
+    case ConfigurableFormModule.CONTRACTOR:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_CONTRACTORS
+      );
+      break;
+    case ConfigurableFormModule.PERMIT_TO_WORK:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_PERMITS_TO_WORK
       );
       break;
   }

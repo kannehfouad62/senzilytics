@@ -46,6 +46,10 @@ export function configurableFormModuleForDocumentEntity(
       return ConfigurableFormModule.ENVIRONMENTAL;
     case DocumentEntityType.ESG:
       return ConfigurableFormModule.ESG;
+    case DocumentEntityType.CONTRACTOR:
+      return ConfigurableFormModule.CONTRACTOR;
+    case DocumentEntityType.PERMIT_TO_WORK:
+      return ConfigurableFormModule.PERMIT_TO_WORK;
     default:
       return null;
   }

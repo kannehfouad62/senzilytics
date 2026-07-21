@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { PermissionKey, UserRole } from "@prisma/client";
 
-export type UnifiedCalendarSource = "COMPLIANCE_CALENDAR"|"COMPLIANCE_OBLIGATION"|"OBSERVATION"|"AUDIT"|"AUDIT_FINDING"|"INSPECTION"|"CAPA"|"TRAINING"|"PERMIT"|"RISK_REVIEW"|"MOC"|"WORKFLOW";
+export type UnifiedCalendarSource = "COMPLIANCE_CALENDAR"|"COMPLIANCE_OBLIGATION"|"OBSERVATION"|"AUDIT"|"AUDIT_FINDING"|"INSPECTION"|"CAPA"|"TRAINING"|"PERMIT"|"CONTRACTOR"|"PERMIT_TO_WORK"|"RISK_REVIEW"|"MOC"|"WORKFLOW";
 export type UnifiedCalendarItem = { id:string; source:UnifiedCalendarSource; sourceLabel:string; title:string; detail:string; date:Date; status:string; href:string; assignee:string; site:string|null; completed:boolean; overdue:boolean };
 type Input={organizationId:string;userId:string;userRole:UserRole;permissions:PermissionKey[];start:Date;end:Date;mineOnly:boolean};
-const doneStatuses=new Set(["COMPLETED","CLOSED","CANCELLED","APPROVED","VERIFIED","RESOLVED"]);
+const doneStatuses=new Set(["COMPLETED","CLOSED","CANCELLED","APPROVED","VERIFIED","RESOLVED","REJECTED","EXPIRED"]);
 export const isUnifiedCalendarStatusComplete=(status:string)=>doneStatuses.has(status);
 const openStatus=(status:string)=>!isUnifiedCalendarStatusComplete(status);
 const item=(data:Omit<UnifiedCalendarItem,"overdue">):UnifiedCalendarItem=>({...data,overdue:data.date<new Date()&&!data.completed});
@@ -12,7 +12,7 @@ const item=(data:Omit<UnifiedCalendarItem,"overdue">):UnifiedCalendarItem=>({...
 export async function getUnifiedCalendarItems(input:Input){
   const allowed=new Set(input.permissions), range={gte:input.start,lt:input.end}, mine=input.mineOnly;
   const canCapa=allowed.has(PermissionKey.CREATE_CAPA)||allowed.has(PermissionKey.UPDATE_CAPA)||allowed.has(PermissionKey.CLOSE_CAPA);
-  const [calendar,obligations,observations,audits,findings,inspections,actions,training,permits,risks,mocTasks,workflowSteps]=await Promise.all([
+  const [calendar,obligations,observations,audits,findings,inspections,actions,training,permits,contractors,contractorWorkers,permitsToWork,risks,mocTasks,workflowSteps]=await Promise.all([
     allowed.has(PermissionKey.VIEW_COMPLIANCE)?prisma.complianceCalendarOccurrence.findMany({where:{organizationId:input.organizationId,dueAt:range,...(mine?{assignedToId:input.userId}:{})},include:{task:true,site:true,assignedTo:true}}):[],
     allowed.has(PermissionKey.VIEW_COMPLIANCE)?prisma.complianceItem.findMany({where:{site:{organizationId:input.organizationId},dueDate:range,...(mine?{ownerId:input.userId}:{})},include:{site:true,owner:true}}):[],
     allowed.has(PermissionKey.VIEW_OBSERVATIONS)?prisma.safetyObservation.findMany({where:{organizationId:input.organizationId,followUpDueDate:range,...(mine?{assignedToId:input.userId}:{})},include:{site:true,assignedTo:true}}):[],
@@ -22,6 +22,9 @@ export async function getUnifiedCalendarItems(input:Input){
     canCapa?prisma.correctiveAction.findMany({where:{assignedTo:{organizationId:input.organizationId},dueDate:range,...(mine?{assignedToId:input.userId}:{})},include:{assignedTo:true}}):[],
     allowed.has(PermissionKey.VIEW_TRAINING)?prisma.trainingRecord.findMany({where:{user:{organizationId:input.organizationId},dueDate:range,...(mine?{userId:input.userId}:{})},include:{user:true}}):[],
     allowed.has(PermissionKey.VIEW_COMPLIANCE)?prisma.permit.findMany({where:{organizationId:input.organizationId,OR:[{renewalDueDate:range},{AND:[{renewalDueDate:null},{expirationDate:range}]}],...(mine?{ownerId:input.userId}:{})},include:{site:true,owner:true}}):[],
+    allowed.has(PermissionKey.VIEW_CONTRACTORS)&&!mine?prisma.contractor.findMany({where:{organizationId:input.organizationId,insuranceExpiresAt:range},include:{approvedBy:true}}):[],
+    allowed.has(PermissionKey.VIEW_CONTRACTORS)&&!mine?prisma.contractorWorker.findMany({where:{contractor:{organizationId:input.organizationId},inductionExpiresAt:range},include:{contractor:true}}):[],
+    allowed.has(PermissionKey.VIEW_PERMITS_TO_WORK)?prisma.permitToWork.findMany({where:{organizationId:input.organizationId,plannedEndAt:range,...(mine?{requestedById:input.userId}:{})},include:{site:true,contractor:true,requestedBy:true}}):[],
     allowed.has(PermissionKey.VIEW_RISKS)?prisma.risk.findMany({where:{organizationId:input.organizationId,nextReviewDate:range,...(mine?{ownerId:input.userId}:{})},include:{site:true,owner:true}}):[],
     allowed.has(PermissionKey.VIEW_MOC)?prisma.mocTask.findMany({where:{moc:{organizationId:input.organizationId},dueDate:range,...(mine?{assignedToId:input.userId}:{})},include:{moc:true,assignedTo:true}}):[],
     (mine||allowed.has(PermissionKey.MANAGE_WORKFLOWS))?prisma.workflowInstanceStep.findMany({where:{instance:{organizationId:input.organizationId},dueAt:range,...(mine?{OR:[{assignedUserId:input.userId},{assignedRole:input.userRole},{assignedUserId:null,assignedRole:null}]}:{})},include:{instance:{include:{template:true}},assignedUser:true}}):[],
@@ -36,6 +39,9 @@ items.push(...calendar.map(x=>item({id:`calendar:${x.id}`,source:"COMPLIANCE_CAL
   items.push(...actions.map(x=>item({id:`capa:${x.id}`,source:"CAPA",sourceLabel:"Corrective Action",title:x.title,detail:`${x.riskLevel} priority`,date:x.dueDate,status:x.status,href:"/capa",assignee:x.assignedTo.name,site:null,completed:!openStatus(x.status)})));
   items.push(...training.map(x=>item({id:`training:${x.id}`,source:"TRAINING",sourceLabel:"Training",title:x.courseName,detail:"Training assignment",date:x.dueDate!,status:x.status,href:"/training",assignee:x.user.name,site:null,completed:!openStatus(x.status)})));
   items.push(...permits.map(x=>item({id:`permit:${x.id}`,source:"PERMIT",sourceLabel:"Permit",title:`${x.number} — ${x.name}`,detail:x.renewalDueDate?"Renewal deadline":"Expiration date",date:x.renewalDueDate??x.expirationDate!,status:x.status,href:"/compliance/permits",assignee:x.owner?.name||"Unassigned",site:x.site.name,completed:!openStatus(x.status)})));
+  items.push(...contractors.map(x=>item({id:`contractor:${x.id}`,source:"CONTRACTOR",sourceLabel:"Contractor Insurance",title:`${x.name} insurance expiry`,detail:x.insurancePolicyNumber||"Insurance renewal",date:x.insuranceExpiresAt!,status:x.status,href:`/contractors/${x.id}`,assignee:x.approvedBy?.name||"Contractor manager",site:null,completed:x.status==="INACTIVE"})));
+  items.push(...contractorWorkers.map(x=>item({id:`contractor-worker:${x.id}`,source:"CONTRACTOR",sourceLabel:"Contractor Induction",title:`${x.firstName} ${x.lastName} induction expiry`,detail:x.contractor.name,date:x.inductionExpiresAt!,status:x.status,href:`/contractors/${x.contractorId}`,assignee:"Contractor manager",site:null,completed:x.status==="INACTIVE"})));
+  items.push(...permitsToWork.map(x=>item({id:`permit-to-work:${x.id}`,source:"PERMIT_TO_WORK",sourceLabel:"Permit to Work",title:`${x.reference} — ${x.title}`,detail:`${x.type.replaceAll("_"," ")} · ${x.contractor?.name||"Internal work"}`,date:x.plannedEndAt,status:x.status,href:`/permits-to-work/${x.id}`,assignee:x.requestedBy.name,site:x.site.name,completed:!openStatus(x.status)})));
   items.push(...risks.map(x=>item({id:`risk:${x.id}`,source:"RISK_REVIEW",sourceLabel:"Risk Review",title:`${x.reference} — ${x.title}`,detail:`${x.currentRiskLevel} risk`,date:x.nextReviewDate!,status:x.status,href:`/risks/${x.id}`,assignee:x.owner?.name||"Unassigned",site:x.site?.name||null,completed:false})));
   items.push(...mocTasks.map(x=>item({id:`moc:${x.id}`,source:"MOC",sourceLabel:"MOC Task",title:x.title,detail:`${x.moc.reference} — ${x.moc.title}`,date:x.dueDate!,status:x.status,href:`/moc/${x.mocId}`,assignee:x.assignedTo?.name||"Unassigned",site:null,completed:!openStatus(x.status)})));
   items.push(...workflowSteps.map(x=>item({id:`workflow:${x.id}`,source:"WORKFLOW",sourceLabel:"Workflow",title:x.name,detail:x.instance.template.name,date:x.dueAt!,status:x.status,href:"/tasks",assignee:x.assignedUser?.name||x.assignedRole?.replaceAll("_"," ")||"Available role task",site:null,completed:!openStatus(x.status)})));

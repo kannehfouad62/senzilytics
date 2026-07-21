@@ -103,6 +103,10 @@ enum PermissionKey {
   MANAGE_ENVIRONMENTAL
   VIEW_ESG
   MANAGE_ESG
+  VIEW_CONTRACTORS
+  MANAGE_CONTRACTORS
+  VIEW_PERMITS_TO_WORK
+  MANAGE_PERMITS_TO_WORK
 }
 
 enum ConfigurableFormModule {
@@ -212,6 +216,51 @@ enum PermitStatus {
   EXPIRED
   SUSPENDED
   CLOSED
+}
+
+enum ContractorStatus {
+  PENDING_APPROVAL
+  APPROVED
+  SUSPENDED
+  EXPIRED
+  INACTIVE
+}
+
+enum ContractorWorkerStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+enum PermitToWorkType {
+  HOT_WORK
+  CONFINED_SPACE
+  ELECTRICAL_ENERGIZED
+  ELECTRICAL_ISOLATION
+  WORK_AT_HEIGHT
+  EXCAVATION
+  LIFTING_OPERATION
+  LINE_BREAKING
+  HAZARDOUS_CHEMICAL
+  GENERAL
+}
+
+enum PermitToWorkStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  SUSPENDED
+  CLOSED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum PermitGasTestResult {
+  PASS
+  FAIL
 }
 
 enum ChemicalApprovalStatus {
@@ -474,6 +523,8 @@ enum DocumentEntityType {
   CHEMICAL
   ENVIRONMENTAL
   ESG
+  CONTRACTOR
+  PERMIT_TO_WORK
 }
 
 enum DocumentCategory {
@@ -907,7 +958,7 @@ model Organization {
   notifications                Notification[]
   workflowTemplates            WorkflowTemplate[]
   configurableForms            ConfigurableFormDefinition[]
-  configurableFormSubmissions ConfigurableFormSubmission[]
+  configurableFormSubmissions  ConfigurableFormSubmission[]
   workflowInstances            WorkflowInstance[]
   documents                    Document[]
   auditChecklistTemplates      AuditChecklistTemplate[]
@@ -947,6 +998,8 @@ model Organization {
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
   offlineSubmissions            OfflineSubmission[]
   pricingInquiries              PricingInquiry[]
+  contractors                   Contractor[]
+  permitsToWork                 PermitToWork[]
 }
 
 model PricingInquiry {
@@ -1000,6 +1053,8 @@ model Site {
   environmentalData             EnvironmentalDataPoint[]
   complianceCalendarTasks       ComplianceCalendarTask[]
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
+  contractorSites               ContractorSite[]
+  permitsToWork                 PermitToWork[]
 }
 
 model Department {
@@ -1024,6 +1079,7 @@ model Department {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   jobSafetyAnalyses JobSafetyAnalysis[]
+  permitsToWork     PermitToWork[]
 }
 
 model User {
@@ -1093,13 +1149,22 @@ model User {
   ownedRiskControls    RiskControl[] @relation("RiskControlOwner")
   completedRiskReviews RiskReview[]  @relation("RiskReviewCompletedBy")
 
-  startedWorkflowInstances WorkflowInstance[]
-  assignedWorkflowSteps    WorkflowInstanceStep[] @relation("WorkflowAssignedUser")
-  completedWorkflowSteps   WorkflowInstanceStep[] @relation("WorkflowCompletedBy")
-  configurableFormsCreated ConfigurableFormDefinition[] @relation("ConfigurableFormCreatedBy")
-  configurableFormVersionsCreated ConfigurableFormVersion[] @relation("ConfigurableFormVersionCreatedBy")
-  configurableFormVersionsPublished ConfigurableFormVersion[] @relation("ConfigurableFormVersionPublishedBy")
-  configurableFormSubmissions ConfigurableFormSubmission[] @relation("ConfigurableFormSubmittedBy")
+  startedWorkflowInstances          WorkflowInstance[]
+  assignedWorkflowSteps             WorkflowInstanceStep[]       @relation("WorkflowAssignedUser")
+  completedWorkflowSteps            WorkflowInstanceStep[]       @relation("WorkflowCompletedBy")
+  configurableFormsCreated          ConfigurableFormDefinition[] @relation("ConfigurableFormCreatedBy")
+  configurableFormVersionsCreated   ConfigurableFormVersion[]    @relation("ConfigurableFormVersionCreatedBy")
+  configurableFormVersionsPublished ConfigurableFormVersion[]    @relation("ConfigurableFormVersionPublishedBy")
+  configurableFormSubmissions       ConfigurableFormSubmission[] @relation("ConfigurableFormSubmittedBy")
+
+  approvedContractors     Contractor[]          @relation("ContractorApprovedBy")
+  requestedPermitsToWork  PermitToWork[]        @relation("PermitToWorkRequestedBy")
+  issuedPermitsToWork     PermitToWork[]        @relation("PermitToWorkIssuedBy")
+  approvedPermitsToWork   PermitToWork[]        @relation("PermitToWorkApprovedBy")
+  closedPermitsToWork     PermitToWork[]        @relation("PermitToWorkClosedBy")
+  verifiedPermitControls  PermitToWorkControl[] @relation("PermitControlVerifiedBy")
+  performedPermitGasTests PermitToWorkGasTest[] @relation("PermitGasTestPerformedBy")
+  permitToWorkHistory     PermitToWorkHistory[] @relation("PermitHistoryActor")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -2894,6 +2959,190 @@ model Permit {
   @@index([ownerId, status])
 }
 
+model Contractor {
+  id                    String             @id @default(cuid())
+  organizationId        String
+  organization          Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                  String
+  legalName             String?
+  registrationNumber    String?
+  taxIdentifier         String?
+  primaryContactName    String?
+  primaryContactEmail   String?
+  primaryContactPhone   String?
+  services              String?
+  safetyProgramSummary  String?
+  insuranceProvider     String?
+  insurancePolicyNumber String?
+  insuranceExpiresAt    DateTime?
+  status                ContractorStatus   @default(PENDING_APPROVAL)
+  safetyRating          Float?
+  approvedById          String?
+  approvedBy            User?              @relation("ContractorApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt            DateTime?
+  suspensionReason      String?
+  notes                 String?
+  sites                 ContractorSite[]
+  workers               ContractorWorker[]
+  permitsToWork         PermitToWork[]
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId, status])
+  @@index([insuranceExpiresAt])
+}
+
+model ContractorSite {
+  id           String     @id @default(cuid())
+  contractorId String
+  contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  siteId       String
+  site         Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  approvedAt   DateTime   @default(now())
+  expiresAt    DateTime?
+  notes        String?
+
+  @@unique([contractorId, siteId])
+  @@index([siteId, expiresAt])
+}
+
+model ContractorWorker {
+  id                   String                 @id @default(cuid())
+  contractorId         String
+  contractor           Contractor             @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  firstName            String
+  lastName             String
+  employeeNumber       String?
+  email                String?
+  phone                String?
+  jobTitle             String?
+  status               ContractorWorkerStatus @default(PENDING)
+  inductionCompletedAt DateTime?
+  inductionExpiresAt   DateTime?
+  medicalExpiresAt     DateTime?
+  competencySummary    String?
+  notes                String?
+  permitAssignments    PermitToWorkWorker[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@unique([contractorId, employeeNumber])
+  @@index([contractorId, status])
+  @@index([inductionExpiresAt])
+}
+
+model PermitToWork {
+  id                 String                @id @default(cuid())
+  organizationId     String
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reference          String
+  title              String
+  description        String?
+  type               PermitToWorkType
+  status             PermitToWorkStatus    @default(DRAFT)
+  siteId             String
+  site               Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId       String?
+  department         Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  contractorId       String?
+  contractor         Contractor?           @relation(fields: [contractorId], references: [id], onDelete: SetNull)
+  requestedById      String
+  requestedBy        User                  @relation("PermitToWorkRequestedBy", fields: [requestedById], references: [id])
+  issuedById         String?
+  issuedBy           User?                 @relation("PermitToWorkIssuedBy", fields: [issuedById], references: [id], onDelete: SetNull)
+  approvedById       String?
+  approvedBy         User?                 @relation("PermitToWorkApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  closedById         String?
+  closedBy           User?                 @relation("PermitToWorkClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  responsiblePerson  String
+  exactLocation      String
+  workOrderReference String?
+  plannedStartAt     DateTime
+  plannedEndAt       DateTime
+  hazardsSummary     String
+  controlsSummary    String
+  requiredPpe        String?
+  isolationDetails   String?
+  emergencyPlan      String?
+  gasTestingRequired Boolean               @default(false)
+  approvedAt         DateTime?
+  activatedAt        DateTime?
+  suspendedAt        DateTime?
+  closedAt           DateTime?
+  closeoutNotes      String?
+  controls           PermitToWorkControl[]
+  gasTests           PermitToWorkGasTest[]
+  workers            PermitToWorkWorker[]
+  history            PermitToWorkHistory[]
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, plannedStartAt])
+  @@index([siteId, plannedStartAt, plannedEndAt])
+  @@index([contractorId, status])
+}
+
+model PermitToWorkControl {
+  id           String       @id @default(cuid())
+  permitId     String
+  permit       PermitToWork @relation(fields: [permitId], references: [id], onDelete: Cascade)
+  description  String
+  isRequired   Boolean      @default(true)
+  isVerified   Boolean      @default(false)
+  verifiedById String?
+  verifiedBy   User?        @relation("PermitControlVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt   DateTime?
+  createdAt    DateTime     @default(now())
+
+  @@index([permitId, isVerified])
+}
+
+model PermitToWorkGasTest {
+  id            String              @id @default(cuid())
+  permitId      String
+  permit        PermitToWork        @relation(fields: [permitId], references: [id], onDelete: Cascade)
+  performedById String
+  performedBy   User                @relation("PermitGasTestPerformedBy", fields: [performedById], references: [id])
+  testedAt      DateTime            @default(now())
+  oxygenPercent Float?
+  lelPercent    Float?
+  h2sPpm        Float?
+  coPpm         Float?
+  result        PermitGasTestResult
+  notes         String?
+
+  @@index([permitId, testedAt])
+}
+
+model PermitToWorkWorker {
+  id        String           @id @default(cuid())
+  permitId  String
+  permit    PermitToWork     @relation(fields: [permitId], references: [id], onDelete: Cascade)
+  workerId  String
+  worker    ContractorWorker @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  role      String?
+  createdAt DateTime         @default(now())
+
+  @@unique([permitId, workerId])
+  @@index([workerId])
+}
+
+model PermitToWorkHistory {
+  id         String              @id @default(cuid())
+  permitId   String
+  permit     PermitToWork        @relation(fields: [permitId], references: [id], onDelete: Cascade)
+  actorId    String
+  actor      User                @relation("PermitHistoryActor", fields: [actorId], references: [id])
+  fromStatus PermitToWorkStatus?
+  toStatus   PermitToWorkStatus
+  comments   String?
+  createdAt  DateTime            @default(now())
+
+  @@index([permitId, createdAt])
+}
+
 model Chemical {
   id                    String                 @id @default(cuid())
   organizationId        String
@@ -3707,8 +3956,8 @@ model ConfigurableFormDefinition {
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User         @relation("ConfigurableFormCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  organization Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                         @relation("ConfigurableFormCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   versions     ConfigurableFormVersion[]
   submissions  ConfigurableFormSubmission[]
 
@@ -3717,20 +3966,20 @@ model ConfigurableFormDefinition {
 }
 
 model ConfigurableFormVersion {
-  id             String                        @id @default(cuid())
-  definitionId   String
-  version        Int
-  status         ConfigurableFormVersionStatus @default(DRAFT)
-  instructions   String?
-  createdById    String
-  publishedById  String?
-  publishedAt    DateTime?
-  createdAt      DateTime                      @default(now())
-  updatedAt      DateTime                      @updatedAt
+  id            String                        @id @default(cuid())
+  definitionId  String
+  version       Int
+  status        ConfigurableFormVersionStatus @default(DRAFT)
+  instructions  String?
+  createdById   String
+  publishedById String?
+  publishedAt   DateTime?
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
 
-  definition  ConfigurableFormDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
-  createdBy   User                       @relation("ConfigurableFormVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  publishedBy User?                      @relation("ConfigurableFormVersionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  definition  ConfigurableFormDefinition   @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  createdBy   User                         @relation("ConfigurableFormVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedBy User?                        @relation("ConfigurableFormVersionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
   fields      ConfigurableFormField[]
   submissions ConfigurableFormSubmission[]
 
@@ -3754,8 +4003,8 @@ model ConfigurableFormField {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  version ConfigurableFormVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  answers ConfigurableFormAnswer[]
+  version     ConfigurableFormVersion      @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  answers     ConfigurableFormAnswer[]
   fileAnswers ConfigurableFormFileAnswer[]
 
   @@unique([versionId, key])
@@ -3776,10 +4025,10 @@ model ConfigurableFormSubmission {
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
 
-  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  definition   ConfigurableFormDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
-  version      ConfigurableFormVersion    @relation(fields: [versionId], references: [id], onDelete: Restrict)
-  submittedBy  User                       @relation("ConfigurableFormSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  organization Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  definition   ConfigurableFormDefinition   @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  version      ConfigurableFormVersion      @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  submittedBy  User                         @relation("ConfigurableFormSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
   answers      ConfigurableFormAnswer[]
   fileAnswers  ConfigurableFormFileAnswer[]
 
@@ -3789,7 +4038,7 @@ model ConfigurableFormSubmission {
 }
 
 model ConfigurableFormAnswer {
-  id           String @id @default(cuid())
+  id           String   @id @default(cuid())
   submissionId String
   fieldId      String
   value        Json
@@ -3951,8 +4200,8 @@ model Document {
   archivedAt DateTime?
   deletedAt  DateTime?
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  uploadedBy   User?        @relation(fields: [uploadedById], references: [id])
+  organization                Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy                  User?                        @relation(fields: [uploadedById], references: [id])
   configurableFormFileAnswers ConfigurableFormFileAnswer[]
 
   @@index([organizationId, entityType, entityId])

@@ -19,7 +19,9 @@ type SupportedEntityType =
   | typeof DocumentEntityType.TRAINING
   | typeof DocumentEntityType.CHEMICAL
   | typeof DocumentEntityType.ENVIRONMENTAL
-  | typeof DocumentEntityType.ESG;
+  | typeof DocumentEntityType.ESG
+  | typeof DocumentEntityType.CONTRACTOR
+  | typeof DocumentEntityType.PERMIT_TO_WORK;
 
 function displayValue(
   value: unknown

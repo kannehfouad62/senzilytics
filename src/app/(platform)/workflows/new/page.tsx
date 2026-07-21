@@ -4,6 +4,7 @@ import {
   WorkflowEntityType,
   WorkflowStepType,
 } from "@prisma/client";
+import Link from "next/link";
 
 export default function NewWorkflowPage() {
   const defaultSteps = [
@@ -160,12 +161,12 @@ export default function NewWorkflowPage() {
             Create Workflow
           </button>
 
-          <a
+          <Link
             href="/workflows"
             className="rounded-2xl border border-white/10 px-6 py-3 text-slate-300 transition hover:bg-white/5"
           >
             Cancel
-          </a>
+          </Link>
         </div>
       </form>
     </div>

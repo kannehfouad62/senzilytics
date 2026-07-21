@@ -31,6 +31,7 @@ import {
   WifiOff,
   Network,
   FileCog,
+  HardHat,
 } from "lucide-react";
 
 export const primaryNavItems = [
@@ -82,6 +83,16 @@ export const primaryNavItems = [
 ];
 
 export const ehsNavItems = [
+  {
+    label: "Contractors",
+    href: "/contractors",
+    icon: HardHat,
+  },
+  {
+    label: "Permit to Work",
+    href: "/permits-to-work",
+    icon: ShieldCheck,
+  },
   {
     label: "Safety Observations",
     href: "/observations",

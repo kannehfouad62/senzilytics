@@ -152,6 +152,10 @@ async function main() {
       PermissionKey.MANAGE_ENVIRONMENTAL,
       PermissionKey.VIEW_ESG,
       PermissionKey.MANAGE_ESG,
+      PermissionKey.VIEW_CONTRACTORS,
+      PermissionKey.MANAGE_CONTRACTORS,
+      PermissionKey.VIEW_PERMITS_TO_WORK,
+      PermissionKey.MANAGE_PERMITS_TO_WORK,
     ],
 
     EHS_MANAGER: [
@@ -180,6 +184,10 @@ async function main() {
       PermissionKey.MANAGE_ENVIRONMENTAL,
       PermissionKey.VIEW_ESG,
       PermissionKey.MANAGE_ESG,
+      PermissionKey.VIEW_CONTRACTORS,
+      PermissionKey.MANAGE_CONTRACTORS,
+      PermissionKey.VIEW_PERMITS_TO_WORK,
+      PermissionKey.MANAGE_PERMITS_TO_WORK,
     ],
 
     SUPERVISOR: [
@@ -198,6 +206,9 @@ async function main() {
       PermissionKey.VIEW_CHEMICALS,
       PermissionKey.VIEW_ENVIRONMENTAL,
       PermissionKey.VIEW_ESG,
+      PermissionKey.VIEW_CONTRACTORS,
+      PermissionKey.VIEW_PERMITS_TO_WORK,
+      PermissionKey.MANAGE_PERMITS_TO_WORK,
     ],
 
     EMPLOYEE: [
@@ -209,6 +220,7 @@ async function main() {
       PermissionKey.CREATE_INCIDENT,
       PermissionKey.VIEW_INCIDENT,
       PermissionKey.VIEW_TRAINING,
+      PermissionKey.VIEW_PERMITS_TO_WORK,
     ],
 
     AUDITOR: [
@@ -222,6 +234,8 @@ async function main() {
       PermissionKey.VIEW_OBSERVATIONS,
       PermissionKey.VIEW_CHEMICALS,
       PermissionKey.VIEW_ENVIRONMENTAL,
+      PermissionKey.VIEW_CONTRACTORS,
+      PermissionKey.VIEW_PERMITS_TO_WORK,
     ],
     DEMO_VIEWER: [
       PermissionKey.VIEW_DASHBOARD,
@@ -238,6 +252,8 @@ async function main() {
       PermissionKey.VIEW_CHEMICALS,
       PermissionKey.VIEW_ENVIRONMENTAL,
       PermissionKey.VIEW_ESG,
+      PermissionKey.VIEW_CONTRACTORS,
+      PermissionKey.VIEW_PERMITS_TO_WORK,
     ],
   };
 

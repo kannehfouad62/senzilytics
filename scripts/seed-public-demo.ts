@@ -24,6 +24,11 @@ import {
   ComplianceCalendarOccurrenceStatus,
   ComplianceCalendarTaskStatus,
   ComplianceRecurrence,
+  ContractorStatus,
+  ContractorWorkerStatus,
+  PermitGasTestResult,
+  PermitToWorkStatus,
+  PermitToWorkType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createAuditService } from "@/modules/audit/audit.service";
@@ -358,6 +363,96 @@ async function main() {
   await prisma.complianceCalendarOccurrence.upsert({
     where: { taskId_dueAt: { taskId: calendarTask.id, dueAt: days(10) } }, update: {},
     create: { organizationId: organization.id, taskId: calendarTask.id, siteId: site.id, departmentId: department.id, assignedToId: manager.id, dueAt: days(10), status: ComplianceCalendarOccurrenceStatus.UPCOMING },
+  });
+
+  const contractor = await prisma.contractor.upsert({
+    where: {
+      organizationId_name: {
+        organizationId: organization.id,
+        name: "Apex Industrial Services",
+      },
+    },
+    update: {},
+    create: {
+      id: "contractor_public_demo_apex",
+      organizationId: organization.id,
+      name: "Apex Industrial Services",
+      legalName: "Apex Industrial Services LLC",
+      registrationNumber: "DEMO-TX-88421",
+      primaryContactName: "Morgan Davis",
+      primaryContactEmail: "morgan.davis@example.com",
+      services: "Mechanical maintenance, welding, lifting support and equipment installation.",
+      safetyProgramSummary: "Prequalified contractor with task planning, energy-isolation and competency controls.",
+      insuranceProvider: "Demonstration Commercial Insurance",
+      insurancePolicyNumber: "DEMO-GL-24051",
+      insuranceExpiresAt: days(90),
+      status: ContractorStatus.APPROVED,
+      safetyRating: 92,
+      approvedById: manager.id,
+      approvedAt: days(-30),
+      sites: { create: { siteId: site.id, expiresAt: days(90), notes: "Authorized for supervised maintenance work." } },
+    },
+  });
+  const contractorWorker = await prisma.contractorWorker.upsert({
+    where: { contractorId_employeeNumber: { contractorId: contractor.id, employeeNumber: "APX-1042" } },
+    update: {},
+    create: {
+      id: "contractor_worker_public_demo_1",
+      contractorId: contractor.id,
+      firstName: "Taylor",
+      lastName: "Morgan",
+      employeeNumber: "APX-1042",
+      jobTitle: "Certified Welder",
+      status: ContractorWorkerStatus.ACTIVE,
+      inductionCompletedAt: days(-20),
+      inductionExpiresAt: days(160),
+      medicalExpiresAt: days(160),
+      competencySummary: "Hot-work, fire-watch and lockout/tagout qualified.",
+    },
+  });
+  await prisma.permitToWork.upsert({
+    where: { organizationId_reference: { organizationId: organization.id, reference: "PTW-DEMO-001" } },
+    update: {},
+    create: {
+      id: "permit_to_work_public_demo_1",
+      organizationId: organization.id,
+      reference: "PTW-DEMO-001",
+      title: "Weld support bracket in maintenance bay",
+      description: "Demonstration active hot-work permit with verified controls and atmospheric test.",
+      type: PermitToWorkType.HOT_WORK,
+      status: PermitToWorkStatus.ACTIVE,
+      siteId: site.id,
+      departmentId: department.id,
+      contractorId: contractor.id,
+      requestedById: manager.id,
+      approvedById: manager.id,
+      issuedById: manager.id,
+      responsiblePerson: "Jordan Lee",
+      exactLocation: "Maintenance bay 3",
+      workOrderReference: "WO-DEMO-4821",
+      plannedStartAt: days(-1),
+      plannedEndAt: days(1),
+      hazardsSummary: "Hot metal, ignition sources, fumes and nearby combustible materials.",
+      controlsSummary: "Area clearance, fire watch, extinguisher, ventilation and post-work monitoring.",
+      requiredPpe: "Welding hood, flame-resistant clothing, gloves, safety footwear and respiratory protection as assessed.",
+      emergencyPlan: "Stop work, raise alarm and follow the site emergency response plan.",
+      gasTestingRequired: true,
+      approvedAt: days(-1),
+      activatedAt: days(-1),
+      controls: { create: [
+        { description: "Combustibles removed or protected", isVerified: true, verifiedById: manager.id, verifiedAt: days(-1) },
+        { description: "Fire watch and extinguisher in place", isVerified: true, verifiedById: manager.id, verifiedAt: days(-1) },
+        { description: "Ventilation confirmed", isVerified: true, verifiedById: manager.id, verifiedAt: days(-1) },
+      ] },
+      gasTests: { create: { performedById: manager.id, testedAt: days(-1), oxygenPercent: 20.9, lelPercent: 0, h2sPpm: 0, coPpm: 0, result: PermitGasTestResult.PASS, notes: "Acceptable pre-work atmosphere." } },
+      workers: { create: { workerId: contractorWorker.id, role: "Welder" } },
+      history: { create: [
+        { actorId: manager.id, toStatus: PermitToWorkStatus.DRAFT, comments: "Permit drafted" },
+        { actorId: manager.id, fromStatus: PermitToWorkStatus.DRAFT, toStatus: PermitToWorkStatus.PENDING_APPROVAL, comments: "Submitted for approval" },
+        { actorId: manager.id, fromStatus: PermitToWorkStatus.PENDING_APPROVAL, toStatus: PermitToWorkStatus.APPROVED, comments: "Controls reviewed" },
+        { actorId: manager.id, fromStatus: PermitToWorkStatus.APPROVED, toStatus: PermitToWorkStatus.ACTIVE, comments: "Work authorized" },
+      ] },
+    },
   });
 
   const existingAudit = await prisma.enterpriseAudit.findFirst({

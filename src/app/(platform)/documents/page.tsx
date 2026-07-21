@@ -598,6 +598,12 @@ function getRelatedRecordLink(
     case DocumentEntityType.MOC:
       return `/moc/${entityId}`;
 
+    case DocumentEntityType.CONTRACTOR:
+      return `/contractors/${entityId}`;
+
+    case DocumentEntityType.PERMIT_TO_WORK:
+      return `/permits-to-work/${entityId}`;
+
     case DocumentEntityType.WORKFLOW:
       return "/workflows";
 
