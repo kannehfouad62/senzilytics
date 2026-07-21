@@ -360,6 +360,11 @@ async function validateRelatedEntity(input: {
       return Boolean(record);
     }
 
+    case DocumentEntityType.SIF_ASSURANCE: {
+      const record = await prisma.criticalControlVerification.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } });
+      return Boolean(record);
+    }
+
     case DocumentEntityType.WORKFLOW: {
       const record = await prisma.workflowInstance.findFirst({
         where: {
@@ -668,6 +673,11 @@ async function requireDocumentUploadPermission(
     case ConfigurableFormModule.INDUSTRIAL_HYGIENE:
       allowed = permissions.includes(
         PermissionKey.MANAGE_INDUSTRIAL_HYGIENE
+      );
+      break;
+    case ConfigurableFormModule.SIF_ASSURANCE:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_CRITICAL_CONTROLS
       );
       break;
   }

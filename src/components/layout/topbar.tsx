@@ -86,10 +86,11 @@ export async function Topbar() {
       })
     : 0;
 
+  const visiblePrimaryItems = primaryNavItems.filter(item => (item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION) && (!("permission" in item) || !item.permission || permissions.includes(item.permission)));
   const platformItems: NavigationItem[] =
     currentUser && isApprovedPlatformAdministrator(currentUser)
       ? [
-          ...primaryNavItems.filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION),
+          ...visiblePrimaryItems,
           {
             label: "Tenant Provisioning",
             href: "/platform/tenants",
@@ -97,8 +98,8 @@ export async function Topbar() {
           },
         ]
       : currentUser?.role === UserRole.DEMO_VIEWER
-        ? primaryNavItems.filter((item) => item.href === "/dashboard")
-        : primaryNavItems.filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION);
+        ? visiblePrimaryItems.filter((item) => item.href === "/dashboard")
+        : visiblePrimaryItems;
 
   const demoMode = currentUser?.role === UserRole.DEMO_VIEWER;
   const visibleEhsItems = ehsNavItems.filter(item => item.permission === undefined || permissions.includes(item.permission));

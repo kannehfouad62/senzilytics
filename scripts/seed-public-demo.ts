@@ -39,6 +39,10 @@ import {
   CompetencyCategory,
   CompetencyEvidenceType,
   CompetencyProficiency,
+  CriticalControlVerificationResult,
+  SifExposureCategory,
+  SifSignalClassification,
+  SifSignalSourceType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createAuditService } from "@/modules/audit/audit.service";
@@ -547,6 +551,95 @@ async function main() {
         { actorId: manager.id, fromStatus: PermitToWorkStatus.PENDING_APPROVAL, toStatus: PermitToWorkStatus.APPROVED, comments: "Controls reviewed" },
         { actorId: manager.id, fromStatus: PermitToWorkStatus.APPROVED, toStatus: PermitToWorkStatus.ACTIVE, comments: "Work authorized" },
       ] },
+    },
+  });
+
+  const mobileControl = await prisma.criticalControlStandard.upsert({
+    where: { organizationId_code: { organizationId: organization.id, code: "CC-MOBILE-01" } },
+    update: { ownerId: manager.id, nextVerificationDueAt: days(15), isActive: true },
+    create: {
+      id: "critical_control_public_demo_mobile",
+      organizationId: organization.id,
+      code: "CC-MOBILE-01",
+      name: "Physical separation of vehicles and pedestrians",
+      category: SifExposureCategory.MOBILE_EQUIPMENT,
+      description: "Prevent pedestrian exposure to powered industrial trucks in shared operational areas.",
+      performanceStandard: "Pedestrian routes, crossings and exclusion zones remain physically separated, visible and unobstructed during operations.",
+      verificationPrompt: "Observe active traffic movements and confirm barriers, markings, crossings, mirrors and exclusion controls are present and being followed.",
+      verificationFrequencyDays: 30,
+      siteId: site.id,
+      departmentId: department.id,
+      ownerId: manager.id,
+      createdById: manager.id,
+      nextVerificationDueAt: days(15),
+    },
+  });
+  await prisma.criticalControlVerification.upsert({
+    where: { id: "critical_control_verification_public_demo_mobile" },
+    update: { result: CriticalControlVerificationResult.DEGRADED, verifiedAt: days(-15), nextDueAt: days(15) },
+    create: {
+      id: "critical_control_verification_public_demo_mobile",
+      organizationId: organization.id,
+      controlId: mobileControl.id,
+      verifiedById: manager.id,
+      verifiedAt: days(-15),
+      nextDueAt: days(15),
+      result: CriticalControlVerificationResult.DEGRADED,
+      evidenceReference: "DEMO-TRAFFIC-WALKDOWN-001",
+      findings: "Floor markings are worn near receiving lane 2 and the convex mirror has a visibility obstruction.",
+      immediateAction: "Temporary cones installed and supervisors briefed pending permanent restoration.",
+    },
+  });
+  const hotWorkControl = await prisma.criticalControlStandard.upsert({
+    where: { organizationId_code: { organizationId: organization.id, code: "CC-FIRE-01" } },
+    update: { ownerId: manager.id, nextVerificationDueAt: days(20), isActive: true },
+    create: {
+      id: "critical_control_public_demo_hot_work",
+      organizationId: organization.id,
+      code: "CC-FIRE-01",
+      name: "Hot-work ignition prevention",
+      category: SifExposureCategory.FIRE_EXPLOSION,
+      description: "Prevent ignition and uncontrolled fire during welding, cutting and grinding.",
+      performanceStandard: "Combustibles are removed or protected, fire watch is assigned, atmosphere is acceptable where required, and post-work monitoring is completed.",
+      verificationPrompt: "Verify the permit, work area, fire watch, extinguisher, gas-test evidence and post-work monitoring controls in the field.",
+      verificationFrequencyDays: 30,
+      siteId: site.id,
+      departmentId: department.id,
+      ownerId: manager.id,
+      createdById: manager.id,
+      nextVerificationDueAt: days(20),
+    },
+  });
+  await prisma.criticalControlVerification.upsert({
+    where: { id: "critical_control_verification_public_demo_hot_work" },
+    update: { result: CriticalControlVerificationResult.EFFECTIVE, verifiedAt: days(-10), nextDueAt: days(20) },
+    create: {
+      id: "critical_control_verification_public_demo_hot_work",
+      organizationId: organization.id,
+      controlId: hotWorkControl.id,
+      verifiedById: manager.id,
+      verifiedAt: days(-10),
+      nextDueAt: days(20),
+      result: CriticalControlVerificationResult.EFFECTIVE,
+      evidenceReference: "PTW-DEMO-001 / field verification",
+      findings: "Required controls were observed in place and functioning during the demonstration verification.",
+    },
+  });
+  await prisma.sifSignalReview.upsert({
+    where: { organizationId_sourceType_sourceId: { organizationId: organization.id, sourceType: SifSignalSourceType.INCIDENT, sourceId: "incident_public_demo_1" } },
+    update: { classification: SifSignalClassification.POTENTIAL_SIF, exposureCategory: SifExposureCategory.MOBILE_EQUIPMENT, potentialSeverity: RiskLevel.CRITICAL, reviewedById: manager.id, reviewedAt: days(-5) },
+    create: {
+      id: "sif_signal_review_public_demo_incident",
+      organizationId: organization.id,
+      sourceType: SifSignalSourceType.INCIDENT,
+      sourceId: "incident_public_demo_1",
+      classification: SifSignalClassification.POTENTIAL_SIF,
+      exposureCategory: SifExposureCategory.MOBILE_EQUIPMENT,
+      potentialSeverity: RiskLevel.CRITICAL,
+      rationale: "The near miss involved pedestrian exposure to moving powered equipment with credible major or fatal potential.",
+      controlFailureNotes: "Traffic separation markings and sight-line controls were degraded.",
+      reviewedById: manager.id,
+      reviewedAt: days(-5),
     },
   });
 

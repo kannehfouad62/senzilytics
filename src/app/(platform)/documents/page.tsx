@@ -607,6 +607,9 @@ function getRelatedRecordLink(
     case DocumentEntityType.INDUSTRIAL_HYGIENE:
       return `/industrial-hygiene/${entityId}`;
 
+    case DocumentEntityType.SIF_ASSURANCE:
+      return "/assurance/sif/controls";
+
     case DocumentEntityType.WORKFLOW:
       return "/workflows";
 

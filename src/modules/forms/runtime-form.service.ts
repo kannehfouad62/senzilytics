@@ -52,6 +52,8 @@ export function configurableFormModuleForDocumentEntity(
       return ConfigurableFormModule.PERMIT_TO_WORK;
     case DocumentEntityType.INDUSTRIAL_HYGIENE:
       return ConfigurableFormModule.INDUSTRIAL_HYGIENE;
+    case DocumentEntityType.SIF_ASSURANCE:
+      return ConfigurableFormModule.SIF_ASSURANCE;
     default:
       return null;
   }

@@ -31,6 +31,7 @@ import {
   Eye,
   WifiOff,
   Network,
+  Radar,
   FileCog,
   HardHat,
   HeartPulse,
@@ -47,6 +48,12 @@ export const primaryNavItems = [
     label: "Operational Assurance",
     href: "/assurance",
     icon: Network,
+  },
+  {
+    label: "SIF Prevention",
+    href: "/assurance/sif",
+    icon: Radar,
+    permission: PermissionKey.VIEW_SIF_INTELLIGENCE,
   },
   {
     label: "My Tasks",
@@ -244,7 +251,7 @@ export async function Sidebar() {
   const [platformAdministrator, { user, organization }, permissions] = await Promise.all([getPlatformAdministrator(), getCurrentUserTenant(), getCurrentUserPermissions()]);
   const isDemo = user.role === UserRole.DEMO_VIEWER;
   const entitlements = organization ? planEntitlements[organization.subscriptionPlan] : planEntitlements.PREMIUM;
-  const entitledPrimaryItems = primaryNavItems.filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION);
+  const entitledPrimaryItems = primaryNavItems.filter(item => (item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION) && (!("permission" in item) || !item.permission || permissions.includes(item.permission)));
   const platformNavItems = platformAdministrator
     ? [
         ...entitledPrimaryItems,

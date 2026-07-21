@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getCompetencyMatrixService } from "@/modules/training/competency.service";
-import { ExposureResultClassification, PermissionKey, RiskLevel, SurveillanceEnrollmentStatus } from "@prisma/client";
+import { CriticalControlVerificationResult, ExposureResultClassification, PermissionKey, RiskLevel, SifSignalClassification, SurveillanceEnrollmentStatus } from "@prisma/client";
 
 export type AssuranceSignal = {
   id: string;
@@ -45,7 +45,7 @@ export async function getOperationalAssuranceOverview(input: {
 
   const contractorHorizon = new Date(now);
   contractorHorizon.setUTCDate(contractorHorizon.getUTCDate() + 30);
-  const [observations, incidents, auditFindings, inspectionFindings, risks, mocs, contractors, permitsToWork, exposureSamples, surveillancePrograms, competencyMatrix, connections] = await Promise.all([
+  const [observations, incidents, auditFindings, inspectionFindings, risks, mocs, contractors, permitsToWork, exposureSamples, surveillancePrograms, competencyMatrix, sifControls, sifReviews, connections] = await Promise.all([
     allowed.has(PermissionKey.VIEW_OBSERVATIONS) ? prisma.safetyObservation.findMany({
       where: { organizationId: input.organizationId, riskLevel: { in: elevated }, status: { notIn: ["RESOLVED", "CLOSED"] } },
       include: { site: true }, orderBy: { observedAt: "desc" }, take: 20,
@@ -88,6 +88,8 @@ export async function getOperationalAssuranceOverview(input: {
       include: { enrollments: { where: { status: { in: [SurveillanceEnrollmentStatus.DUE, SurveillanceEnrollmentStatus.OVERDUE] } }, select: { status: true } } }, take: 20,
     }) : [],
     allowed.has(PermissionKey.VIEW_TRAINING) ? getCompetencyMatrixService(input.organizationId, now) : { rows: [], total: 0, satisfied: 0, expiring: 0, gaps: 0, criticalGaps: 0 },
+    allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE) ? prisma.criticalControlStandard.findMany({ where: { organizationId: input.organizationId, isActive: true }, include: { site: true, verifications: { orderBy: { verifiedAt: "desc" }, take: 1 } } }) : [],
+    allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE) ? prisma.sifSignalReview.findMany({ where: { organizationId: input.organizationId, classification: { in: [SifSignalClassification.POTENTIAL_SIF, SifSignalClassification.PRECURSOR] } }, select: { exposureCategory: true } }) : [],
     Promise.all([
       prisma.safetyObservation.count({ where: { organizationId: input.organizationId, incidentId: { not: null } } }),
       prisma.correctiveAction.count({ where: { ...actionScope, incidentId: { not: null } } }),
@@ -116,6 +118,7 @@ export async function getOperationalAssuranceOverview(input: {
     ...exposureSamples.map(x => ({ id:`exposure-sample:${x.id}`, title:`${x.assessment.reference} — ${x.agent.name}`, detail:`Exposure result exceeded the recorded occupational limit${x.exposureRatio ? ` (${x.exposureRatio.toFixed(2)}× limit)` : ""}.`, source:"Industrial Hygiene", href:`/industrial-hygiene/${x.assessmentId}`, severity:"CRITICAL" as const, site:x.assessment.site.name })),
     ...surveillancePrograms.map(x => { const overdueCount=x.enrollments.filter(row=>row.status===SurveillanceEnrollmentStatus.OVERDUE).length; return { id:`surveillance-program:${x.id}`, title:x.name, detail:`${x.enrollments.length} restricted surveillance milestone${x.enrollments.length===1?"":"s"} require${x.enrollments.length===1?"s":""} administrative attention.`, source:"Occupational Health", href:`/occupational-health/${x.id}`, severity:(overdueCount?"HIGH":"MEDIUM") as AssuranceSignal["severity"], site:null }; }),
     ...[...criticalCompetencyGroups.entries()].map(([id,group])=>({id:`competency:${id}`,title:group.name,detail:`${group.count} worker requirement${group.count===1?"":"s"} lack verified current proficiency.`,source:"Competency",href:"/training/competencies/matrix",severity:"HIGH" as const,site:null})),
+    ...sifControls.filter(control=>control.nextVerificationDueAt<now||control.verifications[0]?.result===CriticalControlVerificationResult.FAILED||control.verifications[0]?.result===CriticalControlVerificationResult.DEGRADED).map(control=>({id:`critical-control:${control.id}`,title:`${control.code} — ${control.name}`,detail:control.nextVerificationDueAt<now?"Critical-control field verification is overdue.":`Latest field verification is ${control.verifications[0]!.result.toLowerCase()}.`,source:"SIF Critical Control",href:`/assurance/sif/controls/${control.id}`,severity:(control.verifications[0]?.result===CriticalControlVerificationResult.FAILED?"CRITICAL":"HIGH") as AssuranceSignal["severity"],site:control.site?.name??null})),
   ];
 
   const connectionRows: AssuranceConnection[] = [
@@ -129,6 +132,7 @@ export async function getOperationalAssuranceOverview(input: {
     ...(allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE) ? [{ label: "Exposure Groups → Assessments", count: connections[7], detail: "Worker exposure groups under assessment", href: "/industrial-hygiene" }] : []),
     ...(allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH) ? [{ label: "Exposure Groups → Surveillance", count: connections[8], detail: "Exposure-driven administrative health programs", href: "/occupational-health" }] : []),
     ...(allowed.has(PermissionKey.VIEW_TRAINING) ? [{ label: "Courses → Competencies", count: connections[9], detail: "Learning outcomes mapped to verified capability", href: "/training/competencies" }] : []),
+    ...(allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE) ? [{ label: "Weak Signals → Critical Controls", count: sifReviews.filter(review=>sifControls.some(control=>control.category===review.exposureCategory)).length, detail: "Reviewed precursors covered by an active control standard", href: "/assurance/sif" }] : []),
   ];
 
   const ranked = rankAssuranceSignals(signals);

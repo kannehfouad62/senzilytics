@@ -5,7 +5,7 @@ import { PermissionKey } from "@prisma/client";
 import { BarChart3, CalendarDays, Plus } from "lucide-react";
 import Link from "next/link";
 
-const sourceLabels:Record<UnifiedCalendarSource,string>={COMPLIANCE_CALENDAR:"Calendar Tasks",COMPLIANCE_OBLIGATION:"Obligations",OBSERVATION:"Observations",AUDIT:"Audits",AUDIT_FINDING:"Audit Findings",INSPECTION:"Inspections",CAPA:"Corrective Actions",TRAINING:"Training",COMPETENCY:"Competency",PERMIT:"Regulatory Permits",CONTRACTOR:"Contractor Credentials",PERMIT_TO_WORK:"Permits to Work",INDUSTRIAL_HYGIENE:"Industrial Hygiene",OCCUPATIONAL_HEALTH:"Occupational Health",RISK_REVIEW:"Risk Reviews",MOC:"MOC Tasks",WORKFLOW:"Workflow Tasks"};
+const sourceLabels:Record<UnifiedCalendarSource,string>={COMPLIANCE_CALENDAR:"Calendar Tasks",COMPLIANCE_OBLIGATION:"Obligations",OBSERVATION:"Observations",AUDIT:"Audits",AUDIT_FINDING:"Audit Findings",INSPECTION:"Inspections",CAPA:"Corrective Actions",TRAINING:"Training",COMPETENCY:"Competency",CRITICAL_CONTROL:"Critical Controls",PERMIT:"Regulatory Permits",CONTRACTOR:"Contractor Credentials",PERMIT_TO_WORK:"Permits to Work",INDUSTRIAL_HYGIENE:"Industrial Hygiene",OCCUPATIONAL_HEALTH:"Occupational Health",RISK_REVIEW:"Risk Reviews",MOC:"MOC Tasks",WORKFLOW:"Workflow Tasks"};
 export default async function ComplianceCalendarPage({searchParams}:{searchParams:Promise<{month?:string;scope?:string;source?:string}>}){
   await requirePermission(PermissionKey.VIEW_COMPLIANCE);
   const[{organizationId,user},canManage,permissions,query]=await Promise.all([getCurrentUserTenant(),hasPermission(PermissionKey.MANAGE_COMPLIANCE),getCurrentUserPermissions(),searchParams]);

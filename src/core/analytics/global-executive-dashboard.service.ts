@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getCompetencyMatrixService } from "@/modules/training/competency.service";
+import { getSifExecutiveMetricsService } from "@/modules/assurance/sif-intelligence.service";
 import {
   EnterpriseAuditFindingStatus,
   EnterpriseAuditStatus,
@@ -39,6 +40,9 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
   const competencyMatrix = allowed.has(PermissionKey.VIEW_TRAINING)
     ? await getCompetencyMatrixService(organizationId, now)
     : { gaps: 0, criticalGaps: 0 };
+  const sifMetrics = allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE)
+    ? await getSifExecutiveMetricsService(organizationId, now)
+    : { potentialSif: 0, precursors: 0, failedOrDegraded: 0, overdueControls: 0, attentionCount: 0 };
 
   const [
     openObservations, openActions, overdueActions, highRisks, overdueRiskReviews, openMocs, overdueMocs,
@@ -98,6 +102,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
   ];
   if (allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE)) modules.push({ label: "Industrial Hygiene", value: openExposureAssessments, note: `${aboveLimitExposureSamples} results above limit`, href: "/industrial-hygiene", tone: aboveLimitExposureSamples ? "danger" : openExposureAssessments ? "neutral" : "good" });
   if (allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH)) modules.push({ label: "Occupational Health", value: overdueSurveillance, note: "restricted milestones overdue", href: "/occupational-health", tone: overdueSurveillance ? "danger" : "good" });
+  if (allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE)) modules.push({ label: "SIF Prevention", value: sifMetrics.attentionCount, note: `${sifMetrics.potentialSif} pSIF decisions · ${sifMetrics.failedOrDegraded} degraded or failed controls`, href: "/assurance/sif", tone: sifMetrics.failedOrDegraded || sifMetrics.overdueControls ? "danger" : sifMetrics.potentialSif ? "warning" : "good" });
 
   return { modules, attentionCount: modules.filter((item) => item.tone === "danger").reduce((sum, item) => sum + item.value, 0) };
 }

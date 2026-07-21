@@ -111,6 +111,8 @@ enum PermissionKey {
   MANAGE_INDUSTRIAL_HYGIENE
   VIEW_OCCUPATIONAL_HEALTH
   MANAGE_OCCUPATIONAL_HEALTH
+  VIEW_SIF_INTELLIGENCE
+  MANAGE_CRITICAL_CONTROLS
 }
 
 enum ConfigurableFormModule {
@@ -129,6 +131,7 @@ enum ConfigurableFormModule {
   CONTRACTOR
   PERMIT_TO_WORK
   INDUSTRIAL_HYGIENE
+  SIF_ASSURANCE
   GENERAL
 }
 
@@ -174,6 +177,45 @@ enum SafetyObservationStatus {
   ACTION_REQUIRED
   RESOLVED
   CLOSED
+}
+
+enum SifExposureCategory {
+  MOBILE_EQUIPMENT
+  WORK_AT_HEIGHT
+  ENERGY_ISOLATION
+  CONFINED_SPACE
+  LIFTING_OPERATIONS
+  FIRE_EXPLOSION
+  HAZARDOUS_MATERIALS
+  ELECTRICAL
+  EXCAVATION
+  LINE_OF_FIRE
+  PROCESS_SAFETY
+  OTHER
+}
+
+enum SifSignalSourceType {
+  OBSERVATION
+  INCIDENT
+  AUDIT_FINDING
+  INSPECTION_FINDING
+  RISK
+  PERMIT_TO_WORK
+  CONTROL_VERIFICATION
+}
+
+enum SifSignalClassification {
+  POTENTIAL_SIF
+  PRECURSOR
+  ROUTINE
+  DISMISSED
+}
+
+enum CriticalControlVerificationResult {
+  EFFECTIVE
+  DEGRADED
+  FAILED
+  NOT_VERIFIED
 }
 
 enum ComplianceObligationType {
@@ -627,6 +669,7 @@ enum DocumentEntityType {
   CONTRACTOR
   PERMIT_TO_WORK
   INDUSTRIAL_HYGIENE
+  SIF_ASSURANCE
 }
 
 enum DocumentCategory {
@@ -1109,6 +1152,9 @@ model Organization {
   similarExposureGroups         SimilarExposureGroup[]
   exposureAssessments           ExposureAssessment[]
   surveillancePrograms          MedicalSurveillanceProgram[]
+  criticalControls              CriticalControlStandard[]
+  criticalControlVerifications  CriticalControlVerification[]
+  sifSignalReviews              SifSignalReview[]
 }
 
 model PricingInquiry {
@@ -1167,6 +1213,7 @@ model Site {
   permitsToWork                 PermitToWork[]
   similarExposureGroups         SimilarExposureGroup[]
   exposureAssessments           ExposureAssessment[]
+  criticalControls              CriticalControlStandard[]
 }
 
 model Department {
@@ -1189,12 +1236,13 @@ model Department {
   complianceCalendarTasks       ComplianceCalendarTask[]
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
 
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
   jobSafetyAnalyses     JobSafetyAnalysis[]
   permitsToWork         PermitToWork[]
   similarExposureGroups SimilarExposureGroup[]
   exposureAssessments   ExposureAssessment[]
+  criticalControls      CriticalControlStandard[]
 }
 
 model User {
@@ -1283,6 +1331,10 @@ model User {
   closedPermitsToWork              PermitToWork[]                  @relation("PermitToWorkClosedBy")
   verifiedPermitControls           PermitToWorkControl[]           @relation("PermitControlVerifiedBy")
   performedPermitGasTests          PermitToWorkGasTest[]           @relation("PermitGasTestPerformedBy")
+  createdCriticalControls          CriticalControlStandard[]       @relation("CriticalControlCreatedBy")
+  ownedCriticalControls            CriticalControlStandard[]       @relation("CriticalControlOwner")
+  criticalControlVerifications     CriticalControlVerification[]   @relation("CriticalControlVerifier")
+  sifSignalReviews                 SifSignalReview[]               @relation("SifSignalReviewer")
   permitToWorkHistory              PermitToWorkHistory[]           @relation("PermitHistoryActor")
   ownedExposureGroups              SimilarExposureGroup[]          @relation("ExposureGroupOwner")
   assignedExposureAssessments      ExposureAssessment[]            @relation("ExposureAssessmentAssessor")
@@ -1535,7 +1587,8 @@ model CorrectiveAction {
   assignedToId String
   assignedTo   User   @relation(fields: [assignedToId], references: [id])
 
-  enterpriseAuditFindingLinks EnterpriseAuditFindingActionLink[] @relation("EnterpriseAuditFindingCorrectiveAction")
+  enterpriseAuditFindingLinks  EnterpriseAuditFindingActionLink[] @relation("EnterpriseAuditFindingCorrectiveAction")
+  criticalControlVerifications CriticalControlVerification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4025,6 +4078,89 @@ model CompetencyAssessment {
   @@index([organizationId, status, expiresAt])
   @@index([userId, competencyId, status])
   @@index([competencyId, assessedLevel])
+}
+
+model CriticalControlStandard {
+  id                        String                        @id @default(cuid())
+  organizationId            String
+  organization              Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code                      String
+  name                      String
+  category                  SifExposureCategory
+  description               String?
+  performanceStandard       String
+  verificationPrompt        String
+  verificationFrequencyDays Int                           @default(30)
+  siteId                    String?
+  site                      Site?                         @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  departmentId              String?
+  department                Department?                   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  ownerId                   String?
+  owner                     User?                         @relation("CriticalControlOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdById               String
+  createdBy                 User                          @relation("CriticalControlCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  isActive                  Boolean                       @default(true)
+  nextVerificationDueAt     DateTime
+  reminderSentAt            DateTime?
+  overdueNotifiedAt         DateTime?
+  verifications             CriticalControlVerification[]
+  createdAt                 DateTime                      @default(now())
+  updatedAt                 DateTime                      @updatedAt
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, category, isActive])
+  @@index([organizationId, nextVerificationDueAt])
+  @@index([siteId, departmentId])
+  @@index([ownerId, isActive])
+}
+
+model CriticalControlVerification {
+  id                 String                            @id @default(cuid())
+  organizationId     String
+  organization       Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  controlId          String
+  control            CriticalControlStandard           @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  verifiedById       String
+  verifiedBy         User                              @relation("CriticalControlVerifier", fields: [verifiedById], references: [id], onDelete: Restrict)
+  verifiedAt         DateTime
+  nextDueAt          DateTime
+  result             CriticalControlVerificationResult
+  evidenceReference  String?
+  findings           String?
+  immediateAction    String?
+  correctiveActionId String?
+  correctiveAction   CorrectiveAction?                 @relation(fields: [correctiveActionId], references: [id], onDelete: SetNull)
+  createdAt          DateTime                          @default(now())
+  updatedAt          DateTime                          @updatedAt
+
+  @@index([organizationId, result, verifiedAt])
+  @@index([controlId, verifiedAt])
+  @@index([verifiedById, verifiedAt])
+  @@index([correctiveActionId])
+}
+
+model SifSignalReview {
+  id                  String                  @id @default(cuid())
+  organizationId      String
+  organization        Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceType          SifSignalSourceType
+  sourceId            String
+  classification      SifSignalClassification
+  exposureCategory    SifExposureCategory
+  potentialSeverity   RiskLevel
+  rationale           String
+  controlFailureNotes String?
+  reviewedById        String
+  reviewedBy          User                    @relation("SifSignalReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  reviewedAt          DateTime                @default(now())
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@unique([organizationId, sourceType, sourceId])
+  @@index([organizationId, classification, reviewedAt])
+  @@index([organizationId, exposureCategory, reviewedAt])
+  @@index([reviewedById, reviewedAt])
 }
 
 model Risk {
