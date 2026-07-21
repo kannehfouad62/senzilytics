@@ -38,6 +38,7 @@ import {
   Waves,
   Award,
   Wrench,
+  BrainCircuit,
 } from "lucide-react";
 
 export const primaryNavItems = [
@@ -50,6 +51,12 @@ export const primaryNavItems = [
     label: "Operational Assurance",
     href: "/assurance",
     icon: Network,
+  },
+  {
+    label: "AI Intelligence",
+    href: "/intelligence",
+    icon: BrainCircuit,
+    permission: PermissionKey.USE_AI,
   },
   {
     label: "SIF Prevention",

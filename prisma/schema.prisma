@@ -122,6 +122,37 @@ enum PermissionKey {
   MANAGE_BEHAVIOR_SAFETY
 }
 
+enum AiIntelligenceUseCase {
+  DAILY_BRIEFING
+  EXECUTIVE_RISK
+  AUDIT_FOCUS
+  REGULATORY_IMPACT
+  CONTROL_EFFECTIVENESS
+  CUSTOM_QUERY
+}
+
+enum AiIntelligenceStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum AiIntelligenceConfidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AiIntelligenceSourceType {
+  PORTFOLIO_METRIC
+  ASSURANCE_SIGNAL
+}
+
+enum AiIntelligenceFeedbackRating {
+  HELPFUL
+  NOT_HELPFUL
+}
+
 enum ConfigurableFormModule {
   OBSERVATION
   INCIDENT
@@ -1338,6 +1369,9 @@ model Organization {
   regulatorySources              RegulatorySource[]
   regulatoryChanges              RegulatoryChange[]
   regulatoryImpactAssessments    RegulatoryImpactAssessment[]
+  aiIntelligenceAnalyses         AiIntelligenceAnalysis[]
+  aiIntelligenceSources          AiIntelligenceSource[]
+  aiIntelligenceFeedback         AiIntelligenceFeedback[]
 }
 
 model PricingInquiry {
@@ -1550,6 +1584,9 @@ model User {
   implementedRegulatoryChanges     RegulatoryChange[]              @relation("RegulatoryChangeImplementedBy")
   regulatoryImpactAssessments      RegulatoryImpactAssessment[]    @relation("RegulatoryAssessmentAssessor")
   reviewedRegulatoryAssessments    RegulatoryImpactAssessment[]    @relation("RegulatoryAssessmentReviewer")
+  requestedAiAnalyses              AiIntelligenceAnalysis[]        @relation("AiIntelligenceRequestedBy")
+  reviewedAiAnalyses               AiIntelligenceAnalysis[]        @relation("AiIntelligenceReviewedBy")
+  aiIntelligenceFeedback           AiIntelligenceFeedback[]
   permitToWorkHistory              PermitToWorkHistory[]           @relation("PermitHistoryActor")
   ownedExposureGroups              SimilarExposureGroup[]          @relation("ExposureGroupOwner")
   assignedExposureAssessments      ExposureAssessment[]            @relation("ExposureAssessmentAssessor")
@@ -5163,6 +5200,79 @@ model MocRiskLink {
 
   @@unique([mocId, riskId])
   @@index([riskId])
+}
+
+model AiIntelligenceAnalysis {
+  id                  String                   @id @default(cuid())
+  organizationId      String
+  requestedById       String
+  useCase             AiIntelligenceUseCase
+  title               String
+  question            String?
+  status              AiIntelligenceStatus     @default(PENDING_REVIEW)
+  executiveSummary    String
+  responsePayload     Json
+  inputScope          Json
+  confidence          AiIntelligenceConfidence
+  confidenceRationale String
+  limitations         String
+  model               String
+  providerResponseId  String?
+  reviewedById        String?
+  reviewedAt          DateTime?
+  reviewNotes         String?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestedBy  User                     @relation("AiIntelligenceRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy   User?                    @relation("AiIntelligenceReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  sources      AiIntelligenceSource[]
+  feedback     AiIntelligenceFeedback[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, useCase, createdAt])
+  @@index([requestedById, createdAt])
+}
+
+model AiIntelligenceSource {
+  id             String                   @id @default(cuid())
+  organizationId String
+  analysisId     String
+  sourceKey      String
+  sourceType     AiIntelligenceSourceType
+  module         String
+  entityType     String
+  entityId       String
+  reference      String?
+  title          String
+  summary        String
+  href           String
+  capturedAt     DateTime                 @default(now())
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  analysis     AiIntelligenceAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, sourceKey])
+  @@index([organizationId, module, entityType, entityId])
+}
+
+model AiIntelligenceFeedback {
+  id             String                       @id @default(cuid())
+  organizationId String
+  analysisId     String
+  userId         String
+  rating         AiIntelligenceFeedbackRating
+  comment        String?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  analysis     AiIntelligenceAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([analysisId, userId])
+  @@index([organizationId, rating, createdAt])
 }
 
 model RolePermission {

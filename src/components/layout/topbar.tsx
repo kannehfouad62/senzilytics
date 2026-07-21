@@ -12,7 +12,7 @@ import {
 } from "./sidebar";
 import { isApprovedPlatformAdministrator } from "@/lib/platform-admin";
 import { MobileNavigationMenu } from "./mobile-navigation-menu";
-import { UserRole } from "@prisma/client";
+import { PermissionKey, UserRole } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
 import { getCurrentUserPermissions } from "@/lib/permissions";
 
@@ -148,9 +148,9 @@ export async function Topbar() {
         </form>
         <Link href="/search" className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10 md:hidden" title="Search Senzilytics"><Search size={20}/></Link>
 
-        {entitlements.AI && <button className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-300">
+        {entitlements.AI && permissions.includes(PermissionKey.USE_AI) && <Link href="/intelligence" className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-300 hover:bg-cyan-400/20" title="EHS Intelligence Workspace">
           <Sparkles size={20} />
-        </button>}
+        </Link>}
 
         {!demoMode && entitlements.IN_APP_NOTIFICATIONS && <Link
           href="/tasks"
