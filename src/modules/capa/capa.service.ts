@@ -66,6 +66,9 @@ const capaInclude = {
   behaviorSessions: {
     include: { program: true, site: true },
   },
+  regulatoryChangeLinks: {
+    include: { change: { include: { source: true } } },
+  },
 } as const;
 
 export async function findTenantCapas(

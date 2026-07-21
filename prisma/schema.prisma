@@ -142,6 +142,7 @@ enum ConfigurableFormModule {
   CERTIFICATION_READINESS
   ASSET_SAFETY
   BEHAVIOR_SAFETY
+  REGULATORY_INTELLIGENCE
   GENERAL
 }
 
@@ -368,6 +369,59 @@ enum ComplianceCalendarOccurrenceStatus {
   REJECTED
   OVERDUE
   CANCELLED
+}
+
+enum RegulatorySourceType {
+  GOVERNMENT_REGULATOR
+  STANDARDS_BODY
+  INDUSTRY_BODY
+  CONTRACTUAL
+  INTERNAL
+  OTHER
+}
+
+enum RegulatorySourceStatus {
+  ACTIVE
+  PAUSED
+  RETIRED
+}
+
+enum RegulatoryChangeType {
+  NEW_REQUIREMENT
+  AMENDMENT
+  REPEAL
+  GUIDANCE
+  ENFORCEMENT_ALERT
+  STANDARD_UPDATE
+  OTHER
+}
+
+enum RegulatoryChangeStatus {
+  DETECTED
+  UNDER_REVIEW
+  IMPACT_ASSESSMENT
+  ACTION_REQUIRED
+  IMPLEMENTED
+  NOT_APPLICABLE
+  CLOSED
+}
+
+enum RegulatoryAssessmentStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum RegulatoryImpactDecision {
+  APPLICABLE
+  NOT_APPLICABLE
+}
+
+enum RegulatoryObligationRelationship {
+  CREATED
+  UPDATED
+  AFFECTED
 }
 
 enum PermitStatus {
@@ -787,6 +841,7 @@ enum DocumentEntityType {
   CERTIFICATION_READINESS
   ASSET_SAFETY
   BEHAVIOR_SAFETY
+  REGULATORY_CHANGE
 }
 
 enum DocumentCategory {
@@ -1280,6 +1335,9 @@ model Organization {
   behaviorSafetyPrograms         BehaviorSafetyProgram[]
   behaviorCoachingSessions       BehaviorCoachingSession[]
   behaviorRecognitions           BehaviorRecognition[]
+  regulatorySources              RegulatorySource[]
+  regulatoryChanges              RegulatoryChange[]
+  regulatoryImpactAssessments    RegulatoryImpactAssessment[]
 }
 
 model PricingInquiry {
@@ -1485,6 +1543,13 @@ model User {
   nominatedBehaviorRecognitions    BehaviorRecognition[]           @relation("BehaviorRecognitionNominee")
   createdBehaviorRecognitions      BehaviorRecognition[]           @relation("BehaviorRecognitionNominator")
   approvedBehaviorRecognitions     BehaviorRecognition[]           @relation("BehaviorRecognitionApprover")
+  ownedRegulatorySources           RegulatorySource[]              @relation("RegulatorySourceOwner")
+  reviewedRegulatorySources        RegulatorySource[]              @relation("RegulatorySourceReviewer")
+  ownedRegulatoryChanges           RegulatoryChange[]              @relation("RegulatoryChangeOwner")
+  detectedRegulatoryChanges        RegulatoryChange[]              @relation("RegulatoryChangeDetectedBy")
+  implementedRegulatoryChanges     RegulatoryChange[]              @relation("RegulatoryChangeImplementedBy")
+  regulatoryImpactAssessments      RegulatoryImpactAssessment[]    @relation("RegulatoryAssessmentAssessor")
+  reviewedRegulatoryAssessments    RegulatoryImpactAssessment[]    @relation("RegulatoryAssessmentReviewer")
   permitToWorkHistory              PermitToWorkHistory[]           @relation("PermitHistoryActor")
   ownedExposureGroups              SimilarExposureGroup[]          @relation("ExposureGroupOwner")
   assignedExposureAssessments      ExposureAssessment[]            @relation("ExposureAssessmentAssessor")
@@ -1744,6 +1809,7 @@ model CorrectiveAction {
   criticalControlVerifications CriticalControlVerification[]
   certificationReviewActions   CertificationReviewActionLink[]
   assetDefects                 AssetDefect[]
+  regulatoryChangeLinks        RegulatoryChangeActionLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3125,28 +3191,31 @@ model InspectionFinding {
 }
 
 model ComplianceItem {
-  id                String                   @id @default(cuid())
-  title             String
-  description       String?
-  status            Status                   @default(OPEN)
-  dueDate           DateTime
-  reference         String?
-  obligationType    ComplianceObligationType @default(REGULATORY)
-  authority         String?
-  jurisdiction      String?
-  legalReference    String?
-  applicability     String?
-  recurrence        ComplianceRecurrence     @default(ONE_TIME)
-  intervalValue     Int                      @default(1)
-  evidenceRequired  String?
-  ownerId           String?
-  owner             User?                    @relation("ComplianceItemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  completedAt       DateTime?
-  lastEvaluatedAt   DateTime?
-  evaluationNotes   String?
-  reminderSentAt    DateTime?
-  overdueNotifiedAt DateTime?
-  evaluations       ComplianceEvaluation[]
+  id                 String                           @id @default(cuid())
+  title              String
+  description        String?
+  status             Status                           @default(OPEN)
+  dueDate            DateTime
+  reference          String?
+  obligationType     ComplianceObligationType         @default(REGULATORY)
+  authority          String?
+  jurisdiction       String?
+  legalReference     String?
+  applicability      String?
+  recurrence         ComplianceRecurrence             @default(ONE_TIME)
+  intervalValue      Int                              @default(1)
+  evidenceRequired   String?
+  ownerId            String?
+  owner              User?                            @relation("ComplianceItemOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  completedAt        DateTime?
+  lastEvaluatedAt    DateTime?
+  evaluationNotes    String?
+  reminderSentAt     DateTime?
+  overdueNotifiedAt  DateTime?
+  evaluations        ComplianceEvaluation[]
+  regulatorySourceId String?
+  regulatorySource   RegulatorySource?                @relation(fields: [regulatorySourceId], references: [id], onDelete: SetNull)
+  regulatoryChanges  RegulatoryChangeObligationLink[]
 
   siteId String
   site   Site   @relation(fields: [siteId], references: [id])
@@ -3156,6 +3225,7 @@ model ComplianceItem {
 
   @@index([ownerId, status])
   @@index([siteId, dueDate])
+  @@index([regulatorySourceId, status])
 }
 
 model ComplianceEvaluation {
@@ -3173,6 +3243,135 @@ model ComplianceEvaluation {
 
   @@index([complianceItemId, evaluatedAt])
   @@index([evaluatedById])
+}
+
+model RegulatorySource {
+  id                String                 @id @default(cuid())
+  organizationId    String
+  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code              String
+  name              String
+  authority         String
+  type              RegulatorySourceType
+  jurisdiction      String
+  sourceUrl         String
+  description       String?
+  ownerId           String
+  owner             User                   @relation("RegulatorySourceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  status            RegulatorySourceStatus @default(ACTIVE)
+  reviewCadenceDays Int                    @default(90)
+  lastReviewedAt    DateTime?
+  lastReviewedById  String?
+  lastReviewedBy    User?                  @relation("RegulatorySourceReviewer", fields: [lastReviewedById], references: [id], onDelete: SetNull)
+  nextReviewAt      DateTime
+  reviewReminderAt  DateTime?
+  obligations       ComplianceItem[]
+  changes           RegulatoryChange[]
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, status, nextReviewAt])
+  @@index([ownerId, status])
+}
+
+model RegulatoryChange {
+  id                    String                           @id @default(cuid())
+  organizationId        String
+  organization          Organization                     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceId              String
+  source                RegulatorySource                 @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  reference             String
+  title                 String
+  summary               String
+  type                  RegulatoryChangeType
+  status                RegulatoryChangeStatus           @default(DETECTED)
+  significance          RiskLevel                        @default(MEDIUM)
+  sourceUrl             String
+  citation              String
+  publishedAt           DateTime?
+  effectiveAt           DateTime?
+  detectedAt            DateTime                         @default(now())
+  assessmentDueAt       DateTime
+  ownerId               String
+  owner                 User                             @relation("RegulatoryChangeOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  detectedById          String
+  detectedBy            User                             @relation("RegulatoryChangeDetectedBy", fields: [detectedById], references: [id], onDelete: Restrict)
+  assessmentReminderAt  DateTime?
+  effectiveReminderAt   DateTime?
+  implementedAt         DateTime?
+  implementedById       String?
+  implementedBy         User?                            @relation("RegulatoryChangeImplementedBy", fields: [implementedById], references: [id], onDelete: SetNull)
+  implementationSummary String?
+  closedAt              DateTime?
+  closeRationale        String?
+  assessments           RegulatoryImpactAssessment[]
+  obligationLinks       RegulatoryChangeObligationLink[]
+  actionLinks           RegulatoryChangeActionLink[]
+  createdAt             DateTime                         @default(now())
+  updatedAt             DateTime                         @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, significance])
+  @@index([sourceId, publishedAt])
+  @@index([ownerId, status, assessmentDueAt])
+  @@index([implementedById, implementedAt])
+  @@index([effectiveAt, status])
+}
+
+model RegulatoryImpactAssessment {
+  id                     String                     @id @default(cuid())
+  organizationId         String
+  organization           Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  changeId               String
+  change                 RegulatoryChange           @relation(fields: [changeId], references: [id], onDelete: Cascade)
+  assessorId             String
+  assessor               User                       @relation("RegulatoryAssessmentAssessor", fields: [assessorId], references: [id], onDelete: Restrict)
+  status                 RegulatoryAssessmentStatus @default(SUBMITTED)
+  decision               RegulatoryImpactDecision
+  applicabilityRationale String
+  impactSummary          String?
+  gapSummary             String?
+  requiredActions        String?
+  implementationDueAt    DateTime?
+  submittedAt            DateTime                   @default(now())
+  reviewedById           String?
+  reviewedBy             User?                      @relation("RegulatoryAssessmentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt             DateTime?
+  reviewNotes            String?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  @@index([organizationId, status, submittedAt])
+  @@index([changeId, status, submittedAt])
+  @@index([assessorId, status])
+}
+
+model RegulatoryChangeObligationLink {
+  id               String                           @id @default(cuid())
+  changeId         String
+  change           RegulatoryChange                 @relation(fields: [changeId], references: [id], onDelete: Cascade)
+  complianceItemId String
+  complianceItem   ComplianceItem                   @relation(fields: [complianceItemId], references: [id], onDelete: Cascade)
+  relationship     RegulatoryObligationRelationship
+  notes            String?
+  createdAt        DateTime                         @default(now())
+
+  @@unique([changeId, complianceItemId])
+  @@index([complianceItemId])
+}
+
+model RegulatoryChangeActionLink {
+  id                 String           @id @default(cuid())
+  changeId           String
+  change             RegulatoryChange @relation(fields: [changeId], references: [id], onDelete: Cascade)
+  correctiveActionId String
+  correctiveAction   CorrectiveAction @relation(fields: [correctiveActionId], references: [id], onDelete: Cascade)
+  createdAt          DateTime         @default(now())
+
+  @@unique([changeId, correctiveActionId])
+  @@index([correctiveActionId])
 }
 
 model ComplianceCalendarTask {

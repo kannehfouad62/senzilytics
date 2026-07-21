@@ -55,6 +55,14 @@ import {
   BehaviorObservationOutcome,
   BehaviorProgramStatus,
   BehaviorRecognitionStatus,
+  ComplianceObligationType,
+  RegulatoryAssessmentStatus,
+  RegulatoryChangeStatus,
+  RegulatoryChangeType,
+  RegulatoryImpactDecision,
+  RegulatoryObligationRelationship,
+  RegulatorySourceStatus,
+  RegulatorySourceType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createAuditService } from "@/modules/audit/audit.service";
@@ -474,6 +482,109 @@ async function main() {
   await prisma.complianceCalendarOccurrence.upsert({
     where: { taskId_dueAt: { taskId: calendarTask.id, dueAt: days(10) } }, update: {},
     create: { organizationId: organization.id, taskId: calendarTask.id, siteId: site.id, departmentId: department.id, assignedToId: manager.id, dueAt: days(10), status: ComplianceCalendarOccurrenceStatus.UPCOMING },
+  });
+
+  const regulatorySource = await prisma.regulatorySource.upsert({
+    where: { organizationId_code: { organizationId: organization.id, code: "REG-DEMO-OSHA" } },
+    update: { ownerId: manager.id, status: RegulatorySourceStatus.ACTIVE },
+    create: {
+      id: "regulatory_source_public_demo_osha",
+      organizationId: organization.id,
+      code: "REG-DEMO-OSHA",
+      name: "Federal Occupational Safety Publications",
+      authority: "Demonstration Federal Safety Authority",
+      type: RegulatorySourceType.GOVERNMENT_REGULATOR,
+      jurisdiction: "United States — Federal",
+      sourceUrl: "https://www.osha.gov/laws-regs",
+      description: "Fictional demonstration monitoring record linked to a real public source landing page; it is not legal advice or an automated applicability determination.",
+      ownerId: manager.id,
+      reviewCadenceDays: 30,
+      lastReviewedAt: days(-20),
+      lastReviewedById: manager.id,
+      nextReviewAt: days(10),
+    },
+  });
+  const regulatoryObligation = await prisma.complianceItem.upsert({
+    where: { id: "compliance_item_public_demo_heat" },
+    update: { regulatorySourceId: regulatorySource.id },
+    create: {
+      id: "compliance_item_public_demo_heat",
+      title: "Heat exposure prevention program review",
+      description: "Review the written heat exposure prevention program, field controls, training, and emergency response arrangements.",
+      status: Status.OPEN,
+      dueDate: days(40),
+      reference: "LEG-DEMO-HEAT-01",
+      obligationType: ComplianceObligationType.REGULATORY,
+      authority: "Demonstration Federal Safety Authority",
+      jurisdiction: "United States — Federal",
+      legalReference: "Fictional demonstration section 1910.XX",
+      applicability: "Warehouse receiving, outdoor loading, and field-service work during elevated heat conditions.",
+      recurrence: ComplianceRecurrence.ANNUAL,
+      intervalValue: 1,
+      evidenceRequired: "Approved program, training records, exposure controls, and field verification evidence.",
+      ownerId: manager.id,
+      regulatorySourceId: regulatorySource.id,
+      siteId: site.id,
+    },
+  });
+  const regulatoryChange = await prisma.regulatoryChange.upsert({
+    where: { organizationId_reference: { organizationId: organization.id, reference: "REG-CHG-DEMO-001" } },
+    update: {},
+    create: {
+      id: "regulatory_change_public_demo_heat",
+      organizationId: organization.id,
+      sourceId: regulatorySource.id,
+      reference: "REG-CHG-DEMO-001",
+      title: "Demonstration heat-exposure prevention update",
+      summary: "Fictional change notice used to demonstrate controlled applicability review, legal-register updates, and implementation traceability.",
+      type: RegulatoryChangeType.NEW_REQUIREMENT,
+      status: RegulatoryChangeStatus.ACTION_REQUIRED,
+      significance: RiskLevel.HIGH,
+      sourceUrl: "https://www.osha.gov/heat-exposure",
+      citation: "Fictional demonstration notice — program requirements section",
+      publishedAt: days(-25),
+      effectiveAt: days(75),
+      detectedAt: days(-20),
+      assessmentDueAt: days(-5),
+      ownerId: manager.id,
+      detectedById: manager.id,
+    },
+  });
+  await prisma.regulatoryImpactAssessment.upsert({
+    where: { id: "regulatory_assessment_public_demo_heat" },
+    update: {},
+    create: {
+      id: "regulatory_assessment_public_demo_heat",
+      organizationId: organization.id,
+      changeId: regulatoryChange.id,
+      assessorId: manager.id,
+      status: RegulatoryAssessmentStatus.APPROVED,
+      decision: RegulatoryImpactDecision.APPLICABLE,
+      applicabilityRationale: "The fictional demonstration requirements apply to warehouse and field-service work with foreseeable heat exposure.",
+      impactSummary: "Update the written program, supervisor trigger criteria, worker training, and field-verification evidence.",
+      gapSummary: "Current program does not include the demonstration trigger and escalation criteria.",
+      requiredActions: "Revise the program, train affected personnel, and verify controls before the fictional effective date.",
+      implementationDueAt: days(60),
+      submittedAt: days(-15),
+      reviewedById: manager.id,
+      reviewedAt: days(-12),
+      reviewNotes: "Approved for demonstration purposes after confirming operational scope.",
+    },
+  });
+  await prisma.regulatoryChangeObligationLink.upsert({
+    where: { changeId_complianceItemId: { changeId: regulatoryChange.id, complianceItemId: regulatoryObligation.id } },
+    update: {},
+    create: { changeId: regulatoryChange.id, complianceItemId: regulatoryObligation.id, relationship: RegulatoryObligationRelationship.UPDATED, notes: "Legal register updated following approved demonstration impact assessment." },
+  });
+  const regulatoryAction = await prisma.correctiveAction.upsert({
+    where: { id: "capa_public_demo_regulatory_heat" },
+    update: {},
+    create: { id: "capa_public_demo_regulatory_heat", title: "Revise heat exposure prevention controls", description: "Update the program, training materials, and field verification before the demonstration effective date.", status: Status.IN_PROGRESS, riskLevel: RiskLevel.HIGH, dueDate: days(45), assignedToId: manager.id },
+  });
+  await prisma.regulatoryChangeActionLink.upsert({
+    where: { changeId_correctiveActionId: { changeId: regulatoryChange.id, correctiveActionId: regulatoryAction.id } },
+    update: {},
+    create: { changeId: regulatoryChange.id, correctiveActionId: regulatoryAction.id },
   });
 
   const contractor = await prisma.contractor.upsert({

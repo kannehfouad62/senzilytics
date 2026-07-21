@@ -42,6 +42,12 @@ export default async function CompliancePage() {
 
         <div className="flex flex-wrap gap-3">
           <Link
+            href="/compliance/regulatory"
+            className="rounded-xl border border-white/10 px-4 py-2"
+          >
+            Regulatory Intelligence
+          </Link>
+          <Link
             href="/compliance/permits"
             className="rounded-xl border border-white/10 px-4 py-2"
           >

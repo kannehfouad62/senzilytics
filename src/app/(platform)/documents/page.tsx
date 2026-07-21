@@ -619,6 +619,9 @@ function getRelatedRecordLink(
     case DocumentEntityType.BEHAVIOR_SAFETY:
       return "/behavior-safety";
 
+    case DocumentEntityType.REGULATORY_CHANGE:
+      return `/compliance/regulatory/changes/${entityId}`;
+
     case DocumentEntityType.WORKFLOW:
       return "/workflows";
 

@@ -88,6 +88,7 @@ export async function createComplianceObligation(
       userId: user.id,
       siteId: required(data, "siteId"),
       ownerId: optional(data, "ownerId"),
+      regulatorySourceId: optional(data, "regulatorySourceId"),
       title: required(data, "title"),
       description: optional(data, "description"),
       reference: optional(data, "reference"),

@@ -26,7 +26,8 @@ type SupportedEntityType =
   | typeof DocumentEntityType.SIF_ASSURANCE
   | typeof DocumentEntityType.CERTIFICATION_READINESS
   | typeof DocumentEntityType.ASSET_SAFETY
-  | typeof DocumentEntityType.BEHAVIOR_SAFETY;
+  | typeof DocumentEntityType.BEHAVIOR_SAFETY
+  | typeof DocumentEntityType.REGULATORY_CHANGE;
 
 function displayValue(
   value: unknown

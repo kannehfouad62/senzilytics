@@ -41,6 +41,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     { certificationReviewActions: { some: { review: { organizationId } } } },
     { assetDefects: { some: { organizationId } } },
     { behaviorSessions: { some: { organizationId } } },
+    { regulatoryChangeLinks: { some: { change: { organizationId } } } },
   ] };
   const competencyMatrix = allowed.has(PermissionKey.VIEW_TRAINING)
     ? await getCompetencyMatrixService(organizationId, now)
@@ -61,6 +62,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     activeWorkPermits, overdueWorkPermits, openExposureAssessments,
     aboveLimitExposureSamples, overdueSurveillance, assetExceptions, overdueAssetInspections, criticalAssetDefects,
     behaviorSessionsThisMonth, criticalBehaviorAtRisk, overdueBehaviorFollowUps,
+    openRegulatoryChanges, overdueRegulatoryAssessments, criticalRegulatoryExposure,
   ] = await Promise.all([
     prisma.safetyObservation.count({ where: { organizationId, status: { notIn: [SafetyObservationStatus.RESOLVED, SafetyObservationStatus.CLOSED] } } }),
     prisma.correctiveAction.count({ where: { ...actionTenantScope, status: { notIn: closedStatuses } } }),
@@ -95,6 +97,9 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.count({ where: { organizationId, observedAt: { gte: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)) } } }) : 0,
     allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.count({ where: { organizationId, criticalAtRiskCount: { gt: 0 }, followUpStatus: { not: "COMPLETED" } } }) : 0,
     allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.count({ where: { organizationId, followUpStatus: { in: ["OPEN", "IN_PROGRESS"] }, followUpDueAt: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.regulatoryChange.count({ where: { organizationId, status: { in: ["DETECTED", "UNDER_REVIEW", "IMPACT_ASSESSMENT", "ACTION_REQUIRED"] } } }) : 0,
+    allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.regulatoryChange.count({ where: { organizationId, status: { in: ["DETECTED", "UNDER_REVIEW", "IMPACT_ASSESSMENT"] }, assessmentDueAt: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.regulatoryChange.count({ where: { organizationId, significance: "CRITICAL", status: { in: ["DETECTED", "UNDER_REVIEW", "IMPACT_ASSESSMENT", "ACTION_REQUIRED"] } } }) : 0,
   ]);
 
   const modules: { label: string; value: number; note: string; href: string; tone: "danger" | "warning" | "good" | "neutral" }[] = [
@@ -107,6 +112,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     { label: "Inspections", value: overdueInspections, note: "overdue", href: "/inspections", tone: overdueInspections ? "danger" : "good" },
     { label: "Training & Competency", value: overdueTraining + competencyMatrix.criticalGaps, note: `${expiringTraining} training records expire in 30 days · ${competencyMatrix.gaps} competency gaps`, href: "/training/dashboard", tone: overdueTraining || competencyMatrix.criticalGaps ? "danger" : competencyMatrix.gaps ? "warning" : "good" },
     { label: "Compliance", value: overdueCompliance, note: "obligations overdue", href: "/compliance/dashboard", tone: overdueCompliance ? "danger" : "good" },
+    { label: "Regulatory Change", value: openRegulatoryChanges, note: `${overdueRegulatoryAssessments} assessments overdue · ${criticalRegulatoryExposure} critical`, href: "/compliance/regulatory", tone: criticalRegulatoryExposure || overdueRegulatoryAssessments ? "danger" : openRegulatoryChanges ? "warning" : "good" },
     { label: "Permits", value: expiringPermits, note: "expiring or expired", href: "/compliance/permits", tone: expiringPermits ? "danger" : "good" },
     { label: "Chemicals", value: governedChemicals, note: "in governed inventory", href: "/chemicals/dashboard", tone: "neutral" },
     { label: "Environmental", value: pendingEnvironmentalData, note: "records need approval", href: "/environmental/dashboard", tone: pendingEnvironmentalData ? "warning" : "good" },

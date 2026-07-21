@@ -318,6 +318,14 @@ function getCapaSource(
     };
   }
 
+  const regulatoryLink = action.regulatoryChangeLinks[0];
+  if (regulatoryLink) {
+    return {
+      label: `${regulatoryLink.change.reference} — ${regulatoryLink.change.title}`,
+      href: `/compliance/regulatory/changes/${regulatoryLink.changeId}`,
+    };
+  }
+
   return {
     label:
       "Standalone corrective action",

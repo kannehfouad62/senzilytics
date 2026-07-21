@@ -44,12 +44,13 @@ export async function getOperationalAssuranceOverview(input: {
       { certificationReviewActions: { some: { review: { organizationId: input.organizationId } } } },
       { assetDefects: { some: { organizationId: input.organizationId } } },
       { behaviorSessions: { some: { organizationId: input.organizationId } } },
+      { regulatoryChangeLinks: { some: { change: { organizationId: input.organizationId } } } },
     ],
   };
 
   const contractorHorizon = new Date(now);
   contractorHorizon.setUTCDate(contractorHorizon.getUTCDate() + 30);
-  const [observations, incidents, auditFindings, inspectionFindings, risks, mocs, contractors, permitsToWork, exposureSamples, surveillancePrograms, competencyMatrix, sifControls, sifReviews, certificationReviews, assetDefects, behaviorSessions, connections] = await Promise.all([
+  const [observations, incidents, auditFindings, inspectionFindings, risks, mocs, contractors, permitsToWork, exposureSamples, surveillancePrograms, competencyMatrix, sifControls, sifReviews, certificationReviews, assetDefects, behaviorSessions, regulatoryChanges, connections] = await Promise.all([
     allowed.has(PermissionKey.VIEW_OBSERVATIONS) ? prisma.safetyObservation.findMany({
       where: { organizationId: input.organizationId, riskLevel: { in: elevated }, status: { notIn: ["RESOLVED", "CLOSED"] } },
       include: { site: true }, orderBy: { observedAt: "desc" }, take: 20,
@@ -97,6 +98,7 @@ export async function getOperationalAssuranceOverview(input: {
     allowed.has(PermissionKey.VIEW_CERTIFICATION_READINESS) ? prisma.certificationManagementReview.findMany({ where: { organizationId: input.organizationId, OR: [{ status: { in: ["PLANNED", "IN_PROGRESS"] }, scheduledAt: { lt: now } }, { status: "APPROVED", nextReviewAt: { lt: now } }] }, include: { program: true }, take: 20 }) : [],
     allowed.has(PermissionKey.VIEW_ASSETS) ? prisma.assetDefect.findMany({ where: { organizationId: input.organizationId, status: { not: "CLOSED" }, OR: [{ severity: { in: ["HIGH", "CRITICAL"] } }, { dueDate: { lt: now } }, { asset: { status: { in: ["OUT_OF_SERVICE", "QUARANTINED"] } } }] }, include: { asset: { include: { site: true } }, correctiveAction: true }, orderBy: { createdAt: "desc" }, take: 20 }) : [],
     allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.findMany({ where: { organizationId: input.organizationId, OR: [{ criticalAtRiskCount: { gt: 0 }, followUpStatus: { not: "COMPLETED" } }, { followUpStatus: { in: ["OPEN", "IN_PROGRESS"] }, followUpDueAt: { lt: now } }] }, include: { program: true, site: true, correctiveAction: true }, orderBy: { observedAt: "desc" }, take: 20 }) : [],
+    allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.regulatoryChange.findMany({ where: { organizationId: input.organizationId, status: { in: ["DETECTED", "UNDER_REVIEW", "IMPACT_ASSESSMENT", "ACTION_REQUIRED"] }, OR: [{ significance: { in: ["HIGH", "CRITICAL"] } }, { assessmentDueAt: { lt: now } }] }, include: { source: true, obligationLinks: true, actionLinks: true }, orderBy: { detectedAt: "desc" }, take: 20 }) : [],
     Promise.all([
       prisma.safetyObservation.count({ where: { organizationId: input.organizationId, incidentId: { not: null } } }),
       prisma.correctiveAction.count({ where: { ...actionScope, incidentId: { not: null } } }),
@@ -112,6 +114,8 @@ export async function getOperationalAssuranceOverview(input: {
       allowed.has(PermissionKey.VIEW_ASSETS) ? prisma.assetDefect.count({ where: { organizationId: input.organizationId, correctiveActionId: { not: null } } }) : 0,
       allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.count({ where: { organizationId: input.organizationId, safetyObservationId: { not: null } } }) : 0,
       allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.count({ where: { organizationId: input.organizationId, correctiveActionId: { not: null } } }) : 0,
+      allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.regulatoryChangeObligationLink.count({ where: { change: { organizationId: input.organizationId } } }) : 0,
+      allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.regulatoryChangeActionLink.count({ where: { change: { organizationId: input.organizationId } } }) : 0,
     ]),
   ]);
 
@@ -133,6 +137,7 @@ export async function getOperationalAssuranceOverview(input: {
     ...certificationReviews.map(review=>({id:`management-review:${review.id}`,title:`${review.reference} — ${review.title}`,detail:review.status==="APPROVED"?"The next required management review is overdue.":"A scheduled management review is overdue.",source:"Certification Readiness",href:`/assurance/certification/reviews/${review.id}`,severity:"HIGH" as const,site:null})),
     ...assetDefects.map(defect=>({id:`asset-defect:${defect.id}`,title:`${defect.reference} — ${defect.title}`,detail:`${defect.asset.status.replaceAll("_"," ")} · ${defect.correctiveAction?"linked CAPA":"no linked CAPA"}${overdue(defect.dueDate,now)?" · resolution overdue":""}.`,source:"Asset Defect",href:`/assets/${defect.assetId}`,severity:(defect.severity==="CRITICAL"||defect.asset.status==="OUT_OF_SERVICE"?"CRITICAL":defect.severity==="HIGH"?"HIGH":"MEDIUM") as AssuranceSignal["severity"],site:defect.asset.site.name})),
     ...behaviorSessions.map(session=>({id:`behavior-session:${session.id}`,title:`${session.reference} — ${session.program.name}`,detail:`${session.criticalAtRiskCount} critical at-risk result${session.criticalAtRiskCount===1?"":"s"} · ${session.correctiveAction?"linked CAPA":"no linked CAPA"}${overdue(session.followUpDueAt,now)?" · follow-up overdue":""}.`,source:"Behavior Safety",href:`/behavior-safety/sessions/${session.id}`,severity:(session.criticalAtRiskCount>0?"CRITICAL":"HIGH") as AssuranceSignal["severity"],site:session.site.name})),
+    ...regulatoryChanges.map(change=>({id:`regulatory-change:${change.id}`,title:`${change.reference} — ${change.title}`,detail:`${change.status.replaceAll("_"," ")} · ${change.obligationLinks.length} obligation link${change.obligationLinks.length===1?"":"s"} · ${change.actionLinks.length} CAPA link${change.actionLinks.length===1?"":"s"}${change.assessmentDueAt<now&&(change.status==="DETECTED"||change.status==="UNDER_REVIEW"||change.status==="IMPACT_ASSESSMENT")?" · assessment overdue":""}.`,source:"Regulatory Change",href:`/compliance/regulatory/changes/${change.id}`,severity:(change.significance==="CRITICAL"?"CRITICAL":"HIGH") as AssuranceSignal["severity"],site:change.source.jurisdiction})),
   ];
 
   const connectionRows: AssuranceConnection[] = [
@@ -150,6 +155,7 @@ export async function getOperationalAssuranceOverview(input: {
     ...(allowed.has(PermissionKey.VIEW_CERTIFICATION_READINESS) ? [{ label: "Audit Programs → Management Reviews", count: connections[10], detail: "Completed leadership reviews supporting management-system assurance", href: "/assurance/certification" }] : []),
     ...(allowed.has(PermissionKey.VIEW_ASSETS) ? [{ label: "Asset Defects → CAPA", count: connections[11], detail: "Equipment deficiencies under corrective-action governance", href: "/assets" }] : []),
     ...(allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? [{ label: "Behavior Coaching → Observations", count: connections[12], detail: "Coaching signals escalated into the observation workflow", href: "/behavior-safety" }, { label: "Behavior Coaching → CAPA", count: connections[13], detail: "Systemic at-risk behaviors under corrective-action governance", href: "/behavior-safety" }] : []),
+    ...(allowed.has(PermissionKey.VIEW_COMPLIANCE) ? [{ label: "Regulatory Changes → Obligations", count: connections[14], detail: "Approved applicability decisions reflected in the legal register", href: "/compliance/regulatory" }, { label: "Regulatory Changes → CAPA", count: connections[15], detail: "Regulatory implementation work under corrective-action governance", href: "/compliance/regulatory" }] : []),
   ];
 
   const ranked = rankAssuranceSignals(signals);

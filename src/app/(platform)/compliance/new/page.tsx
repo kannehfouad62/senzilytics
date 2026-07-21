@@ -18,7 +18,7 @@ const inputClassName =
 export default async function NewComplianceObligationPage() {
   await requirePermission(PermissionKey.MANAGE_COMPLIANCE);
   const { organizationId } = await getCurrentUserTenant();
-  const [sites, users, forms] = await Promise.all([
+  const [sites, users, sources, forms] = await Promise.all([
     prisma.site.findMany({
       where: { organizationId },
       orderBy: { name: "asc" },
@@ -27,6 +27,7 @@ export default async function NewComplianceObligationPage() {
       where: { organizationId, isActive: true },
       orderBy: { name: "asc" },
     }),
+    prisma.regulatorySource.findMany({ where: { organizationId, status: "ACTIVE" }, select: { id: true, code: true, name: true }, orderBy: { name: "asc" } }),
     getPublishedRuntimeForms(
       organizationId,
       ConfigurableFormModule.COMPLIANCE
@@ -90,6 +91,14 @@ export default async function NewComplianceObligationPage() {
           <label className="block text-sm md:col-span-2">
             Legal reference
             <input name="legalReference" className={inputClassName} />
+          </label>
+
+          <label className="block text-sm md:col-span-2">
+            Governed regulatory source
+            <select name="regulatorySourceId" className={inputClassName}>
+              <option value="">Not linked</option>
+              {sources.map((source) => <option key={source.id} value={source.id}>{source.code} — {source.name}</option>)}
+            </select>
           </label>
 
           <label className="block text-sm">

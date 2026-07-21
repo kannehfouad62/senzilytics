@@ -15,6 +15,7 @@ export async function createComplianceObligationService(input: {
   userId: string;
   siteId: string;
   ownerId?: string | null;
+  regulatorySourceId?: string | null;
   title: string;
   description?: string | null;
   reference?: string | null;
@@ -29,7 +30,7 @@ export async function createComplianceObligationService(input: {
   dueDate: Date;
   customSubmissions?: PreparedSubmission[];
 }) {
-  const [site, owner, creator] = await Promise.all([
+  const [site, owner, creator, regulatorySource] = await Promise.all([
     prisma.site.findFirst({
       where: {
         id: input.siteId,
@@ -50,6 +51,7 @@ export async function createComplianceObligationService(input: {
         organizationId: input.organizationId,
       },
     }),
+    input.regulatorySourceId ? prisma.regulatorySource.findFirst({ where: { id: input.regulatorySourceId, organizationId: input.organizationId, status: "ACTIVE" } }) : null,
   ]);
 
   if (!site) {
@@ -62,6 +64,10 @@ export async function createComplianceObligationService(input: {
 
   if (!creator) {
     throw new Error("The obligation creator is not a tenant user.");
+  }
+
+  if (input.regulatorySourceId && !regulatorySource) {
+    throw new Error("Select a valid active regulatory source.");
   }
 
   if (
@@ -80,6 +86,7 @@ export async function createComplianceObligationService(input: {
       data: {
         siteId: site.id,
         ownerId: owner?.id ?? null,
+        regulatorySourceId: regulatorySource?.id ?? null,
         title: input.title,
         description: input.description,
         reference: input.reference,

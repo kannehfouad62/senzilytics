@@ -105,6 +105,16 @@ function sourceOf(action: TenantCapa) {
     };
   }
 
+  const regulatoryLink = action.regulatoryChangeLinks[0];
+  if (regulatoryLink) {
+    return {
+      label: `${regulatoryLink.change.reference} — ${regulatoryLink.change.title}`,
+      type: "Regulatory Change",
+      site: regulatoryLink.change.source.jurisdiction,
+      href: `/compliance/regulatory/changes/${regulatoryLink.changeId}`,
+    };
+  }
+
   return {
     label: "Standalone CAPA",
     type: "Standalone",

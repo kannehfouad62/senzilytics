@@ -50,6 +50,8 @@ export default async function ComplianceObligationDetailPage({
         include: { evaluatedBy: true },
         orderBy: { evaluatedAt: "desc" },
       },
+      regulatorySource: true,
+      regulatoryChanges: { include: { change: true }, orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -151,6 +153,7 @@ export default async function ComplianceObligationDetailPage({
             <Detail label="Type" value={item.obligationType} />
             <Detail label="Jurisdiction" value={item.jurisdiction} />
             <Detail label="Legal reference" value={item.legalReference} />
+            <Detail label="Regulatory source" value={item.regulatorySource ? `${item.regulatorySource.code} — ${item.regulatorySource.name}` : null} />
             <Detail label="Applicability" value={item.applicability} />
             <Detail
               label="Recurrence"
@@ -160,6 +163,8 @@ export default async function ComplianceObligationDetailPage({
             />
             <Detail label="Evidence required" value={item.evidenceRequired} />
           </dl>
+
+          {item.regulatoryChanges.length > 0 && <div className="mt-6"><h3 className="text-sm font-semibold text-cyan-200">Regulatory change traceability</h3><div className="mt-3 space-y-2">{item.regulatoryChanges.map(link => <Link key={link.id} href={`/compliance/regulatory/changes/${link.changeId}`} className="block rounded-xl border border-white/10 p-3 text-sm"><span className="text-cyan-200">{link.change.reference}</span> — {link.change.title}<span className="ml-2 text-xs text-slate-500">{link.relationship}</span></Link>)}</div></div>}
 
           <h2 className="mt-8 text-xl font-semibold">Evaluation history</h2>
           <div className="mt-4 space-y-3">

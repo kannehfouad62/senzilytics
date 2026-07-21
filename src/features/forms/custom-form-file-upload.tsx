@@ -40,7 +40,8 @@ type SupportedEntityType =
   | typeof DocumentEntityType.SIF_ASSURANCE
   | typeof DocumentEntityType.CERTIFICATION_READINESS
   | typeof DocumentEntityType.ASSET_SAFETY
-  | typeof DocumentEntityType.BEHAVIOR_SAFETY;
+  | typeof DocumentEntityType.BEHAVIOR_SAFETY
+  | typeof DocumentEntityType.REGULATORY_CHANGE;
 
 function entityFolder(
   entityType: SupportedEntityType
@@ -82,6 +83,8 @@ function entityFolder(
       return "asset-safety";
     case DocumentEntityType.BEHAVIOR_SAFETY:
       return "behavior-safety";
+    case DocumentEntityType.REGULATORY_CHANGE:
+      return "regulatory-changes";
   }
 }
 

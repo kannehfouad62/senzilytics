@@ -226,6 +226,11 @@ export const complianceNavItems = [
     icon: FlaskConical,
   },
   {
+    label: "Regulatory Intelligence",
+    href: "/compliance/regulatory",
+    icon: Radar,
+  },
+  {
     label: "Compliance",
     href: "/compliance",
     icon: CalendarCheck,

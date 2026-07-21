@@ -60,6 +60,8 @@ export function configurableFormModuleForDocumentEntity(
       return ConfigurableFormModule.ASSET_SAFETY;
     case DocumentEntityType.BEHAVIOR_SAFETY:
       return ConfigurableFormModule.BEHAVIOR_SAFETY;
+    case DocumentEntityType.REGULATORY_CHANGE:
+      return ConfigurableFormModule.REGULATORY_INTELLIGENCE;
     default:
       return null;
   }
