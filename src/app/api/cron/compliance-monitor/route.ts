@@ -3,14 +3,15 @@ import { generateComplianceCalendarOccurrences, monitorComplianceCalendar } from
 import { processComplianceMonitoring } from "@/modules/compliance/compliance-monitor.service";
 import { processOccupationalHealthMonitoring } from "@/modules/occupational-health/occupational-health.service";
 import { processCriticalControlMonitoring } from "@/modules/assurance/critical-control.service";
+import { processCertificationReviewMonitoring } from "@/modules/assurance/certification-readiness.service";
 import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   if (!isAuthorizedCronRequest(request.headers.get("authorization"))) return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
   try {
-    const [compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls] = await Promise.all([processComplianceMonitoring(), generateComplianceCalendarOccurrences(), monitorComplianceCalendar(), processOccupationalHealthMonitoring(), processCriticalControlMonitoring()]);
-    return NextResponse.json({ success: true, processedAt: new Date().toISOString(), compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls });
+    const [compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls, certificationReviews] = await Promise.all([processComplianceMonitoring(), generateComplianceCalendarOccurrences(), monitorComplianceCalendar(), processOccupationalHealthMonitoring(), processCriticalControlMonitoring(), processCertificationReviewMonitoring()]);
+    return NextResponse.json({ success: true, processedAt: new Date().toISOString(), compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls, certificationReviews });
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Compliance monitoring failed." }, { status: 500 });
   }

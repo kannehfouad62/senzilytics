@@ -43,6 +43,7 @@ import {
   SifExposureCategory,
   SifSignalClassification,
   SifSignalSourceType,
+  CertificationManagementReviewStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createAuditService } from "@/modules/audit/audit.service";
@@ -791,6 +792,25 @@ async function main() {
       teamMembers: [{ userId: manager.id, role: EnterpriseAuditTeamRole.LEAD_AUDITOR, canEdit: true, canReview: true }],
     });
   }
+
+  await prisma.certificationManagementReview.upsert({
+    where: { id: "certification_review_public_demo_1" },
+    update: { scheduledAt: days(21), chairId: manager.id, status: CertificationManagementReviewStatus.PLANNED },
+    create: {
+      id: "certification_review_public_demo_1",
+      organizationId: organization.id,
+      programId: program.id,
+      reference: "MR-DEMO-001",
+      title: "ISO 45001 Leadership Management Review",
+      status: CertificationManagementReviewStatus.PLANNED,
+      periodStart: days(-365),
+      periodEnd: days(-1),
+      scheduledAt: days(21),
+      chairId: manager.id,
+      attendees: "Director EHS, Operations Director, Warehouse Manager, Worker Representative",
+      createdById: manager.id,
+    },
+  });
 
   console.log("Public demo tenant and sample data are ready.");
 }

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCompetencyMatrixService } from "@/modules/training/competency.service";
 import { getSifExecutiveMetricsService } from "@/modules/assurance/sif-intelligence.service";
+import { getCertificationExecutiveMetricsService } from "@/modules/assurance/certification-readiness.service";
 import {
   EnterpriseAuditFindingStatus,
   EnterpriseAuditStatus,
@@ -36,6 +37,8 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     { auditFinding: { audit: { site: { organizationId } } } },
     { inspectionFinding: { inspection: { site: { organizationId } } } },
     { enterpriseAuditFindingLinks: { some: { finding: { organizationId } } } },
+    { criticalControlVerifications: { some: { organizationId } } },
+    { certificationReviewActions: { some: { review: { organizationId } } } },
   ] };
   const competencyMatrix = allowed.has(PermissionKey.VIEW_TRAINING)
     ? await getCompetencyMatrixService(organizationId, now)
@@ -43,6 +46,9 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
   const sifMetrics = allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE)
     ? await getSifExecutiveMetricsService(organizationId, now)
     : { potentialSif: 0, precursors: 0, failedOrDegraded: 0, overdueControls: 0, attentionCount: 0 };
+  const certificationMetrics = allowed.has(PermissionKey.VIEW_CERTIFICATION_READINESS)
+    ? await getCertificationExecutiveMetricsService(organizationId, now)
+    : { programCount: 0, withoutManagementReview: 0, overdueReviews: 0, attentionCount: 0 };
 
   const [
     openObservations, openActions, overdueActions, highRisks, overdueRiskReviews, openMocs, overdueMocs,
@@ -103,6 +109,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
   if (allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE)) modules.push({ label: "Industrial Hygiene", value: openExposureAssessments, note: `${aboveLimitExposureSamples} results above limit`, href: "/industrial-hygiene", tone: aboveLimitExposureSamples ? "danger" : openExposureAssessments ? "neutral" : "good" });
   if (allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH)) modules.push({ label: "Occupational Health", value: overdueSurveillance, note: "restricted milestones overdue", href: "/occupational-health", tone: overdueSurveillance ? "danger" : "good" });
   if (allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE)) modules.push({ label: "SIF Prevention", value: sifMetrics.attentionCount, note: `${sifMetrics.potentialSif} pSIF decisions · ${sifMetrics.failedOrDegraded} degraded or failed controls`, href: "/assurance/sif", tone: sifMetrics.failedOrDegraded || sifMetrics.overdueControls ? "danger" : sifMetrics.potentialSif ? "warning" : "good" });
+  if (allowed.has(PermissionKey.VIEW_CERTIFICATION_READINESS)) modules.push({ label: "Certification Readiness", value: certificationMetrics.attentionCount, note: `${certificationMetrics.programCount} standard programs · ${certificationMetrics.overdueReviews} reviews overdue`, href: "/assurance/certification", tone: certificationMetrics.overdueReviews ? "danger" : certificationMetrics.withoutManagementReview ? "warning" : "good" });
 
   return { modules, attentionCount: modules.filter((item) => item.tone === "danger").reduce((sum, item) => sum + item.value, 0) };
 }

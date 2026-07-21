@@ -37,7 +37,8 @@ type SupportedEntityType =
   | typeof DocumentEntityType.CONTRACTOR
   | typeof DocumentEntityType.PERMIT_TO_WORK
   | typeof DocumentEntityType.INDUSTRIAL_HYGIENE
-  | typeof DocumentEntityType.SIF_ASSURANCE;
+  | typeof DocumentEntityType.SIF_ASSURANCE
+  | typeof DocumentEntityType.CERTIFICATION_READINESS;
 
 function entityFolder(
   entityType: SupportedEntityType
@@ -73,6 +74,8 @@ function entityFolder(
       return "industrial-hygiene";
     case DocumentEntityType.SIF_ASSURANCE:
       return "sif-assurance";
+    case DocumentEntityType.CERTIFICATION_READINESS:
+      return "certification-readiness";
   }
 }
 

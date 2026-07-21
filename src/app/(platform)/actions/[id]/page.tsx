@@ -280,6 +280,28 @@ function getCapaSource(
     };
   }
 
+  const criticalControlVerification =
+    action.criticalControlVerifications[0];
+
+  if (criticalControlVerification) {
+    return {
+      label:
+        criticalControlVerification.control.name,
+      href: `/assurance/sif/controls/${criticalControlVerification.controlId}`,
+    };
+  }
+
+  const managementReviewAction =
+    action.certificationReviewActions[0];
+
+  if (managementReviewAction) {
+    return {
+      label:
+        managementReviewAction.review.program.name,
+      href: `/assurance/certification/reviews/${managementReviewAction.reviewId}`,
+    };
+  }
+
   return {
     label:
       "Standalone corrective action",

@@ -23,7 +23,8 @@ type SupportedEntityType =
   | typeof DocumentEntityType.CONTRACTOR
   | typeof DocumentEntityType.PERMIT_TO_WORK
   | typeof DocumentEntityType.INDUSTRIAL_HYGIENE
-  | typeof DocumentEntityType.SIF_ASSURANCE;
+  | typeof DocumentEntityType.SIF_ASSURANCE
+  | typeof DocumentEntityType.CERTIFICATION_READINESS;
 
 function displayValue(
   value: unknown

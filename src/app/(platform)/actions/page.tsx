@@ -65,6 +65,26 @@ function sourceOf(action: TenantCapa) {
     };
   }
 
+  const criticalControlVerification = action.criticalControlVerifications[0];
+  if (criticalControlVerification) {
+    return {
+      label: criticalControlVerification.control.name,
+      type: "Critical Control",
+      site: "Organization-wide",
+      href: `/assurance/sif/controls/${criticalControlVerification.controlId}`,
+    };
+  }
+
+  const managementReviewAction = action.certificationReviewActions[0];
+  if (managementReviewAction) {
+    return {
+      label: managementReviewAction.review.program.name,
+      type: "Management Review",
+      site: "Organization-wide",
+      href: `/assurance/certification/reviews/${managementReviewAction.reviewId}`,
+    };
+  }
+
   return {
     label: "Standalone CAPA",
     type: "Standalone",

@@ -113,6 +113,8 @@ enum PermissionKey {
   MANAGE_OCCUPATIONAL_HEALTH
   VIEW_SIF_INTELLIGENCE
   MANAGE_CRITICAL_CONTROLS
+  VIEW_CERTIFICATION_READINESS
+  MANAGE_CERTIFICATION_READINESS
 }
 
 enum ConfigurableFormModule {
@@ -132,6 +134,7 @@ enum ConfigurableFormModule {
   PERMIT_TO_WORK
   INDUSTRIAL_HYGIENE
   SIF_ASSURANCE
+  CERTIFICATION_READINESS
   GENERAL
 }
 
@@ -216,6 +219,20 @@ enum CriticalControlVerificationResult {
   DEGRADED
   FAILED
   NOT_VERIFIED
+}
+
+enum CertificationManagementReviewStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  CANCELLED
+}
+
+enum ManagementSystemConclusion {
+  EFFECTIVE
+  NEEDS_IMPROVEMENT
+  NOT_EFFECTIVE
 }
 
 enum ComplianceObligationType {
@@ -670,6 +687,7 @@ enum DocumentEntityType {
   PERMIT_TO_WORK
   INDUSTRIAL_HYGIENE
   SIF_ASSURANCE
+  CERTIFICATION_READINESS
 }
 
 enum DocumentCategory {
@@ -1123,38 +1141,39 @@ model Organization {
 
   enterpriseAuditFindingsV2 EnterpriseAuditFinding[] @relation("EnterpriseAuditFindingOrganization")
 
-  enterpriseAuditHistoryV2      EnterpriseAuditHistory[]        @relation("EnterpriseAuditHistoryOrganization")
-  safetyObservations            SafetyObservation[]
-  trainingCourses               TrainingCourse[]
-  trainingRequirements          TrainingRequirement[]
-  competencies                  CompetencyDefinition[]
-  competencyRequirements        CompetencyRequirement[]
-  competencyAssessments         CompetencyAssessment[]
-  permits                       Permit[]
-  chemicals                     Chemical[]
-  environmentalMetrics          EnvironmentalMetricDefinition[]
-  environmentalTargets          EnvironmentalTarget[]
-  esgFrameworks                 EsgFramework[]
-  esgMetrics                    EsgMetricDefinition[]
-  esgDisclosurePeriods          EsgDisclosurePeriod[]
-  esgInitiatives                EsgInitiative[]
-  jobSafetyAnalyses             JobSafetyAnalysis[]
-  identityProviders             OrganizationIdentityProvider[]
-  tenantInvitations             TenantInvitation[]
-  demoLeads                     DemoLead[]
-  complianceCalendarTasks       ComplianceCalendarTask[]
-  complianceCalendarOccurrences ComplianceCalendarOccurrence[]
-  offlineSubmissions            OfflineSubmission[]
-  pricingInquiries              PricingInquiry[]
-  contractors                   Contractor[]
-  permitsToWork                 PermitToWork[]
-  hygieneAgents                 HygieneAgent[]
-  similarExposureGroups         SimilarExposureGroup[]
-  exposureAssessments           ExposureAssessment[]
-  surveillancePrograms          MedicalSurveillanceProgram[]
-  criticalControls              CriticalControlStandard[]
-  criticalControlVerifications  CriticalControlVerification[]
-  sifSignalReviews              SifSignalReview[]
+  enterpriseAuditHistoryV2       EnterpriseAuditHistory[]        @relation("EnterpriseAuditHistoryOrganization")
+  safetyObservations             SafetyObservation[]
+  trainingCourses                TrainingCourse[]
+  trainingRequirements           TrainingRequirement[]
+  competencies                   CompetencyDefinition[]
+  competencyRequirements         CompetencyRequirement[]
+  competencyAssessments          CompetencyAssessment[]
+  permits                        Permit[]
+  chemicals                      Chemical[]
+  environmentalMetrics           EnvironmentalMetricDefinition[]
+  environmentalTargets           EnvironmentalTarget[]
+  esgFrameworks                  EsgFramework[]
+  esgMetrics                     EsgMetricDefinition[]
+  esgDisclosurePeriods           EsgDisclosurePeriod[]
+  esgInitiatives                 EsgInitiative[]
+  jobSafetyAnalyses              JobSafetyAnalysis[]
+  identityProviders              OrganizationIdentityProvider[]
+  tenantInvitations              TenantInvitation[]
+  demoLeads                      DemoLead[]
+  complianceCalendarTasks        ComplianceCalendarTask[]
+  complianceCalendarOccurrences  ComplianceCalendarOccurrence[]
+  offlineSubmissions             OfflineSubmission[]
+  pricingInquiries               PricingInquiry[]
+  contractors                    Contractor[]
+  permitsToWork                  PermitToWork[]
+  hygieneAgents                  HygieneAgent[]
+  similarExposureGroups          SimilarExposureGroup[]
+  exposureAssessments            ExposureAssessment[]
+  surveillancePrograms           MedicalSurveillanceProgram[]
+  criticalControls               CriticalControlStandard[]
+  criticalControlVerifications   CriticalControlVerification[]
+  sifSignalReviews               SifSignalReview[]
+  certificationManagementReviews CertificationManagementReview[]
 }
 
 model PricingInquiry {
@@ -1335,6 +1354,10 @@ model User {
   ownedCriticalControls            CriticalControlStandard[]       @relation("CriticalControlOwner")
   criticalControlVerifications     CriticalControlVerification[]   @relation("CriticalControlVerifier")
   sifSignalReviews                 SifSignalReview[]               @relation("SifSignalReviewer")
+  chairedCertificationReviews      CertificationManagementReview[] @relation("CertificationReviewChair")
+  createdCertificationReviews      CertificationManagementReview[] @relation("CertificationReviewCreatedBy")
+  completedCertificationReviews    CertificationManagementReview[] @relation("CertificationReviewCompletedBy")
+  approvedCertificationReviews     CertificationManagementReview[] @relation("CertificationReviewApprovedBy")
   permitToWorkHistory              PermitToWorkHistory[]           @relation("PermitHistoryActor")
   ownedExposureGroups              SimilarExposureGroup[]          @relation("ExposureGroupOwner")
   assignedExposureAssessments      ExposureAssessment[]            @relation("ExposureAssessmentAssessor")
@@ -1589,6 +1612,7 @@ model CorrectiveAction {
 
   enterpriseAuditFindingLinks  EnterpriseAuditFindingActionLink[] @relation("EnterpriseAuditFindingCorrectiveAction")
   criticalControlVerifications CriticalControlVerification[]
+  certificationReviewActions   CertificationReviewActionLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1811,9 +1835,10 @@ model AuditProgram {
 
   enterpriseAudits EnterpriseAudit[] @relation("EnterpriseAuditProgram")
 
-  sites       AuditProgramSite[]
-  departments AuditProgramDepartment[]
-  schedules   AuditSchedule[]
+  sites                AuditProgramSite[]
+  departments          AuditProgramDepartment[]
+  schedules            AuditSchedule[]
+  certificationReviews CertificationManagementReview[]
 
   @@unique([organizationId, name])
   @@unique([organizationId, code])
@@ -4161,6 +4186,68 @@ model SifSignalReview {
   @@index([organizationId, classification, reviewedAt])
   @@index([organizationId, exposureCategory, reviewedAt])
   @@index([reviewedById, reviewedAt])
+}
+
+model CertificationManagementReview {
+  id                       String                              @id @default(cuid())
+  organizationId           String
+  organization             Organization                        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId                String
+  program                  AuditProgram                        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  reference                String
+  title                    String
+  status                   CertificationManagementReviewStatus @default(PLANNED)
+  periodStart              DateTime
+  periodEnd                DateTime
+  scheduledAt              DateTime
+  chairId                  String
+  chair                    User                                @relation("CertificationReviewChair", fields: [chairId], references: [id], onDelete: Restrict)
+  attendees                String?
+  auditResultsSummary      String?
+  complianceStatusSummary  String?
+  objectivesPerformance    String?
+  stakeholderFeedback      String?
+  changesInContext         String?
+  risksAndOpportunities    String?
+  resourceAdequacy         String?
+  decisions                String?
+  improvementOpportunities String?
+  conclusion               ManagementSystemConclusion?
+  readinessScore           Int?
+  readinessSnapshot        Json?
+  nextReviewAt             DateTime?
+  completedById            String?
+  completedBy              User?                               @relation("CertificationReviewCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  completedAt              DateTime?
+  approvedById             String?
+  approvedBy               User?                               @relation("CertificationReviewApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt               DateTime?
+  createdById              String
+  createdBy                User                                @relation("CertificationReviewCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  reminderSentAt           DateTime?
+  overdueNotifiedAt        DateTime?
+  actions                  CertificationReviewActionLink[]
+  createdAt                DateTime                            @default(now())
+  updatedAt                DateTime                            @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, scheduledAt])
+  @@index([programId, scheduledAt])
+  @@index([chairId, scheduledAt])
+  @@index([nextReviewAt])
+}
+
+model CertificationReviewActionLink {
+  id                 String                        @id @default(cuid())
+  reviewId           String
+  review             CertificationManagementReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  correctiveActionId String                        @unique
+  correctiveAction   CorrectiveAction              @relation(fields: [correctiveActionId], references: [id], onDelete: Cascade)
+  agendaTopic        String?
+  decision           String
+  createdAt          DateTime                      @default(now())
+
+  @@index([reviewId])
 }
 
 model Risk {

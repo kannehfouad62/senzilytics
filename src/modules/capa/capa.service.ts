@@ -54,6 +54,12 @@ const capaInclude = {
       },
     },
   },
+  criticalControlVerifications: {
+    include: { control: true },
+  },
+  certificationReviewActions: {
+    include: { review: { include: { program: true } } },
+  },
 } as const;
 
 export async function findTenantCapas(

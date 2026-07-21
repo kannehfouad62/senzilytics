@@ -1,0 +1,11 @@
+INSERT INTO "RolePermission" ("id", "role", "permission", "createdAt") VALUES
+  ('rp_super_admin_view_cert', 'SUPER_ADMIN', 'VIEW_CERTIFICATION_READINESS', CURRENT_TIMESTAMP),
+  ('rp_super_admin_manage_cert', 'SUPER_ADMIN', 'MANAGE_CERTIFICATION_READINESS', CURRENT_TIMESTAMP),
+  ('rp_org_admin_view_cert', 'ORG_ADMIN', 'VIEW_CERTIFICATION_READINESS', CURRENT_TIMESTAMP),
+  ('rp_org_admin_manage_cert', 'ORG_ADMIN', 'MANAGE_CERTIFICATION_READINESS', CURRENT_TIMESTAMP),
+  ('rp_ehs_manager_view_cert', 'EHS_MANAGER', 'VIEW_CERTIFICATION_READINESS', CURRENT_TIMESTAMP),
+  ('rp_ehs_manager_manage_cert', 'EHS_MANAGER', 'MANAGE_CERTIFICATION_READINESS', CURRENT_TIMESTAMP),
+  ('rp_supervisor_view_cert', 'SUPERVISOR', 'VIEW_CERTIFICATION_READINESS', CURRENT_TIMESTAMP),
+  ('rp_auditor_view_cert', 'AUDITOR', 'VIEW_CERTIFICATION_READINESS', CURRENT_TIMESTAMP),
+  ('rp_demo_view_cert', 'DEMO_VIEWER', 'VIEW_CERTIFICATION_READINESS', CURRENT_TIMESTAMP)
+ON CONFLICT ("role", "permission") DO NOTHING;

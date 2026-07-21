@@ -36,6 +36,7 @@ import {
   HardHat,
   HeartPulse,
   Waves,
+  Award,
 } from "lucide-react";
 
 export const primaryNavItems = [
@@ -54,6 +55,12 @@ export const primaryNavItems = [
     href: "/assurance/sif",
     icon: Radar,
     permission: PermissionKey.VIEW_SIF_INTELLIGENCE,
+  },
+  {
+    label: "Certification Readiness",
+    href: "/assurance/certification",
+    icon: Award,
+    permission: PermissionKey.VIEW_CERTIFICATION_READINESS,
   },
   {
     label: "My Tasks",
