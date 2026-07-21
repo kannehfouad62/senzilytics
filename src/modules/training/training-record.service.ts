@@ -1,3 +1,4 @@
+import { createNotification } from "@/core/notifications/notifications.service";
 import { prisma } from "@/lib/prisma";
 import { completeMissingEntityForms } from "@/modules/forms/entity-form-completion.service";
 import {
@@ -7,6 +8,7 @@ import {
 import {
   ActivityAction,
   ConfigurableFormModule,
+  NotificationType,
 } from "@prisma/client";
 
 export async function assignTrainingService(input: {
@@ -48,7 +50,7 @@ export async function assignTrainingService(input: {
     throw new Error("Enter a valid due date.");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const record = await prisma.$transaction(async (tx) => {
     const record = await tx.trainingRecord.create({
       data: {
         courseId: course.id,
@@ -88,6 +90,8 @@ export async function assignTrainingService(input: {
 
     return record;
   });
+  await createNotification({ organizationId: input.organizationId, userId: learner.id, type: NotificationType.ASSIGNMENT, title: "Training assigned", message: `${course.name} is due ${input.dueDate.toLocaleDateString("en-US")}.`, link: `/training/${record.id}` }).catch(() => undefined);
+  return record;
 }
 
 export async function completeTrainingRecordFormsService(input: {

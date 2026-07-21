@@ -35,6 +35,10 @@ import {
   HygieneAgentCategory,
   SurveillanceEnrollmentStatus,
   SurveillanceProgramStatus,
+  CompetencyAssessmentStatus,
+  CompetencyCategory,
+  CompetencyEvidenceType,
+  CompetencyProficiency,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createAuditService } from "@/modules/audit/audit.service";
@@ -211,6 +215,91 @@ async function main() {
       courseId: course.id,
       assignedById: manager.id,
       provider: course.provider,
+    },
+  });
+
+  const pitCompetency = await prisma.competencyDefinition.upsert({
+    where: { organizationId_code: { organizationId: organization.id, code: "COMP-PIT" } },
+    update: {},
+    create: {
+      id: "competency_public_demo_pit",
+      organizationId: organization.id,
+      code: "COMP-PIT",
+      name: "Powered industrial truck risk awareness",
+      description: "Recognize and apply vehicle–pedestrian separation, visibility and pre-use inspection controls.",
+      category: CompetencyCategory.SAFETY,
+      validityMonths: 12,
+      isCritical: true,
+      createdById: manager.id,
+    },
+  });
+  await prisma.competencyCourseLink.upsert({
+    where: { competencyId_courseId: { competencyId: pitCompetency.id, courseId: course.id } },
+    update: { achievedLevel: CompetencyProficiency.WORKING, minimumScore: 80, isPrimary: true },
+    create: { competencyId: pitCompetency.id, courseId: course.id, achievedLevel: CompetencyProficiency.WORKING, minimumScore: 80, isPrimary: true },
+  });
+  await prisma.competencyRequirement.upsert({
+    where: { id: "competency_requirement_public_demo_pit" },
+    update: { competencyId: pitCompetency.id, role: UserRole.EHS_MANAGER, siteId: site.id, departmentId: department.id, isActive: true },
+    create: {
+      id: "competency_requirement_public_demo_pit",
+      organizationId: organization.id,
+      competencyId: pitCompetency.id,
+      role: UserRole.EHS_MANAGER,
+      siteId: site.id,
+      departmentId: department.id,
+      requiredLevel: CompetencyProficiency.WORKING,
+      dueWithinDays: 30,
+      isMandatory: true,
+    },
+  });
+
+  const leadershipCompetency = await prisma.competencyDefinition.upsert({
+    where: { organizationId_code: { organizationId: organization.id, code: "COMP-EHS-LEAD" } },
+    update: {},
+    create: {
+      id: "competency_public_demo_ehs_leadership",
+      organizationId: organization.id,
+      code: "COMP-EHS-LEAD",
+      name: "EHS assurance leadership",
+      description: "Lead risk-based assurance, evaluate evidence and drive corrective-action accountability.",
+      category: CompetencyCategory.LEADERSHIP,
+      validityMonths: 24,
+      isCritical: true,
+      createdById: manager.id,
+    },
+  });
+  await prisma.competencyRequirement.upsert({
+    where: { id: "competency_requirement_public_demo_leadership" },
+    update: { competencyId: leadershipCompetency.id, role: UserRole.EHS_MANAGER, isActive: true },
+    create: {
+      id: "competency_requirement_public_demo_leadership",
+      organizationId: organization.id,
+      competencyId: leadershipCompetency.id,
+      role: UserRole.EHS_MANAGER,
+      requiredLevel: CompetencyProficiency.PRACTITIONER,
+      dueWithinDays: 30,
+      isMandatory: true,
+    },
+  });
+  await prisma.competencyAssessment.upsert({
+    where: { id: "competency_assessment_public_demo_leadership" },
+    update: { status: CompetencyAssessmentStatus.VERIFIED, expiresAt: days(120), verifiedById: manager.id, verifiedAt: days(-30) },
+    create: {
+      id: "competency_assessment_public_demo_leadership",
+      organizationId: organization.id,
+      competencyId: leadershipCompetency.id,
+      userId: manager.id,
+      assessorId: manager.id,
+      status: CompetencyAssessmentStatus.VERIFIED,
+      assessedLevel: CompetencyProficiency.ADVANCED,
+      assessedAt: days(-30),
+      expiresAt: days(120),
+      evidenceType: CompetencyEvidenceType.EXPERIENCE,
+      evidenceReference: "DEMO-EHS-LEADERSHIP-PORTFOLIO",
+      notes: "Fictional verified evidence included to demonstrate the workforce competency matrix.",
+      verifiedById: manager.id,
+      verifiedAt: days(-30),
     },
   });
 

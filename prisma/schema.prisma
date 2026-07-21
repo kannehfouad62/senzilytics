@@ -328,6 +328,42 @@ enum FitnessOutcome {
   TEMPORARILY_NOT_CLEARED
 }
 
+enum CompetencyCategory {
+  SAFETY
+  TECHNICAL
+  ENVIRONMENTAL
+  COMPLIANCE
+  EMERGENCY_RESPONSE
+  LEADERSHIP
+  QUALITY
+  OTHER
+}
+
+enum CompetencyProficiency {
+  AWARENESS
+  WORKING
+  PRACTITIONER
+  ADVANCED
+  EXPERT
+}
+
+enum CompetencyAssessmentStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum CompetencyEvidenceType {
+  TRAINING
+  PRACTICAL_ASSESSMENT
+  EXPERIENCE
+  LICENSE
+  CERTIFICATION
+  SUPERVISOR_OBSERVATION
+  OTHER
+}
+
 enum ChemicalApprovalStatus {
   DRAFT
   UNDER_REVIEW
@@ -1048,6 +1084,9 @@ model Organization {
   safetyObservations            SafetyObservation[]
   trainingCourses               TrainingCourse[]
   trainingRequirements          TrainingRequirement[]
+  competencies                  CompetencyDefinition[]
+  competencyRequirements        CompetencyRequirement[]
+  competencyAssessments         CompetencyAssessment[]
   permits                       Permit[]
   chemicals                     Chemical[]
   environmentalMetrics          EnvironmentalMetricDefinition[]
@@ -1117,6 +1156,7 @@ model Site {
   enterpriseAuditsV2            EnterpriseAudit[]              @relation("EnterpriseAuditSite")
   safetyObservations            SafetyObservation[]
   trainingRequirements          TrainingRequirement[]
+  competencyRequirements        CompetencyRequirement[]
   jobSafetyAnalyses             JobSafetyAnalysis[]
   permits                       Permit[]
   chemicalInventories           ChemicalInventory[]
@@ -1145,6 +1185,7 @@ model Department {
   enterpriseAuditsV2            EnterpriseAudit[]              @relation("EnterpriseAuditDepartment")
   safetyObservations            SafetyObservation[]
   trainingRequirements          TrainingRequirement[]
+  competencyRequirements        CompetencyRequirement[]
   complianceCalendarTasks       ComplianceCalendarTask[]
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
 
@@ -1190,6 +1231,10 @@ model User {
   trainingRecords                  TrainingRecord[]               @relation("TrainingRecordLearner")
   assignedTrainingRecords          TrainingRecord[]               @relation("TrainingRecordAssignedBy")
   createdTrainingCourses           TrainingCourse[]               @relation("TrainingCourseCreatedBy")
+  createdCompetencies              CompetencyDefinition[]         @relation("CompetencyDefinitionCreatedBy")
+  competencyAssessments            CompetencyAssessment[]         @relation("CompetencyAssessmentLearner")
+  assessedCompetencies             CompetencyAssessment[]         @relation("CompetencyAssessmentAssessor")
+  verifiedCompetencies             CompetencyAssessment[]         @relation("CompetencyAssessmentVerifier")
   ownedComplianceItems             ComplianceItem[]               @relation("ComplianceItemOwner")
   ownedPermits                     Permit[]                       @relation("PermitOwner")
   complianceEvaluations            ComplianceEvaluation[]         @relation("ComplianceEvaluationUser")
@@ -3817,20 +3862,21 @@ model TrainingRecord {
   userId String
   user   User   @relation("TrainingRecordLearner", fields: [userId], references: [id])
 
-  courseId          String?
-  course            TrainingCourse?      @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  assignedById      String?
-  assignedBy        User?                @relation("TrainingRecordAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
-  assignedAt        DateTime             @default(now())
-  expiresAt         DateTime?
-  provider          String?
-  certificateNumber String?
-  score             Float?
-  notes             String?
-  requirementId     String?
-  requirement       TrainingRequirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
-  generationKey     String?              @unique
-  reminderSentAt    DateTime?
+  courseId              String?
+  course                TrainingCourse?        @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  assignedById          String?
+  assignedBy            User?                  @relation("TrainingRecordAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedAt            DateTime               @default(now())
+  expiresAt             DateTime?
+  provider              String?
+  certificateNumber     String?
+  score                 Float?
+  notes                 String?
+  requirementId         String?
+  requirement           TrainingRequirement?   @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+  competencyAssessments CompetencyAssessment[]
+  generationKey         String?                @unique
+  reminderSentAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3842,21 +3888,22 @@ model TrainingRecord {
 }
 
 model TrainingCourse {
-  id             String                @id @default(cuid())
-  organizationId String
-  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  code           String
-  name           String
-  description    String?
-  provider       String?
-  validityMonths Int?
-  isActive       Boolean               @default(true)
-  createdById    String?
-  createdBy      User?                 @relation("TrainingCourseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  requirements   TrainingRequirement[]
-  records        TrainingRecord[]
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  id              String                 @id @default(cuid())
+  organizationId  String
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code            String
+  name            String
+  description     String?
+  provider        String?
+  validityMonths  Int?
+  isActive        Boolean                @default(true)
+  createdById     String?
+  createdBy       User?                  @relation("TrainingCourseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  requirements    TrainingRequirement[]
+  competencyLinks CompetencyCourseLink[]
+  records         TrainingRecord[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   @@unique([organizationId, code])
   @@index([organizationId, isActive])
@@ -3882,6 +3929,102 @@ model TrainingRequirement {
 
   @@index([organizationId, isActive])
   @@index([courseId])
+}
+
+model CompetencyDefinition {
+  id             String                  @id @default(cuid())
+  organizationId String
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code           String
+  name           String
+  description    String?
+  category       CompetencyCategory
+  validityMonths Int?
+  isCritical     Boolean                 @default(false)
+  isActive       Boolean                 @default(true)
+  createdById    String?
+  createdBy      User?                   @relation("CompetencyDefinitionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  courseLinks    CompetencyCourseLink[]
+  requirements   CompetencyRequirement[]
+  assessments    CompetencyAssessment[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, category, isActive])
+}
+
+model CompetencyCourseLink {
+  id            String                @id @default(cuid())
+  competencyId  String
+  competency    CompetencyDefinition  @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  courseId      String
+  course        TrainingCourse        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  achievedLevel CompetencyProficiency
+  minimumScore  Float?
+  isPrimary     Boolean               @default(false)
+  createdAt     DateTime              @default(now())
+
+  @@unique([competencyId, courseId])
+  @@index([courseId])
+}
+
+model CompetencyRequirement {
+  id             String                @id @default(cuid())
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  competencyId   String
+  competency     CompetencyDefinition  @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  role           UserRole?
+  jobTitle       String?
+  siteId         String?
+  site           Site?                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId   String?
+  department     Department?           @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  requiredLevel  CompetencyProficiency
+  dueWithinDays  Int                   @default(30)
+  isMandatory    Boolean               @default(true)
+  isActive       Boolean               @default(true)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([organizationId, isActive])
+  @@index([competencyId, requiredLevel])
+  @@index([role, siteId, departmentId])
+}
+
+model CompetencyAssessment {
+  id                     String                     @id @default(cuid())
+  organizationId         String
+  organization           Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  competencyId           String
+  competency             CompetencyDefinition       @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  userId                 String
+  user                   User                       @relation("CompetencyAssessmentLearner", fields: [userId], references: [id], onDelete: Cascade)
+  assessorId             String
+  assessor               User                       @relation("CompetencyAssessmentAssessor", fields: [assessorId], references: [id], onDelete: Restrict)
+  status                 CompetencyAssessmentStatus @default(PENDING_VERIFICATION)
+  assessedLevel          CompetencyProficiency
+  assessedAt             DateTime
+  expiresAt              DateTime?
+  evidenceType           CompetencyEvidenceType
+  evidenceReference      String?
+  notes                  String?
+  sourceTrainingRecordId String?
+  sourceTrainingRecord   TrainingRecord?            @relation(fields: [sourceTrainingRecordId], references: [id], onDelete: SetNull)
+  verifiedById           String?
+  verifiedBy             User?                      @relation("CompetencyAssessmentVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt             DateTime?
+  rejectionReason        String?
+  reminderSentAt         DateTime?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  @@unique([sourceTrainingRecordId, competencyId])
+  @@index([organizationId, status, expiresAt])
+  @@index([userId, competencyId, status])
+  @@index([competencyId, assessedLevel])
 }
 
 model Risk {

@@ -1,0 +1,8 @@
+"use client";
+
+import { initialFormActionState } from "@/core/actions/action-state";
+import { completeTraining } from "@/features/training/actions";
+import { useActionState } from "react";
+
+const input="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3";
+export function TrainingCompletionForm({recordId}:{recordId:string}){const[state,action,pending]=useActionState(completeTraining,initialFormActionState);return <form action={action} className="h-fit rounded-3xl border border-white/10 bg-white/5 p-6"><input type="hidden" name="id" value={recordId}/><h2 className="text-xl font-semibold">Record completion</h2><p className="mt-1 text-sm text-slate-400">Capture results and automatically award mapped competencies when score rules are met.</p><label className="mt-5 block text-sm">Completion date<input type="date" name="completedAt" required className={input}/></label><label className="mt-5 block text-sm">Certificate number<input name="certificateNumber" className={input}/></label><label className="mt-5 block text-sm">Score (%)<input type="number" min="0" max="100" step="any" name="score" className={input}/></label><label className="mt-5 block text-sm">Notes<textarea name="notes" rows={4} className={input}/></label><button disabled={pending} className="mt-5 rounded-xl bg-emerald-300 px-5 py-3 font-semibold text-slate-950 disabled:opacity-50">{pending?"Recording…":"Complete Training"}</button>{state.message&&<p role={state.status==="ERROR"?"alert":"status"} className={`mt-4 rounded-xl border p-3 text-sm ${state.status==="ERROR"?"border-red-400/20 bg-red-400/10 text-red-300":"border-emerald-400/20 bg-emerald-400/10 text-emerald-200"}`}>{state.message}</p>}</form>}

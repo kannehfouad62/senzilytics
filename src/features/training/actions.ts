@@ -9,10 +9,10 @@ import {
   assignTrainingService,
   completeTrainingRecordFormsService,
 } from "@/modules/training/training-record.service";
+import { completeTrainingWithCompetenciesService } from "@/modules/training/competency.service";
 import {
   ConfigurableFormModule,
   PermissionKey,
-  Status,
   UserRole,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -126,53 +126,27 @@ export async function completeTrainingRecordForms(
   };
 }
 
-export async function completeTraining(data: FormData) {
+export async function completeTraining(
+  _previousState: FormActionState,
+  data: FormData
+): Promise<FormActionState> {
   await requirePermission(PermissionKey.MANAGE_TRAINING);
-  const { organizationId } = await getCurrentUserTenant();
+  const { organizationId, user } = await getCurrentUserTenant();
   const id = required(data, "id");
-  const record = await prisma.trainingRecord.findFirst({
-    where: { id, user: { organizationId } },
-    include: { course: true },
-  });
-
-  if (!record) {
-    throw new Error("Training assignment not found.");
+  try {
+    const rawScore = optional(data, "score");
+    const completedAt = new Date(required(data, "completedAt"));
+    if (Number.isNaN(completedAt.getTime())) throw new Error("Enter a valid completion date.");
+    await completeTrainingWithCompetenciesService({ organizationId, userId: user.id, recordId: id, completedAt, certificateNumber: optional(data, "certificateNumber"), score: rawScore ? Number(rawScore) : null, notes: optional(data, "notes") });
+  } catch (cause) {
+    return { status: "ERROR", message: cause instanceof Error ? cause.message : "The training completion could not be recorded." };
   }
-
-  const completedAt = new Date(required(data, "completedAt"));
-
-  if (Number.isNaN(completedAt.getTime())) {
-    throw new Error("Enter a valid completion date.");
-  }
-
-  const expiresAt = record.course?.validityMonths
-    ? new Date(
-        completedAt.getFullYear(),
-        completedAt.getMonth() + record.course.validityMonths,
-        completedAt.getDate()
-      )
-    : null;
-  const rawScore = optional(data, "score");
-  const score = rawScore ? Number(rawScore) : null;
-
-  if (score !== null && !Number.isFinite(score)) {
-    throw new Error("Enter a valid training score.");
-  }
-
-  await prisma.trainingRecord.update({
-    where: { id },
-    data: {
-      status: Status.COMPLETED,
-      completedAt,
-      expiresAt,
-      certificateNumber: optional(data, "certificateNumber"),
-      score,
-      notes: optional(data, "notes"),
-    },
-  });
 
   revalidatePath("/training");
   revalidatePath(`/training/${id}`);
+  revalidatePath("/training/competencies/matrix");
+  revalidatePath("/training/dashboard");
+  return { status: "SUCCESS", message: "Training completion and mapped competencies recorded." };
 }
 
 export async function createTrainingRequirement(data: FormData) {

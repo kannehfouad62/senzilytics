@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getCompetencyMatrixService } from "@/modules/training/competency.service";
 import {
   EnterpriseAuditFindingStatus,
   EnterpriseAuditStatus,
@@ -35,6 +36,9 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     { inspectionFinding: { inspection: { site: { organizationId } } } },
     { enterpriseAuditFindingLinks: { some: { finding: { organizationId } } } },
   ] };
+  const competencyMatrix = allowed.has(PermissionKey.VIEW_TRAINING)
+    ? await getCompetencyMatrixService(organizationId, now)
+    : { gaps: 0, criticalGaps: 0 };
 
   const [
     openObservations, openActions, overdueActions, highRisks, overdueRiskReviews, openMocs, overdueMocs,
@@ -82,7 +86,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     { label: "Audits", value: activeAudits, note: `${overdueAudits} overdue`, href: "/audits/dashboard", tone: overdueAudits ? "danger" : "neutral" },
     { label: "Audit Findings", value: openAuditFindings, note: "requiring closure", href: "/audits", tone: openAuditFindings ? "warning" : "good" },
     { label: "Inspections", value: overdueInspections, note: "overdue", href: "/inspections", tone: overdueInspections ? "danger" : "good" },
-    { label: "Training", value: overdueTraining, note: `${expiringTraining} expire in 30 days`, href: "/training/dashboard", tone: overdueTraining ? "danger" : "good" },
+    { label: "Training & Competency", value: overdueTraining + competencyMatrix.criticalGaps, note: `${expiringTraining} training records expire in 30 days · ${competencyMatrix.gaps} competency gaps`, href: "/training/dashboard", tone: overdueTraining || competencyMatrix.criticalGaps ? "danger" : competencyMatrix.gaps ? "warning" : "good" },
     { label: "Compliance", value: overdueCompliance, note: "obligations overdue", href: "/compliance/dashboard", tone: overdueCompliance ? "danger" : "good" },
     { label: "Permits", value: expiringPermits, note: "expiring or expired", href: "/compliance/permits", tone: expiringPermits ? "danger" : "good" },
     { label: "Chemicals", value: governedChemicals, note: "in governed inventory", href: "/chemicals/dashboard", tone: "neutral" },

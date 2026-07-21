@@ -10,9 +10,10 @@ import Link from "next/link";
 const inputClassName =
   "mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3";
 
-export default async function AssignTrainingPage() {
+export default async function AssignTrainingPage({ searchParams }: { searchParams: Promise<{ courseId?: string; userId?: string; dueDate?: string }> }) {
   await requirePermission(PermissionKey.MANAGE_TRAINING);
   const { organizationId } = await getCurrentUserTenant();
+  const params = await searchParams;
   const [courses, users, forms] = await Promise.all([
     prisma.trainingCourse.findMany({
       where: { organizationId, isActive: true },
@@ -27,6 +28,9 @@ export default async function AssignTrainingPage() {
       ConfigurableFormModule.TRAINING
     ),
   ]);
+  const selectedCourseId = courses.some((course) => course.id === params.courseId) ? params.courseId : "";
+  const selectedUserId = users.some((user) => user.id === params.userId) ? params.userId : "";
+  const selectedDueDate = /^\d{4}-\d{2}-\d{2}$/.test(params.dueDate || "") ? params.dueDate : undefined;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -48,7 +52,7 @@ export default async function AssignTrainingPage() {
           <select
             name="courseId"
             required
-            defaultValue=""
+            defaultValue={selectedCourseId}
             className={inputClassName}
           >
             <option value="" disabled>
@@ -67,7 +71,7 @@ export default async function AssignTrainingPage() {
           <select
             name="userId"
             required
-            defaultValue=""
+            defaultValue={selectedUserId}
             className={inputClassName}
           >
             <option value="" disabled>
@@ -88,6 +92,7 @@ export default async function AssignTrainingPage() {
             type="date"
             name="dueDate"
             required
+            defaultValue={selectedDueDate}
             className={inputClassName}
           />
         </label>

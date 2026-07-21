@@ -1,9 +1,9 @@
 import { EntityCustomFormSubmissions } from "@/features/forms/entity-custom-form-submissions";
 import { RuntimeFormCompletion } from "@/features/forms/runtime-form-completion";
 import {
-  completeTraining,
   completeTrainingRecordForms,
 } from "@/features/training/actions";
+import { TrainingCompletionForm } from "@/features/training/training-completion-form";
 import {
   getCurrentUserPermissions,
   requirePermission,
@@ -21,9 +21,6 @@ import {
 import { ArrowLeft, Award, CalendarClock, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
-const inputClassName =
-  "mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3";
 
 export default async function TrainingRecordDetailPage({
   params,
@@ -153,47 +150,7 @@ export default async function TrainingRecordDetailPage({
           </dl>
         </section>
 
-        {canManage && record.status !== Status.COMPLETED && (
-          <form
-            action={completeTraining}
-            className="h-fit rounded-3xl border border-white/10 bg-white/5 p-6"
-          >
-            <input type="hidden" name="id" value={record.id} />
-            <h2 className="text-xl font-semibold">Record completion</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Capture the result and certificate reference for this learner.
-            </p>
-            <label className="mt-5 block text-sm">
-              Completion date
-              <input
-                type="date"
-                name="completedAt"
-                required
-                className={inputClassName}
-              />
-            </label>
-            <label className="mt-5 block text-sm">
-              Certificate number
-              <input name="certificateNumber" className={inputClassName} />
-            </label>
-            <label className="mt-5 block text-sm">
-              Score
-              <input
-                type="number"
-                step="any"
-                name="score"
-                className={inputClassName}
-              />
-            </label>
-            <label className="mt-5 block text-sm">
-              Notes
-              <textarea name="notes" rows={4} className={inputClassName} />
-            </label>
-            <button className="mt-5 rounded-xl bg-emerald-300 px-5 py-3 font-semibold text-slate-950">
-              Complete Training
-            </button>
-          </form>
-        )}
+        {canManage && record.status !== Status.COMPLETED && <TrainingCompletionForm recordId={record.id} />}
       </div>
     </div>
   );

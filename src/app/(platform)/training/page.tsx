@@ -43,6 +43,12 @@ export default async function TrainingPage() {
           >
             Analytics
           </Link>
+          <Link
+            href="/training/competencies"
+            className="rounded-xl border border-white/10 px-4 py-2"
+          >
+            Competencies
+          </Link>
           {canManage && (
             <>
               <Link
