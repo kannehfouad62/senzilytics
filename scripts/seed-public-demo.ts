@@ -50,6 +50,11 @@ import {
   AssetMaintenanceType,
   AssetStatus,
   AssetType,
+  BehaviorCoachingType,
+  BehaviorFollowUpStatus,
+  BehaviorObservationOutcome,
+  BehaviorProgramStatus,
+  BehaviorRecognitionStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createAuditService } from "@/modules/audit/audit.service";
@@ -883,6 +888,124 @@ async function main() {
       maintenanceIntervalDays: 180,
       lastMaintenanceAt: days(-30),
       nextMaintenanceDueAt: days(150),
+    },
+  });
+
+  const behaviorProgram = await prisma.behaviorSafetyProgram.upsert({
+    where: { organizationId_code: { organizationId: organization.id, code: "BBS-DEMO-01" } },
+    update: { status: BehaviorProgramStatus.ACTIVE, ownerId: manager.id },
+    create: {
+      id: "behavior_program_public_demo_1",
+      organizationId: organization.id,
+      code: "BBS-DEMO-01",
+      name: "Warehouse Critical Behavior Coaching",
+      description: "Fictional peer-coaching program focused on vehicle–pedestrian separation and pre-use equipment controls.",
+      objective: "Reinforce critical controls through respectful field conversations and measurable positive recognition.",
+      status: BehaviorProgramStatus.ACTIVE,
+      siteId: site.id,
+      departmentId: department.id,
+      ownerId: manager.id,
+      createdById: manager.id,
+      targetSessionsPerMonth: 12,
+      effectiveFrom: days(-60),
+      nextReviewAt: days(45),
+    },
+  });
+  const separationBehavior = await prisma.behaviorDefinition.upsert({
+    where: { programId_code: { programId: behaviorProgram.id, code: "BBS-ME-01" } },
+    update: {},
+    create: {
+      id: "behavior_definition_public_demo_separation",
+      programId: behaviorProgram.id,
+      code: "BBS-ME-01",
+      title: "Maintain vehicle–pedestrian separation",
+      category: SifExposureCategory.MOBILE_EQUIPMENT,
+      prompt: "Are pedestrians using designated routes and remaining outside active equipment exclusion zones?",
+      safeDescription: "Pedestrian uses marked route, establishes eye contact, and remains outside the exclusion zone.",
+      atRiskDescription: "Pedestrian enters an active equipment lane or exclusion zone without positive communication.",
+      isCritical: true,
+      sequence: 1,
+    },
+  });
+  const preUseBehavior = await prisma.behaviorDefinition.upsert({
+    where: { programId_code: { programId: behaviorProgram.id, code: "BBS-ME-02" } },
+    update: {},
+    create: {
+      id: "behavior_definition_public_demo_preuse",
+      programId: behaviorProgram.id,
+      code: "BBS-ME-02",
+      title: "Complete equipment pre-use inspection",
+      category: SifExposureCategory.MOBILE_EQUIPMENT,
+      prompt: "Was the documented pre-use inspection completed before operation?",
+      safeDescription: "Operator completes the inspection and isolates defects before use.",
+      atRiskDescription: "Equipment is operated without a complete inspection or identified defects remain in service.",
+      isCritical: true,
+      sequence: 2,
+    },
+  });
+  const positiveSession = await prisma.behaviorCoachingSession.upsert({
+    where: { organizationId_reference: { organizationId: organization.id, reference: "BBS-DEMO-001" } },
+    update: {},
+    create: {
+      id: "behavior_session_public_demo_positive",
+      organizationId: organization.id,
+      reference: "BBS-DEMO-001",
+      programId: behaviorProgram.id,
+      siteId: site.id,
+      departmentId: department.id,
+      observerId: manager.id,
+      participantId: manager.id,
+      workGroup: "Warehouse receiving team",
+      observedAt: days(-5),
+      location: "Warehouse staging bay",
+      coachingType: BehaviorCoachingType.POSITIVE_REINFORCEMENT,
+      overallOutcome: BehaviorObservationOutcome.SAFE,
+      safeCount: 2,
+      discussionSummary: "The operator completed the inspection and paused to confirm the pedestrian route was clear.",
+      workerCommitment: "Continue using positive eye-contact confirmation before vehicle movement.",
+      results: { create: [
+        { behaviorId: separationBehavior.id, outcome: BehaviorObservationOutcome.SAFE, note: "Positive communication and route separation observed." },
+        { behaviorId: preUseBehavior.id, outcome: BehaviorObservationOutcome.SAFE, note: "Inspection was complete and available at the equipment." },
+      ] },
+    },
+  });
+  await prisma.behaviorRecognition.upsert({
+    where: { id: "behavior_recognition_public_demo_1" },
+    update: {},
+    create: { id: "behavior_recognition_public_demo_1", organizationId: organization.id, sessionId: positiveSession.id, nominatedUserId: manager.id, nominatedById: manager.id, reason: "Demonstrated visible leadership by verifying both the equipment condition and pedestrian separation before movement.", status: BehaviorRecognitionStatus.APPROVED, approvedById: manager.id, awardedAt: days(-4) },
+  });
+  const behaviorObservation = await prisma.safetyObservation.upsert({
+    where: { organizationId_reference: { organizationId: organization.id, reference: "OBS-DEMO-BBS-001" } },
+    update: {},
+    create: { id: "observation_public_demo_bbs", organizationId: organization.id, reference: "OBS-DEMO-BBS-001", title: "Pedestrian entered powered-equipment exclusion zone", description: "A behavior coaching session identified entry into an active vehicle lane without positive communication.", type: SafetyObservationType.UNSAFE_ACT, status: SafetyObservationStatus.ACTION_REQUIRED, riskLevel: RiskLevel.CRITICAL, location: "Warehouse receiving lane 2", observedAt: days(-2), immediateAction: "Equipment movement stopped and the exclusion zone was re-established.", isAnonymous: true, siteId: site.id, departmentId: department.id, reportedById: manager.id, assignedToId: manager.id, followUpDueDate: days(3) },
+  });
+  await prisma.behaviorCoachingSession.upsert({
+    where: { organizationId_reference: { organizationId: organization.id, reference: "BBS-DEMO-002" } },
+    update: {},
+    create: {
+      id: "behavior_session_public_demo_atrisk",
+      organizationId: organization.id,
+      reference: "BBS-DEMO-002",
+      programId: behaviorProgram.id,
+      siteId: site.id,
+      departmentId: department.id,
+      observerId: manager.id,
+      isParticipantAnonymous: true,
+      workGroup: "Warehouse receiving team",
+      observedAt: days(-2),
+      location: "Warehouse receiving lane 2",
+      coachingType: BehaviorCoachingType.STOP_WORK,
+      overallOutcome: BehaviorObservationOutcome.AT_RISK,
+      atRiskCount: 1,
+      criticalAtRiskCount: 1,
+      discussionSummary: "Work stopped and the team reviewed exclusion-zone entry expectations.",
+      workerCommitment: "Use the designated crossing and establish eye contact before entering the vehicle lane.",
+      immediateAction: "Equipment movement stopped and the exclusion zone was re-established.",
+      followUpStatus: BehaviorFollowUpStatus.OPEN,
+      followUpOwnerId: manager.id,
+      followUpDueAt: days(3),
+      safetyObservationId: behaviorObservation.id,
+      results: { create: [{ behaviorId: separationBehavior.id, outcome: BehaviorObservationOutcome.AT_RISK, note: "Entry occurred without positive communication.", immediateAction: "Stop-work coaching completed." }, { behaviorId: preUseBehavior.id, outcome: BehaviorObservationOutcome.NOT_OBSERVED }] },
     },
   });
 

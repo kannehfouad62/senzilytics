@@ -380,6 +380,11 @@ async function validateRelatedEntity(input: {
       return Boolean(asset || inspection || maintenance || defect);
     }
 
+    case DocumentEntityType.BEHAVIOR_SAFETY: {
+      const record = await prisma.behaviorCoachingSession.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } });
+      return Boolean(record);
+    }
+
     case DocumentEntityType.WORKFLOW: {
       const record = await prisma.workflowInstance.findFirst({
         where: {
@@ -703,6 +708,11 @@ async function requireDocumentUploadPermission(
     case ConfigurableFormModule.ASSET_SAFETY:
       allowed = permissions.includes(
         PermissionKey.MANAGE_ASSETS
+      );
+      break;
+    case ConfigurableFormModule.BEHAVIOR_SAFETY:
+      allowed = permissions.includes(
+        PermissionKey.RECORD_BEHAVIOR_COACHING
       );
       break;
   }

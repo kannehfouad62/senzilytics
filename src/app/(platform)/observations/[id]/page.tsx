@@ -14,6 +14,7 @@ import {
   SafetyObservationStatus,
 } from "@prisma/client";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
 const inputClassName =
   "mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3";
@@ -50,6 +51,7 @@ export default async function ObservationPage({
         site: true,
         reportedBy: true,
         assignedTo: true,
+        behaviorSession: { include: { program: true } },
       },
     }),
     prisma.user.findMany({
@@ -132,6 +134,11 @@ export default async function ObservationPage({
                   : "Not set"}
               </div>
             </dl>
+            {observation.behaviorSession && (
+              <Link href={`/behavior-safety/sessions/${observation.behaviorSession.id}`} className="mt-5 inline-block rounded-xl border border-white/10 px-4 py-2 text-sm text-cyan-300">
+                Linked coaching: {observation.behaviorSession.reference} — {observation.behaviorSession.program.name}
+              </Link>
+            )}
           </section>
 
           <EntityCustomFormSubmissions

@@ -166,6 +166,9 @@ async function main() {
       PermissionKey.MANAGE_CERTIFICATION_READINESS,
       PermissionKey.VIEW_ASSETS,
       PermissionKey.MANAGE_ASSETS,
+      PermissionKey.VIEW_BEHAVIOR_SAFETY,
+      PermissionKey.RECORD_BEHAVIOR_COACHING,
+      PermissionKey.MANAGE_BEHAVIOR_SAFETY,
     ],
 
     EHS_MANAGER: [
@@ -208,6 +211,9 @@ async function main() {
       PermissionKey.MANAGE_CERTIFICATION_READINESS,
       PermissionKey.VIEW_ASSETS,
       PermissionKey.MANAGE_ASSETS,
+      PermissionKey.VIEW_BEHAVIOR_SAFETY,
+      PermissionKey.RECORD_BEHAVIOR_COACHING,
+      PermissionKey.MANAGE_BEHAVIOR_SAFETY,
     ],
 
     SUPERVISOR: [
@@ -235,6 +241,8 @@ async function main() {
       PermissionKey.VIEW_CERTIFICATION_READINESS,
       PermissionKey.VIEW_ASSETS,
       PermissionKey.MANAGE_ASSETS,
+      PermissionKey.VIEW_BEHAVIOR_SAFETY,
+      PermissionKey.RECORD_BEHAVIOR_COACHING,
     ],
 
     EMPLOYEE: [
@@ -247,6 +255,8 @@ async function main() {
       PermissionKey.VIEW_INCIDENT,
       PermissionKey.VIEW_TRAINING,
       PermissionKey.VIEW_PERMITS_TO_WORK,
+      PermissionKey.VIEW_BEHAVIOR_SAFETY,
+      PermissionKey.RECORD_BEHAVIOR_COACHING,
     ],
 
     AUDITOR: [
@@ -266,6 +276,7 @@ async function main() {
       PermissionKey.VIEW_SIF_INTELLIGENCE,
       PermissionKey.VIEW_CERTIFICATION_READINESS,
       PermissionKey.VIEW_ASSETS,
+      PermissionKey.VIEW_BEHAVIOR_SAFETY,
     ],
     DEMO_VIEWER: [
       PermissionKey.VIEW_DASHBOARD,
@@ -289,6 +300,7 @@ async function main() {
       PermissionKey.VIEW_SIF_INTELLIGENCE,
       PermissionKey.VIEW_CERTIFICATION_READINESS,
       PermissionKey.VIEW_ASSETS,
+      PermissionKey.VIEW_BEHAVIOR_SAFETY,
     ],
   };
 

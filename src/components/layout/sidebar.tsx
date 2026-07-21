@@ -102,6 +102,12 @@ export const primaryNavItems = [
 
 export const ehsNavItems = [
   {
+    label: "Behavior-Based Safety",
+    href: "/behavior-safety",
+    icon: Users,
+    permission: PermissionKey.VIEW_BEHAVIOR_SAFETY,
+  },
+  {
     label: "Assets & Equipment",
     href: "/assets",
     icon: Wrench,

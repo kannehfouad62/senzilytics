@@ -63,6 +63,9 @@ const capaInclude = {
   assetDefects: {
     include: { asset: { include: { site: true } } },
   },
+  behaviorSessions: {
+    include: { program: true, site: true },
+  },
 } as const;
 
 export async function findTenantCapas(

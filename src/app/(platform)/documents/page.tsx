@@ -616,6 +616,9 @@ function getRelatedRecordLink(
     case DocumentEntityType.ASSET_SAFETY:
       return "/assets";
 
+    case DocumentEntityType.BEHAVIOR_SAFETY:
+      return "/behavior-safety";
+
     case DocumentEntityType.WORKFLOW:
       return "/workflows";
 

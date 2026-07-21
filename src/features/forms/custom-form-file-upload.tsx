@@ -39,7 +39,8 @@ type SupportedEntityType =
   | typeof DocumentEntityType.INDUSTRIAL_HYGIENE
   | typeof DocumentEntityType.SIF_ASSURANCE
   | typeof DocumentEntityType.CERTIFICATION_READINESS
-  | typeof DocumentEntityType.ASSET_SAFETY;
+  | typeof DocumentEntityType.ASSET_SAFETY
+  | typeof DocumentEntityType.BEHAVIOR_SAFETY;
 
 function entityFolder(
   entityType: SupportedEntityType
@@ -79,6 +80,8 @@ function entityFolder(
       return "certification-readiness";
     case DocumentEntityType.ASSET_SAFETY:
       return "asset-safety";
+    case DocumentEntityType.BEHAVIOR_SAFETY:
+      return "behavior-safety";
   }
 }
 

@@ -117,6 +117,9 @@ enum PermissionKey {
   MANAGE_CERTIFICATION_READINESS
   VIEW_ASSETS
   MANAGE_ASSETS
+  VIEW_BEHAVIOR_SAFETY
+  RECORD_BEHAVIOR_COACHING
+  MANAGE_BEHAVIOR_SAFETY
 }
 
 enum ConfigurableFormModule {
@@ -138,6 +141,7 @@ enum ConfigurableFormModule {
   SIF_ASSURANCE
   CERTIFICATION_READINESS
   ASSET_SAFETY
+  BEHAVIOR_SAFETY
   GENERAL
 }
 
@@ -183,6 +187,39 @@ enum SafetyObservationStatus {
   ACTION_REQUIRED
   RESOLVED
   CLOSED
+}
+
+enum BehaviorProgramStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum BehaviorObservationOutcome {
+  SAFE
+  AT_RISK
+  NOT_OBSERVED
+}
+
+enum BehaviorCoachingType {
+  POSITIVE_REINFORCEMENT
+  CORRECTIVE_COACHING
+  PEER_DISCUSSION
+  STOP_WORK
+}
+
+enum BehaviorFollowUpStatus {
+  NOT_REQUIRED
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum BehaviorRecognitionStatus {
+  NOMINATED
+  APPROVED
+  DECLINED
 }
 
 enum SifExposureCategory {
@@ -749,6 +786,7 @@ enum DocumentEntityType {
   SIF_ASSURANCE
   CERTIFICATION_READINESS
   ASSET_SAFETY
+  BEHAVIOR_SAFETY
 }
 
 enum DocumentCategory {
@@ -1239,6 +1277,9 @@ model Organization {
   assetInspections               AssetInspection[]
   assetMaintenanceRecords        AssetMaintenanceRecord[]
   assetDefects                   AssetDefect[]
+  behaviorSafetyPrograms         BehaviorSafetyProgram[]
+  behaviorCoachingSessions       BehaviorCoachingSession[]
+  behaviorRecognitions           BehaviorRecognition[]
 }
 
 model PricingInquiry {
@@ -1299,6 +1340,8 @@ model Site {
   exposureAssessments           ExposureAssessment[]
   criticalControls              CriticalControlStandard[]
   assets                        Asset[]
+  behaviorSafetyPrograms        BehaviorSafetyProgram[]
+  behaviorCoachingSessions      BehaviorCoachingSession[]
 }
 
 model Department {
@@ -1321,14 +1364,16 @@ model Department {
   complianceCalendarTasks       ComplianceCalendarTask[]
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
 
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-  jobSafetyAnalyses     JobSafetyAnalysis[]
-  permitsToWork         PermitToWork[]
-  similarExposureGroups SimilarExposureGroup[]
-  exposureAssessments   ExposureAssessment[]
-  criticalControls      CriticalControlStandard[]
-  assets                Asset[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  jobSafetyAnalyses        JobSafetyAnalysis[]
+  permitsToWork            PermitToWork[]
+  similarExposureGroups    SimilarExposureGroup[]
+  exposureAssessments      ExposureAssessment[]
+  criticalControls         CriticalControlStandard[]
+  assets                   Asset[]
+  behaviorSafetyPrograms   BehaviorSafetyProgram[]
+  behaviorCoachingSessions BehaviorCoachingSession[]
 }
 
 model User {
@@ -1432,6 +1477,14 @@ model User {
   reportedAssetDefects             AssetDefect[]                   @relation("AssetDefectReportedBy")
   ownedAssetDefects                AssetDefect[]                   @relation("AssetDefectOwner")
   verifiedAssetDefects             AssetDefect[]                   @relation("AssetDefectVerifiedBy")
+  ownedBehaviorPrograms            BehaviorSafetyProgram[]         @relation("BehaviorProgramOwner")
+  createdBehaviorPrograms          BehaviorSafetyProgram[]         @relation("BehaviorProgramCreatedBy")
+  observedBehaviorSessions         BehaviorCoachingSession[]       @relation("BehaviorSessionObserver")
+  participatedBehaviorSessions     BehaviorCoachingSession[]       @relation("BehaviorSessionParticipant")
+  ownedBehaviorFollowUps           BehaviorCoachingSession[]       @relation("BehaviorSessionFollowUpOwner")
+  nominatedBehaviorRecognitions    BehaviorRecognition[]           @relation("BehaviorRecognitionNominee")
+  createdBehaviorRecognitions      BehaviorRecognition[]           @relation("BehaviorRecognitionNominator")
+  approvedBehaviorRecognitions     BehaviorRecognition[]           @relation("BehaviorRecognitionApprover")
   permitToWorkHistory              PermitToWorkHistory[]           @relation("PermitHistoryActor")
   ownedExposureGroups              SimilarExposureGroup[]          @relation("ExposureGroupOwner")
   assignedExposureAssessments      ExposureAssessment[]            @relation("ExposureAssessmentAssessor")
@@ -1614,18 +1667,19 @@ model SafetyObservation {
   resolvedAt      DateTime?
 
   organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   siteId          String
-  site            Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  site            Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   departmentId    String?
-  department      Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  department      Department?              @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   reportedById    String
-  reportedBy      User         @relation("SafetyObservationReporter", fields: [reportedById], references: [id])
+  reportedBy      User                     @relation("SafetyObservationReporter", fields: [reportedById], references: [id])
   assignedToId    String?
-  assignedTo      User?        @relation("SafetyObservationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo      User?                    @relation("SafetyObservationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   followUpDueDate DateTime?
   incidentId      String?
-  incident        Incident?    @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  incident        Incident?                @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  behaviorSession BehaviorCoachingSession?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1683,6 +1737,8 @@ model CorrectiveAction {
 
   assignedToId String
   assignedTo   User   @relation(fields: [assignedToId], references: [id])
+
+  behaviorSessions BehaviorCoachingSession[]
 
   enterpriseAuditFindingLinks  EnterpriseAuditFindingActionLink[] @relation("EnterpriseAuditFindingCorrectiveAction")
   criticalControlVerifications CriticalControlVerification[]
@@ -4468,6 +4524,151 @@ model AssetDefect {
   @@index([assetId, status])
   @@index([ownerId, status, dueDate])
   @@index([sourceInspectionId])
+}
+
+model BehaviorSafetyProgram {
+  id                     String                    @id @default(cuid())
+  organizationId         String
+  organization           Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code                   String
+  name                   String
+  description            String?
+  objective              String?
+  status                 BehaviorProgramStatus     @default(DRAFT)
+  siteId                 String?
+  site                   Site?                     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  departmentId           String?
+  department             Department?               @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  ownerId                String
+  owner                  User                      @relation("BehaviorProgramOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdById            String
+  createdBy              User                      @relation("BehaviorProgramCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  targetSessionsPerMonth Int                       @default(10)
+  effectiveFrom          DateTime?
+  effectiveTo            DateTime?
+  nextReviewAt           DateTime?
+  reviewReminderAt       DateTime?
+  behaviors              BehaviorDefinition[]
+  sessions               BehaviorCoachingSession[]
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, status, nextReviewAt])
+  @@index([siteId, departmentId, status])
+  @@index([ownerId, status])
+}
+
+model BehaviorDefinition {
+  id                String                      @id @default(cuid())
+  programId         String
+  program           BehaviorSafetyProgram       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  code              String
+  title             String
+  category          SifExposureCategory
+  prompt            String
+  safeDescription   String
+  atRiskDescription String
+  isCritical        Boolean                     @default(false)
+  isActive          Boolean                     @default(true)
+  sequence          Int                         @default(0)
+  results           BehaviorObservationResult[]
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  @@unique([programId, code])
+  @@index([programId, isActive, sequence])
+  @@index([category, isCritical])
+}
+
+model BehaviorCoachingSession {
+  id                     String                      @id @default(cuid())
+  organizationId         String
+  organization           Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reference              String
+  programId              String
+  program                BehaviorSafetyProgram       @relation(fields: [programId], references: [id], onDelete: Restrict)
+  siteId                 String
+  site                   Site                        @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  departmentId           String?
+  department             Department?                 @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  observerId             String
+  observer               User                        @relation("BehaviorSessionObserver", fields: [observerId], references: [id], onDelete: Restrict)
+  participantId          String?
+  participant            User?                       @relation("BehaviorSessionParticipant", fields: [participantId], references: [id], onDelete: SetNull)
+  isParticipantAnonymous Boolean                     @default(false)
+  workGroup              String?
+  observedAt             DateTime
+  location               String?
+  coachingType           BehaviorCoachingType
+  overallOutcome         BehaviorObservationOutcome
+  safeCount              Int                         @default(0)
+  atRiskCount            Int                         @default(0)
+  criticalAtRiskCount    Int                         @default(0)
+  discussionSummary      String?
+  workerCommitment       String?
+  immediateAction        String?
+  followUpStatus         BehaviorFollowUpStatus      @default(NOT_REQUIRED)
+  followUpOwnerId        String?
+  followUpOwner          User?                       @relation("BehaviorSessionFollowUpOwner", fields: [followUpOwnerId], references: [id], onDelete: SetNull)
+  followUpDueAt          DateTime?
+  followUpReminderAt     DateTime?
+  followUpCompletedAt    DateTime?
+  safetyObservationId    String?                     @unique
+  safetyObservation      SafetyObservation?          @relation(fields: [safetyObservationId], references: [id], onDelete: SetNull)
+  correctiveActionId     String?
+  correctiveAction       CorrectiveAction?           @relation(fields: [correctiveActionId], references: [id], onDelete: SetNull)
+  results                BehaviorObservationResult[]
+  recognitions           BehaviorRecognition[]
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, observedAt, overallOutcome])
+  @@index([programId, observedAt])
+  @@index([siteId, departmentId, observedAt])
+  @@index([observerId, observedAt])
+  @@index([participantId, observedAt])
+  @@index([followUpOwnerId, followUpStatus, followUpDueAt])
+  @@index([correctiveActionId])
+}
+
+model BehaviorObservationResult {
+  id              String                     @id @default(cuid())
+  sessionId       String
+  session         BehaviorCoachingSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  behaviorId      String
+  behavior        BehaviorDefinition         @relation(fields: [behaviorId], references: [id], onDelete: Restrict)
+  outcome         BehaviorObservationOutcome
+  note            String?
+  immediateAction String?
+  createdAt       DateTime                   @default(now())
+
+  @@unique([sessionId, behaviorId])
+  @@index([behaviorId, outcome, createdAt])
+}
+
+model BehaviorRecognition {
+  id              String                    @id @default(cuid())
+  organizationId  String
+  organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessionId       String?                   @unique
+  session         BehaviorCoachingSession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  nominatedUserId String
+  nominatedUser   User                      @relation("BehaviorRecognitionNominee", fields: [nominatedUserId], references: [id], onDelete: Cascade)
+  nominatedById   String
+  nominatedBy     User                      @relation("BehaviorRecognitionNominator", fields: [nominatedById], references: [id], onDelete: Restrict)
+  reason          String
+  status          BehaviorRecognitionStatus @default(NOMINATED)
+  approvedById    String?
+  approvedBy      User?                     @relation("BehaviorRecognitionApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  awardedAt       DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  @@index([organizationId, status, createdAt])
+  @@index([nominatedUserId, status, createdAt])
 }
 
 model Risk {

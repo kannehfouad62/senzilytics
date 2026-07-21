@@ -95,6 +95,16 @@ function sourceOf(action: TenantCapa) {
     };
   }
 
+  const behaviorSession = action.behaviorSessions[0];
+  if (behaviorSession) {
+    return {
+      label: `${behaviorSession.reference} — ${behaviorSession.program.name}`,
+      type: "Behavior Coaching",
+      site: behaviorSession.site.name,
+      href: `/behavior-safety/sessions/${behaviorSession.id}`,
+    };
+  }
+
   return {
     label: "Standalone CAPA",
     type: "Standalone",

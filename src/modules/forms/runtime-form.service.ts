@@ -58,6 +58,8 @@ export function configurableFormModuleForDocumentEntity(
       return ConfigurableFormModule.CERTIFICATION_READINESS;
     case DocumentEntityType.ASSET_SAFETY:
       return ConfigurableFormModule.ASSET_SAFETY;
+    case DocumentEntityType.BEHAVIOR_SAFETY:
+      return ConfigurableFormModule.BEHAVIOR_SAFETY;
     default:
       return null;
   }

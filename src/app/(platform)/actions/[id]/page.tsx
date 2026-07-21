@@ -310,6 +310,14 @@ function getCapaSource(
     };
   }
 
+  const behaviorSession = action.behaviorSessions[0];
+  if (behaviorSession) {
+    return {
+      label: `${behaviorSession.reference} — ${behaviorSession.program.name}`,
+      href: `/behavior-safety/sessions/${behaviorSession.id}`,
+    };
+  }
+
   return {
     label:
       "Standalone corrective action",

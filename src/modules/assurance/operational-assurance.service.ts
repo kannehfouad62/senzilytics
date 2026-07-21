@@ -43,12 +43,13 @@ export async function getOperationalAssuranceOverview(input: {
       { criticalControlVerifications: { some: { organizationId: input.organizationId } } },
       { certificationReviewActions: { some: { review: { organizationId: input.organizationId } } } },
       { assetDefects: { some: { organizationId: input.organizationId } } },
+      { behaviorSessions: { some: { organizationId: input.organizationId } } },
     ],
   };
 
   const contractorHorizon = new Date(now);
   contractorHorizon.setUTCDate(contractorHorizon.getUTCDate() + 30);
-  const [observations, incidents, auditFindings, inspectionFindings, risks, mocs, contractors, permitsToWork, exposureSamples, surveillancePrograms, competencyMatrix, sifControls, sifReviews, certificationReviews, assetDefects, connections] = await Promise.all([
+  const [observations, incidents, auditFindings, inspectionFindings, risks, mocs, contractors, permitsToWork, exposureSamples, surveillancePrograms, competencyMatrix, sifControls, sifReviews, certificationReviews, assetDefects, behaviorSessions, connections] = await Promise.all([
     allowed.has(PermissionKey.VIEW_OBSERVATIONS) ? prisma.safetyObservation.findMany({
       where: { organizationId: input.organizationId, riskLevel: { in: elevated }, status: { notIn: ["RESOLVED", "CLOSED"] } },
       include: { site: true }, orderBy: { observedAt: "desc" }, take: 20,
@@ -95,6 +96,7 @@ export async function getOperationalAssuranceOverview(input: {
     allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE) ? prisma.sifSignalReview.findMany({ where: { organizationId: input.organizationId, classification: { in: [SifSignalClassification.POTENTIAL_SIF, SifSignalClassification.PRECURSOR] } }, select: { exposureCategory: true } }) : [],
     allowed.has(PermissionKey.VIEW_CERTIFICATION_READINESS) ? prisma.certificationManagementReview.findMany({ where: { organizationId: input.organizationId, OR: [{ status: { in: ["PLANNED", "IN_PROGRESS"] }, scheduledAt: { lt: now } }, { status: "APPROVED", nextReviewAt: { lt: now } }] }, include: { program: true }, take: 20 }) : [],
     allowed.has(PermissionKey.VIEW_ASSETS) ? prisma.assetDefect.findMany({ where: { organizationId: input.organizationId, status: { not: "CLOSED" }, OR: [{ severity: { in: ["HIGH", "CRITICAL"] } }, { dueDate: { lt: now } }, { asset: { status: { in: ["OUT_OF_SERVICE", "QUARANTINED"] } } }] }, include: { asset: { include: { site: true } }, correctiveAction: true }, orderBy: { createdAt: "desc" }, take: 20 }) : [],
+    allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.findMany({ where: { organizationId: input.organizationId, OR: [{ criticalAtRiskCount: { gt: 0 }, followUpStatus: { not: "COMPLETED" } }, { followUpStatus: { in: ["OPEN", "IN_PROGRESS"] }, followUpDueAt: { lt: now } }] }, include: { program: true, site: true, correctiveAction: true }, orderBy: { observedAt: "desc" }, take: 20 }) : [],
     Promise.all([
       prisma.safetyObservation.count({ where: { organizationId: input.organizationId, incidentId: { not: null } } }),
       prisma.correctiveAction.count({ where: { ...actionScope, incidentId: { not: null } } }),
@@ -108,6 +110,8 @@ export async function getOperationalAssuranceOverview(input: {
       allowed.has(PermissionKey.VIEW_TRAINING) ? prisma.competencyCourseLink.count({ where: { competency: { organizationId: input.organizationId } } }) : 0,
       allowed.has(PermissionKey.VIEW_CERTIFICATION_READINESS) ? prisma.certificationManagementReview.count({ where: { organizationId: input.organizationId, status: { in: ["COMPLETED", "APPROVED"] } } }) : 0,
       allowed.has(PermissionKey.VIEW_ASSETS) ? prisma.assetDefect.count({ where: { organizationId: input.organizationId, correctiveActionId: { not: null } } }) : 0,
+      allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.count({ where: { organizationId: input.organizationId, safetyObservationId: { not: null } } }) : 0,
+      allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.count({ where: { organizationId: input.organizationId, correctiveActionId: { not: null } } }) : 0,
     ]),
   ]);
 
@@ -128,6 +132,7 @@ export async function getOperationalAssuranceOverview(input: {
     ...sifControls.filter(control=>control.nextVerificationDueAt<now||control.verifications[0]?.result===CriticalControlVerificationResult.FAILED||control.verifications[0]?.result===CriticalControlVerificationResult.DEGRADED).map(control=>({id:`critical-control:${control.id}`,title:`${control.code} — ${control.name}`,detail:control.nextVerificationDueAt<now?"Critical-control field verification is overdue.":`Latest field verification is ${control.verifications[0]!.result.toLowerCase()}.`,source:"SIF Critical Control",href:`/assurance/sif/controls/${control.id}`,severity:(control.verifications[0]?.result===CriticalControlVerificationResult.FAILED?"CRITICAL":"HIGH") as AssuranceSignal["severity"],site:control.site?.name??null})),
     ...certificationReviews.map(review=>({id:`management-review:${review.id}`,title:`${review.reference} — ${review.title}`,detail:review.status==="APPROVED"?"The next required management review is overdue.":"A scheduled management review is overdue.",source:"Certification Readiness",href:`/assurance/certification/reviews/${review.id}`,severity:"HIGH" as const,site:null})),
     ...assetDefects.map(defect=>({id:`asset-defect:${defect.id}`,title:`${defect.reference} — ${defect.title}`,detail:`${defect.asset.status.replaceAll("_"," ")} · ${defect.correctiveAction?"linked CAPA":"no linked CAPA"}${overdue(defect.dueDate,now)?" · resolution overdue":""}.`,source:"Asset Defect",href:`/assets/${defect.assetId}`,severity:(defect.severity==="CRITICAL"||defect.asset.status==="OUT_OF_SERVICE"?"CRITICAL":defect.severity==="HIGH"?"HIGH":"MEDIUM") as AssuranceSignal["severity"],site:defect.asset.site.name})),
+    ...behaviorSessions.map(session=>({id:`behavior-session:${session.id}`,title:`${session.reference} — ${session.program.name}`,detail:`${session.criticalAtRiskCount} critical at-risk result${session.criticalAtRiskCount===1?"":"s"} · ${session.correctiveAction?"linked CAPA":"no linked CAPA"}${overdue(session.followUpDueAt,now)?" · follow-up overdue":""}.`,source:"Behavior Safety",href:`/behavior-safety/sessions/${session.id}`,severity:(session.criticalAtRiskCount>0?"CRITICAL":"HIGH") as AssuranceSignal["severity"],site:session.site.name})),
   ];
 
   const connectionRows: AssuranceConnection[] = [
@@ -144,6 +149,7 @@ export async function getOperationalAssuranceOverview(input: {
     ...(allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE) ? [{ label: "Weak Signals → Critical Controls", count: sifReviews.filter(review=>sifControls.some(control=>control.category===review.exposureCategory)).length, detail: "Reviewed precursors covered by an active control standard", href: "/assurance/sif" }] : []),
     ...(allowed.has(PermissionKey.VIEW_CERTIFICATION_READINESS) ? [{ label: "Audit Programs → Management Reviews", count: connections[10], detail: "Completed leadership reviews supporting management-system assurance", href: "/assurance/certification" }] : []),
     ...(allowed.has(PermissionKey.VIEW_ASSETS) ? [{ label: "Asset Defects → CAPA", count: connections[11], detail: "Equipment deficiencies under corrective-action governance", href: "/assets" }] : []),
+    ...(allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? [{ label: "Behavior Coaching → Observations", count: connections[12], detail: "Coaching signals escalated into the observation workflow", href: "/behavior-safety" }, { label: "Behavior Coaching → CAPA", count: connections[13], detail: "Systemic at-risk behaviors under corrective-action governance", href: "/behavior-safety" }] : []),
   ];
 
   const ranked = rankAssuranceSignals(signals);

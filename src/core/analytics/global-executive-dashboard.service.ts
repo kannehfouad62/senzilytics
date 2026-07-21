@@ -40,6 +40,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     { criticalControlVerifications: { some: { organizationId } } },
     { certificationReviewActions: { some: { review: { organizationId } } } },
     { assetDefects: { some: { organizationId } } },
+    { behaviorSessions: { some: { organizationId } } },
   ] };
   const competencyMatrix = allowed.has(PermissionKey.VIEW_TRAINING)
     ? await getCompetencyMatrixService(organizationId, now)
@@ -59,6 +60,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     overdueJsaReviews, approvedContractors, expiringContractorInsurance,
     activeWorkPermits, overdueWorkPermits, openExposureAssessments,
     aboveLimitExposureSamples, overdueSurveillance, assetExceptions, overdueAssetInspections, criticalAssetDefects,
+    behaviorSessionsThisMonth, criticalBehaviorAtRisk, overdueBehaviorFollowUps,
   ] = await Promise.all([
     prisma.safetyObservation.count({ where: { organizationId, status: { notIn: [SafetyObservationStatus.RESOLVED, SafetyObservationStatus.CLOSED] } } }),
     prisma.correctiveAction.count({ where: { ...actionTenantScope, status: { notIn: closedStatuses } } }),
@@ -90,6 +92,9 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     allowed.has(PermissionKey.VIEW_ASSETS) ? prisma.asset.count({ where: { organizationId, status: { in: ["OUT_OF_SERVICE", "QUARANTINED"] } } }) : 0,
     allowed.has(PermissionKey.VIEW_ASSETS) ? prisma.asset.count({ where: { organizationId, status: { not: "RETIRED" }, nextInspectionDueAt: { lt: now } } }) : 0,
     allowed.has(PermissionKey.VIEW_ASSETS) ? prisma.assetDefect.count({ where: { organizationId, severity: "CRITICAL", status: { not: "CLOSED" } } }) : 0,
+    allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.count({ where: { organizationId, observedAt: { gte: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)) } } }) : 0,
+    allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.count({ where: { organizationId, criticalAtRiskCount: { gt: 0 }, followUpStatus: { not: "COMPLETED" } } }) : 0,
+    allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY) ? prisma.behaviorCoachingSession.count({ where: { organizationId, followUpStatus: { in: ["OPEN", "IN_PROGRESS"] }, followUpDueAt: { lt: now } } }) : 0,
   ]);
 
   const modules: { label: string; value: number; note: string; href: string; tone: "danger" | "warning" | "good" | "neutral" }[] = [
@@ -115,6 +120,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
   if (allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE)) modules.push({ label: "SIF Prevention", value: sifMetrics.attentionCount, note: `${sifMetrics.potentialSif} pSIF decisions · ${sifMetrics.failedOrDegraded} degraded or failed controls`, href: "/assurance/sif", tone: sifMetrics.failedOrDegraded || sifMetrics.overdueControls ? "danger" : sifMetrics.potentialSif ? "warning" : "good" });
   if (allowed.has(PermissionKey.VIEW_CERTIFICATION_READINESS)) modules.push({ label: "Certification Readiness", value: certificationMetrics.attentionCount, note: `${certificationMetrics.programCount} standard programs · ${certificationMetrics.overdueReviews} reviews overdue`, href: "/assurance/certification", tone: certificationMetrics.overdueReviews ? "danger" : certificationMetrics.withoutManagementReview ? "warning" : "good" });
   if (allowed.has(PermissionKey.VIEW_ASSETS)) modules.push({ label: "Assets & Equipment", value: assetExceptions + criticalAssetDefects, note: `${overdueAssetInspections} inspections overdue · ${criticalAssetDefects} critical defects`, href: "/assets/dashboard", tone: assetExceptions || criticalAssetDefects ? "danger" : overdueAssetInspections ? "warning" : "good" });
+  if (allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY)) modules.push({ label: "Behavior-Based Safety", value: criticalBehaviorAtRisk + overdueBehaviorFollowUps, note: `${behaviorSessionsThisMonth} coaching sessions this month · ${overdueBehaviorFollowUps} follow-ups overdue`, href: "/behavior-safety/dashboard", tone: criticalBehaviorAtRisk || overdueBehaviorFollowUps ? "danger" : behaviorSessionsThisMonth ? "good" : "neutral" });
 
   return { modules, attentionCount: modules.filter((item) => item.tone === "danger").reduce((sum, item) => sum + item.value, 0) };
 }
