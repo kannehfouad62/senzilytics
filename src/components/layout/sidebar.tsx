@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getPlatformAdministrator } from "@/lib/platform-admin";
 import { getCurrentUserTenant } from "@/lib/tenant";
-import { UserRole } from "@prisma/client";
+import { getCurrentUserPermissions } from "@/lib/permissions";
+import { PermissionKey, UserRole } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
 import {
   Activity,
@@ -32,6 +33,8 @@ import {
   Network,
   FileCog,
   HardHat,
+  HeartPulse,
+  Waves,
 } from "lucide-react";
 
 export const primaryNavItems = [
@@ -92,6 +95,18 @@ export const ehsNavItems = [
     label: "Permit to Work",
     href: "/permits-to-work",
     icon: ShieldCheck,
+  },
+  {
+    label: "Industrial Hygiene",
+    href: "/industrial-hygiene",
+    icon: Waves,
+    permission: PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
+  },
+  {
+    label: "Occupational Health",
+    href: "/occupational-health",
+    icon: HeartPulse,
+    permission: PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
   },
   {
     label: "Safety Observations",
@@ -222,10 +237,11 @@ export type NavigationItem = {
     size?: number;
     className?: string;
   }>;
+  permission?: PermissionKey;
 };
 
 export async function Sidebar() {
-  const [platformAdministrator, { user, organization }] = await Promise.all([getPlatformAdministrator(), getCurrentUserTenant()]);
+  const [platformAdministrator, { user, organization }, permissions] = await Promise.all([getPlatformAdministrator(), getCurrentUserTenant(), getCurrentUserPermissions()]);
   const isDemo = user.role === UserRole.DEMO_VIEWER;
   const entitlements = organization ? planEntitlements[organization.subscriptionPlan] : planEntitlements.PREMIUM;
   const entitledPrimaryItems = primaryNavItems.filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION);
@@ -244,6 +260,7 @@ export async function Sidebar() {
   const governanceItems = isDemo
     ? complianceNavItems.filter((item) => item.href !== "/notifications")
     : complianceNavItems.filter(item => item.href !== "/notifications" || entitlements.IN_APP_NOTIFICATIONS);
+  const visibleEhsItems = ehsNavItems.filter(item => item.permission === undefined || permissions.includes(item.permission));
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:flex">
@@ -271,7 +288,7 @@ export async function Sidebar() {
 
         <NavigationSection
           label="EHS Management"
-          items={ehsNavItems}
+          items={visibleEhsItems}
         />
 
         <NavigationSection

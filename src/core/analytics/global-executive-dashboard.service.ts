@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import {
   EnterpriseAuditFindingStatus,
   EnterpriseAuditStatus,
+  ExposureAssessmentStatus,
+  ExposureResultClassification,
   ChemicalApprovalStatus,
   ContractorStatus,
   EnvironmentalDataStatus,
@@ -10,16 +12,19 @@ import {
   MocStatus,
   PermitStatus,
   PermitToWorkStatus,
+  PermissionKey,
   RiskLevel,
   RiskStatus,
   SafetyObservationStatus,
   Status,
+  SurveillanceEnrollmentStatus,
 } from "@prisma/client";
 
 const closedStatuses = [Status.COMPLETED, Status.CLOSED];
 
-export async function getGlobalExecutivePortfolio(organizationId: string) {
+export async function getGlobalExecutivePortfolio(organizationId: string, permissions: PermissionKey[]) {
   const now = new Date();
+  const allowed = new Set(permissions);
   const credentialHorizon = new Date(now.getTime() + 30 * 86400000);
   const auditClosed = [EnterpriseAuditStatus.COMPLETED, EnterpriseAuditStatus.CLOSED, EnterpriseAuditStatus.CANCELLED];
   const findingClosed = [EnterpriseAuditFindingStatus.VERIFIED, EnterpriseAuditFindingStatus.CLOSED, EnterpriseAuditFindingStatus.REJECTED, EnterpriseAuditFindingStatus.CANCELLED];
@@ -37,7 +42,8 @@ export async function getGlobalExecutivePortfolio(organizationId: string) {
     overdueTraining, expiringTraining, overdueCompliance, expiringPermits,
     governedChemicals, pendingEnvironmentalData, openEsgPeriods, activeJsas,
     overdueJsaReviews, approvedContractors, expiringContractorInsurance,
-    activeWorkPermits, overdueWorkPermits,
+    activeWorkPermits, overdueWorkPermits, openExposureAssessments,
+    aboveLimitExposureSamples, overdueSurveillance,
   ] = await Promise.all([
     prisma.safetyObservation.count({ where: { organizationId, status: { notIn: [SafetyObservationStatus.RESOLVED, SafetyObservationStatus.CLOSED] } } }),
     prisma.correctiveAction.count({ where: { ...actionTenantScope, status: { notIn: closedStatuses } } }),
@@ -63,9 +69,12 @@ export async function getGlobalExecutivePortfolio(organizationId: string) {
     prisma.contractor.count({ where: { organizationId, status: ContractorStatus.APPROVED, insuranceExpiresAt: { lte: credentialHorizon } } }),
     prisma.permitToWork.count({ where: { organizationId, status: { in: [PermitToWorkStatus.APPROVED, PermitToWorkStatus.ACTIVE, PermitToWorkStatus.SUSPENDED] } } }),
     prisma.permitToWork.count({ where: { organizationId, status: { in: [PermitToWorkStatus.DRAFT, PermitToWorkStatus.PENDING_APPROVAL, PermitToWorkStatus.APPROVED, PermitToWorkStatus.ACTIVE, PermitToWorkStatus.SUSPENDED] }, plannedEndAt: { lt: now } } }),
+    allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE) ? prisma.exposureAssessment.count({ where: { organizationId, status: { notIn: [ExposureAssessmentStatus.COMPLETED, ExposureAssessmentStatus.CANCELLED] } } }) : 0,
+    allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE) ? prisma.exposureSample.count({ where: { assessment: { organizationId }, classification: ExposureResultClassification.ABOVE_LIMIT } }) : 0,
+    allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH) ? prisma.medicalSurveillanceEnrollment.count({ where: { program: { organizationId }, status: SurveillanceEnrollmentStatus.OVERDUE } }) : 0,
   ]);
 
-  const modules = [
+  const modules: { label: string; value: number; note: string; href: string; tone: "danger" | "warning" | "good" | "neutral" }[] = [
     { label: "Observations", value: openObservations, note: "open", href: "/observations", tone: openObservations ? "warning" : "good" },
     { label: "CAPA", value: openActions, note: `${overdueActions} overdue`, href: "/capa", tone: overdueActions ? "danger" : "neutral" },
     { label: "Risk", value: highRisks, note: `${overdueRiskReviews} reviews overdue`, href: "/risks/dashboard", tone: highRisks || overdueRiskReviews ? "danger" : "good" },
@@ -82,7 +91,9 @@ export async function getGlobalExecutivePortfolio(organizationId: string) {
     { label: "JSA / JHA", value: activeJsas, note: `${overdueJsaReviews} reviews overdue`, href: "/risks/jsa", tone: overdueJsaReviews ? "danger" : "neutral" },
     { label: "Contractors", value: approvedContractors, note: `${expiringContractorInsurance} insurance credentials due`, href: "/contractors", tone: expiringContractorInsurance ? "danger" : "neutral" },
     { label: "Permits to Work", value: activeWorkPermits, note: `${overdueWorkPermits} past authorized end`, href: "/permits-to-work", tone: overdueWorkPermits ? "danger" : "neutral" },
-  ] as const;
+  ];
+  if (allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE)) modules.push({ label: "Industrial Hygiene", value: openExposureAssessments, note: `${aboveLimitExposureSamples} results above limit`, href: "/industrial-hygiene", tone: aboveLimitExposureSamples ? "danger" : openExposureAssessments ? "neutral" : "good" });
+  if (allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH)) modules.push({ label: "Occupational Health", value: overdueSurveillance, note: "restricted milestones overdue", href: "/occupational-health", tone: overdueSurveillance ? "danger" : "good" });
 
   return { modules, attentionCount: modules.filter((item) => item.tone === "danger").reduce((sum, item) => sum + item.value, 0) };
 }

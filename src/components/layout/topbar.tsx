@@ -14,11 +14,12 @@ import { isApprovedPlatformAdministrator } from "@/lib/platform-admin";
 import { MobileNavigationMenu } from "./mobile-navigation-menu";
 import { UserRole } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
+import { getCurrentUserPermissions } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export async function Topbar() {
-  const session = await auth();
+  const [session, permissions] = await Promise.all([auth(), getCurrentUserPermissions()]);
 
   const currentUser = session?.user?.email
     ? await prisma.user.findUnique({
@@ -100,10 +101,11 @@ export async function Topbar() {
         : primaryNavItems.filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION);
 
   const demoMode = currentUser?.role === UserRole.DEMO_VIEWER;
+  const visibleEhsItems = ehsNavItems.filter(item => item.permission === undefined || permissions.includes(item.permission));
 
   const mobileSections = [
     { label: "Platform", items: platformItems },
-    { label: "EHS Management", items: ehsNavItems },
+    { label: "EHS Management", items: visibleEhsItems },
     { label: "Audit Management 2.0", items: auditNavItems },
     { label: "Inspections", items: inspectionNavItems },
     { label: "Governance", items: demoMode ? complianceNavItems.filter((item) => item.href !== "/notifications") : complianceNavItems.filter(item => item.href !== "/notifications" || entitlements.IN_APP_NOTIFICATIONS) },

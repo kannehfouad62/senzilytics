@@ -107,6 +107,10 @@ enum PermissionKey {
   MANAGE_CONTRACTORS
   VIEW_PERMITS_TO_WORK
   MANAGE_PERMITS_TO_WORK
+  VIEW_INDUSTRIAL_HYGIENE
+  MANAGE_INDUSTRIAL_HYGIENE
+  VIEW_OCCUPATIONAL_HEALTH
+  MANAGE_OCCUPATIONAL_HEALTH
 }
 
 enum ConfigurableFormModule {
@@ -124,6 +128,7 @@ enum ConfigurableFormModule {
   ESG
   CONTRACTOR
   PERMIT_TO_WORK
+  INDUSTRIAL_HYGIENE
   GENERAL
 }
 
@@ -261,6 +266,66 @@ enum PermitToWorkStatus {
 enum PermitGasTestResult {
   PASS
   FAIL
+}
+
+enum HygieneAgentCategory {
+  CHEMICAL
+  NOISE
+  BIOLOGICAL
+  ERGONOMIC
+  HEAT
+  COLD
+  VIBRATION
+  RADIATION
+  INDOOR_AIR_QUALITY
+  OTHER
+}
+
+enum ExposureAssessmentStatus {
+  DRAFT
+  PLANNED
+  IN_PROGRESS
+  UNDER_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum ExposureSampleType {
+  PERSONAL
+  AREA
+  TASK
+  DIRECT_READING
+  WIPE
+}
+
+enum ExposureResultClassification {
+  BELOW_DETECTION
+  BELOW_ACTION_LEVEL
+  AT_OR_ABOVE_ACTION_LEVEL
+  ABOVE_LIMIT
+  NOT_EVALUATED
+}
+
+enum SurveillanceProgramStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum SurveillanceEnrollmentStatus {
+  ENROLLED
+  DUE
+  COMPLETED
+  OVERDUE
+  REMOVED
+}
+
+enum FitnessOutcome {
+  NOT_ASSESSED
+  CLEARED
+  CLEARED_WITH_RESTRICTIONS
+  TEMPORARILY_NOT_CLEARED
 }
 
 enum ChemicalApprovalStatus {
@@ -525,6 +590,7 @@ enum DocumentEntityType {
   ESG
   CONTRACTOR
   PERMIT_TO_WORK
+  INDUSTRIAL_HYGIENE
 }
 
 enum DocumentCategory {
@@ -1000,6 +1066,10 @@ model Organization {
   pricingInquiries              PricingInquiry[]
   contractors                   Contractor[]
   permitsToWork                 PermitToWork[]
+  hygieneAgents                 HygieneAgent[]
+  similarExposureGroups         SimilarExposureGroup[]
+  exposureAssessments           ExposureAssessment[]
+  surveillancePrograms          MedicalSurveillanceProgram[]
 }
 
 model PricingInquiry {
@@ -1055,6 +1125,8 @@ model Site {
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
   contractorSites               ContractorSite[]
   permitsToWork                 PermitToWork[]
+  similarExposureGroups         SimilarExposureGroup[]
+  exposureAssessments           ExposureAssessment[]
 }
 
 model Department {
@@ -1076,10 +1148,12 @@ model Department {
   complianceCalendarTasks       ComplianceCalendarTask[]
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  jobSafetyAnalyses JobSafetyAnalysis[]
-  permitsToWork     PermitToWork[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  jobSafetyAnalyses     JobSafetyAnalysis[]
+  permitsToWork         PermitToWork[]
+  similarExposureGroups SimilarExposureGroup[]
+  exposureAssessments   ExposureAssessment[]
 }
 
 model User {
@@ -1157,14 +1231,21 @@ model User {
   configurableFormVersionsPublished ConfigurableFormVersion[]    @relation("ConfigurableFormVersionPublishedBy")
   configurableFormSubmissions       ConfigurableFormSubmission[] @relation("ConfigurableFormSubmittedBy")
 
-  approvedContractors     Contractor[]          @relation("ContractorApprovedBy")
-  requestedPermitsToWork  PermitToWork[]        @relation("PermitToWorkRequestedBy")
-  issuedPermitsToWork     PermitToWork[]        @relation("PermitToWorkIssuedBy")
-  approvedPermitsToWork   PermitToWork[]        @relation("PermitToWorkApprovedBy")
-  closedPermitsToWork     PermitToWork[]        @relation("PermitToWorkClosedBy")
-  verifiedPermitControls  PermitToWorkControl[] @relation("PermitControlVerifiedBy")
-  performedPermitGasTests PermitToWorkGasTest[] @relation("PermitGasTestPerformedBy")
-  permitToWorkHistory     PermitToWorkHistory[] @relation("PermitHistoryActor")
+  approvedContractors              Contractor[]                    @relation("ContractorApprovedBy")
+  requestedPermitsToWork           PermitToWork[]                  @relation("PermitToWorkRequestedBy")
+  issuedPermitsToWork              PermitToWork[]                  @relation("PermitToWorkIssuedBy")
+  approvedPermitsToWork            PermitToWork[]                  @relation("PermitToWorkApprovedBy")
+  closedPermitsToWork              PermitToWork[]                  @relation("PermitToWorkClosedBy")
+  verifiedPermitControls           PermitToWorkControl[]           @relation("PermitControlVerifiedBy")
+  performedPermitGasTests          PermitToWorkGasTest[]           @relation("PermitGasTestPerformedBy")
+  permitToWorkHistory              PermitToWorkHistory[]           @relation("PermitHistoryActor")
+  ownedExposureGroups              SimilarExposureGroup[]          @relation("ExposureGroupOwner")
+  assignedExposureAssessments      ExposureAssessment[]            @relation("ExposureAssessmentAssessor")
+  createdExposureSamples           ExposureSample[]                @relation("ExposureSampleCreatedBy")
+  sampledExposureRecords           ExposureSample[]                @relation("ExposureSampleWorker")
+  responsibleSurveillancePrograms  MedicalSurveillanceProgram[]    @relation("SurveillanceProgramResponsible")
+  surveillanceEnrollments          MedicalSurveillanceEnrollment[] @relation("SurveillanceEnrollmentUser")
+  completedSurveillanceEnrollments MedicalSurveillanceEnrollment[] @relation("SurveillanceEnrollmentCompletedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -3141,6 +3222,204 @@ model PermitToWorkHistory {
   createdAt  DateTime            @default(now())
 
   @@index([permitId, createdAt])
+}
+
+model HygieneAgent {
+  id                   String                       @id @default(cuid())
+  organizationId       String
+  organization         Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                 String
+  category             HygieneAgentCategory
+  casNumber            String?
+  description          String?
+  healthEffects        String?
+  exposureRoutes       String?
+  occupationalLimit    Float?
+  actionLevel          Float?
+  ceilingLimit         Float?
+  unit                 String?
+  limitSource          String?
+  samplingMethod       String?
+  analyticalMethod     String?
+  requiresSurveillance Boolean                      @default(false)
+  isActive             Boolean                      @default(true)
+  groupLinks           SimilarExposureGroupAgent[]
+  samples              ExposureSample[]
+  surveillancePrograms MedicalSurveillanceProgram[]
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId, category, isActive])
+}
+
+model SimilarExposureGroup {
+  id                   String                       @id @default(cuid())
+  organizationId       String
+  organization         Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  siteId               String
+  site                 Site                         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId         String?
+  department           Department?                  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  name                 String
+  code                 String?
+  description          String?
+  jobRoles             String?
+  tasks                String?
+  locations            String?
+  exposedHeadcount     Int?
+  existingControls     String?
+  requiredPpe          String?
+  ownerId              String?
+  owner                User?                        @relation("ExposureGroupOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  reviewDueDate        DateTime?
+  isActive             Boolean                      @default(true)
+  agents               SimilarExposureGroupAgent[]
+  assessments          ExposureAssessment[]
+  surveillancePrograms MedicalSurveillanceProgram[]
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId, isActive, reviewDueDate])
+  @@index([siteId, departmentId])
+}
+
+model SimilarExposureGroupAgent {
+  id      String               @id @default(cuid())
+  groupId String
+  group   SimilarExposureGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  agentId String
+  agent   HygieneAgent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  notes   String?
+
+  @@unique([groupId, agentId])
+  @@index([agentId])
+}
+
+model ExposureAssessment {
+  id              String                   @id @default(cuid())
+  organizationId  String
+  organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reference       String
+  title           String
+  description     String?
+  status          ExposureAssessmentStatus @default(DRAFT)
+  groupId         String
+  group           SimilarExposureGroup     @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  siteId          String
+  site            Site                     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  departmentId    String?
+  department      Department?              @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assessorId      String?
+  assessor        User?                    @relation("ExposureAssessmentAssessor", fields: [assessorId], references: [id], onDelete: SetNull)
+  scheduledAt     DateTime?
+  dueDate         DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  scope           String?
+  samplingPlan    String?
+  observations    String?
+  conclusions     String?
+  recommendations String?
+  samples         ExposureSample[]
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, dueDate])
+  @@index([groupId, scheduledAt])
+  @@index([assessorId, status])
+}
+
+model ExposureSample {
+  id                String                       @id @default(cuid())
+  assessmentId      String
+  assessment        ExposureAssessment           @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  agentId           String
+  agent             HygieneAgent                 @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  sampleType        ExposureSampleType
+  sampleReference   String?
+  sampledWorkerId   String?
+  sampledWorker     User?                        @relation("ExposureSampleWorker", fields: [sampledWorkerId], references: [id], onDelete: SetNull)
+  location          String?
+  task              String?
+  sampledAt         DateTime
+  durationMinutes   Int?
+  resultValue       Float?
+  reportingLimit    Float?
+  occupationalLimit Float?
+  actionLevel       Float?
+  unit              String?
+  exposureRatio     Float?
+  classification    ExposureResultClassification @default(NOT_EVALUATED)
+  laboratory        String?
+  analyticalMethod  String?
+  analyzedAt        DateTime?
+  notes             String?
+  createdById       String
+  createdBy         User                         @relation("ExposureSampleCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  @@unique([assessmentId, sampleReference])
+  @@index([assessmentId, classification])
+  @@index([agentId, sampledAt])
+  @@index([sampledWorkerId])
+}
+
+model MedicalSurveillanceProgram {
+  id                String                          @id @default(cuid())
+  organizationId    String
+  organization      Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  status            SurveillanceProgramStatus       @default(DRAFT)
+  regulatoryBasis   String?
+  protocolReference String?
+  providerName      String?
+  frequencyMonths   Int                             @default(12)
+  leadDays          Int                             @default(30)
+  agentId           String?
+  agent             HygieneAgent?                   @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  groupId           String?
+  group             SimilarExposureGroup?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  responsibleUserId String
+  responsibleUser   User                            @relation("SurveillanceProgramResponsible", fields: [responsibleUserId], references: [id])
+  isActive          Boolean                         @default(true)
+  enrollments       MedicalSurveillanceEnrollment[]
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId, status, isActive])
+  @@index([responsibleUserId])
+}
+
+model MedicalSurveillanceEnrollment {
+  id                   String                       @id @default(cuid())
+  programId            String
+  program              MedicalSurveillanceProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User                         @relation("SurveillanceEnrollmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  status               SurveillanceEnrollmentStatus @default(ENROLLED)
+  enrolledAt           DateTime                     @default(now())
+  lastCompletedAt      DateTime?
+  nextDueAt            DateTime
+  fitnessOutcome       FitnessOutcome               @default(NOT_ASSESSED)
+  workRestrictions     String?
+  certificateReference String?
+  completedById        String?
+  completedBy          User?                        @relation("SurveillanceEnrollmentCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  removedAt            DateTime?
+  notes                String?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  @@unique([programId, userId])
+  @@index([status, nextDueAt])
+  @@index([userId, status])
 }
 
 model Chemical {

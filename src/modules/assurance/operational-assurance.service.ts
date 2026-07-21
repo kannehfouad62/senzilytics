@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { PermissionKey, RiskLevel } from "@prisma/client";
+import { ExposureResultClassification, PermissionKey, RiskLevel, SurveillanceEnrollmentStatus } from "@prisma/client";
 
 export type AssuranceSignal = {
   id: string;
@@ -44,7 +44,7 @@ export async function getOperationalAssuranceOverview(input: {
 
   const contractorHorizon = new Date(now);
   contractorHorizon.setUTCDate(contractorHorizon.getUTCDate() + 30);
-  const [observations, incidents, auditFindings, inspectionFindings, risks, mocs, contractors, permitsToWork, connections] = await Promise.all([
+  const [observations, incidents, auditFindings, inspectionFindings, risks, mocs, contractors, permitsToWork, exposureSamples, surveillancePrograms, connections] = await Promise.all([
     allowed.has(PermissionKey.VIEW_OBSERVATIONS) ? prisma.safetyObservation.findMany({
       where: { organizationId: input.organizationId, riskLevel: { in: elevated }, status: { notIn: ["RESOLVED", "CLOSED"] } },
       include: { site: true }, orderBy: { observedAt: "desc" }, take: 20,
@@ -78,6 +78,14 @@ export async function getOperationalAssuranceOverview(input: {
       where: { organizationId: input.organizationId, OR: [{ status: "SUSPENDED" }, { status: "ACTIVE", plannedEndAt: { lt: now } }] },
       include: { site: true }, orderBy: { plannedEndAt: "asc" }, take: 20,
     }) : [],
+    allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE) ? prisma.exposureSample.findMany({
+      where: { assessment: { organizationId: input.organizationId }, classification: ExposureResultClassification.ABOVE_LIMIT },
+      include: { agent: true, assessment: { include: { site: true } } }, orderBy: { sampledAt: "desc" }, take: 20,
+    }) : [],
+    allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH) ? prisma.medicalSurveillanceProgram.findMany({
+      where: { organizationId: input.organizationId, enrollments: { some: { status: { in: [SurveillanceEnrollmentStatus.DUE, SurveillanceEnrollmentStatus.OVERDUE] } } } },
+      include: { enrollments: { where: { status: { in: [SurveillanceEnrollmentStatus.DUE, SurveillanceEnrollmentStatus.OVERDUE] } }, select: { status: true } } }, take: 20,
+    }) : [],
     Promise.all([
       prisma.safetyObservation.count({ where: { organizationId: input.organizationId, incidentId: { not: null } } }),
       prisma.correctiveAction.count({ where: { ...actionScope, incidentId: { not: null } } }),
@@ -86,6 +94,8 @@ export async function getOperationalAssuranceOverview(input: {
       prisma.inspectionFinding.count({ where: { inspection: { site: { organizationId: input.organizationId } }, correctiveAction: { isNot: null } } }),
       prisma.mocRiskLink.count({ where: { moc: { organizationId: input.organizationId } } }),
       prisma.permitToWork.count({ where: { organizationId: input.organizationId, contractorId: { not: null } } }),
+      allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE) ? prisma.exposureAssessment.count({ where: { organizationId: input.organizationId } }) : 0,
+      allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH) ? prisma.medicalSurveillanceProgram.count({ where: { organizationId: input.organizationId, groupId: { not: null } } }) : 0,
     ]),
   ]);
 
@@ -98,6 +108,8 @@ export async function getOperationalAssuranceOverview(input: {
     ...mocs.map(x => { const overdueTasks=x.tasks.filter(t=>overdue(t.dueDate,now)).length; return { id:`moc:${x.id}`, title:x.title, detail:overdueTasks?`${overdueTasks} required change task${overdueTasks===1?" is":"s are"} overdue.`:`Elevated residual risk with ${x.riskLinks.length} linked risk${x.riskLinks.length===1?"":"s"}.`, source:"MOC", href:`/moc/${x.id}`, severity:x.residualRiskLevel as "CRITICAL"|"HIGH", site:x.site.name }; }),
     ...contractors.map(x => ({ id:`contractor:${x.id}`, title:x.name, detail:x.insuranceExpiresAt && x.insuranceExpiresAt < now ? "Approved contractor insurance has expired." : `Contractor insurance expires within 30 days${x.insuranceExpiresAt ? ` (${x.insuranceExpiresAt.toLocaleDateString()})` : ""}.`, source:"Contractor", href:`/contractors/${x.id}`, severity:(x.insuranceExpiresAt && x.insuranceExpiresAt < now ? "CRITICAL" : "HIGH") as AssuranceSignal["severity"], site:null })),
     ...permitsToWork.map(x => ({ id:`permit-to-work:${x.id}`, title:`${x.reference} — ${x.title}`, detail:x.status==="SUSPENDED"?"High-risk work permit is suspended and requires resolution.":"Active work permit is past its authorized end time.", source:"Permit to Work", href:`/permits-to-work/${x.id}`, severity:(x.plannedEndAt < now ? "CRITICAL" : "HIGH") as AssuranceSignal["severity"], site:x.site.name })),
+    ...exposureSamples.map(x => ({ id:`exposure-sample:${x.id}`, title:`${x.assessment.reference} — ${x.agent.name}`, detail:`Exposure result exceeded the recorded occupational limit${x.exposureRatio ? ` (${x.exposureRatio.toFixed(2)}× limit)` : ""}.`, source:"Industrial Hygiene", href:`/industrial-hygiene/${x.assessmentId}`, severity:"CRITICAL" as const, site:x.assessment.site.name })),
+    ...surveillancePrograms.map(x => { const overdueCount=x.enrollments.filter(row=>row.status===SurveillanceEnrollmentStatus.OVERDUE).length; return { id:`surveillance-program:${x.id}`, title:x.name, detail:`${x.enrollments.length} restricted surveillance milestone${x.enrollments.length===1?"":"s"} require${x.enrollments.length===1?"s":""} administrative attention.`, source:"Occupational Health", href:`/occupational-health/${x.id}`, severity:(overdueCount?"HIGH":"MEDIUM") as AssuranceSignal["severity"], site:null }; }),
   ];
 
   const connectionRows: AssuranceConnection[] = [
@@ -108,6 +120,8 @@ export async function getOperationalAssuranceOverview(input: {
     { label: "Inspection Findings → CAPA", count: connections[4], detail: "Inspection deficiencies under correction", href: "/inspections" },
     { label: "MOC → Risks", count: connections[5], detail: "Change-related risk relationships", href: "/moc" },
     { label: "Contractors → Work Permits", count: connections[6], detail: "Third-party work under permit control", href: "/permits-to-work" },
+    ...(allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE) ? [{ label: "Exposure Groups → Assessments", count: connections[7], detail: "Worker exposure groups under assessment", href: "/industrial-hygiene" }] : []),
+    ...(allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH) ? [{ label: "Exposure Groups → Surveillance", count: connections[8], detail: "Exposure-driven administrative health programs", href: "/occupational-health" }] : []),
   ];
 
   const ranked = rankAssuranceSignals(signals);

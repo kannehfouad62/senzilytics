@@ -50,6 +50,8 @@ export function configurableFormModuleForDocumentEntity(
       return ConfigurableFormModule.CONTRACTOR;
     case DocumentEntityType.PERMIT_TO_WORK:
       return ConfigurableFormModule.PERMIT_TO_WORK;
+    case DocumentEntityType.INDUSTRIAL_HYGIENE:
+      return ConfigurableFormModule.INDUSTRIAL_HYGIENE;
     default:
       return null;
   }

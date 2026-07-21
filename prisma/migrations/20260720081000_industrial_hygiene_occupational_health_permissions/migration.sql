@@ -1,0 +1,14 @@
+INSERT INTO "RolePermission" ("id", "role", "permission", "createdAt") VALUES
+  ('rp_org_admin_view_ih', 'ORG_ADMIN', 'VIEW_INDUSTRIAL_HYGIENE', CURRENT_TIMESTAMP),
+  ('rp_org_admin_manage_ih', 'ORG_ADMIN', 'MANAGE_INDUSTRIAL_HYGIENE', CURRENT_TIMESTAMP),
+  ('rp_org_admin_view_oh', 'ORG_ADMIN', 'VIEW_OCCUPATIONAL_HEALTH', CURRENT_TIMESTAMP),
+  ('rp_org_admin_manage_oh', 'ORG_ADMIN', 'MANAGE_OCCUPATIONAL_HEALTH', CURRENT_TIMESTAMP),
+  ('rp_ehs_manager_view_ih', 'EHS_MANAGER', 'VIEW_INDUSTRIAL_HYGIENE', CURRENT_TIMESTAMP),
+  ('rp_ehs_manager_manage_ih', 'EHS_MANAGER', 'MANAGE_INDUSTRIAL_HYGIENE', CURRENT_TIMESTAMP),
+  ('rp_ehs_manager_view_oh', 'EHS_MANAGER', 'VIEW_OCCUPATIONAL_HEALTH', CURRENT_TIMESTAMP),
+  ('rp_ehs_manager_manage_oh', 'EHS_MANAGER', 'MANAGE_OCCUPATIONAL_HEALTH', CURRENT_TIMESTAMP),
+  ('rp_supervisor_view_ih', 'SUPERVISOR', 'VIEW_INDUSTRIAL_HYGIENE', CURRENT_TIMESTAMP),
+  ('rp_auditor_view_ih', 'AUDITOR', 'VIEW_INDUSTRIAL_HYGIENE', CURRENT_TIMESTAMP),
+  ('rp_demo_view_ih', 'DEMO_VIEWER', 'VIEW_INDUSTRIAL_HYGIENE', CURRENT_TIMESTAMP),
+  ('rp_demo_view_oh', 'DEMO_VIEWER', 'VIEW_OCCUPATIONAL_HEALTH', CURRENT_TIMESTAMP)
+ON CONFLICT ("role", "permission") DO NOTHING;

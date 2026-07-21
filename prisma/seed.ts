@@ -156,6 +156,10 @@ async function main() {
       PermissionKey.MANAGE_CONTRACTORS,
       PermissionKey.VIEW_PERMITS_TO_WORK,
       PermissionKey.MANAGE_PERMITS_TO_WORK,
+      PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
+      PermissionKey.MANAGE_INDUSTRIAL_HYGIENE,
+      PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
+      PermissionKey.MANAGE_OCCUPATIONAL_HEALTH,
     ],
 
     EHS_MANAGER: [
@@ -188,6 +192,10 @@ async function main() {
       PermissionKey.MANAGE_CONTRACTORS,
       PermissionKey.VIEW_PERMITS_TO_WORK,
       PermissionKey.MANAGE_PERMITS_TO_WORK,
+      PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
+      PermissionKey.MANAGE_INDUSTRIAL_HYGIENE,
+      PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
+      PermissionKey.MANAGE_OCCUPATIONAL_HEALTH,
     ],
 
     SUPERVISOR: [
@@ -209,6 +217,7 @@ async function main() {
       PermissionKey.VIEW_CONTRACTORS,
       PermissionKey.VIEW_PERMITS_TO_WORK,
       PermissionKey.MANAGE_PERMITS_TO_WORK,
+      PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
     ],
 
     EMPLOYEE: [
@@ -236,6 +245,7 @@ async function main() {
       PermissionKey.VIEW_ENVIRONMENTAL,
       PermissionKey.VIEW_CONTRACTORS,
       PermissionKey.VIEW_PERMITS_TO_WORK,
+      PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
     ],
     DEMO_VIEWER: [
       PermissionKey.VIEW_DASHBOARD,
@@ -254,6 +264,8 @@ async function main() {
       PermissionKey.VIEW_ESG,
       PermissionKey.VIEW_CONTRACTORS,
       PermissionKey.VIEW_PERMITS_TO_WORK,
+      PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
+      PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
     ],
   };
 

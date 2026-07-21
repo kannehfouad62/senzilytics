@@ -355,6 +355,11 @@ async function validateRelatedEntity(input: {
       return Boolean(record);
     }
 
+    case DocumentEntityType.INDUSTRIAL_HYGIENE: {
+      const record = await prisma.exposureAssessment.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } });
+      return Boolean(record);
+    }
+
     case DocumentEntityType.WORKFLOW: {
       const record = await prisma.workflowInstance.findFirst({
         where: {
@@ -658,6 +663,11 @@ async function requireDocumentUploadPermission(
     case ConfigurableFormModule.PERMIT_TO_WORK:
       allowed = permissions.includes(
         PermissionKey.MANAGE_PERMITS_TO_WORK
+      );
+      break;
+    case ConfigurableFormModule.INDUSTRIAL_HYGIENE:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_INDUSTRIAL_HYGIENE
       );
       break;
   }

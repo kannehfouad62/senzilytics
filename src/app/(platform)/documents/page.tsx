@@ -604,6 +604,9 @@ function getRelatedRecordLink(
     case DocumentEntityType.PERMIT_TO_WORK:
       return `/permits-to-work/${entityId}`;
 
+    case DocumentEntityType.INDUSTRIAL_HYGIENE:
+      return `/industrial-hygiene/${entityId}`;
+
     case DocumentEntityType.WORKFLOW:
       return "/workflows";
 

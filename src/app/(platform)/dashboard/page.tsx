@@ -3,6 +3,7 @@ import { getExecutiveDashboardData } from "@/core/analytics/dashboard.service";
 import { getGlobalExecutivePortfolio } from "@/core/analytics/global-executive-dashboard.service";
 import { GlobalExecutivePortfolio } from "@/core/analytics/global-executive-portfolio";
 import { getCurrentUserTenant } from "@/lib/tenant";
+import { getCurrentUserPermissions } from "@/lib/permissions";
 import { OperationalDashboardCharts } from "@/core/analytics/operational-dashboard-charts";
 import { PerformanceDashboardCharts } from "@/core/analytics/performance-dashboard-charts";
 import {
@@ -24,10 +25,11 @@ export default async function DashboardPage() {
   const { organizationId, user } =
     await getCurrentUserTenant();
 
-  const [dashboard, portfolio] = await Promise.all([
+  const [dashboard, permissions] = await Promise.all([
     getExecutiveDashboardData({ organizationId }),
-    getGlobalExecutivePortfolio(organizationId),
+    getCurrentUserPermissions(),
   ]);
+  const portfolio = await getGlobalExecutivePortfolio(organizationId, permissions);
 
   const stats = [
     {
