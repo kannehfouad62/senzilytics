@@ -575,13 +575,28 @@ function getRelatedRecordLink(
       return `/inspections/${entityId}`;
 
     case DocumentEntityType.COMPLIANCE:
-      return "/compliance";
+      return `/compliance/${entityId}`;
 
     case DocumentEntityType.TRAINING:
-      return "/training";
+      return `/training/${entityId}`;
 
     case DocumentEntityType.CORRECTIVE_ACTION:
-      return "/actions";
+      return `/actions/${entityId}`;
+
+    case DocumentEntityType.CHEMICAL:
+      return `/chemicals/${entityId}`;
+
+    case DocumentEntityType.ENVIRONMENTAL:
+      return `/environmental/${entityId}`;
+
+    case DocumentEntityType.ESG:
+      return `/esg/${entityId}`;
+
+    case DocumentEntityType.RISK:
+      return `/risks/${entityId}`;
+
+    case DocumentEntityType.MOC:
+      return `/moc/${entityId}`;
 
     case DocumentEntityType.WORKFLOW:
       return "/workflows";

@@ -38,6 +38,14 @@ export function configurableFormModuleForDocumentEntity(
       return ConfigurableFormModule.CAPA;
     case DocumentEntityType.COMPLIANCE:
       return ConfigurableFormModule.COMPLIANCE;
+    case DocumentEntityType.TRAINING:
+      return ConfigurableFormModule.TRAINING;
+    case DocumentEntityType.CHEMICAL:
+      return ConfigurableFormModule.CHEMICAL;
+    case DocumentEntityType.ENVIRONMENTAL:
+      return ConfigurableFormModule.ENVIRONMENTAL;
+    case DocumentEntityType.ESG:
+      return ConfigurableFormModule.ESG;
     default:
       return null;
   }

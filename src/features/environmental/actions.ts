@@ -1,6 +1,209 @@
-"use server";import { requirePermission } from "@/lib/permissions";import { prisma } from "@/lib/prisma";import { getCurrentUserTenant } from "@/lib/tenant";import { EnvironmentalDataQuality,EnvironmentalDataStatus,EnvironmentalMetricType,PermissionKey } from "@prisma/client";import { revalidatePath } from "next/cache";import { redirect } from "next/navigation";
-const req=(d:FormData,k:string)=>{const v=String(d.get(k)||"").trim();if(!v)throw new Error(`${k} is required.`);return v};const opt=(d:FormData,k:string)=>String(d.get(k)||"").trim()||null;const date=(d:FormData,k:string)=>{const x=new Date(req(d,k));if(Number.isNaN(x.getTime()))throw new Error(`Enter a valid ${k}.`);return x};
-export async function createEnvironmentalMetric(d:FormData){await requirePermission(PermissionKey.MANAGE_ENVIRONMENTAL);const{organizationId}=await getCurrentUserTenant();const type=req(d,"type") as EnvironmentalMetricType;if(!Object.values(EnvironmentalMetricType).includes(type))throw new Error("Select a valid metric type.");await prisma.environmentalMetricDefinition.create({data:{organizationId,code:req(d,"code").toUpperCase(),name:req(d,"name"),description:opt(d,"description"),type,sourceUnit:req(d,"sourceUnit"),reportingUnit:req(d,"reportingUnit"),conversionFactor:Number(req(d,"conversionFactor")),methodology:opt(d,"methodology")}});redirect("/environmental/metrics")}
-export async function recordEnvironmentalData(d:FormData){await requirePermission(PermissionKey.MANAGE_ENVIRONMENTAL);const{organizationId,user}=await getCurrentUserTenant();const metricId=req(d,"metricId"),siteId=req(d,"siteId"),quality=req(d,"quality") as EnvironmentalDataQuality;const[metric,site]=await Promise.all([prisma.environmentalMetricDefinition.findFirst({where:{id:metricId,organizationId,isActive:true}}),prisma.site.findFirst({where:{id:siteId,organizationId}})]);if(!metric||!site)throw new Error("Select a valid metric and site.");if(!Object.values(EnvironmentalDataQuality).includes(quality))throw new Error("Select a valid data-quality classification.");const value=Number(req(d,"value")),periodStart=date(d,"periodStart"),periodEnd=date(d,"periodEnd");if(!Number.isFinite(value)||periodEnd<periodStart)throw new Error("Enter a valid value and reporting period.");await prisma.environmentalDataPoint.upsert({where:{metricId_siteId_periodStart_periodEnd:{metricId,siteId,periodStart,periodEnd}},update:{value,normalizedValue:value*metric.conversionFactor,quality,evidenceSummary:opt(d,"evidenceSummary"),notes:opt(d,"notes"),enteredById:user.id,status:EnvironmentalDataStatus.DRAFT},create:{metricId,siteId,periodStart,periodEnd,value,normalizedValue:value*metric.conversionFactor,quality,evidenceSummary:opt(d,"evidenceSummary"),notes:opt(d,"notes"),enteredById:user.id}});redirect("/environmental")}
-export async function reviewEnvironmentalData(d:FormData){await requirePermission(PermissionKey.MANAGE_ENVIRONMENTAL);const{organizationId,user}=await getCurrentUserTenant();const id=req(d,"id"),status=req(d,"status") as EnvironmentalDataStatus;if(status!==EnvironmentalDataStatus.APPROVED&&status!==EnvironmentalDataStatus.REJECTED)throw new Error("Select an approval decision.");const result=await prisma.environmentalDataPoint.updateMany({where:{id,metric:{organizationId}},data:{status,approvedById:user.id,approvedAt:new Date()}});if(!result.count)throw new Error("Environmental record not found.");revalidatePath("/environmental")}
-export async function createEnvironmentalTarget(d:FormData){await requirePermission(PermissionKey.MANAGE_ENVIRONMENTAL);const{organizationId}=await getCurrentUserTenant();const metricId=req(d,"metricId");if(!(await prisma.environmentalMetricDefinition.findFirst({where:{id:metricId,organizationId}})))throw new Error("Select a valid metric.");await prisma.environmentalTarget.create({data:{organizationId,metricId,name:req(d,"name"),baselineYear:Number(req(d,"baselineYear")),baselineValue:Number(req(d,"baselineValue")),targetYear:Number(req(d,"targetYear")),targetValue:Number(req(d,"targetValue")),description:opt(d,"description")}});redirect("/environmental/dashboard")}
+"use server";
+
+import type { FormActionState } from "@/core/actions/action-state";
+import { requirePermission } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserTenant } from "@/lib/tenant";
+import {
+  completeEnvironmentalFormsService,
+  recordEnvironmentalDataService,
+} from "@/modules/environmental/environmental-data.service";
+import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
+import {
+  ConfigurableFormModule,
+  EnvironmentalDataQuality,
+  EnvironmentalDataStatus,
+  EnvironmentalMetricType,
+  PermissionKey,
+} from "@prisma/client";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+const required = (data: FormData, key: string) => {
+  const value = String(data.get(key) || "").trim();
+
+  if (!value) {
+    throw new Error(`${key} is required.`);
+  }
+
+  return value;
+};
+
+const optional = (data: FormData, key: string) =>
+  String(data.get(key) || "").trim() || null;
+
+const requiredDate = (data: FormData, key: string) => {
+  const value = new Date(required(data, key));
+
+  if (Number.isNaN(value.getTime())) {
+    throw new Error(`Enter a valid ${key}.`);
+  }
+
+  return value;
+};
+
+export async function createEnvironmentalMetric(data: FormData) {
+  await requirePermission(PermissionKey.MANAGE_ENVIRONMENTAL);
+  const { organizationId } = await getCurrentUserTenant();
+  const type = required(data, "type") as EnvironmentalMetricType;
+
+  if (!Object.values(EnvironmentalMetricType).includes(type)) {
+    throw new Error("Select a valid metric type.");
+  }
+
+  await prisma.environmentalMetricDefinition.create({
+    data: {
+      organizationId,
+      code: required(data, "code").toUpperCase(),
+      name: required(data, "name"),
+      description: optional(data, "description"),
+      type,
+      sourceUnit: required(data, "sourceUnit"),
+      reportingUnit: required(data, "reportingUnit"),
+      conversionFactor: Number(required(data, "conversionFactor")),
+      methodology: optional(data, "methodology"),
+    },
+  });
+
+  redirect("/environmental/metrics");
+}
+
+export async function recordEnvironmentalData(
+  _previousState: FormActionState,
+  data: FormData
+): Promise<FormActionState> {
+  await requirePermission(PermissionKey.MANAGE_ENVIRONMENTAL);
+  const { organizationId, user } = await getCurrentUserTenant();
+  let dataPointId: string;
+
+  try {
+    const quality = required(data, "quality") as EnvironmentalDataQuality;
+
+    if (!Object.values(EnvironmentalDataQuality).includes(quality)) {
+      throw new Error("Select a valid data-quality classification.");
+    }
+
+    const customSubmissions = await preparePublishedFormSubmissions({
+      organizationId,
+      module: ConfigurableFormModule.ENVIRONMENTAL,
+      data,
+    });
+    const point = await recordEnvironmentalDataService({
+      organizationId,
+      userId: user.id,
+      metricId: required(data, "metricId"),
+      siteId: required(data, "siteId"),
+      value: Number(required(data, "value")),
+      quality,
+      periodStart: requiredDate(data, "periodStart"),
+      periodEnd: requiredDate(data, "periodEnd"),
+      evidenceSummary: optional(data, "evidenceSummary"),
+      notes: optional(data, "notes"),
+      customSubmissions,
+    });
+
+    dataPointId = point.id;
+  } catch (error) {
+    return {
+      status: "ERROR",
+      message:
+        error instanceof Error
+          ? error.message
+          : "The environmental data point could not be recorded.",
+    };
+  }
+
+  redirect(`/environmental/${dataPointId}`);
+}
+
+export async function completeEnvironmentalForms(
+  _previousState: FormActionState,
+  data: FormData
+): Promise<FormActionState> {
+  await requirePermission(PermissionKey.MANAGE_ENVIRONMENTAL);
+  const { organizationId, user } = await getCurrentUserTenant();
+  const dataPointId = required(data, "dataPointId");
+
+  try {
+    const submissions = await preparePublishedFormSubmissions({
+      organizationId,
+      module: ConfigurableFormModule.ENVIRONMENTAL,
+      data,
+    });
+    await completeEnvironmentalFormsService({
+      organizationId,
+      userId: user.id,
+      dataPointId,
+      submissions,
+    });
+  } catch (error) {
+    return {
+      status: "ERROR",
+      message:
+        error instanceof Error
+          ? error.message
+          : "The environmental forms could not be saved.",
+    };
+  }
+
+  revalidatePath(`/environmental/${dataPointId}`);
+  return {
+    status: "SUCCESS",
+    message: "Environmental forms captured successfully.",
+  };
+}
+
+export async function reviewEnvironmentalData(data: FormData) {
+  await requirePermission(PermissionKey.MANAGE_ENVIRONMENTAL);
+  const { organizationId, user } = await getCurrentUserTenant();
+  const id = required(data, "id");
+  const status = required(data, "status") as EnvironmentalDataStatus;
+
+  if (
+    status !== EnvironmentalDataStatus.APPROVED &&
+    status !== EnvironmentalDataStatus.REJECTED
+  ) {
+    throw new Error("Select an approval decision.");
+  }
+
+  const result = await prisma.environmentalDataPoint.updateMany({
+    where: { id, metric: { organizationId } },
+    data: { status, approvedById: user.id, approvedAt: new Date() },
+  });
+
+  if (!result.count) {
+    throw new Error("Environmental record not found.");
+  }
+
+  revalidatePath("/environmental");
+  revalidatePath(`/environmental/${id}`);
+}
+
+export async function createEnvironmentalTarget(data: FormData) {
+  await requirePermission(PermissionKey.MANAGE_ENVIRONMENTAL);
+  const { organizationId } = await getCurrentUserTenant();
+  const metricId = required(data, "metricId");
+
+  if (
+    !(await prisma.environmentalMetricDefinition.findFirst({
+      where: { id: metricId, organizationId },
+    }))
+  ) {
+    throw new Error("Select a valid metric.");
+  }
+
+  await prisma.environmentalTarget.create({
+    data: {
+      organizationId,
+      metricId,
+      name: required(data, "name"),
+      baselineYear: Number(required(data, "baselineYear")),
+      baselineValue: Number(required(data, "baselineValue")),
+      targetYear: Number(required(data, "targetYear")),
+      targetValue: Number(required(data, "targetValue")),
+      description: optional(data, "description"),
+    },
+  });
+
+  redirect("/environmental/dashboard");
+}

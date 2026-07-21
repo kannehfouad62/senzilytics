@@ -29,7 +29,11 @@ type SupportedEntityType =
   | typeof DocumentEntityType.RISK
   | typeof DocumentEntityType.MOC
   | typeof DocumentEntityType.CORRECTIVE_ACTION
-  | typeof DocumentEntityType.COMPLIANCE;
+  | typeof DocumentEntityType.COMPLIANCE
+  | typeof DocumentEntityType.TRAINING
+  | typeof DocumentEntityType.CHEMICAL
+  | typeof DocumentEntityType.ENVIRONMENTAL
+  | typeof DocumentEntityType.ESG;
 
 function entityFolder(
   entityType: SupportedEntityType
@@ -49,6 +53,14 @@ function entityFolder(
       return "capa";
     case DocumentEntityType.COMPLIANCE:
       return "compliance";
+    case DocumentEntityType.TRAINING:
+      return "training";
+    case DocumentEntityType.CHEMICAL:
+      return "chemicals";
+    case DocumentEntityType.ENVIRONMENTAL:
+      return "environmental";
+    case DocumentEntityType.ESG:
+      return "esg";
   }
 }
 

@@ -1,7 +1,226 @@
 "use server";
-import { requirePermission } from "@/lib/permissions";import { prisma } from "@/lib/prisma";import { getCurrentUserTenant } from "@/lib/tenant";import { PermissionKey,Status,UserRole } from "@prisma/client";import { revalidatePath } from "next/cache";import { redirect } from "next/navigation";
-const req=(d:FormData,k:string)=>{const v=String(d.get(k)||"").trim();if(!v)throw new Error(`${k} is required.`);return v};const opt=(d:FormData,k:string)=>String(d.get(k)||"").trim()||null;
-export async function createTrainingCourse(d:FormData){await requirePermission(PermissionKey.MANAGE_TRAINING);const{organizationId,user}=await getCurrentUserTenant();const validity=opt(d,"validityMonths");await prisma.trainingCourse.create({data:{organizationId,createdById:user.id,code:req(d,"code").toUpperCase(),name:req(d,"name"),description:opt(d,"description"),provider:opt(d,"provider"),validityMonths:validity?Number(validity):null}});redirect("/training/courses")}
-export async function assignTraining(d:FormData){await requirePermission(PermissionKey.MANAGE_TRAINING);const{organizationId,user}=await getCurrentUserTenant();const courseId=req(d,"courseId"),userId=req(d,"userId");const[course,learner]=await Promise.all([prisma.trainingCourse.findFirst({where:{id:courseId,organizationId,isActive:true}}),prisma.user.findFirst({where:{id:userId,organizationId}})]);if(!course||!learner)throw new Error("Select a valid active course and employee.");const dueDate=new Date(req(d,"dueDate"));if(Number.isNaN(dueDate.getTime()))throw new Error("Enter a valid due date.");await prisma.trainingRecord.create({data:{courseId,userId,assignedById:user.id,courseName:course.name,dueDate,provider:course.provider}});redirect("/training")}
-export async function completeTraining(d:FormData){await requirePermission(PermissionKey.MANAGE_TRAINING);const{organizationId}=await getCurrentUserTenant();const id=req(d,"id");const record=await prisma.trainingRecord.findFirst({where:{id,user:{organizationId}},include:{course:true}});if(!record)throw new Error("Training assignment not found.");const completedAt=new Date(req(d,"completedAt"));if(Number.isNaN(completedAt.getTime()))throw new Error("Enter a valid completion date.");const expiresAt=record.course?.validityMonths?new Date(completedAt.getFullYear(),completedAt.getMonth()+record.course.validityMonths,completedAt.getDate()):null;const score=opt(d,"score");await prisma.trainingRecord.update({where:{id},data:{status:Status.COMPLETED,completedAt,expiresAt,certificateNumber:opt(d,"certificateNumber"),score:score?Number(score):null,notes:opt(d,"notes")}});revalidatePath("/training")}
-export async function createTrainingRequirement(d:FormData){await requirePermission(PermissionKey.MANAGE_TRAINING);const{organizationId}=await getCurrentUserTenant();const courseId=req(d,"courseId"),role=opt(d,"role") as UserRole|null,siteId=opt(d,"siteId"),departmentId=opt(d,"departmentId");const course=await prisma.trainingCourse.findFirst({where:{id:courseId,organizationId,isActive:true}});if(!course)throw new Error("Select a valid course.");if(role&&!Object.values(UserRole).includes(role))throw new Error("Select a valid role.");if(siteId&&!(await prisma.site.findFirst({where:{id:siteId,organizationId}})))throw new Error("Select a valid site.");if(departmentId&&!(await prisma.department.findFirst({where:{id:departmentId,site:{organizationId}}})))throw new Error("Select a valid department.");await prisma.trainingRequirement.create({data:{organizationId,courseId,role,siteId,departmentId,dueWithinDays:Number(req(d,"dueWithinDays")),renewalLeadDays:Number(req(d,"renewalLeadDays"))}});redirect("/training/requirements")}
+
+import type { FormActionState } from "@/core/actions/action-state";
+import { requirePermission } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserTenant } from "@/lib/tenant";
+import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
+import {
+  assignTrainingService,
+  completeTrainingRecordFormsService,
+} from "@/modules/training/training-record.service";
+import {
+  ConfigurableFormModule,
+  PermissionKey,
+  Status,
+  UserRole,
+} from "@prisma/client";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+const required = (data: FormData, key: string) => {
+  const value = String(data.get(key) || "").trim();
+
+  if (!value) {
+    throw new Error(`${key} is required.`);
+  }
+
+  return value;
+};
+
+const optional = (data: FormData, key: string) =>
+  String(data.get(key) || "").trim() || null;
+
+export async function createTrainingCourse(data: FormData) {
+  await requirePermission(PermissionKey.MANAGE_TRAINING);
+  const { organizationId, user } = await getCurrentUserTenant();
+  const validity = optional(data, "validityMonths");
+
+  await prisma.trainingCourse.create({
+    data: {
+      organizationId,
+      createdById: user.id,
+      code: required(data, "code").toUpperCase(),
+      name: required(data, "name"),
+      description: optional(data, "description"),
+      provider: optional(data, "provider"),
+      validityMonths: validity ? Number(validity) : null,
+    },
+  });
+
+  redirect("/training/courses");
+}
+
+export async function assignTraining(
+  _previousState: FormActionState,
+  data: FormData
+): Promise<FormActionState> {
+  await requirePermission(PermissionKey.MANAGE_TRAINING);
+  const { organizationId, user } = await getCurrentUserTenant();
+  let recordId: string;
+
+  try {
+    const dueDate = new Date(required(data, "dueDate"));
+    const customSubmissions = await preparePublishedFormSubmissions({
+      organizationId,
+      module: ConfigurableFormModule.TRAINING,
+      data,
+    });
+    const record = await assignTrainingService({
+      organizationId,
+      userId: user.id,
+      courseId: required(data, "courseId"),
+      learnerId: required(data, "userId"),
+      dueDate,
+      customSubmissions,
+    });
+
+    recordId = record.id;
+  } catch (error) {
+    return {
+      status: "ERROR",
+      message:
+        error instanceof Error
+          ? error.message
+          : "The training assignment could not be created.",
+    };
+  }
+
+  redirect(`/training/${recordId}`);
+}
+
+export async function completeTrainingRecordForms(
+  _previousState: FormActionState,
+  data: FormData
+): Promise<FormActionState> {
+  await requirePermission(PermissionKey.MANAGE_TRAINING);
+  const { organizationId, user } = await getCurrentUserTenant();
+  const trainingRecordId = required(data, "trainingRecordId");
+
+  try {
+    const submissions = await preparePublishedFormSubmissions({
+      organizationId,
+      module: ConfigurableFormModule.TRAINING,
+      data,
+    });
+    await completeTrainingRecordFormsService({
+      organizationId,
+      userId: user.id,
+      trainingRecordId,
+      submissions,
+    });
+  } catch (error) {
+    return {
+      status: "ERROR",
+      message:
+        error instanceof Error
+          ? error.message
+          : "The training forms could not be saved.",
+    };
+  }
+
+  revalidatePath(`/training/${trainingRecordId}`);
+  return {
+    status: "SUCCESS",
+    message: "Training forms captured successfully.",
+  };
+}
+
+export async function completeTraining(data: FormData) {
+  await requirePermission(PermissionKey.MANAGE_TRAINING);
+  const { organizationId } = await getCurrentUserTenant();
+  const id = required(data, "id");
+  const record = await prisma.trainingRecord.findFirst({
+    where: { id, user: { organizationId } },
+    include: { course: true },
+  });
+
+  if (!record) {
+    throw new Error("Training assignment not found.");
+  }
+
+  const completedAt = new Date(required(data, "completedAt"));
+
+  if (Number.isNaN(completedAt.getTime())) {
+    throw new Error("Enter a valid completion date.");
+  }
+
+  const expiresAt = record.course?.validityMonths
+    ? new Date(
+        completedAt.getFullYear(),
+        completedAt.getMonth() + record.course.validityMonths,
+        completedAt.getDate()
+      )
+    : null;
+  const rawScore = optional(data, "score");
+  const score = rawScore ? Number(rawScore) : null;
+
+  if (score !== null && !Number.isFinite(score)) {
+    throw new Error("Enter a valid training score.");
+  }
+
+  await prisma.trainingRecord.update({
+    where: { id },
+    data: {
+      status: Status.COMPLETED,
+      completedAt,
+      expiresAt,
+      certificateNumber: optional(data, "certificateNumber"),
+      score,
+      notes: optional(data, "notes"),
+    },
+  });
+
+  revalidatePath("/training");
+  revalidatePath(`/training/${id}`);
+}
+
+export async function createTrainingRequirement(data: FormData) {
+  await requirePermission(PermissionKey.MANAGE_TRAINING);
+  const { organizationId } = await getCurrentUserTenant();
+  const courseId = required(data, "courseId");
+  const role = optional(data, "role") as UserRole | null;
+  const siteId = optional(data, "siteId");
+  const departmentId = optional(data, "departmentId");
+  const course = await prisma.trainingCourse.findFirst({
+    where: { id: courseId, organizationId, isActive: true },
+  });
+
+  if (!course) {
+    throw new Error("Select a valid course.");
+  }
+
+  if (role && !Object.values(UserRole).includes(role)) {
+    throw new Error("Select a valid role.");
+  }
+
+  if (
+    siteId &&
+    !(await prisma.site.findFirst({ where: { id: siteId, organizationId } }))
+  ) {
+    throw new Error("Select a valid site.");
+  }
+
+  if (
+    departmentId &&
+    !(await prisma.department.findFirst({
+      where: { id: departmentId, site: { organizationId } },
+    }))
+  ) {
+    throw new Error("Select a valid department.");
+  }
+
+  await prisma.trainingRequirement.create({
+    data: {
+      organizationId,
+      courseId,
+      role,
+      siteId,
+      departmentId,
+      dueWithinDays: Number(required(data, "dueWithinDays")),
+      renewalLeadDays: Number(required(data, "renewalLeadDays")),
+    },
+  });
+
+  redirect("/training/requirements");
+}

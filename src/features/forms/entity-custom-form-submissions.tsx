@@ -15,7 +15,11 @@ type SupportedEntityType =
   | typeof DocumentEntityType.RISK
   | typeof DocumentEntityType.MOC
   | typeof DocumentEntityType.CORRECTIVE_ACTION
-  | typeof DocumentEntityType.COMPLIANCE;
+  | typeof DocumentEntityType.COMPLIANCE
+  | typeof DocumentEntityType.TRAINING
+  | typeof DocumentEntityType.CHEMICAL
+  | typeof DocumentEntityType.ENVIRONMENTAL
+  | typeof DocumentEntityType.ESG;
 
 function displayValue(
   value: unknown

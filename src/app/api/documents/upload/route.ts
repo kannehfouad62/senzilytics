@@ -620,6 +620,26 @@ async function requireDocumentUploadPermission(
         PermissionKey.MANAGE_COMPLIANCE
       );
       break;
+    case ConfigurableFormModule.TRAINING:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_TRAINING
+      );
+      break;
+    case ConfigurableFormModule.CHEMICAL:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_CHEMICALS
+      );
+      break;
+    case ConfigurableFormModule.ENVIRONMENTAL:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_ENVIRONMENTAL
+      );
+      break;
+    case ConfigurableFormModule.ESG:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_ESG
+      );
+      break;
   }
 
   if (!allowed) {
