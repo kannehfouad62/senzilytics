@@ -120,6 +120,45 @@ enum PermissionKey {
   VIEW_BEHAVIOR_SAFETY
   RECORD_BEHAVIOR_COACHING
   MANAGE_BEHAVIOR_SAFETY
+  MANAGE_INTEGRATIONS
+}
+
+enum IntegrationApiScope {
+  READ_INCIDENTS
+  READ_ACTIONS
+  READ_AUDITS
+  READ_INSPECTIONS
+  READ_RISKS
+  READ_COMPLIANCE
+  READ_TRAINING
+  READ_ASSURANCE
+}
+
+enum IntegrationCredentialStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum IntegrationWebhookStatus {
+  ACTIVE
+  PAUSED
+  REVOKED
+}
+
+enum IntegrationWebhookEvent {
+  RECORD_CREATED
+  RECORD_UPDATED
+  RECORD_STATUS_CHANGED
+  RECORD_ASSIGNED
+  RECORD_DELETED
+  SYSTEM_EVENT
+}
+
+enum IntegrationDeliveryStatus {
+  PENDING
+  FAILED
+  DELIVERED
+  ABANDONED
 }
 
 enum AiIntelligenceUseCase {
@@ -1372,6 +1411,10 @@ model Organization {
   aiIntelligenceAnalyses         AiIntelligenceAnalysis[]
   aiIntelligenceSources          AiIntelligenceSource[]
   aiIntelligenceFeedback         AiIntelligenceFeedback[]
+  integrationApiCredentials      IntegrationApiCredential[]
+  integrationApiRequestLogs      IntegrationApiRequestLog[]
+  integrationWebhookEndpoints    IntegrationWebhookEndpoint[]
+  integrationWebhookDeliveries   IntegrationWebhookDelivery[]
 }
 
 model PricingInquiry {
@@ -1595,6 +1638,10 @@ model User {
   responsibleSurveillancePrograms  MedicalSurveillanceProgram[]    @relation("SurveillanceProgramResponsible")
   surveillanceEnrollments          MedicalSurveillanceEnrollment[] @relation("SurveillanceEnrollmentUser")
   completedSurveillanceEnrollments MedicalSurveillanceEnrollment[] @relation("SurveillanceEnrollmentCompletedBy")
+  createdIntegrationCredentials    IntegrationApiCredential[]      @relation("IntegrationCredentialCreatedBy")
+  revokedIntegrationCredentials    IntegrationApiCredential[]      @relation("IntegrationCredentialRevokedBy")
+  createdIntegrationWebhooks       IntegrationWebhookEndpoint[]    @relation("IntegrationWebhookCreatedBy")
+  revokedIntegrationWebhooks       IntegrationWebhookEndpoint[]    @relation("IntegrationWebhookRevokedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -5300,6 +5347,105 @@ model ActivityLog {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User?        @relation(fields: [userId], references: [id])
+
+  integrationWebhookDeliveries IntegrationWebhookDelivery[]
+}
+
+model IntegrationApiCredential {
+  id                 String                      @id @default(cuid())
+  organizationId     String
+  name               String
+  tokenPrefix        String                      @unique
+  tokenHash          String
+  tokenLastFour      String
+  scopes             IntegrationApiScope[]
+  status             IntegrationCredentialStatus @default(ACTIVE)
+  rateLimitPerMinute Int                         @default(120)
+  expiresAt          DateTime?
+  lastUsedAt         DateTime?
+  createdById        String
+  revokedById        String?
+  revokedAt          DateTime?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                       @relation("IntegrationCredentialCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  revokedBy    User?                      @relation("IntegrationCredentialRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+  requestLogs  IntegrationApiRequestLog[]
+
+  @@index([organizationId, status])
+  @@index([expiresAt])
+}
+
+model IntegrationApiRequestLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  credentialId   String
+  requestId      String   @unique
+  route          String
+  method         String
+  statusCode     Int
+  durationMs     Int
+  createdAt      DateTime @default(now())
+
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  credential   IntegrationApiCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@index([credentialId, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+model IntegrationWebhookEndpoint {
+  id              String                    @id @default(cuid())
+  organizationId  String
+  name            String
+  url             String
+  status          IntegrationWebhookStatus  @default(ACTIVE)
+  events          IntegrationWebhookEvent[]
+  encryptedSecret String
+  secretLastFour  String
+  createdById     String
+  rotatedAt       DateTime?
+  revokedById     String?
+  revokedAt       DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  organization Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                         @relation("IntegrationWebhookCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  revokedBy    User?                        @relation("IntegrationWebhookRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+  deliveries   IntegrationWebhookDelivery[]
+
+  @@index([organizationId, status])
+}
+
+model IntegrationWebhookDelivery {
+  id             String                    @id @default(cuid())
+  organizationId String
+  endpointId     String
+  activityId     String
+  event          IntegrationWebhookEvent
+  payload        Json
+  status         IntegrationDeliveryStatus @default(PENDING)
+  attemptCount   Int                       @default(0)
+  maxAttempts    Int                       @default(7)
+  nextAttemptAt  DateTime                  @default(now())
+  responseStatus Int?
+  responseBody   String?
+  error          String?
+  deliveredAt    DateTime?
+  lastAttemptAt  DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  endpoint     IntegrationWebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  activity     ActivityLog                @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([endpointId, activityId])
+  @@index([status, nextAttemptAt])
+  @@index([organizationId, createdAt])
 }
 
 model Notification {

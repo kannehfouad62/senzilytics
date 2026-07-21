@@ -169,6 +169,7 @@ async function main() {
       PermissionKey.VIEW_BEHAVIOR_SAFETY,
       PermissionKey.RECORD_BEHAVIOR_COACHING,
       PermissionKey.MANAGE_BEHAVIOR_SAFETY,
+      PermissionKey.MANAGE_INTEGRATIONS,
     ],
 
     EHS_MANAGER: [

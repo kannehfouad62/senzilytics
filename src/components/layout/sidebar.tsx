@@ -39,6 +39,7 @@ import {
   Award,
   Wrench,
   BrainCircuit,
+  PlugZap,
 } from "lucide-react";
 
 export const primaryNavItems = [
@@ -84,6 +85,12 @@ export const primaryNavItems = [
     label: "Documents",
     href: "/documents",
     icon: FolderOpen,
+  },
+  {
+    label: "Integrations",
+    href: "/integrations",
+    icon: PlugZap,
+    permission: PermissionKey.MANAGE_INTEGRATIONS,
   },
   {
     label: "Workflows",

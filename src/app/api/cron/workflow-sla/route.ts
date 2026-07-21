@@ -1,6 +1,7 @@
 import { processMocSlaNotifications } from "@/core/notifications/moc-sla.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
+import { processIntegrationWebhookDeliveries } from "@/modules/integrations/webhook-delivery.service";
 import {
   NextRequest,
   NextResponse,
@@ -40,9 +41,11 @@ export async function GET(
     const [
       workflowResult,
       mocResult,
+      integrationResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
       processMocSlaNotifications(),
+      processIntegrationWebhookDeliveries(),
     ]);
 
     return NextResponse.json({
@@ -54,10 +57,13 @@ export async function GET(
 
       moc:
         mocResult,
+
+      integrations:
+        integrationResult,
     });
   } catch (error) {
     console.error(
-      "Workflow and MOC SLA cron failed:",
+      "Workflow, MOC, and integration processing failed:",
       error
     );
 
@@ -69,7 +75,7 @@ export async function GET(
         error:
           error instanceof Error
             ? error.message
-            : "SLA processing failed.",
+            : "Scheduled processing failed.",
       },
       {
         status: 500,

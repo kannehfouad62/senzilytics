@@ -1,5 +1,6 @@
 import { ActivityAction, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { enqueueActivityWebhooks } from "@/modules/integrations/webhook-delivery.service";
 
 type LogActivityInput = {
   organizationId: string;
@@ -13,7 +14,7 @@ type LogActivityInput = {
 };
 
 export async function logActivity(input: LogActivityInput) {
-  return prisma.activityLog.create({
+  const activity = await prisma.activityLog.create({
     data: {
       organizationId: input.organizationId,
       userId: input.userId,
@@ -25,4 +26,12 @@ export async function logActivity(input: LogActivityInput) {
       metadata: input.metadata ?? Prisma.JsonNull,
     },
   });
+
+  try {
+    await enqueueActivityWebhooks(activity);
+  } catch (error) {
+    console.error("Webhook enqueue failed:", error);
+  }
+
+  return activity;
 }

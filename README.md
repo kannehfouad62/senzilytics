@@ -11,12 +11,12 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-Required local variables are stored in `.env` and must never be committed. At minimum configure `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, and `APP_URL`. Document uploads require `BLOB_READ_WRITE_TOKEN`; email delivery requires the configured provider credentials; AI features require `OPENAI_API_KEY`.
+Required local variables are stored in `.env` and must never be committed. At minimum configure `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, `APP_URL`, and `INTEGRATION_ENCRYPTION_KEY`. Generate the integration key with `openssl rand -base64 32`; it encrypts webhook signing secrets and must remain stable across deployments. Document uploads require `BLOB_READ_WRITE_TOKEN`; email delivery requires the configured provider credentials; AI features require `OPENAI_API_KEY`.
 
 ## Production release
 
 1. Take a verified database backup and record the currently deployed commit.
-2. Configure production secrets. Generate independent random values of at least 32 characters for `AUTH_SECRET` and `CRON_SECRET`.
+2. Configure production secrets. Generate independent random values for `AUTH_SECRET`, `CRON_SECRET`, and the 32-byte `INTEGRATION_ENCRYPTION_KEY`.
 3. Run `npm run verify:production` against the intended production environment.
 4. Run `npm ci`, `npx prisma generate`, `npm test`, and `npm run build`.
 5. Review pending migrations, then run `npm run db:deploy` once against the production database.

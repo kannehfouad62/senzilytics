@@ -1,0 +1,55 @@
+"use client";
+
+import { IntegrationApiScope, IntegrationWebhookEvent, IntegrationWebhookStatus } from "@prisma/client";
+import { useActionState } from "react";
+import type { InputHTMLAttributes } from "react";
+import { createIntegrationCredential, createIntegrationWebhook, initialIntegrationActionState, retryIntegrationWebhookDelivery, revokeIntegrationCredential, revokeIntegrationWebhook, rotateIntegrationWebhookSecret, setIntegrationWebhookStatus, type IntegrationActionState } from "@/features/integrations/actions";
+
+type Credential = { id: string; name: string; status: string; tokenPrefix: string; tokenLastFour: string; scopes: string[]; rateLimitPerMinute: number; expiresAt: string | null; lastUsedAt: string | null; createdAt: string; createdBy: { name: string }; requestCount: number };
+type Endpoint = { id: string; name: string; url: string; status: string; events: string[]; secretLastFour: string; createdAt: string; rotatedAt: string | null; createdBy: { name: string }; deliveryCount: number };
+type Delivery = { id: string; event: string; status: string; attemptCount: number; responseStatus: number | null; error: string | null; createdAt: string; deliveredAt: string | null; endpoint: { name: string } };
+
+export function IntegrationWorkspace({ credentials, endpoints, deliveries }: { credentials: Credential[]; endpoints: Endpoint[]; deliveries: Delivery[] }) {
+  return <div className="mt-8 space-y-8"><section className="grid gap-6 xl:grid-cols-2"><CredentialForm /><WebhookForm /></section><CredentialRegister credentials={credentials} /><WebhookRegister endpoints={endpoints} /><DeliveryRegister deliveries={deliveries} /></div>;
+}
+
+function CredentialForm() {
+  const [state, action, pending] = useActionState(createIntegrationCredential, initialIntegrationActionState);
+  return <form action={action} className={card}><h2 className="text-xl font-semibold">Create API credential</h2><p className={help}>Use a separate credential for each consuming system. Tokens are shown once and stored only as hashes.</p><Field name="name" label="Credential name" placeholder="Corporate data warehouse" required /><div className="grid gap-3 sm:grid-cols-2"><Field name="rateLimitPerMinute" label="Requests per minute" type="number" defaultValue="120" min="10" max="600" required /><Field name="expiresAt" label="Expiration (optional)" type="date" /></div><Checks name="scopes" values={Object.values(IntegrationApiScope)} /><Feedback state={state} /><button disabled={pending} className={primary}>{pending ? "Creating…" : "Create Credential"}</button></form>;
+}
+
+function WebhookForm() {
+  const [state, action, pending] = useActionState(createIntegrationWebhook, initialIntegrationActionState);
+  return <form action={action} className={card}><h2 className="text-xl font-semibold">Register webhook</h2><p className={help}>Only HTTPS public endpoints are accepted. Payloads are HMAC signed and retried after transient failures.</p><Field name="name" label="Endpoint name" placeholder="EHS event receiver" required /><Field name="url" label="HTTPS endpoint URL" type="url" placeholder="https://example.com/webhooks/senzilytics" required /><Checks name="events" values={Object.values(IntegrationWebhookEvent)} /><Feedback state={state} /><button disabled={pending} className={primary}>{pending ? "Validating…" : "Create Webhook"}</button></form>;
+}
+
+function CredentialRegister({ credentials }: { credentials: Credential[] }) {
+  return <section className={card}><Header title="API credentials" detail={`${credentials.length} configured`} /><div className="mt-5 space-y-3">{credentials.map((item) => <div key={item.id} className={row}><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{item.name}</h3><Badge value={item.status} /></div><p className="mt-1 font-mono text-xs text-slate-400">sz_live_{item.tokenPrefix}_••••{item.tokenLastFour}</p><p className="mt-2 text-xs text-slate-500">{item.scopes.map(label).join(" · ")} · {item.rateLimitPerMinute}/min · {item.requestCount} total requests</p><p className="mt-1 text-xs text-slate-600">Created by {item.createdBy.name} {format(item.createdAt)} · Last used {item.lastUsedAt ? format(item.lastUsedAt) : "never"}{item.expiresAt ? ` · Expires ${format(item.expiresAt)}` : ""}</p></div>{item.status === "ACTIVE" && <ActionForm action={revokeIntegrationCredential} fields={{ credentialId: item.id }} label="Revoke" danger />}</div>)}{!credentials.length && <Empty text="No API credentials have been created." />}</div></section>;
+}
+
+function WebhookRegister({ endpoints }: { endpoints: Endpoint[] }) {
+  return <section className={card}><Header title="Webhook endpoints" detail={`${endpoints.length} configured`} /><div className="mt-5 space-y-3">{endpoints.map((item) => <div key={item.id} className={row}><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{item.name}</h3><Badge value={item.status} /></div><p className="mt-1 truncate text-sm text-cyan-300">{item.url}</p><p className="mt-2 text-xs text-slate-500">{item.events.map(label).join(" · ")} · Secret ••••{item.secretLastFour} · {item.deliveryCount} deliveries</p><p className="mt-1 text-xs text-slate-600">Created by {item.createdBy.name} {format(item.createdAt)}{item.rotatedAt ? ` · Rotated ${format(item.rotatedAt)}` : ""}</p></div>{item.status !== "REVOKED" && <div className="flex flex-wrap justify-end gap-2"><ActionForm action={setIntegrationWebhookStatus} fields={{ endpointId: item.id, status: item.status === IntegrationWebhookStatus.ACTIVE ? IntegrationWebhookStatus.PAUSED : IntegrationWebhookStatus.ACTIVE }} label={item.status === "ACTIVE" ? "Pause" : "Resume"} /><ActionForm action={rotateIntegrationWebhookSecret} fields={{ endpointId: item.id }} label="Rotate secret" revealsSecret /><ActionForm action={revokeIntegrationWebhook} fields={{ endpointId: item.id }} label="Revoke" danger /></div>}</div>)}{!endpoints.length && <Empty text="No webhook endpoints have been registered." />}</div></section>;
+}
+
+function DeliveryRegister({ deliveries }: { deliveries: Delivery[] }) {
+  return <section className={card}><Header title="Recent webhook deliveries" detail="Latest 50" /><div className="mt-5 overflow-x-auto"><table className="w-full min-w-[860px] text-left text-sm"><thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="pb-3">Endpoint</th><th>Event</th><th>Status</th><th>Attempts</th><th>HTTP</th><th>Created</th><th>Result</th><th></th></tr></thead><tbody className="divide-y divide-white/5">{deliveries.map((item) => <tr key={item.id}><td className="py-3 font-medium">{item.endpoint.name}</td><td>{label(item.event)}</td><td><Badge value={item.status} /></td><td>{item.attemptCount}</td><td>{item.responseStatus ?? "—"}</td><td className="text-slate-500">{format(item.createdAt)}</td><td className="max-w-xs truncate text-slate-500">{item.error || (item.deliveredAt ? `Delivered ${format(item.deliveredAt)}` : "Queued")}</td><td>{item.status !== "DELIVERED" && <ActionForm action={retryIntegrationWebhookDelivery} fields={{ deliveryId: item.id }} label="Retry" />}</td></tr>)}</tbody></table>{!deliveries.length && <Empty text="No webhook deliveries have been queued." />}</div></section>;
+}
+
+function ActionForm({ action, fields, label: actionLabel, danger = false, revealsSecret = false }: { action: (state: IntegrationActionState, data: FormData) => Promise<IntegrationActionState>; fields: Record<string, string>; label: string; danger?: boolean; revealsSecret?: boolean }) {
+  const [state, formAction, pending] = useActionState(action, initialIntegrationActionState);
+  return <form action={formAction} className="text-right">{Object.entries(fields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}<button disabled={pending} className={`rounded-lg border px-3 py-2 text-xs ${danger ? "border-red-400/20 text-red-300" : "border-white/10 text-slate-300"}`}>{pending ? "Working…" : actionLabel}</button>{state.message && <p role="status" className={`mt-2 max-w-sm text-xs ${state.status === "ERROR" ? "text-red-300" : "text-emerald-300"}`}>{state.message}</p>}{revealsSecret && state.secret && <Secret value={state.secret} />}</form>;
+}
+
+function Checks({ name, values }: { name: string; values: string[] }) { return <fieldset><legend className="text-sm text-slate-300">Permissions <span className="text-red-300">*</span></legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{values.map((value) => <label key={value} className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-300"><input type="checkbox" name={name} value={value} />{label(value)}</label>)}</div></fieldset>; }
+function Field(props: InputHTMLAttributes<HTMLInputElement> & { label: string }) { const { label: fieldLabel, ...inputProps } = props; return <label className="block text-sm text-slate-300">{fieldLabel}<input {...inputProps} className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-cyan-400/40" /></label>; }
+function Feedback({ state }: { state: IntegrationActionState }) { if (!state.message) return null; return <div role="status" className={`rounded-xl border p-3 text-sm ${state.status === "ERROR" ? "border-red-400/20 bg-red-400/5 text-red-300" : "border-emerald-400/20 bg-emerald-400/5 text-emerald-200"}`}><p>{state.message}</p>{state.secret && <Secret value={state.secret} />}</div>; }
+function Secret({ value }: { value: string }) { return <code className="mt-2 block break-all rounded-lg bg-slate-950 p-3 text-left text-xs text-cyan-200 select-all">{value}</code>; }
+function Header({ title, detail }: { title: string; detail: string }) { return <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">{title}</h2><span className="text-xs text-slate-500">{detail}</span></div>; }
+function Badge({ value }: { value: string }) { const tone = value === "ACTIVE" || value === "DELIVERED" ? "bg-emerald-400/10 text-emerald-200" : value === "REVOKED" || value === "ABANDONED" ? "bg-red-400/10 text-red-200" : "bg-amber-400/10 text-amber-200"; return <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone}`}>{label(value)}</span>; }
+function Empty({ text }: { text: string }) { return <p className="rounded-xl border border-dashed border-white/10 p-7 text-center text-sm text-slate-500">{text}</p>; }
+function label(value: string) { return value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (character) => character.toUpperCase()); }
+function format(value: string) { return new Date(value).toLocaleString(); }
+const card = "rounded-3xl border border-white/10 bg-white/[.04] p-6";
+const row = "flex flex-col gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4 lg:flex-row lg:items-start lg:justify-between";
+const help = "mt-2 mb-5 text-sm text-slate-400";
+const primary = "rounded-xl bg-cyan-300 px-5 py-3 font-semibold text-slate-950 disabled:opacity-50";
