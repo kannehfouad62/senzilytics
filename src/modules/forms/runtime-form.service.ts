@@ -56,6 +56,8 @@ export function configurableFormModuleForDocumentEntity(
       return ConfigurableFormModule.SIF_ASSURANCE;
     case DocumentEntityType.CERTIFICATION_READINESS:
       return ConfigurableFormModule.CERTIFICATION_READINESS;
+    case DocumentEntityType.ASSET_SAFETY:
+      return ConfigurableFormModule.ASSET_SAFETY;
     default:
       return null;
   }

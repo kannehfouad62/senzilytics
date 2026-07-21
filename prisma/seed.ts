@@ -164,6 +164,8 @@ async function main() {
       PermissionKey.MANAGE_CRITICAL_CONTROLS,
       PermissionKey.VIEW_CERTIFICATION_READINESS,
       PermissionKey.MANAGE_CERTIFICATION_READINESS,
+      PermissionKey.VIEW_ASSETS,
+      PermissionKey.MANAGE_ASSETS,
     ],
 
     EHS_MANAGER: [
@@ -204,6 +206,8 @@ async function main() {
       PermissionKey.MANAGE_CRITICAL_CONTROLS,
       PermissionKey.VIEW_CERTIFICATION_READINESS,
       PermissionKey.MANAGE_CERTIFICATION_READINESS,
+      PermissionKey.VIEW_ASSETS,
+      PermissionKey.MANAGE_ASSETS,
     ],
 
     SUPERVISOR: [
@@ -229,6 +233,8 @@ async function main() {
       PermissionKey.VIEW_SIF_INTELLIGENCE,
       PermissionKey.MANAGE_CRITICAL_CONTROLS,
       PermissionKey.VIEW_CERTIFICATION_READINESS,
+      PermissionKey.VIEW_ASSETS,
+      PermissionKey.MANAGE_ASSETS,
     ],
 
     EMPLOYEE: [
@@ -259,6 +265,7 @@ async function main() {
       PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
       PermissionKey.VIEW_SIF_INTELLIGENCE,
       PermissionKey.VIEW_CERTIFICATION_READINESS,
+      PermissionKey.VIEW_ASSETS,
     ],
     DEMO_VIEWER: [
       PermissionKey.VIEW_DASHBOARD,
@@ -281,6 +288,7 @@ async function main() {
       PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
       PermissionKey.VIEW_SIF_INTELLIGENCE,
       PermissionKey.VIEW_CERTIFICATION_READINESS,
+      PermissionKey.VIEW_ASSETS,
     ],
   };
 

@@ -613,6 +613,9 @@ function getRelatedRecordLink(
     case DocumentEntityType.CERTIFICATION_READINESS:
       return `/assurance/certification/reviews/${entityId}`;
 
+    case DocumentEntityType.ASSET_SAFETY:
+      return "/assets";
+
     case DocumentEntityType.WORKFLOW:
       return "/workflows";
 

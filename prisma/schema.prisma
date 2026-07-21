@@ -115,6 +115,8 @@ enum PermissionKey {
   MANAGE_CRITICAL_CONTROLS
   VIEW_CERTIFICATION_READINESS
   MANAGE_CERTIFICATION_READINESS
+  VIEW_ASSETS
+  MANAGE_ASSETS
 }
 
 enum ConfigurableFormModule {
@@ -135,6 +137,7 @@ enum ConfigurableFormModule {
   INDUSTRIAL_HYGIENE
   SIF_ASSURANCE
   CERTIFICATION_READINESS
+  ASSET_SAFETY
   GENERAL
 }
 
@@ -233,6 +236,63 @@ enum ManagementSystemConclusion {
   EFFECTIVE
   NEEDS_IMPROVEMENT
   NOT_EFFECTIVE
+}
+
+enum AssetType {
+  MOBILE_EQUIPMENT
+  MACHINERY
+  PRESSURE_SYSTEM
+  LIFTING_EQUIPMENT
+  ELECTRICAL
+  FIRE_PROTECTION
+  ENVIRONMENTAL_CONTROL
+  EMERGENCY_EQUIPMENT
+  VEHICLE
+  TOOL
+  FACILITY_SYSTEM
+  OTHER
+}
+
+enum AssetStatus {
+  ACTIVE
+  OUT_OF_SERVICE
+  UNDER_MAINTENANCE
+  QUARANTINED
+  RETIRED
+}
+
+enum AssetInspectionResult {
+  SATISFACTORY
+  DEFECT_FOUND
+  OUT_OF_SERVICE
+  NOT_INSPECTED
+}
+
+enum AssetMaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  CALIBRATION
+  FUNCTION_TEST
+  STATUTORY
+  OTHER
+}
+
+enum AssetMaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum AssetDefectStatus {
+  OPEN
+  UNDER_REVIEW
+  REPAIR_PLANNED
+  REPAIRED
+  VERIFIED
+  CLOSED
+  DEFERRED
 }
 
 enum ComplianceObligationType {
@@ -688,6 +748,7 @@ enum DocumentEntityType {
   INDUSTRIAL_HYGIENE
   SIF_ASSURANCE
   CERTIFICATION_READINESS
+  ASSET_SAFETY
 }
 
 enum DocumentCategory {
@@ -1174,6 +1235,10 @@ model Organization {
   criticalControlVerifications   CriticalControlVerification[]
   sifSignalReviews               SifSignalReview[]
   certificationManagementReviews CertificationManagementReview[]
+  assets                         Asset[]
+  assetInspections               AssetInspection[]
+  assetMaintenanceRecords        AssetMaintenanceRecord[]
+  assetDefects                   AssetDefect[]
 }
 
 model PricingInquiry {
@@ -1233,6 +1298,7 @@ model Site {
   similarExposureGroups         SimilarExposureGroup[]
   exposureAssessments           ExposureAssessment[]
   criticalControls              CriticalControlStandard[]
+  assets                        Asset[]
 }
 
 model Department {
@@ -1262,6 +1328,7 @@ model Department {
   similarExposureGroups SimilarExposureGroup[]
   exposureAssessments   ExposureAssessment[]
   criticalControls      CriticalControlStandard[]
+  assets                Asset[]
 }
 
 model User {
@@ -1358,6 +1425,13 @@ model User {
   createdCertificationReviews      CertificationManagementReview[] @relation("CertificationReviewCreatedBy")
   completedCertificationReviews    CertificationManagementReview[] @relation("CertificationReviewCompletedBy")
   approvedCertificationReviews     CertificationManagementReview[] @relation("CertificationReviewApprovedBy")
+  ownedAssets                      Asset[]                         @relation("AssetOwner")
+  createdAssets                    Asset[]                         @relation("AssetCreatedBy")
+  performedAssetInspections        AssetInspection[]               @relation("AssetInspector")
+  assignedAssetMaintenance         AssetMaintenanceRecord[]        @relation("AssetMaintenanceTechnician")
+  reportedAssetDefects             AssetDefect[]                   @relation("AssetDefectReportedBy")
+  ownedAssetDefects                AssetDefect[]                   @relation("AssetDefectOwner")
+  verifiedAssetDefects             AssetDefect[]                   @relation("AssetDefectVerifiedBy")
   permitToWorkHistory              PermitToWorkHistory[]           @relation("PermitHistoryActor")
   ownedExposureGroups              SimilarExposureGroup[]          @relation("ExposureGroupOwner")
   assignedExposureAssessments      ExposureAssessment[]            @relation("ExposureAssessmentAssessor")
@@ -1613,6 +1687,7 @@ model CorrectiveAction {
   enterpriseAuditFindingLinks  EnterpriseAuditFindingActionLink[] @relation("EnterpriseAuditFindingCorrectiveAction")
   criticalControlVerifications CriticalControlVerification[]
   certificationReviewActions   CertificationReviewActionLink[]
+  assetDefects                 AssetDefect[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4248,6 +4323,151 @@ model CertificationReviewActionLink {
   createdAt          DateTime                      @default(now())
 
   @@index([reviewId])
+}
+
+model Asset {
+  id                      String                   @id @default(cuid())
+  organizationId          String
+  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reference               String
+  name                    String
+  description             String?
+  type                    AssetType
+  status                  AssetStatus              @default(ACTIVE)
+  criticality             RiskLevel                @default(MEDIUM)
+  isSafetyCritical        Boolean                  @default(false)
+  manufacturer            String?
+  modelNumber             String?
+  serialNumber            String?
+  siteId                  String
+  site                    Site                     @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  departmentId            String?
+  department              Department?              @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  location                String?
+  ownerId                 String?
+  owner                   User?                    @relation("AssetOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdById             String
+  createdBy               User                     @relation("AssetCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  commissionedAt          DateTime?
+  inspectionIntervalDays  Int                      @default(30)
+  lastInspectionAt        DateTime?
+  nextInspectionDueAt     DateTime
+  maintenanceIntervalDays Int                      @default(90)
+  lastMaintenanceAt       DateTime?
+  nextMaintenanceDueAt    DateTime
+  permitRequired          Boolean                  @default(false)
+  inspectionReminderAt    DateTime?
+  inspectionOverdueAt     DateTime?
+  maintenanceReminderAt   DateTime?
+  maintenanceOverdueAt    DateTime?
+  inspections             AssetInspection[]
+  maintenanceRecords      AssetMaintenanceRecord[]
+  defects                 AssetDefect[]
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+
+  @@unique([organizationId, reference])
+  @@unique([organizationId, serialNumber])
+  @@index([organizationId, status, criticality])
+  @@index([siteId, departmentId, status])
+  @@index([ownerId, status])
+  @@index([organizationId, nextInspectionDueAt])
+  @@index([organizationId, nextMaintenanceDueAt])
+}
+
+model AssetInspection {
+  id                  String                @id @default(cuid())
+  organizationId      String
+  organization        Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assetId             String
+  asset               Asset                 @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  inspectedById       String
+  inspectedBy         User                  @relation("AssetInspector", fields: [inspectedById], references: [id], onDelete: Restrict)
+  inspectedAt         DateTime
+  result              AssetInspectionResult
+  conditionScore      Int?
+  evidenceReference   String?
+  observations        String?
+  immediateAction     String?
+  nextInspectionDueAt DateTime
+  defects             AssetDefect[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([organizationId, result, inspectedAt])
+  @@index([assetId, inspectedAt])
+  @@index([inspectedById, inspectedAt])
+}
+
+model AssetMaintenanceRecord {
+  id                   String                 @id @default(cuid())
+  organizationId       String
+  organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assetId              String
+  asset                Asset                  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  defectId             String?
+  defect               AssetDefect?           @relation(fields: [defectId], references: [id], onDelete: SetNull)
+  type                 AssetMaintenanceType
+  status               AssetMaintenanceStatus @default(SCHEDULED)
+  title                String
+  scheduledAt          DateTime
+  dueAt                DateTime
+  startedAt            DateTime?
+  completedAt          DateTime?
+  technicianId         String?
+  technician           User?                  @relation("AssetMaintenanceTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
+  serviceProvider      String?
+  workOrderReference   String?
+  workSummary          String?
+  evidenceReference    String?
+  downtimeHours        Decimal?               @db.Decimal(10, 2)
+  nextMaintenanceDueAt DateTime?
+  reminderSentAt       DateTime?
+  overdueNotifiedAt    DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@index([organizationId, status, dueAt])
+  @@index([assetId, scheduledAt])
+  @@index([technicianId, status, dueAt])
+  @@index([defectId])
+}
+
+model AssetDefect {
+  id                   String                   @id @default(cuid())
+  organizationId       String
+  organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assetId              String
+  asset                Asset                    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  sourceInspectionId   String?
+  sourceInspection     AssetInspection?         @relation(fields: [sourceInspectionId], references: [id], onDelete: SetNull)
+  reference            String
+  title                String
+  description          String
+  severity             RiskLevel
+  status               AssetDefectStatus        @default(OPEN)
+  reportedById         String
+  reportedBy           User                     @relation("AssetDefectReportedBy", fields: [reportedById], references: [id], onDelete: Restrict)
+  ownerId              String?
+  owner                User?                    @relation("AssetDefectOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  dueDate              DateTime?
+  immediateControls    String?
+  repairPlan           String?
+  verificationEvidence String?
+  verifiedById         String?
+  verifiedBy           User?                    @relation("AssetDefectVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt           DateTime?
+  correctiveActionId   String?                  @unique
+  correctiveAction     CorrectiveAction?        @relation(fields: [correctiveActionId], references: [id], onDelete: SetNull)
+  maintenanceRecords   AssetMaintenanceRecord[]
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, severity])
+  @@index([assetId, status])
+  @@index([ownerId, status, dueDate])
+  @@index([sourceInspectionId])
 }
 
 model Risk {

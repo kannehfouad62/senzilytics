@@ -370,6 +370,16 @@ async function validateRelatedEntity(input: {
       return Boolean(record);
     }
 
+    case DocumentEntityType.ASSET_SAFETY: {
+      const [asset, inspection, maintenance, defect] = await Promise.all([
+        prisma.asset.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } }),
+        prisma.assetInspection.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } }),
+        prisma.assetMaintenanceRecord.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } }),
+        prisma.assetDefect.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } }),
+      ]);
+      return Boolean(asset || inspection || maintenance || defect);
+    }
+
     case DocumentEntityType.WORKFLOW: {
       const record = await prisma.workflowInstance.findFirst({
         where: {
@@ -688,6 +698,11 @@ async function requireDocumentUploadPermission(
     case ConfigurableFormModule.CERTIFICATION_READINESS:
       allowed = permissions.includes(
         PermissionKey.MANAGE_CERTIFICATION_READINESS
+      );
+      break;
+    case ConfigurableFormModule.ASSET_SAFETY:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_ASSETS
       );
       break;
   }

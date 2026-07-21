@@ -39,6 +39,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     { enterpriseAuditFindingLinks: { some: { finding: { organizationId } } } },
     { criticalControlVerifications: { some: { organizationId } } },
     { certificationReviewActions: { some: { review: { organizationId } } } },
+    { assetDefects: { some: { organizationId } } },
   ] };
   const competencyMatrix = allowed.has(PermissionKey.VIEW_TRAINING)
     ? await getCompetencyMatrixService(organizationId, now)
@@ -57,7 +58,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     governedChemicals, pendingEnvironmentalData, openEsgPeriods, activeJsas,
     overdueJsaReviews, approvedContractors, expiringContractorInsurance,
     activeWorkPermits, overdueWorkPermits, openExposureAssessments,
-    aboveLimitExposureSamples, overdueSurveillance,
+    aboveLimitExposureSamples, overdueSurveillance, assetExceptions, overdueAssetInspections, criticalAssetDefects,
   ] = await Promise.all([
     prisma.safetyObservation.count({ where: { organizationId, status: { notIn: [SafetyObservationStatus.RESOLVED, SafetyObservationStatus.CLOSED] } } }),
     prisma.correctiveAction.count({ where: { ...actionTenantScope, status: { notIn: closedStatuses } } }),
@@ -86,6 +87,9 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE) ? prisma.exposureAssessment.count({ where: { organizationId, status: { notIn: [ExposureAssessmentStatus.COMPLETED, ExposureAssessmentStatus.CANCELLED] } } }) : 0,
     allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE) ? prisma.exposureSample.count({ where: { assessment: { organizationId }, classification: ExposureResultClassification.ABOVE_LIMIT } }) : 0,
     allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH) ? prisma.medicalSurveillanceEnrollment.count({ where: { program: { organizationId }, status: SurveillanceEnrollmentStatus.OVERDUE } }) : 0,
+    allowed.has(PermissionKey.VIEW_ASSETS) ? prisma.asset.count({ where: { organizationId, status: { in: ["OUT_OF_SERVICE", "QUARANTINED"] } } }) : 0,
+    allowed.has(PermissionKey.VIEW_ASSETS) ? prisma.asset.count({ where: { organizationId, status: { not: "RETIRED" }, nextInspectionDueAt: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_ASSETS) ? prisma.assetDefect.count({ where: { organizationId, severity: "CRITICAL", status: { not: "CLOSED" } } }) : 0,
   ]);
 
   const modules: { label: string; value: number; note: string; href: string; tone: "danger" | "warning" | "good" | "neutral" }[] = [
@@ -110,6 +114,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
   if (allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH)) modules.push({ label: "Occupational Health", value: overdueSurveillance, note: "restricted milestones overdue", href: "/occupational-health", tone: overdueSurveillance ? "danger" : "good" });
   if (allowed.has(PermissionKey.VIEW_SIF_INTELLIGENCE)) modules.push({ label: "SIF Prevention", value: sifMetrics.attentionCount, note: `${sifMetrics.potentialSif} pSIF decisions · ${sifMetrics.failedOrDegraded} degraded or failed controls`, href: "/assurance/sif", tone: sifMetrics.failedOrDegraded || sifMetrics.overdueControls ? "danger" : sifMetrics.potentialSif ? "warning" : "good" });
   if (allowed.has(PermissionKey.VIEW_CERTIFICATION_READINESS)) modules.push({ label: "Certification Readiness", value: certificationMetrics.attentionCount, note: `${certificationMetrics.programCount} standard programs · ${certificationMetrics.overdueReviews} reviews overdue`, href: "/assurance/certification", tone: certificationMetrics.overdueReviews ? "danger" : certificationMetrics.withoutManagementReview ? "warning" : "good" });
+  if (allowed.has(PermissionKey.VIEW_ASSETS)) modules.push({ label: "Assets & Equipment", value: assetExceptions + criticalAssetDefects, note: `${overdueAssetInspections} inspections overdue · ${criticalAssetDefects} critical defects`, href: "/assets/dashboard", tone: assetExceptions || criticalAssetDefects ? "danger" : overdueAssetInspections ? "warning" : "good" });
 
   return { modules, attentionCount: modules.filter((item) => item.tone === "danger").reduce((sum, item) => sum + item.value, 0) };
 }

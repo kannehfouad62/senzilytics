@@ -60,6 +60,9 @@ const capaInclude = {
   certificationReviewActions: {
     include: { review: { include: { program: true } } },
   },
+  assetDefects: {
+    include: { asset: { include: { site: true } } },
+  },
 } as const;
 
 export async function findTenantCapas(

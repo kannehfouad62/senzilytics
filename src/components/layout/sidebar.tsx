@@ -37,6 +37,7 @@ import {
   HeartPulse,
   Waves,
   Award,
+  Wrench,
 } from "lucide-react";
 
 export const primaryNavItems = [
@@ -100,6 +101,12 @@ export const primaryNavItems = [
 ];
 
 export const ehsNavItems = [
+  {
+    label: "Assets & Equipment",
+    href: "/assets",
+    icon: Wrench,
+    permission: PermissionKey.VIEW_ASSETS,
+  },
   {
     label: "Contractors",
     href: "/contractors",

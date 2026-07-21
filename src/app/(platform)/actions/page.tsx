@@ -85,6 +85,16 @@ function sourceOf(action: TenantCapa) {
     };
   }
 
+  const assetDefect = action.assetDefects[0];
+  if (assetDefect) {
+    return {
+      label: `${assetDefect.asset.reference} — ${assetDefect.title}`,
+      type: "Asset Defect",
+      site: assetDefect.asset.site.name,
+      href: `/assets/${assetDefect.assetId}`,
+    };
+  }
+
   return {
     label: "Standalone CAPA",
     type: "Standalone",

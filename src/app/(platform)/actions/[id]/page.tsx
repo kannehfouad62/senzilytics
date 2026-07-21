@@ -302,6 +302,14 @@ function getCapaSource(
     };
   }
 
+  const assetDefect = action.assetDefects[0];
+  if (assetDefect) {
+    return {
+      label: `${assetDefect.asset.reference} — ${assetDefect.title}`,
+      href: `/assets/${assetDefect.assetId}`,
+    };
+  }
+
   return {
     label:
       "Standalone corrective action",
