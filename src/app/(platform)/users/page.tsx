@@ -2,16 +2,18 @@ import { prisma } from "@/lib/prisma";
 import { Users } from "lucide-react";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { requirePermission } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { PermissionKey } from "@prisma/client";
 import { UserRole } from "@prisma/client";
 import { inviteTenantUser, setTenantUserActive } from "@/features/identity/tenant.actions";
+import { RevokeMobileDeviceForm } from "@/features/mobile/mobile-device-management";
 
 
 export default async function UsersPage() {
   await requirePermission(PermissionKey.VIEW_USERS);
   const { organizationId } = await getCurrentUserTenant();
 
-  const [users, departments] = await Promise.all([prisma.user.findMany({
+  const [users, departments, mobileSessions, canManageUsers] = await Promise.all([prisma.user.findMany({
   where: {
     organizationId,
   },
@@ -24,7 +26,7 @@ export default async function UsersPage() {
       },
     },
   },
-}), prisma.department.findMany({where:{site:{organizationId}},include:{site:true},orderBy:{name:"asc"}})]);
+}), prisma.department.findMany({where:{site:{organizationId}},include:{site:true},orderBy:{name:"asc"}}), prisma.mobileSession.findMany({where:{organizationId,status:"ACTIVE",expiresAt:{gt:new Date()}},select:{id:true,deviceName:true,platform:true,lastUsedAt:true,expiresAt:true,user:{select:{name:true,email:true}},_count:{select:{pushTokens:{where:{enabled:true}}}}},orderBy:{lastUsedAt:"desc"}}), hasPermission(PermissionKey.MANAGE_USERS)]);
 
   return (
     <div>
@@ -102,6 +104,12 @@ export default async function UsersPage() {
             No users found.
           </div>
         )}
+      </div>
+
+      <div className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
+        <div className="border-b border-white/10 p-6"><h2 className="text-xl font-semibold">Native mobile devices</h2><p className="mt-2 text-sm text-slate-400">Review active, device-bound sessions and revoke access immediately when a device is lost, replaced, or no longer approved.</p></div>
+        <div className="overflow-x-auto"><table className="w-full border-collapse text-left text-sm"><thead className="border-b border-white/10 bg-white/5 text-slate-300"><tr><th className="px-6 py-4 font-medium">User</th><th className="px-6 py-4 font-medium">Device</th><th className="px-6 py-4 font-medium">Platform</th><th className="px-6 py-4 font-medium">Last used</th><th className="px-6 py-4 font-medium">Push</th><th className="px-6 py-4 font-medium">Access</th></tr></thead><tbody>{mobileSessions.map(session=><tr key={session.id} className="border-b border-white/5"><td className="px-6 py-5"><p className="font-medium text-white">{session.user.name}</p><p className="mt-1 text-xs text-slate-400">{session.user.email}</p></td><td className="px-6 py-5 text-slate-300">{session.deviceName}</td><td className="px-6 py-5 text-slate-300">{session.platform}</td><td className="px-6 py-5 text-slate-300">{session.lastUsedAt?.toLocaleString()||"Not refreshed"}</td><td className="px-6 py-5 text-slate-300">{session._count.pushTokens?"Enabled":"Not enabled"}</td><td className="px-6 py-5">{canManageUsers?<RevokeMobileDeviceForm sessionId={session.id}/>:<span className="text-slate-500">View only</span>}</td></tr>)}</tbody></table></div>
+        {!mobileSessions.length && <div className="p-10 text-center text-slate-400">No active native mobile devices are registered.</div>}
       </div>
     </div>
   );

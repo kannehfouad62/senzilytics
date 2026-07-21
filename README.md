@@ -11,12 +11,12 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-Required local variables are stored in `.env` and must never be committed. At minimum configure `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, `APP_URL`, and `INTEGRATION_ENCRYPTION_KEY`. Generate the integration key with `openssl rand -base64 32`; it encrypts webhook signing secrets and must remain stable across deployments. Document uploads require `BLOB_READ_WRITE_TOKEN`; email delivery requires the configured provider credentials; AI features require `OPENAI_API_KEY`.
+Required local variables are stored in `.env` and must never be committed. At minimum configure `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, `MOBILE_TOKEN_SECRET`, `APP_URL`, and `INTEGRATION_ENCRYPTION_KEY`. Generate independent mobile and integration keys with `openssl rand -base64 48` and `openssl rand -base64 32`; they must remain stable across deployments. Document uploads require `BLOB_READ_WRITE_TOKEN`; email delivery requires the configured provider credentials; AI features require `OPENAI_API_KEY`. `EXPO_ACCESS_TOKEN` is optional and only needed when enhanced Expo Push Service security is enabled.
 
 ## Production release
 
 1. Take a verified database backup and record the currently deployed commit.
-2. Configure production secrets. Generate independent random values for `AUTH_SECRET`, `CRON_SECRET`, and the 32-byte `INTEGRATION_ENCRYPTION_KEY`.
+2. Configure production secrets. Generate independent random values for `AUTH_SECRET`, `CRON_SECRET`, `MOBILE_TOKEN_SECRET`, and the 32-byte `INTEGRATION_ENCRYPTION_KEY`.
 3. Run `npm run verify:production` against the intended production environment.
 4. Run `npm ci`, `npx prisma generate`, `npm test`, and `npm run build`.
 5. Review pending migrations, then run `npm run db:deploy` once against the production database.
@@ -40,3 +40,15 @@ npm run check
 ```
 
 This runs linting, automated tests, and the optimized production build.
+
+## Native mobile application
+
+The Premium iOS and Android client is isolated in `apps/mobile`, while the Next.js application remains its authenticated, tenant-aware backend. Install and validate it independently:
+
+```bash
+npm run mobile:install
+cp apps/mobile/.env.example apps/mobile/.env
+npm run mobile:check
+```
+
+See `apps/mobile/README.md` for Expo Application Services setup, development builds, push credentials, and store-release commands.

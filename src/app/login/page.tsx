@@ -1,21 +1,20 @@
 import { signIn } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import Link from "next/link";
+import { safeLoginRedirect } from "@/lib/login-redirect";
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ callbackUrl?: string | string[] }> }) {
+  const callbackUrl = safeLoginRedirect((await searchParams).callbackUrl);
   async function login(formData: FormData) {
     "use server";
 
     await signIn("credentials", {
       email: String(formData.get("email")),
       password: String(formData.get("password")),
-      redirectTo: "/dashboard",
+      redirectTo: callbackUrl,
     });
-
-    redirect("/dashboard");
   }
-  async function microsoftLogin(){"use server";await signIn("microsoft-entra-id",{redirectTo:"/dashboard"})}
-  async function oktaLogin(){"use server";await signIn("okta",{redirectTo:"/dashboard"})}
+  async function microsoftLogin(){"use server";await signIn("microsoft-entra-id",{redirectTo:callbackUrl})}
+  async function oktaLogin(){"use server";await signIn("okta",{redirectTo:callbackUrl})}
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-white">

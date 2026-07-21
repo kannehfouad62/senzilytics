@@ -1,0 +1,31 @@
+{
+  "name": "senzilytics-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "check": "tsc --noEmit && expo-doctor"
+  },
+  "dependencies": {
+    "expo": "~56.0.0",
+    "expo-crypto": "~56.0.4",
+    "expo-dev-client": "~56.0.23",
+    "expo-device": "~56.0.4",
+    "expo-linking": "~56.0.15",
+    "expo-network": "~56.0.5",
+    "expo-notifications": "~56.0.21",
+    "expo-secure-store": "~56.0.4",
+    "expo-sqlite": "~56.0.5",
+    "expo-web-browser": "~56.0.5",
+    "react": "19.2.3",
+    "react-native": "0.85.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "expo-doctor": "^1.20.0",
+    "typescript": "~5.9.2"
+  }
+}

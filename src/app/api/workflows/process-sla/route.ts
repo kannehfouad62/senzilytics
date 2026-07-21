@@ -6,6 +6,8 @@ import { processInvestigationSlaNotifications } from "@/core/notifications/inves
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { cleanupExpiredDemoUsers } from "@/features/demo/cleanup.service";
+import { processIntegrationWebhookDeliveries } from "@/modules/integrations/webhook-delivery.service";
+import { processMobilePushDeliveries } from "@/modules/mobile/mobile-push.service";
 import {
   NextRequest,
   NextResponse,
@@ -65,6 +67,10 @@ export async function GET(
       cleanupExpiredDemoUsers(),
 
     ]);
+    const [integrationResult, mobilePushResult] = await Promise.all([
+      processIntegrationWebhookDeliveries(),
+      processMobilePushDeliveries(),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -92,6 +98,12 @@ export async function GET(
 
       demoCleanup:
         demoResult,
+
+      integrations:
+        integrationResult,
+
+      mobilePush:
+        mobilePushResult,
 
       totals: {
         checked:

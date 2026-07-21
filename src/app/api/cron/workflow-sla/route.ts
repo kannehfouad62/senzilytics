@@ -2,6 +2,7 @@ import { processMocSlaNotifications } from "@/core/notifications/moc-sla.service
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { processIntegrationWebhookDeliveries } from "@/modules/integrations/webhook-delivery.service";
+import { processMobilePushDeliveries } from "@/modules/mobile/mobile-push.service";
 import {
   NextRequest,
   NextResponse,
@@ -42,10 +43,12 @@ export async function GET(
       workflowResult,
       mocResult,
       integrationResult,
+      mobilePushResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
       processMocSlaNotifications(),
       processIntegrationWebhookDeliveries(),
+      processMobilePushDeliveries(),
     ]);
 
     return NextResponse.json({
@@ -60,10 +63,13 @@ export async function GET(
 
       integrations:
         integrationResult,
+
+      mobilePush:
+        mobilePushResult,
     });
   } catch (error) {
     console.error(
-      "Workflow, MOC, and integration processing failed:",
+      "Workflow, MOC, integration, or mobile-push processing failed:",
       error
     );
 

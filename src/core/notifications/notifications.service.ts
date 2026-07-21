@@ -14,15 +14,20 @@ type CreateNotificationInput = {
 export async function createNotification(input: CreateNotificationInput) {
   const organization = await prisma.organization.findUnique({ where: { id: input.organizationId }, select: { subscriptionPlan: true } });
   if (!organization || !planEntitlements[organization.subscriptionPlan].IN_APP_NOTIFICATIONS) return null;
-  return prisma.notification.create({
-    data: {
+  return prisma.$transaction(async (tx) => {
+    const notification = await tx.notification.create({ data: {
       organizationId: input.organizationId,
       userId: input.userId,
       type: input.type ?? NotificationType.INFO,
       title: input.title,
       message: input.message,
       link: input.link,
-    },
+    } });
+    if (planEntitlements[organization.subscriptionPlan].MOBILE_APPS) {
+      const tokens = await tx.mobilePushToken.findMany({ where: { organizationId: input.organizationId, userId: input.userId, enabled: true, session: { status: "ACTIVE", expiresAt: { gt: new Date() } } }, select: { id: true } });
+      if (tokens.length) await tx.mobilePushDelivery.createMany({ data: tokens.map((token) => ({ organizationId: input.organizationId, userId: input.userId, pushTokenId: token.id, notificationId: notification.id, payload: { notificationId: notification.id, link: input.link ?? "/notifications", type: input.type ?? NotificationType.INFO } })), skipDuplicates: true });
+    }
+    return notification;
   });
 }
 

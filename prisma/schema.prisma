@@ -161,6 +161,24 @@ enum IntegrationDeliveryStatus {
   ABANDONED
 }
 
+enum MobilePlatform {
+  IOS
+  ANDROID
+}
+
+enum MobileSessionStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum MobilePushDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  ABANDONED
+}
+
 enum AiIntelligenceUseCase {
   DAILY_BRIEFING
   EXECUTIVE_RISK
@@ -1415,6 +1433,10 @@ model Organization {
   integrationApiRequestLogs      IntegrationApiRequestLog[]
   integrationWebhookEndpoints    IntegrationWebhookEndpoint[]
   integrationWebhookDeliveries   IntegrationWebhookDelivery[]
+  mobileAuthChallenges           MobileAuthChallenge[]
+  mobileSessions                 MobileSession[]
+  mobilePushTokens               MobilePushToken[]
+  mobilePushDeliveries           MobilePushDelivery[]
 }
 
 model PricingInquiry {
@@ -1642,6 +1664,10 @@ model User {
   revokedIntegrationCredentials    IntegrationApiCredential[]      @relation("IntegrationCredentialRevokedBy")
   createdIntegrationWebhooks       IntegrationWebhookEndpoint[]    @relation("IntegrationWebhookCreatedBy")
   revokedIntegrationWebhooks       IntegrationWebhookEndpoint[]    @relation("IntegrationWebhookRevokedBy")
+  authorizedMobileChallenges       MobileAuthChallenge[]           @relation("MobileChallengeAuthorizedBy")
+  mobileSessions                   MobileSession[]
+  mobilePushTokens                 MobilePushToken[]
+  mobilePushDeliveries             MobilePushDelivery[]
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -5448,6 +5474,103 @@ model IntegrationWebhookDelivery {
   @@index([organizationId, createdAt])
 }
 
+model MobileAuthChallenge {
+  id                     String    @id @default(cuid())
+  tokenHash              String    @unique
+  requestFingerprintHash String
+  clientState            String
+  codeChallenge          String
+  redirectUri            String
+  expiresAt              DateTime
+  organizationId         String?
+  authorizedById         String?
+  authorizationCodeHash  String?   @unique
+  authorizedAt           DateTime?
+  usedAt                 DateTime?
+  createdAt              DateTime  @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  authorizedBy User?         @relation("MobileChallengeAuthorizedBy", fields: [authorizedById], references: [id], onDelete: SetNull)
+
+  @@index([expiresAt, usedAt])
+  @@index([requestFingerprintHash, createdAt])
+}
+
+model MobileSession {
+  id                   String              @id @default(cuid())
+  organizationId       String
+  userId               String
+  deviceId             String
+  deviceName           String
+  platform             MobilePlatform
+  refreshTokenHash     String              @unique
+  refreshTokenLastFour String
+  status               MobileSessionStatus @default(ACTIVE)
+  userSessionVersion   Int
+  expiresAt            DateTime
+  lastUsedAt           DateTime?
+  revokedAt            DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushTokens   MobilePushToken[]
+
+  @@unique([userId, deviceId])
+  @@index([organizationId, status])
+  @@index([expiresAt])
+}
+
+model MobilePushToken {
+  id               String         @id @default(cuid())
+  organizationId   String
+  userId           String
+  sessionId        String
+  token            String         @unique
+  platform         MobilePlatform
+  enabled          Boolean        @default(true)
+  lastRegisteredAt DateTime       @default(now())
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session      MobileSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  deliveries   MobilePushDelivery[]
+
+  @@index([userId, enabled])
+  @@index([organizationId, enabled])
+}
+
+model MobilePushDelivery {
+  id             String                   @id @default(cuid())
+  organizationId String
+  userId         String
+  pushTokenId    String
+  notificationId String
+  payload        Json
+  status         MobilePushDeliveryStatus @default(PENDING)
+  attemptCount   Int                      @default(0)
+  maxAttempts    Int                      @default(6)
+  nextAttemptAt  DateTime                 @default(now())
+  ticketId       String?
+  error          String?
+  lastAttemptAt  DateTime?
+  sentAt         DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushToken    MobilePushToken @relation(fields: [pushTokenId], references: [id], onDelete: Cascade)
+  notification Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([pushTokenId, notificationId])
+  @@index([status, nextAttemptAt])
+  @@index([organizationId, createdAt])
+}
+
 model Notification {
   id             String           @id @default(cuid())
   organizationId String
@@ -5461,8 +5584,9 @@ model Notification {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mobilePushDeliveries MobilePushDelivery[]
 }
 
 model ConfigurableFormDefinition {

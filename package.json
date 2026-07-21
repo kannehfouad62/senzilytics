@@ -15,6 +15,8 @@
     "platform:grant": "tsx --env-file=.env scripts/grant-platform-admin.ts",
     "password:reset": "tsx --env-file=.env scripts/reset-user-password.ts",
     "demo:seed": "tsx --env-file=.env scripts/seed-public-demo.ts",
+    "mobile:install": "npm --prefix apps/mobile install",
+    "mobile:check": "npm --prefix apps/mobile run check",
     "postinstall": "prisma generate",
     "repair:workflows": "tsx prisma/repair-workflows.ts"
   },

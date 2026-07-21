@@ -1,4 +1,4 @@
-const requiredProductionVariables = ["DATABASE_URL", "AUTH_SECRET", "CRON_SECRET", "APP_URL"] as const;
+const requiredProductionVariables = ["DATABASE_URL", "AUTH_SECRET", "CRON_SECRET", "APP_URL", "MOBILE_TOKEN_SECRET"] as const;
 
 export function inspectProductionEnvironment(environment: Record<string, string | undefined> = process.env) {
   const missing = requiredProductionVariables.filter((key) => !environment[key]?.trim());
@@ -7,6 +7,7 @@ export function inspectProductionEnvironment(environment: Record<string, string 
   if (appUrl && !appUrl.startsWith("https://")) warnings.push("APP_URL should use HTTPS in production.");
   if ((environment.AUTH_SECRET?.trim().length ?? 0) < 32) warnings.push("AUTH_SECRET should contain at least 32 characters.");
   if ((environment.CRON_SECRET?.trim().length ?? 0) < 32) warnings.push("CRON_SECRET should contain at least 32 characters.");
+  if ((environment.MOBILE_TOKEN_SECRET?.trim().length ?? 0) < 32) warnings.push("MOBILE_TOKEN_SECRET should contain at least 32 characters.");
   const integrationKey = environment.INTEGRATION_ENCRYPTION_KEY?.trim();
   if (!integrationKey) warnings.push("INTEGRATION_ENCRYPTION_KEY is required before creating webhook endpoints.");
   else {
