@@ -25,7 +25,7 @@ Capture at least one supported phone class for both stores and an iPad/tablet cl
 
 ## Visual rules
 
-- Keep the Senzilytics cyan S mark, navy background and approved typography consistent.
+- Keep the Senzilytics cyan-to-blue S intelligence mark, navy background and approved typography consistent.
 - Use short factual captions; avoid unverifiable rankings, certification claims or guarantees.
 - Do not add Apple, Android, Microsoft or Okta logos to screenshots or the feature graphic.
 - Preserve safe margins so store cropping does not cut the mark or text.

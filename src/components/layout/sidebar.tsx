@@ -359,7 +359,7 @@ export async function Sidebar() {
         className="mb-8 flex shrink-0 items-center gap-3 rounded-2xl transition hover:-translate-y-0.5"
       >
         <Image
-          src="/brand/senzilytics-mark.svg"
+          src="/brand/senzilytics-mark.png"
           alt=""
           width={46}
           height={46}
