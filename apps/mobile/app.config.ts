@@ -18,7 +18,6 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.senzilytics.mobile",
-    edgeToEdgeEnabled: true,
     adaptiveIcon: { backgroundColor: "#07111f" },
   },
   plugins: ["expo-secure-store", "expo-notifications", ["expo-sqlite", { useSQLCipher: true }]],
