@@ -1,6 +1,6 @@
 import { ActivityAction, MobilePlatform, MobilePushDeliveryStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { nextMobilePushAttempt } from "@/modules/mobile/mobile-push-lifecycle";
+import { mobilePushIdentityMatches, nextMobilePushAttempt } from "@/modules/mobile/mobile-push-lifecycle";
 
 const EXPO_SEND_URL = "https://exp.host/--/api/v2/push/send";
 const EXPO_RECEIPT_URL = "https://exp.host/--/api/v2/push/getReceipts";
@@ -9,6 +9,10 @@ export async function registerMobilePushTokenService(input: { organizationId: st
   if (!/^Expo(nent)?PushToken\[[A-Za-z0-9_-]+\]$/.test(input.token) || input.token.length > 200) throw new Error("Expo push token is invalid.");
   if (input.platform !== input.sessionPlatform) throw new Error("Push-token platform does not match this mobile session.");
   return prisma.$transaction(async (tx) => {
+    const existing = await tx.mobilePushToken.findUnique({ where: { token: input.token }, select: { id: true, organizationId: true, userId: true, sessionId: true } });
+    if (existing && (existing.organizationId !== input.organizationId || existing.userId !== input.userId || existing.sessionId !== input.sessionId)) {
+      await tx.mobilePushDelivery.updateMany({ where: { pushTokenId: existing.id, status: { in: [MobilePushDeliveryStatus.PENDING, MobilePushDeliveryStatus.FAILED, MobilePushDeliveryStatus.SENT] } }, data: { status: MobilePushDeliveryStatus.ABANDONED, error: "Push token was securely reassigned to a different mobile session." } });
+    }
     await tx.mobilePushToken.updateMany({ where: { sessionId: input.sessionId, token: { not: input.token } }, data: { enabled: false } });
     const token = await tx.mobilePushToken.upsert({ where: { token: input.token }, update: { organizationId: input.organizationId, userId: input.userId, sessionId: input.sessionId, platform: input.platform, enabled: true, lastRegisteredAt: new Date() }, create: { organizationId: input.organizationId, userId: input.userId, sessionId: input.sessionId, token: input.token, platform: input.platform } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: ActivityAction.UPDATE, entityType: "MobilePushToken", entityId: token.id, title: "Native push notifications registered", metadata: { platform: input.platform } } });
@@ -25,12 +29,18 @@ export async function processMobilePushDeliveries() {
   const receiptResult = await processReceipts(now);
   const due = await prisma.mobilePushDelivery.findMany({ where: { status: { in: [MobilePushDeliveryStatus.PENDING, MobilePushDeliveryStatus.FAILED] }, nextAttemptAt: { lte: now }, pushToken: { enabled: true, session: { status: "ACTIVE", expiresAt: { gt: now } } } }, include: { pushToken: true }, orderBy: { nextAttemptAt: "asc" }, take: 50 });
   const claimed: typeof due = [];
+  let abandoned = 0;
   for (const delivery of due) {
+    if (!mobilePushIdentityMatches(delivery, delivery.pushToken)) {
+      const rejected = await prisma.mobilePushDelivery.updateMany({ where: { id: delivery.id, status: delivery.status }, data: { status: MobilePushDeliveryStatus.ABANDONED, error: "Push-token tenant or user ownership no longer matches this delivery." } });
+      abandoned += rejected.count;
+      continue;
+    }
     const changed = await prisma.mobilePushDelivery.updateMany({ where: { id: delivery.id, status: delivery.status, attemptCount: delivery.attemptCount, nextAttemptAt: { lte: now } }, data: { attemptCount: delivery.attemptCount + 1, lastAttemptAt: now, nextAttemptAt: new Date(now.getTime() + 5 * 60_000) } });
     if (changed.count) claimed.push(delivery);
   }
-  if (!claimed.length) return { queued: 0, accepted: 0, failed: 0, abandoned: 0, receipts: receiptResult };
-  let accepted = 0, failed = 0, abandoned = 0;
+  if (!claimed.length) return { queued: 0, accepted: 0, failed: 0, abandoned, receipts: receiptResult };
+  let accepted = 0, failed = 0;
   try {
     const response = await expoFetch(EXPO_SEND_URL, claimed.map((delivery) => ({ to: delivery.pushToken.token, sound: "default", title: "Senzilytics action required", body: "Open the app to review a new notification.", data: delivery.payload, priority: "high" })));
     const body = await response.json() as { data?: Array<{ status?: string; id?: string; message?: string; details?: { error?: string } }> };

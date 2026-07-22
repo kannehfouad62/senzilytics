@@ -4,12 +4,15 @@ import * as Device from "expo-device";
 import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
+import { mobileOwnerKey, parseStoredMobileContext, shouldDiscardMobileSession } from "./session-lifecycle";
 import type { MobileBootstrap, MobileTokens } from "./types";
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || "https://www.senzilytics.cloud").replace(/\/$/, "");
 const REFRESH_TOKEN_KEY = "senzilytics.mobile.refresh-token";
+const SESSION_CONTEXT_KEY = "senzilytics.mobile.session-context";
 const DEVICE_ID_KEY = "senzilytics.mobile.device-id";
 let accessToken: string | null = null;
+let refreshInFlight: Promise<MobileTokens> | null = null;
 
 export class MobileApiError extends Error {
   constructor(message: string, public readonly status: number, public readonly code?: string) { super(message); }
@@ -72,30 +75,53 @@ export async function beginMobileSignIn() {
 export async function restoreMobileSession() {
   const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
   if (!refreshToken) return null;
-  try { return await refreshMobileSession(refreshToken); }
-  catch { await clearMobileSession(); return null; }
+  return refreshMobileSession(refreshToken);
 }
 
 async function refreshMobileSession(refreshToken?: string) {
-  const stored = refreshToken || await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-  if (!stored) throw new MobileApiError("Sign in is required.", 401, "unauthorized");
-  const response = await fetch(`${API_URL}/api/mobile/auth/token`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ grantType: "refresh_token", refreshToken: stored }),
-  });
-  return storeTokens(await parseJson<MobileTokens>(response));
+  if (refreshInFlight) return refreshInFlight;
+  const request = (async () => {
+    const stored = refreshToken || await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    if (!stored) throw new MobileApiError("Sign in is required.", 401, "unauthorized");
+    const response = await fetch(`${API_URL}/api/mobile/auth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ grantType: "refresh_token", refreshToken: stored }),
+    });
+    return storeTokens(await parseJson<MobileTokens>(response));
+  })();
+  refreshInFlight = request;
+  try {
+    return await request;
+  } catch (error) {
+    if (error instanceof MobileApiError && shouldDiscardMobileSession(error)) await clearMobileSession();
+    throw error;
+  } finally {
+    if (refreshInFlight === request) refreshInFlight = null;
+  }
 }
 
 async function storeTokens(tokens: MobileTokens) {
   accessToken = tokens.accessToken;
-  await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
+  const options = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
+  await Promise.all([
+    SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken, options),
+    SecureStore.setItemAsync(SESSION_CONTEXT_KEY, JSON.stringify({ organizationId: tokens.organization.id, userId: tokens.user.id }), options),
+  ]);
   return tokens;
+}
+
+export async function getStoredMobileOwnerKey() {
+  const context = parseStoredMobileContext(await SecureStore.getItemAsync(SESSION_CONTEXT_KEY));
+  return context ? mobileOwnerKey(context) : null;
 }
 
 export async function clearMobileSession() {
   accessToken = null;
-  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+  await Promise.all([
+    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+    SecureStore.deleteItemAsync(SESSION_CONTEXT_KEY),
+  ]);
 }
 
 export async function mobileApi<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {

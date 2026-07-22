@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,9 +14,10 @@ import {
   View,
 } from "react-native";
 import * as Network from "expo-network";
-import { beginMobileSignIn, loadMobileWorkspace, logoutMobileSession, mobileApi, MobileApiError, restoreMobileSession } from "./src/api";
+import { beginMobileSignIn, clearMobileSession, getStoredMobileOwnerKey, loadMobileWorkspace, logoutMobileSession, mobileApi, MobileApiError, restoreMobileSession } from "./src/api";
 import { registerForMobilePush } from "./src/push";
-import { cacheWorkspace, clearWorkspaceCache, initializeOfflineStore, pendingObservationCount, queueObservation, synchronizeObservations } from "./src/storage";
+import { MOBILE_WORKSPACE_MAX_OFFLINE_AGE_MS } from "./src/session-lifecycle";
+import { cacheWorkspace, clearWorkspaceCache, initializeOfflineStore, pendingObservationCount, queueObservation, readCachedWorkspace, synchronizeObservations } from "./src/storage";
 import type { CapturedAnswer, CapturedForm, MobileBootstrap, MobileNotification, ObservationPayload, RuntimeField, RuntimeForm } from "./src/types";
 
 type Tab = "home" | "capture" | "notifications" | "settings";
@@ -32,31 +33,55 @@ export default function App() {
   const [pending, setPending] = useState(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [verifiedAt, setVerifiedAt] = useState<number | null>(null);
+  const syncInFlight = useRef(false);
 
   const ownerKey = workspace ? `${workspace.organization.id}:${workspace.user.id}` : "";
+  const online = network.isConnected !== false && network.isInternetReachable !== false;
 
   const refreshWorkspace = useCallback(async () => {
     const next = await loadMobileWorkspace();
     const nextOwner = `${next.organization.id}:${next.user.id}`;
+    const verified = new Date().toISOString();
     setWorkspace(next);
-    await cacheWorkspace(nextOwner, next);
+    setVerifiedAt(Date.parse(verified));
+    await cacheWorkspace(nextOwner, next, verified);
     setPending(await pendingObservationCount(nextOwner));
     return next;
   }, []);
 
   useEffect(() => {
+    let active = true;
     void (async () => {
       try {
         await initializeOfflineStore();
-        const session = await restoreMobileSession();
-        if (!session) { setAuthState("signed-out"); return; }
-        await refreshWorkspace();
-        setAuthState("signed-in");
+        try {
+          const session = await restoreMobileSession();
+          if (!session) { if (active) setAuthState("signed-out"); return; }
+          await refreshWorkspace();
+          if (active) setAuthState("signed-in");
+        } catch (error) {
+          const storedOwner = await getStoredMobileOwnerKey();
+          const cached = storedOwner ? await readCachedWorkspace(storedOwner) : null;
+          const cachedOwner = cached ? `${cached.workspace.organization.id}:${cached.workspace.user.id}` : null;
+          if (active && storedOwner && cached && cachedOwner === storedOwner) {
+            setWorkspace(cached.workspace);
+            setVerifiedAt(Date.parse(cached.verifiedAt));
+            setPending(await pendingObservationCount(storedOwner));
+            setNotice("Live verification is unavailable. You are using encrypted device data and can continue capturing observations offline.");
+            setAuthState("signed-in");
+            return;
+          }
+          throw error;
+        }
       } catch (error) {
-        setNotice(messageOf(error));
-        setAuthState("signed-out");
+        if (active) {
+          setNotice(messageOf(error));
+          setAuthState("signed-out");
+        }
       }
     })();
+    return () => { active = false; };
   }, [refreshWorkspace]);
 
   const signIn = async () => {
@@ -66,18 +91,43 @@ export default function App() {
     finally { setBusy(false); }
   };
 
-  const sync = useCallback(async () => {
-    if (!ownerKey) return;
-    if (network.isConnected === false || network.isInternetReachable === false) { setNotice("You are offline. Records remain securely queued on this device."); return; }
+  const sync = useCallback(async (silent = false) => {
+    if (!ownerKey || syncInFlight.current) return;
+    if (!online) { if (!silent) setNotice("You are offline. Records remain securely queued on this device."); return; }
+    syncInFlight.current = true;
     setBusy(true); setNotice("");
     try {
       const result = await synchronizeObservations(ownerKey);
       setPending(await pendingObservationCount(ownerKey));
-      setNotice(result.synchronized ? `${result.synchronized} record${result.synchronized === 1 ? "" : "s"} synchronized.` : result.failed ? "Queued records still require attention." : "Everything is synchronized.");
+      if (result.synchronized || result.failed || !silent) setNotice(result.synchronized ? `${result.synchronized} record${result.synchronized === 1 ? "" : "s"} synchronized.` : result.failed ? "Queued records still require attention." : "Everything is synchronized.");
       await refreshWorkspace();
     } catch (error) { setNotice(`Synchronization paused: ${messageOf(error)}`); }
-    finally { setBusy(false); }
-  }, [network.isConnected, network.isInternetReachable, ownerKey, refreshWorkspace]);
+    finally { syncInFlight.current = false; setBusy(false); }
+  }, [online, ownerKey, refreshWorkspace]);
+
+  useEffect(() => {
+    if (authState === "signed-in" && ownerKey && online) void sync(true);
+  }, [authState, online, ownerKey, sync]);
+
+  useEffect(() => {
+    if (authState !== "signed-in" || verifiedAt === null) return;
+    const remaining = verifiedAt + MOBILE_WORKSPACE_MAX_OFFLINE_AGE_MS - Date.now();
+    let active = true;
+    const verifyOrLock = async () => {
+      try { await refreshWorkspace(); }
+      catch {
+        await clearMobileSession();
+        if (active) {
+          setWorkspace(null);
+          setVerifiedAt(null);
+          setAuthState("signed-out");
+          setNotice("The 72-hour offline authorization window expired. Connect to the internet and sign in again.");
+        }
+      }
+    };
+    const timer = setTimeout(() => { void verifyOrLock(); }, Math.max(remaining, 0));
+    return () => { active = false; clearTimeout(timer); };
+  }, [authState, refreshWorkspace, verifiedAt]);
 
   if (authState === "loading") return <LoadingScreen />;
   if (authState === "signed-out" || !workspace) return <SignInScreen busy={busy} notice={notice} onSignIn={signIn} />;
@@ -91,10 +141,10 @@ export default function App() {
         <View style={[styles.onlineDot, { backgroundColor: network.isConnected === false ? "#fb7185" : "#34d399" }]} />
       </View>
       {notice ? <Pressable onPress={() => setNotice("")} style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
-      {tab === "home" && <HomeScreen workspace={workspace} pending={pending} busy={busy} onRefresh={refreshWorkspace} onSync={sync} onNavigate={setTab} />}
-      {tab === "capture" && <CaptureScreen workspace={workspace} ownerKey={ownerKey} online={network.isConnected !== false && network.isInternetReachable !== false} onQueued={async (message) => { setPending(await pendingObservationCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "notifications" && <NotificationsScreen notifications={workspace.notifications} onRead={async (id) => { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); }} />}
-      {tab === "settings" && <SettingsScreen workspace={workspace} pending={pending} onEnablePush={async () => { setBusy(true); try { setNotice(await registerForMobilePush()); } catch (error) { setNotice(messageOf(error)); } finally { setBusy(false); } }} onLogout={async () => { setBusy(true); try { await logoutMobileSession(); await clearWorkspaceCache(ownerKey); setWorkspace(null); setAuthState("signed-out"); setTab("home"); } finally { setBusy(false); } }} />}
+      {tab === "home" && <HomeScreen workspace={workspace} pending={pending} busy={busy} onRefresh={async () => { try { return await refreshWorkspace(); } catch (error) { setNotice(`Refresh paused: ${messageOf(error)}`); return workspace; } }} onSync={sync} onNavigate={setTab} />}
+      {tab === "capture" && <CaptureScreen workspace={workspace} ownerKey={ownerKey} online={online} onQueued={async (message) => { setPending(await pendingObservationCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "notifications" && <NotificationsScreen notifications={workspace.notifications} onRead={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
+      {tab === "settings" && <SettingsScreen workspace={workspace} pending={pending} onEnablePush={async () => { setBusy(true); try { setNotice(await registerForMobilePush()); } catch (error) { setNotice(messageOf(error)); } finally { setBusy(false); } }} onLogout={async () => { setBusy(true); try { await logoutMobileSession(); await clearWorkspaceCache(ownerKey); setWorkspace(null); setVerifiedAt(null); setAuthState("signed-out"); setTab("home"); } finally { setBusy(false); } }} />}
       <View style={styles.tabs}>
         <TabButton active={tab === "home"} label="Home" onPress={() => setTab("home")} />
         <TabButton active={tab === "capture"} label="Capture" badge={pending || undefined} onPress={() => setTab("capture")} />

@@ -9,8 +9,10 @@ This Expo/React Native application is the Premium native field workspace for iOS
 - Tenant, role, account-status, session-version, and Premium-entitlement checks
 - Assigned workflow tasks and in-app notifications
 - Offline safety-observation capture using a tenant/user-scoped SQLCipher-encrypted outbox
+- Encrypted cached-workspace startup during a bounded 72-hour offline authorization window
+- Automatic idempotent synchronization when connectivity returns
 - Published configurable observation forms and custom field validation
-- Idempotent synchronization and Expo push-token registration
+- Expo push-token registration with tenant/user ownership enforcement
 
 ## Local setup
 

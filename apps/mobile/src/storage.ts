@@ -2,6 +2,7 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import * as SQLite from "expo-sqlite";
 import { mobileApi } from "./api";
+import { isMobileWorkspaceCacheFresh } from "./session-lifecycle";
 import type { MobileBootstrap, ObservationPayload } from "./types";
 
 type QueueRow = { id: string; payload: string; captured_at: string };
@@ -78,16 +79,16 @@ export async function synchronizeObservations(ownerKey: string) {
   return { synchronized, failed: response.results.length - synchronized };
 }
 
-export async function cacheWorkspace(ownerKey: string, value: MobileBootstrap) {
+export async function cacheWorkspace(ownerKey: string, value: MobileBootstrap, verifiedAt = new Date().toISOString()) {
   const database = await db();
-  await database.runAsync("INSERT INTO mobile_cache (cache_key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(cache_key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", `bootstrap:${ownerKey}`, JSON.stringify(value), new Date().toISOString());
+  await database.runAsync("INSERT INTO mobile_cache (cache_key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(cache_key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", `bootstrap:${ownerKey}`, JSON.stringify(value), verifiedAt);
 }
 
 export async function readCachedWorkspace(ownerKey: string) {
   const database = await db();
-  const row = await database.getFirstAsync<{ value: string }>("SELECT value FROM mobile_cache WHERE cache_key = ?", `bootstrap:${ownerKey}`);
-  if (!row) return null;
-  try { return JSON.parse(row.value) as MobileBootstrap; } catch { return null; }
+  const row = await database.getFirstAsync<{ value: string; updated_at: string }>("SELECT value, updated_at FROM mobile_cache WHERE cache_key = ?", `bootstrap:${ownerKey}`);
+  if (!row || !isMobileWorkspaceCacheFresh(row.updated_at)) return null;
+  try { return { workspace: JSON.parse(row.value) as MobileBootstrap, verifiedAt: row.updated_at }; } catch { return null; }
 }
 
 export async function clearWorkspaceCache(ownerKey: string) {

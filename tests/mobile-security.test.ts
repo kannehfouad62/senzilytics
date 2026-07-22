@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MobilePlatform, MobilePushDeliveryStatus, UserRole } from "@prisma/client";
 import { safeLoginRedirect } from "../src/lib/login-redirect";
-import { nextMobilePushAttempt } from "../src/modules/mobile/mobile-push-lifecycle";
+import { mobilePushIdentityMatches, nextMobilePushAttempt } from "../src/modules/mobile/mobile-push-lifecycle";
 import {
   createMobileOpaqueToken,
   hashMobileToken,
@@ -67,4 +67,11 @@ test("mobile push failures retry with backoff and eventually abandon", () => {
   assert.equal(nextMobilePushAttempt(1, 6, now).nextAttemptAt.toISOString(), "2026-07-21T00:01:00.000Z");
   assert.equal(nextMobilePushAttempt(5, 6, now).nextAttemptAt.toISOString(), "2026-07-21T12:00:00.000Z");
   assert.equal(nextMobilePushAttempt(6, 6, now).status, MobilePushDeliveryStatus.ABANDONED);
+});
+
+test("mobile push delivery ownership cannot cross users or tenants", () => {
+  const delivery = { organizationId: "org-1", userId: "user-1" };
+  assert.equal(mobilePushIdentityMatches(delivery, { organizationId: "org-1", userId: "user-1" }), true);
+  assert.equal(mobilePushIdentityMatches(delivery, { organizationId: "org-2", userId: "user-1" }), false);
+  assert.equal(mobilePushIdentityMatches(delivery, { organizationId: "org-1", userId: "user-2" }), false);
 });
