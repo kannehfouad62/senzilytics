@@ -42,6 +42,7 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 
 ## Apple submission
 
+- [ ] Review every proposed answer in `APPLE_STORE_SUBMISSION.md` against the final binary and production vendor contracts.
 - [ ] Create the App Store Connect record and note its App Store Connect app ID.
 - [ ] Complete App Privacy answers for contact information, identifiers, user content and diagnostics actually collected.
 - [ ] Confirm data is not declared as tracking unless production practices change.
@@ -53,11 +54,12 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 
 ## Google Play submission
 
+- [ ] Review every proposed answer in `GOOGLE_PLAY_SUBMISSION.md` against the final Android App Bundle and production vendor contracts.
 - [ ] Create the app in Play Console and complete the first internal release manually if required.
 - [ ] Copy the approved listing from `PLAY_STORE_LISTING.md`.
 - [ ] Complete Data safety, App access, Ads, Content rating and Target audience declarations.
 - [ ] Provide review credentials in App access and explain that a Premium tenant account is required.
-- [ ] Add phone and tablet screenshots, the 512×512 store icon and a 1024×500 feature graphic.
+- [ ] Add phone and tablet screenshots, the 512×512 store icon and the approved `store-assets/google-play-feature-graphic.png`.
 - [ ] Test the Android App Bundle through Internal testing before closed or production rollout.
 
 ## Build and release

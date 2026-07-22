@@ -66,7 +66,7 @@ Native access is deliberately denied for demo, Essential, and Enterprise tenants
 
 ## Store builds
 
-The initial Apple listing copy is versioned in `store.config.json`. Review it in App Store Connect before submission. EAS Metadata is currently Apple-only, so use `PLAY_STORE_LISTING.md` when completing Google Play Console. Work through `STORE_RELEASE_CHECKLIST.md` before uploading a production binary.
+The initial Apple listing copy is versioned in `store.config.json`. Review it in App Store Connect before submission. EAS Metadata is currently Apple-only, so use `PLAY_STORE_LISTING.md` when completing Google Play Console. Use `APPLE_STORE_SUBMISSION.md` and `GOOGLE_PLAY_SUBMISSION.md` as working disclosure sheets, prepare approved imagery using `store-assets/README.md`, and work through `STORE_RELEASE_CHECKLIST.md` before uploading a production binary.
 
 Before store submission, approve the included production icons, add current screenshots, complete Apple privacy disclosures and Google Play Data safety, provide a dedicated non-production App Review tenant, and verify the public privacy, support and account-request pages. Never commit review credentials to `store.config.json`.
 
