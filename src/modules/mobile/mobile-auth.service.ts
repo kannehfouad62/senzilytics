@@ -5,6 +5,87 @@ import { createMobileOpaqueToken, hashMobileToken, isMobilePlatform, isMobileRed
 
 export class MobileAuthError extends Error { constructor(message: string, public readonly status: number, public readonly code: string) { super(message); } }
 
+export type MobileAuthorizationEligibility =
+  | {
+      eligible: true;
+      user: { id: string };
+      organization: {
+        id: string;
+        subscriptionPlan: keyof typeof planEntitlements;
+        isDemo: boolean;
+      };
+    }
+  | {
+      eligible: false;
+      title: string;
+      detail: string;
+    };
+
+export async function getMobileAuthorizationEligibilityService(
+  userId: string
+): Promise<MobileAuthorizationEligibility> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      isActive: true,
+      organization: {
+        select: {
+          id: true,
+          status: true,
+          isDemo: true,
+          subscriptionPlan: true,
+        },
+      },
+    },
+  });
+
+  if (!user?.isActive) {
+    return {
+      eligible: false,
+      title: "Account unavailable",
+      detail:
+        "This account is inactive or no longer exists. Contact your Senzilytics administrator.",
+    };
+  }
+
+  if (!user.organization) {
+    return {
+      eligible: false,
+      title: "Tenant assignment required",
+      detail:
+        "Native mobile access is tenant-scoped. Ask a Senzilytics platform administrator to assign this user to an active Premium tenant.",
+    };
+  }
+
+  if (user.organization.status !== OrganizationStatus.ACTIVE) {
+    return {
+      eligible: false,
+      title: "Organization unavailable",
+      detail:
+        "Your organization is not active. Contact your Senzilytics administrator before signing in on mobile.",
+    };
+  }
+
+  if (
+    user.organization.isDemo ||
+    !planEntitlements[user.organization.subscriptionPlan].MOBILE_APPS
+  ) {
+    return {
+      eligible: false,
+      title: "Premium mobile access required",
+      detail:
+        "Your organization does not currently include native iOS and Android access. Contact your Senzilytics administrator to enable the Premium plan.",
+    };
+  }
+
+  return {
+    eligible: true,
+    user: { id: user.id },
+    organization: user.organization,
+  };
+}
+
 export async function createMobileChallengeService(input: { codeChallenge: string; state: string; redirectUri: string; requestFingerprint: string }) {
   if (!isValidPkceChallenge(input.codeChallenge)) throw new MobileAuthError("PKCE code challenge is invalid.", 400, "invalid_request");
   if (!isValidMobileState(input.state)) throw new MobileAuthError("Authentication state is invalid.", 400, "invalid_request");
