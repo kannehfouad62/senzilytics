@@ -1,26 +1,51 @@
 import type { ExpoConfig } from "expo/config";
 
+const notificationMode: "development" | "production" = process.env.EAS_BUILD_PROFILE === "production" ? "production" : "development";
+
 const config: ExpoConfig = {
   name: "Senzilytics",
   slug: "senzilytics-mobile",
   owner: "senzilytics-app",
-  version: "0.1.0",
+  version: "1.0.0",
+  platforms: ["ios", "android"],
   description: "Secure EHS, ESG, risk, audit, and compliance field intelligence for Senzilytics Premium tenants.",
   orientation: "portrait",
   userInterfaceStyle: "dark",
   scheme: "senzilytics",
   backgroundColor: "#07111f",
   primaryColor: "#67e8f9",
+  icon: "./assets/app-icon.png",
   ios: {
     bundleIdentifier: "com.senzilytics.mobile",
     supportsTablet: true,
-    infoPlist: { ITSAppUsesNonExemptEncryption: false },
+    icon: "./assets/app-icon.png",
+    config: { usesNonExemptEncryption: false },
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+      NSPrivacyAccessedAPITypes: [
+        { NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryUserDefaults", NSPrivacyAccessedAPITypeReasons: ["CA92.1"] },
+        { NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryFileTimestamp", NSPrivacyAccessedAPITypeReasons: ["C617.1", "0A2A.1", "3B52.1"] },
+        { NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategorySystemBootTime", NSPrivacyAccessedAPITypeReasons: ["35F9.1"] },
+        { NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryDiskSpace", NSPrivacyAccessedAPITypeReasons: ["E174.1", "85F4.1"] },
+      ],
+    },
   },
   android: {
     package: "com.senzilytics.mobile",
-    adaptiveIcon: { backgroundColor: "#07111f" },
+    icon: "./assets/app-icon.png",
+    adaptiveIcon: {
+      foregroundImage: "./assets/adaptive-foreground.png",
+      monochromeImage: "./assets/monochrome-icon.png",
+      backgroundColor: "#07111f",
+    },
   },
-  plugins: ["expo-secure-store", "expo-notifications", ["expo-sqlite", { useSQLCipher: true }]],
+  plugins: [
+    "expo-secure-store",
+    ["expo-notifications", { icon: "./assets/notification-icon.png", color: "#22D3EE", defaultChannel: "default", mode: notificationMode }],
+    ["expo-splash-screen", { image: "./assets/splash-icon.png", imageWidth: 220, resizeMode: "contain", backgroundColor: "#f4efe9" }],
+    ["expo-sqlite", { useSQLCipher: true }],
+  ],
   extra: {
     eas: {
       projectId: "fa7f9a49-5c6a-47c4-82d4-33d747c3d241",

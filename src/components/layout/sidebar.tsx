@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getPlatformAdministrator } from "@/lib/platform-admin";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { getCurrentUserPermissions } from "@/lib/permissions";
@@ -310,21 +311,19 @@ export async function Sidebar() {
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:flex">
-      <div className="mb-8 flex shrink-0 items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/15 text-cyan-300">
-          <Activity size={24} />
-        </div>
-
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">
-            Senzilytics
-          </h1>
-
-          <p className="text-xs text-slate-400">
-            EHS Intelligence
-          </p>
-        </div>
-      </div>
+      <Link
+        href="/dashboard"
+        aria-label="Senzilytics dashboard"
+        className="mb-8 inline-flex shrink-0 rounded-2xl bg-[#f4efe9] px-3 py-2 shadow-[0_12px_35px_rgba(0,0,0,.2)] transition hover:-translate-y-0.5"
+      >
+        <Image
+          src="/brand/senzilytics-wordmark.svg"
+          alt="Senzilytics"
+          width={192}
+          height={44}
+          priority
+        />
+      </Link>
 
       <nav className="min-h-0 flex-1 space-y-7 overflow-y-auto pr-2">
         <NavigationSection

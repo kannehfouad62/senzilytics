@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,8 +15,9 @@ import {
   View,
 } from "react-native";
 import * as Network from "expo-network";
+import * as Linking from "expo-linking";
 import { beginMobileSignIn, clearMobileSession, getStoredMobileOwnerKey, loadMobileWorkspace, logoutMobileSession, mobileApi, MobileApiError, restoreMobileSession } from "./src/api";
-import { registerForMobilePush } from "./src/push";
+import { registerForMobilePush, subscribeToMobileNotificationResponses } from "./src/push";
 import { MOBILE_WORKSPACE_MAX_OFFLINE_AGE_MS } from "./src/session-lifecycle";
 import { cacheWorkspace, clearWorkspaceCache, initializeOfflineStore, pendingObservationCount, queueObservation, readCachedWorkspace, synchronizeObservations } from "./src/storage";
 import type { CapturedAnswer, CapturedForm, MobileBootstrap, MobileNotification, ObservationPayload, RuntimeField, RuntimeForm } from "./src/types";
@@ -109,6 +111,11 @@ export default function App() {
     if (authState === "signed-in" && ownerKey && online) void sync(true);
   }, [authState, online, ownerKey, sync]);
 
+  useEffect(() => subscribeToMobileNotificationResponses(() => {
+    setTab("notifications");
+    if (authState === "signed-in" && online) void refreshWorkspace().catch((error) => setNotice(`Notification refresh paused: ${messageOf(error)}`));
+  }), [authState, online, refreshWorkspace]);
+
   useEffect(() => {
     if (authState !== "signed-in" || verifiedAt === null) return;
     const remaining = verifiedAt + MOBILE_WORKSPACE_MAX_OFFLINE_AGE_MS - Date.now();
@@ -137,7 +144,7 @@ export default function App() {
     <SafeAreaView style={styles.app}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        <View><Text style={styles.brand}>SENZILYTICS</Text><Text style={styles.headerTitle}>{workspace.organization.name}</Text></View>
+        <View style={styles.headerBrandRow}><View style={styles.headerLogo}><Image source={require("./assets/app-icon.png")} style={styles.headerLogoImage} resizeMode="contain" /></View><View><Text style={styles.brand}>SENZILYTICS</Text><Text style={styles.headerTitle}>{workspace.organization.name}</Text></View></View>
         <View style={[styles.onlineDot, { backgroundColor: network.isConnected === false ? "#fb7185" : "#34d399" }]} />
       </View>
       {notice ? <Pressable onPress={() => setNotice("")} style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
@@ -158,7 +165,7 @@ export default function App() {
 function LoadingScreen() { return <SafeAreaView style={[styles.app, styles.center]}><ActivityIndicator color="#67e8f9" size="large" /><Text style={styles.loadingText}>Securing your mobile workspace…</Text></SafeAreaView>; }
 
 function SignInScreen({ busy, notice, onSignIn }: { busy: boolean; notice: string; onSignIn: () => void }) {
-  return <SafeAreaView style={[styles.app, styles.center]}><View style={styles.signInCard}><View style={styles.logo}><Text style={styles.logoText}>S</Text></View><Text style={styles.eyebrow}>EHS INTELLIGENCE</Text><Text style={styles.signInTitle}>Work safely, wherever work happens.</Text><Text style={styles.muted}>Use your Senzilytics, Microsoft, or Okta account. Your organization and permissions are verified before mobile access is issued.</Text>{notice ? <Text style={styles.error}>{notice}</Text> : null}<PrimaryButton label={busy ? "Opening secure sign-in…" : "Sign in securely"} disabled={busy} onPress={onSignIn} /><Text style={styles.securityNote}>Device-bound session · Encrypted credential storage · Premium access only</Text></View></SafeAreaView>;
+  return <SafeAreaView style={[styles.app, styles.center]}><View style={styles.signInCard}><View style={styles.logoLockup}><Image source={require("./assets/brand-wordmark.png")} style={styles.logoWordmark} resizeMode="contain" /></View><Text style={styles.eyebrow}>EHS INTELLIGENCE</Text><Text style={styles.signInTitle}>Work safely, wherever work happens.</Text><Text style={styles.muted}>Use your Senzilytics, Microsoft, or Okta account. Your organization and permissions are verified before mobile access is issued.</Text>{notice ? <Text style={styles.error}>{notice}</Text> : null}<PrimaryButton label={busy ? "Opening secure sign-in…" : "Sign in securely"} disabled={busy} onPress={onSignIn} /><Text style={styles.securityNote}>Device-bound session · Encrypted credential storage · Premium access only</Text></View></SafeAreaView>;
 }
 
 function HomeScreen({ workspace, pending, busy, onRefresh, onSync, onNavigate }: { workspace: MobileBootstrap; pending: number; busy: boolean; onRefresh: () => Promise<MobileBootstrap>; onSync: () => void; onNavigate: (tab: Tab) => void }) {
@@ -219,7 +226,7 @@ function NotificationsScreen({ notifications, onRead }: { notifications: MobileN
 }
 
 function SettingsScreen({ workspace, pending, onEnablePush, onLogout }: { workspace: MobileBootstrap; pending: number; onEnablePush: () => void; onLogout: () => void }) {
-  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><Text style={styles.eyebrow}>ACCOUNT</Text><Text style={styles.pageTitle}>Mobile settings</Text><Card><Text style={styles.cardTitle}>{workspace.user.name}</Text><Text style={styles.muted}>{workspace.user.email}</Text><Text style={styles.due}>{humanize(workspace.user.role)} · {workspace.organization.name}</Text></Card><Card><Text style={styles.cardTitle}>Data protection</Text><Text style={styles.muted}>Credentials are stored in the device Keychain or Android Keystore. Offline submissions are isolated by tenant and user. The server revalidates your access on every synchronization.</Text></Card><Card><Text style={styles.cardTitle}>Offline queue</Text><Text style={styles.muted}>{pending} observation{pending === 1 ? "" : "s"} waiting on this device.</Text></Card><PrimaryButton label="Enable push notifications" onPress={onEnablePush} /><SecondaryButton label="Sign out of this device" onPress={onLogout} /></ScrollView>;
+  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><Text style={styles.eyebrow}>ACCOUNT</Text><Text style={styles.pageTitle}>Mobile settings</Text><Card><Text style={styles.cardTitle}>{workspace.user.name}</Text><Text style={styles.muted}>{workspace.user.email}</Text><Text style={styles.due}>{humanize(workspace.user.role)} · {workspace.organization.name}</Text></Card><Card><Text style={styles.cardTitle}>Data protection</Text><Text style={styles.muted}>Credentials are stored in the device Keychain or Android Keystore. Offline submissions are isolated by tenant and user. The server revalidates your access on every synchronization.</Text></Card><Card><Text style={styles.cardTitle}>Offline queue</Text><Text style={styles.muted}>{pending} observation{pending === 1 ? "" : "s"} waiting on this device.</Text></Card><PrimaryButton label="Enable push notifications" onPress={onEnablePush} /><SecondaryButton label="Privacy policy" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/privacy"); }} /><SecondaryButton label="Support and account requests" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/account-deletion"); }} /><SecondaryButton label="Sign out of this device" onPress={onLogout} /></ScrollView>;
 }
 
 function buildCapturedForms(forms: RuntimeForm[], answers: Record<string, FieldValue>): CapturedForm[] {
@@ -265,7 +272,7 @@ function messageOf(error: unknown) { return error instanceof MobileApiError || e
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: "#07111f", paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0 },
   flex: { flex: 1 }, center: { alignItems: "center", justifyContent: "center", padding: 24 }, loadingText: { color: "#94a3b8", marginTop: 16 },
-  header: { minHeight: 72, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: "#172033" },
+  header: { minHeight: 72, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: "#172033" }, headerBrandRow: { flexDirection: "row", alignItems: "center", gap: 11 }, headerLogo: { width: 38, height: 38, borderRadius: 11, overflow: "hidden", backgroundColor: "#f4efe9" }, headerLogoImage: { width: "100%", height: "100%" },
   brand: { color: "#67e8f9", fontSize: 11, fontWeight: "800", letterSpacing: 2.4 }, headerTitle: { color: "#f8fafc", fontSize: 17, fontWeight: "700", marginTop: 3 }, onlineDot: { width: 10, height: 10, borderRadius: 5 },
   notice: { backgroundColor: "#123047", paddingHorizontal: 18, paddingVertical: 10 }, noticeText: { color: "#bae6fd", fontSize: 13, lineHeight: 18 },
   content: { flex: 1 }, contentInner: { padding: 20, paddingBottom: 120, gap: 14 }, eyebrow: { color: "#67e8f9", fontSize: 11, fontWeight: "800", letterSpacing: 2 }, pageTitle: { color: "#f8fafc", fontSize: 30, lineHeight: 37, fontWeight: "800" }, muted: { color: "#94a3b8", fontSize: 14, lineHeight: 21 },
@@ -277,5 +284,5 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, chip: { borderRadius: 999, borderWidth: 1, borderColor: "#263a55", paddingHorizontal: 13, paddingVertical: 9, backgroundColor: "#091525" }, chipOn: { borderColor: "#67e8f9", backgroundColor: "#123047" }, chipText: { color: "#94a3b8", fontSize: 12, fontWeight: "600" }, chipTextOn: { color: "#cffafe" },
   checkRow: { flexDirection: "row", alignItems: "center", gap: 11, marginVertical: 8 }, checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: "#334155", alignItems: "center", justifyContent: "center" }, checkboxOn: { backgroundColor: "#22d3ee", borderColor: "#22d3ee" }, checkmark: { color: "#07111f", fontWeight: "900" }, checkLabel: { flex: 1, color: "#cbd5e1", fontSize: 13, lineHeight: 18 }, error: { color: "#fda4af", fontSize: 13, lineHeight: 19, marginTop: 8 },
   tabs: { position: "absolute", bottom: 0, left: 0, right: 0, minHeight: 74, paddingBottom: Platform.OS === "ios" ? 16 : 6, flexDirection: "row", alignItems: "center", backgroundColor: "#081321", borderTopWidth: 1, borderTopColor: "#172033" }, tab: { flex: 1, alignItems: "center", justifyContent: "center", minHeight: 54 }, tabText: { color: "#64748b", fontSize: 12, fontWeight: "700" }, tabTextOn: { color: "#67e8f9" }, badge: { position: "absolute", right: -16, top: -10, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#fb7185", alignItems: "center", justifyContent: "center" }, badgeText: { color: "white", fontSize: 9, fontWeight: "800" },
-  signInCard: { width: "100%", maxWidth: 440, borderRadius: 28, padding: 26, gap: 14, backgroundColor: "#0d1a2c", borderWidth: 1, borderColor: "#1f3852" }, logo: { width: 58, height: 58, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "#67e8f9" }, logoText: { color: "#07111f", fontWeight: "900", fontSize: 29 }, signInTitle: { color: "#f8fafc", fontSize: 31, lineHeight: 38, fontWeight: "800" }, securityNote: { color: "#64748b", textAlign: "center", fontSize: 11, marginTop: 3 },
+  signInCard: { width: "100%", maxWidth: 440, borderRadius: 28, padding: 26, gap: 14, backgroundColor: "#0d1a2c", borderWidth: 1, borderColor: "#1f3852" }, logoLockup: { alignSelf: "flex-start", width: 228, height: 60, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: "#f4efe9" }, logoWordmark: { width: "100%", height: "100%" }, signInTitle: { color: "#f8fafc", fontSize: 31, lineHeight: 38, fontWeight: "800" }, securityNote: { color: "#64748b", textAlign: "center", fontSize: 11, marginTop: 3 },
 });

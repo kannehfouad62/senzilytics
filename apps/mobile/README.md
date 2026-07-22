@@ -13,6 +13,8 @@ This Expo/React Native application is the Premium native field workspace for iOS
 - Automatic idempotent synchronization when connectivity returns
 - Published configurable observation forms and custom field validation
 - Expo push-token registration with tenant/user ownership enforcement
+- Production launcher, adaptive, themed, notification and splash assets
+- Store-facing privacy, support and account-request links
 
 ## Local setup
 
@@ -55,9 +57,9 @@ Native access is deliberately denied for demo, Essential, and Enterprise tenants
 
 ## Store builds
 
-The initial Apple listing copy is versioned in `store.config.json`. Review it in App Store Connect before submission. EAS Metadata is currently Apple-only, so reuse the approved copy manually in Google Play Console.
+The initial Apple listing copy is versioned in `store.config.json`. Review it in App Store Connect before submission. EAS Metadata is currently Apple-only, so use `PLAY_STORE_LISTING.md` when completing Google Play Console. Work through `STORE_RELEASE_CHECKLIST.md` before uploading a production binary.
 
-Before store submission, add approved production icons and screenshots, complete Apple privacy disclosures and Google Play Data safety, provide a dedicated non-production App Review tenant, and verify the public privacy and support pages. Never commit review credentials to `store.config.json`.
+Before store submission, approve the included production icons, add current screenshots, complete Apple privacy disclosures and Google Play Data safety, provide a dedicated non-production App Review tenant, and verify the public privacy, support and account-request pages. Never commit review credentials to `store.config.json`.
 
 Then build and submit:
 

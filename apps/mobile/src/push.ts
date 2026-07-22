@@ -9,7 +9,7 @@ Notifications.setNotificationHandler({
 
 export async function registerForMobilePush() {
   if (!Device.isDevice) return "Push notifications require a physical device.";
-  if (Platform.OS === "android") await Notifications.setNotificationChannelAsync("default", { name: "Senzilytics", importance: Notifications.AndroidImportance.HIGH });
+  if (Platform.OS === "android") await Notifications.setNotificationChannelAsync("default", { name: "Senzilytics alerts", description: "Assigned EHS, audit, risk, compliance, and workflow notifications", importance: Notifications.AndroidImportance.HIGH });
   const existing = await Notifications.getPermissionsAsync();
   const permission = existing.status === "granted" ? existing : await Notifications.requestPermissionsAsync();
   if (permission.status !== "granted") return "Push notifications are disabled in device settings.";
@@ -18,4 +18,15 @@ export async function registerForMobilePush() {
   const token = await Notifications.getExpoPushTokenAsync({ projectId });
   await mobileApi("/api/mobile/push-token", { method: "POST", body: JSON.stringify({ token: token.data, platform: Platform.OS === "ios" ? "IOS" : "ANDROID" }) });
   return "Push notifications are active.";
+}
+
+export function subscribeToMobileNotificationResponses(onOpen: () => void) {
+  const handle = (response: Notifications.NotificationResponse) => {
+    const data = response.notification.request.content.data ?? {};
+    if (typeof data.notificationId === "string" || typeof data.link === "string") onOpen();
+    void Notifications.clearLastNotificationResponseAsync();
+  };
+  const subscription = Notifications.addNotificationResponseReceivedListener(handle);
+  void Notifications.getLastNotificationResponseAsync().then((response) => { if (response) handle(response); }).catch(() => undefined);
+  return () => subscription.remove();
 }

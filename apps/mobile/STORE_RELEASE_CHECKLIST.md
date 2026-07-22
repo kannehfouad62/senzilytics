@@ -1,0 +1,75 @@
+# Senzilytics mobile store release checklist
+
+Use this checklist for version 1.0.0. Store rules and questionnaire wording change; verify each answer in App Store Connect and Google Play Console at submission time.
+
+## Product and account preparation
+
+- [ ] Confirm `com.senzilytics.mobile` is available and registered in both developer accounts.
+- [ ] Confirm the Apple Developer Program and Google Play Console accounts use the intended legal entity.
+- [ ] Create a dedicated non-production Premium review tenant with realistic fictional data.
+- [ ] Create a least-privilege review user and keep its credentials outside Git.
+- [ ] Confirm credential, Microsoft and Okta sign-in against production.
+- [ ] Verify tenant administrators can revoke the review device from `/users`.
+- [ ] Have qualified counsel review the Privacy Policy, customer terms, retention language and cross-border arrangements.
+
+## Public endpoints
+
+- [ ] `https://www.senzilytics.cloud/privacy` is public and current.
+- [ ] `https://www.senzilytics.cloud/support` is public and monitored.
+- [ ] `https://www.senzilytics.cloud/account-deletion` is public and the mailbox is monitored.
+- [ ] `https://www.senzilytics.cloud/api/health` returns a healthy production response.
+
+## Native configuration
+
+- [ ] App icon is legible on light, dark and themed Android launchers.
+- [ ] Splash screen is checked in a preview build; development clients do not accurately show it.
+- [ ] Android notification icon is white with transparency and renders correctly.
+- [ ] APNs credentials are configured through EAS for iOS.
+- [ ] FCM v1 credentials are configured through EAS for Android.
+- [ ] `MOBILE_TOKEN_SECRET`, `CRON_SECRET` and `EXPO_ACCESS_TOKEN` are configured in Vercel where applicable.
+- [ ] No server secret is stored in an `EXPO_PUBLIC_` variable or committed mobile config.
+
+## Functional acceptance
+
+- [ ] Test small and large phones plus an iPad or iPad simulator.
+- [ ] Sign in, force-close and reopen the app.
+- [ ] Capture an observation offline, restart offline and synchronize after reconnecting.
+- [ ] Confirm the 72-hour offline authorization policy and session revocation behavior.
+- [ ] Confirm one tenant cannot view or synchronize another tenant's cache, outbox, tasks or notifications.
+- [ ] Register push on a physical device, deliver a test alert and tap it into the Notifications tab.
+- [ ] Test declined notification permission and confirm core app use remains available.
+- [ ] Sign out with and without connectivity and verify protected workspace access is removed.
+
+## Apple submission
+
+- [ ] Create the App Store Connect record and note its App Store Connect app ID.
+- [ ] Complete App Privacy answers for contact information, identifiers, user content and diagnostics actually collected.
+- [ ] Confirm data is not declared as tracking unless production practices change.
+- [ ] Complete the age-rating questionnaire and export-compliance questions.
+- [ ] Add screenshots for every required iPhone and iPad display class.
+- [ ] Add review contact information, review credentials and concise sign-in instructions in App Store Connect.
+- [ ] Upload the production build to TestFlight and resolve any privacy-manifest email from Apple.
+- [ ] Complete external TestFlight review before production App Review.
+
+## Google Play submission
+
+- [ ] Create the app in Play Console and complete the first internal release manually if required.
+- [ ] Copy the approved listing from `PLAY_STORE_LISTING.md`.
+- [ ] Complete Data safety, App access, Ads, Content rating and Target audience declarations.
+- [ ] Provide review credentials in App access and explain that a Premium tenant account is required.
+- [ ] Add phone and tablet screenshots, the 512×512 store icon and a 1024×500 feature graphic.
+- [ ] Test the Android App Bundle through Internal testing before closed or production rollout.
+
+## Build and release
+
+```bash
+cd apps/mobile
+npm ci
+npm run check
+npx eas-cli@latest config --platform ios --profile production
+npx eas-cli@latest config --platform android --profile production
+npx eas-cli@latest build --profile preview --platform all
+npx eas-cli@latest build --profile production --platform all
+```
+
+Submit only after preview acceptance. The first Play Console upload may require a manual internal-track release before API-driven submissions are accepted.
