@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { AlertTriangle, Plus } from "lucide-react";
 import Link from "next/link";
+import { hasPermission, requirePermission } from "@/lib/permissions";
+import { PermissionKey } from "@prisma/client";
 
 function badgeClass(value: string) {
   switch (value) {
@@ -19,7 +21,11 @@ function badgeClass(value: string) {
 }
 
 export default async function IncidentsPage() {
-  const { organizationId } = await getCurrentUserTenant();
+  await requirePermission(PermissionKey.VIEW_INCIDENT);
+  const [{ organizationId }, canCreate] = await Promise.all([
+    getCurrentUserTenant(),
+    hasPermission(PermissionKey.CREATE_INCIDENT),
+  ]);
 
   const incidents = await prisma.incident.findMany({
     where: {
@@ -51,13 +57,13 @@ export default async function IncidentsPage() {
           </p>
         </div>
 
-        <Link
+        {canCreate && <Link
           href="/incidents/new"
           className="flex items-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
         >
           <Plus size={18} />
           New Incident
-        </Link>
+        </Link>}
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">

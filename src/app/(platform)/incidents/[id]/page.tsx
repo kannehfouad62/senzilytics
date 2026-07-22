@@ -18,7 +18,7 @@ import {
   upsertInvestigation,
 } from "@/features/incidents/actions";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserPermissions } from "@/lib/permissions";
+import { getCurrentUserPermissions, requirePermission } from "@/lib/permissions";
 import { hasSubscriptionFeature } from "@/lib/subscription";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import {
@@ -55,6 +55,7 @@ type IncidentDetailPageProps = {
 export default async function IncidentDetailPage({
   params,
 }: IncidentDetailPageProps) {
+  await requirePermission(PermissionKey.VIEW_INCIDENT);
   const { id } = await params;
 
   const {

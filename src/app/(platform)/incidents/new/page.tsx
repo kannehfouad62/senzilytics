@@ -5,10 +5,13 @@ import {
   ConfigurableFormModule,
   IncidentType,
   RiskLevel,
+  PermissionKey,
 } from "@prisma/client";
 import { getCurrentUserTenant } from "@/lib/tenant";
+import { requirePermission } from "@/lib/permissions";
 
 export default async function NewIncidentPage() {
+  await requirePermission(PermissionKey.CREATE_INCIDENT);
   const { organizationId, user } = await getCurrentUserTenant();
 
   const [sites, forms] =

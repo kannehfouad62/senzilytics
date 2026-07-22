@@ -15,6 +15,7 @@ import { MobileNavigationMenu } from "./mobile-navigation-menu";
 import { PermissionKey, UserRole } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
 import { getCurrentUserPermissions } from "@/lib/permissions";
+import { filterNavigationItems } from "@/core/permissions/navigation-access";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,7 @@ export async function Topbar() {
       })
     : 0;
 
-  const visiblePrimaryItems = primaryNavItems.filter(item => (item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION) && (!("permission" in item) || !item.permission || permissions.includes(item.permission)));
+  const visiblePrimaryItems = filterNavigationItems(primaryNavItems, permissions).filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION);
   const platformItems: NavigationItem[] =
     currentUser && isApprovedPlatformAdministrator(currentUser)
       ? [
@@ -102,15 +103,18 @@ export async function Topbar() {
         : visiblePrimaryItems;
 
   const demoMode = currentUser?.role === UserRole.DEMO_VIEWER;
-  const visibleEhsItems = ehsNavItems.filter(item => item.permission === undefined || permissions.includes(item.permission));
+  const visibleEhsItems = filterNavigationItems(ehsNavItems, permissions);
+  const visibleAuditItems = filterNavigationItems(auditNavItems, permissions);
+  const visibleInspectionItems = filterNavigationItems(inspectionNavItems, permissions);
+  const permittedGovernanceItems = filterNavigationItems(complianceNavItems, permissions);
 
   const mobileSections = [
     { label: "Platform", items: platformItems },
     { label: "EHS Management", items: visibleEhsItems },
-    { label: "Audit Management 2.0", items: auditNavItems },
-    { label: "Inspections", items: inspectionNavItems },
-    { label: "Governance", items: demoMode ? complianceNavItems.filter((item) => item.href !== "/notifications") : complianceNavItems.filter(item => item.href !== "/notifications" || entitlements.IN_APP_NOTIFICATIONS) },
-  ];
+    { label: "Audit Management 2.0", items: visibleAuditItems },
+    { label: "Inspections", items: visibleInspectionItems },
+    { label: "Governance", items: demoMode ? permittedGovernanceItems.filter((item) => item.href !== "/notifications") : permittedGovernanceItems.filter(item => item.href !== "/notifications" || entitlements.IN_APP_NOTIFICATIONS) },
+  ].filter((section) => section.items.length > 0);
 
   async function logout() {
     "use server";
@@ -170,7 +174,7 @@ export async function Topbar() {
           )}
         </Link>}
 
-        {!demoMode && <Link
+        {!demoMode && entitlements.IN_APP_NOTIFICATIONS && <Link
           href="/notifications"
           className="relative rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10"
           title="Notifications"

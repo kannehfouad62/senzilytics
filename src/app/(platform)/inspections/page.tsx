@@ -1,4 +1,4 @@
-import { requirePermission } from "@/lib/permissions";
+import { hasPermission, requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { findTenantInspections } from "@/modules/inspection/inspection.repository";
 import {
@@ -21,8 +21,11 @@ export default async function InspectionsPage() {
     PermissionKey.VIEW_INSPECTIONS
   );
 
-  const { organizationId } =
-    await getCurrentUserTenant();
+  const [{ organizationId }, canManage] =
+    await Promise.all([
+      getCurrentUserTenant(),
+      hasPermission(PermissionKey.MANAGE_INSPECTIONS),
+    ]);
 
   const inspections =
     await findTenantInspections(
@@ -81,13 +84,13 @@ export default async function InspectionsPage() {
           </p>
         </div>
 
-        <Link
+        {canManage && <Link
           href="/inspections/new"
           className="inline-flex items-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
         >
           <Plus size={17} />
           Create Inspection
-        </Link>
+        </Link>}
       </div>
 
       <div className="mb-8 grid gap-4 md:grid-cols-3">
@@ -255,18 +258,18 @@ export default async function InspectionsPage() {
             </h2>
 
             <p className="mt-2 text-sm text-slate-400">
-              Create your first inspection
-              to begin structured field
-              assurance activities.
+              {canManage
+                ? "Create your first inspection to begin structured field assurance activities."
+                : "No inspections are currently available to review."}
             </p>
 
-            <Link
+            {canManage && <Link
               href="/inspections/new"
               className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950"
             >
               <Plus size={17} />
               Create Inspection
-            </Link>
+            </Link>}
           </div>
         )}
       </div>

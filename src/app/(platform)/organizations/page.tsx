@@ -1,127 +1,115 @@
-import { prisma } from "@/lib/prisma";
-import { Building2, MapPin, Users } from "lucide-react";
-import { getCurrentUserTenant } from "@/lib/tenant";
-import { requirePermission } from "@/lib/permissions";
-import { PermissionKey } from "@prisma/client";
+import { OrganizationStructureManager } from "@/features/identity/organization-structure-forms";
 import { configureTenantIdentityProvider } from "@/features/identity/tenant.actions";
+import { requirePermission } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUserTenant } from "@/lib/tenant";
+import { PermissionKey } from "@prisma/client";
+import { Building2, ShieldCheck } from "lucide-react";
+
+const input =
+  "rounded-xl border border-white/10 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-400/40";
 
 export default async function OrganizationsPage() {
   await requirePermission(PermissionKey.MANAGE_ORGANIZATION);
   const { organizationId } = await getCurrentUserTenant();
 
-const organizations = await prisma.organization.findMany({
-  where: {
-    id: organizationId,
-  },
-  orderBy: { name: "asc" },
-  include: {
-    sites: {
-      include: {
-        departments: true,
+  const organization = await prisma.organization.findUniqueOrThrow({
+    where: { id: organizationId },
+    include: {
+      sites: {
+        include: { departments: { orderBy: { name: "asc" } } },
+        orderBy: { name: "asc" },
       },
+      identityProviders: { orderBy: { type: "asc" } },
+      _count: { select: { users: true } },
     },
-    users: true,
-  },
-});
+  });
+
+  const departmentCount = organization.sites.reduce(
+    (total, site) => total + site.departments.length,
+    0,
+  );
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-5">
+        <div>
+          <p className="flex items-center gap-2 text-sm text-cyan-300">
+            <Building2 size={16} /> Enterprise Structure
+          </p>
+          <h1 className="mt-2 text-4xl font-bold tracking-tight">
+            Organization settings
+          </h1>
+          <p className="mt-2 max-w-2xl text-slate-400">
+            Manage your tenant&apos;s sites, departments, and enterprise identity
+            configuration.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <StatCard label="Sites" value={organization.sites.length.toString()} />
+          <StatCard label="Departments" value={departmentCount.toString()} />
+          <StatCard label="Users" value={organization._count.users.toString()} />
+        </div>
+      </div>
+
+      <section className="mb-8 rounded-3xl border border-white/10 bg-white/[.04] p-6">
         <p className="flex items-center gap-2 text-sm text-cyan-300">
-          <Building2 size={16} />
-          Enterprise Structure
+          <ShieldCheck size={16} /> Enterprise identity
         </p>
-
-        <h1 className="mt-2 text-4xl font-bold tracking-tight">
-          Organizations
-        </h1>
-
-        <p className="mt-2 max-w-2xl text-slate-400">
-          Manage organizations, sites, departments, and operational structure.
+        <h2 className="mt-2 text-2xl font-semibold">Single sign-on</h2>
+        <p className="mt-2 text-sm text-slate-400">
+          Configure Microsoft Entra ID or Okta for {organization.name}. Existing
+          connections: {organization.identityProviders.length}.
         </p>
-      </div>
-      <form action={configureTenantIdentityProvider} className="mb-8 grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 md:grid-cols-2 xl:grid-cols-5"><select name="type" className="rounded-xl bg-slate-950 px-4 py-3"><option value="MICROSOFT_ENTRA">Microsoft Entra ID</option><option value="OKTA">Okta</option></select><input name="issuer" required placeholder="OIDC issuer URL" className="rounded-xl bg-slate-950 px-4 py-3"/><input name="directoryId" placeholder="Microsoft directory ID" className="rounded-xl bg-slate-950 px-4 py-3"/><input name="emailDomain" placeholder="company.com" className="rounded-xl bg-slate-950 px-4 py-3"/><button className="rounded-xl bg-cyan-300 px-4 py-3 font-semibold text-slate-950">Configure SSO</button><label className="text-sm"><input type="checkbox" name="enforceSso" className="mr-2"/>Require SSO for this tenant</label></form>
+        <form
+          action={configureTenantIdentityProvider}
+          className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5"
+        >
+          <select name="type" className={input}>
+            <option value="MICROSOFT_ENTRA">Microsoft Entra ID</option>
+            <option value="OKTA">Okta</option>
+          </select>
+          <input
+            name="issuer"
+            required
+            placeholder="OIDC issuer URL"
+            className={input}
+          />
+          <input
+            name="directoryId"
+            placeholder="Microsoft directory ID"
+            className={input}
+          />
+          <input name="emailDomain" placeholder="company.com" className={input} />
+          <button className="rounded-xl bg-cyan-300 px-4 py-3 font-semibold text-slate-950">
+            Configure SSO
+          </button>
+          <label className="text-sm xl:col-span-5">
+            <input type="checkbox" name="enforceSso" className="mr-2" />
+            Require SSO for this tenant
+          </label>
+        </form>
+      </section>
 
-      <div className="grid gap-6">
-        {organizations.map((org) => (
-          <div
-            key={org.id}
-            className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl"
-          >
-            <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-semibold">{org.name}</h2>
-                <p className="mt-2 text-sm text-slate-400">
-                  {org.industry || "No industry provided"}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {org.address || "No address provided"}
-                </p>
-              </div>
+      <OrganizationStructureManager sites={organization.sites} />
 
-              <div className="flex gap-3">
-                <StatCard label="Sites" value={org.sites.length.toString()} />
-                <StatCard label="Users" value={org.users.length.toString()} />
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {org.sites.map((site) => (
-                <div
-                  key={site.id}
-                  className="rounded-2xl border border-white/10 bg-slate-950/50 p-5"
-                >
-                  <p className="flex items-center gap-2 font-medium text-white">
-                    <MapPin size={16} className="text-cyan-300" />
-                    {site.name}
-                  </p>
-
-                  <p className="mt-2 text-sm text-slate-400">
-                    {[site.city, site.state, site.country]
-                      .filter(Boolean)
-                      .join(", ") || "No location provided"}
-                  </p>
-
-                  <div className="mt-4">
-                    <p className="mb-2 flex items-center gap-2 text-xs text-slate-500">
-                      <Users size={14} />
-                      Departments
-                    </p>
-
-                    <div className="flex flex-wrap gap-2">
-                      {site.departments.map((department) => (
-                        <span
-                          key={department.id}
-                          className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-300"
-                        >
-                          {department.name}
-                        </span>
-                      ))}
-
-                      {site.departments.length === 0 && (
-                        <span className="text-xs text-slate-500">
-                          No departments
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {org.sites.length === 0 && (
-                <p className="text-sm text-slate-500">No sites found.</p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      <section className="rounded-3xl border border-white/10 bg-white/[.04] p-6">
+        <p className="text-sm text-slate-500">Tenant profile</p>
+        <h2 className="mt-2 text-2xl font-semibold">{organization.name}</h2>
+        <p className="mt-2 text-sm text-slate-400">
+          {organization.industry || "Industry not provided"}
+        </p>
+        <p className="mt-1 text-sm text-slate-500">
+          {organization.address || "Organization address not provided"}
+        </p>
+      </section>
     </div>
   );
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/50 px-5 py-4 text-center">
+    <div className="min-w-24 rounded-2xl border border-white/10 bg-slate-950/50 px-5 py-4 text-center">
       <p className="text-2xl font-bold text-white">{value}</p>
       <p className="text-xs text-slate-500">{label}</p>
     </div>
