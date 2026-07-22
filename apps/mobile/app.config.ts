@@ -43,7 +43,7 @@ const config: ExpoConfig = {
   plugins: [
     "expo-secure-store",
     ["expo-notifications", { icon: "./assets/notification-icon.png", color: "#22D3EE", defaultChannel: "default", mode: notificationMode }],
-    ["expo-splash-screen", { image: "./assets/splash-icon.png", imageWidth: 220, resizeMode: "contain", backgroundColor: "#f4efe9" }],
+    ["expo-splash-screen", { image: "./assets/splash-icon.png", imageWidth: 220, resizeMode: "contain", backgroundColor: "#07111f" }],
     ["expo-sqlite", { useSQLCipher: true }],
   ],
   extra: {

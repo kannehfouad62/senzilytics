@@ -314,15 +314,20 @@ export async function Sidebar() {
       <Link
         href="/dashboard"
         aria-label="Senzilytics dashboard"
-        className="mb-8 inline-flex shrink-0 rounded-2xl bg-[#f4efe9] px-3 py-2 shadow-[0_12px_35px_rgba(0,0,0,.2)] transition hover:-translate-y-0.5"
+        className="mb-8 flex shrink-0 items-center gap-3 rounded-2xl transition hover:-translate-y-0.5"
       >
         <Image
-          src="/brand/senzilytics-wordmark.svg"
-          alt="Senzilytics"
-          width={192}
-          height={44}
+          src="/brand/senzilytics-mark.svg"
+          alt=""
+          width={46}
+          height={46}
+          className="rounded-2xl shadow-[0_10px_30px_rgba(34,211,238,.18)]"
           priority
         />
+        <span>
+          <strong className="block text-xl font-bold tracking-tight">Senzilytics</strong>
+          <span className="block text-xs text-slate-400">EHS Intelligence</span>
+        </span>
       </Link>
 
       <nav className="min-h-0 flex-1 space-y-7 overflow-y-auto pr-2">
