@@ -1,0 +1,31 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 Senzilytics",
+    "categories": ["BUSINESS", "PRODUCTIVITY"],
+    "info": {
+      "en-US": {
+        "title": "Senzilytics",
+        "subtitle": "EHS Intelligence in the Field",
+        "description": "Senzilytics gives authorized Premium tenant users secure mobile access to environmental, health, safety, ESG, risk, audit, and compliance workflows. Review assigned work and notifications, capture governed safety observations, complete tenant-configured fields, work through unreliable connectivity, and synchronize protected field records with your organization's Senzilytics workspace.\n\nA provisioned Senzilytics Premium tenant account is required. Organization access, roles, permissions, subscription entitlements, account status, and session revocation are enforced by the Senzilytics platform.",
+        "keywords": [
+          "EHS",
+          "ESG",
+          "safety",
+          "compliance",
+          "audit",
+          "risk",
+          "inspection"
+        ],
+        "promoText": "Secure EHS intelligence and offline-ready field capture for Senzilytics Premium tenants.",
+        "marketingUrl": "https://www.senzilytics.cloud/",
+        "supportUrl": "https://www.senzilytics.cloud/support",
+        "privacyPolicyUrl": "https://www.senzilytics.cloud/privacy"
+      }
+    },
+    "release": {
+      "automaticRelease": false,
+      "phasedRelease": false
+    }
+  }
+}

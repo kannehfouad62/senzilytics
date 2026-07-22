@@ -24,13 +24,16 @@ npx eas-cli@latest login
 npx eas-cli@latest init
 ```
 
-Set `EXPO_PUBLIC_API_URL` to the HTTPS Senzilytics deployment and copy the EAS project ID created by `eas init` into `EXPO_PUBLIC_EAS_PROJECT_ID`. Keep the URL free of a trailing slash.
+Set `EXPO_PUBLIC_API_URL` to the HTTPS Senzilytics deployment. Keep the URL free of a trailing slash. The EAS project ID is already linked in `app.config.ts` and must not be replaced by an `app.json` file.
+
+The checked-in EAS profiles deliberately contain only the public production API URL. They explicitly bind development, preview, and production builds to the matching EAS environment, so remote builds do not depend on an uncommitted local `.env` file. No API keys or server secrets belong in an `EXPO_PUBLIC_` variable.
 
 Create a development client on a physical device. A native build is required because the encrypted SQLCipher database and Android remote push are unavailable in Expo Go:
 
 ```bash
 npx eas-cli@latest build --profile development --platform ios
 npx eas-cli@latest build --profile development --platform android
+npx eas-cli@latest build --profile development-simulator --platform ios
 npm start
 ```
 
@@ -50,12 +53,18 @@ Native access is deliberately denied for demo, Essential, and Enterprise tenants
 
 ## Store builds
 
-After replacing placeholder store metadata and adding approved icons, screenshots, privacy disclosures, support URLs, and legal text:
+The initial Apple listing copy is versioned in `store.config.json`. Review it in App Store Connect before submission. EAS Metadata is currently Apple-only, so reuse the approved copy manually in Google Play Console.
+
+Before store submission, add approved production icons and screenshots, complete Apple privacy disclosures and Google Play Data safety, provide a dedicated non-production App Review tenant, and verify the public privacy and support pages. Never commit review credentials to `store.config.json`.
+
+Then build and submit:
 
 ```bash
 npx eas-cli@latest build --profile production --platform all
 npx eas-cli@latest submit --profile production --platform ios
 npx eas-cli@latest submit --profile production --platform android
 ```
+
+`EXPO_PUBLIC_API_URL` is public configuration, not a secret. If you prefer to manage it in the Expo dashboard instead of `eas.json`, create the same value separately for the development, preview, and production environments and retain each profile's explicit `environment` selection. Confirm the active configuration before a release with `eas config --platform ios --profile production` and `eas config --platform android --profile production`.
 
 Release builds should be exercised against a staging tenant first. Verify sign-in for credentials, Microsoft, and Okta; tenant isolation; offline capture; refresh-token rotation; session revocation; notification delivery; and synchronization after connectivity returns.
