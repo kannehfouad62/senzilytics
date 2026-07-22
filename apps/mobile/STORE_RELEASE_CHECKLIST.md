@@ -68,8 +68,9 @@ npm ci
 npm run check
 npx eas-cli@latest config --platform ios --profile production
 npx eas-cli@latest config --platform android --profile production
-npx eas-cli@latest build --profile preview --platform all
+npx eas-cli@latest build --profile preview --platform android
+npx eas-cli@latest build --profile preview-simulator --platform ios
 npx eas-cli@latest build --profile production --platform all
 ```
 
-Submit only after preview acceptance. The first Play Console upload may require a manual internal-track release before API-driven submissions are accepted.
+The simulator profile validates production-like iOS behavior without Apple signing. Before TestFlight, also test a signed build on a physical iPhone or iPad. Submit only after preview acceptance. The first Play Console upload may require a manual internal-track release before API-driven submissions are accepted.

@@ -41,6 +41,15 @@ npx eas-cli@latest build --profile development-simulator --platform ios
 npm start
 ```
 
+After Android preview acceptance, create the production-like iOS Simulator build. This profile bundles the application and does not require Metro, an Apple signing certificate, or a registered physical device:
+
+```bash
+npx eas-cli@latest config --platform ios --profile preview-simulator
+npx eas-cli@latest build --profile preview-simulator --platform ios
+```
+
+Install the resulting archive from its EAS build page, or allow EAS CLI to open it in an available iOS Simulator. Push notification delivery still requires a signed build on a physical Apple device.
+
 Configure Apple Push Notification service and Firebase Cloud Messaging credentials through EAS before testing push delivery.
 
 ## Backend release
