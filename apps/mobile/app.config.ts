@@ -17,7 +17,11 @@ const config: ExpoConfig = {
     adaptiveIcon: { backgroundColor: "#07111f" },
   },
   plugins: ["expo-secure-store", "expo-notifications", ["expo-sqlite", { useSQLCipher: true }]],
-  extra: { eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID } },
+  extra: {
+    eas: {
+      projectId: "fa7f9a49-5c6a-47c4-82d4-33d747c3d241",
+    },
+  },
 };
 
 export default config;
