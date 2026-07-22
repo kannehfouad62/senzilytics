@@ -1,7 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import { approveMobileAuthorization, denyMobileAuthorization, initialMobileAuthorizationState } from "@/features/mobile/mobile-authorization.actions";
+import { approveMobileAuthorization, denyMobileAuthorization, type MobileAuthorizationState } from "@/features/mobile/mobile-authorization.actions";
+
+const initialMobileAuthorizationState: MobileAuthorizationState = { status: "IDLE", message: null };
 
 export function MobileAuthorizationForm({ challenge }: { challenge: string }) {
   const [approveState, approveAction, approving] = useActionState(approveMobileAuthorization, initialMobileAuthorizationState);

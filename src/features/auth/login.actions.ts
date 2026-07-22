@@ -9,11 +9,6 @@ export type LoginActionState = {
   message: string | null;
 };
 
-export const initialLoginActionState: LoginActionState = {
-  status: "IDLE",
-  message: null,
-};
-
 export async function loginWithCredentials(
   _: LoginActionState,
   formData: FormData

@@ -7,7 +7,6 @@ import { requirePermission } from "@/lib/permissions";
 import { createApiCredentialService, createWebhookEndpointService, retryWebhookDeliveryService, revokeApiCredentialService, revokeWebhookEndpointService, rotateWebhookSecretService, updateWebhookStatusService } from "@/modules/integrations/integration.service";
 
 export type IntegrationActionState = { status: "IDLE" | "SUCCESS" | "ERROR"; message: string | null; secret?: string | null };
-export const initialIntegrationActionState: IntegrationActionState = { status: "IDLE", message: null, secret: null };
 
 export async function createIntegrationCredential(_: IntegrationActionState, formData: FormData): Promise<IntegrationActionState> {
   await requirePermission(PermissionKey.MANAGE_INTEGRATIONS);

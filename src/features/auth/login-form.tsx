@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import {
-  initialLoginActionState,
   loginWithCredentials,
+  type LoginActionState,
 } from "@/features/auth/login.actions";
+
+const initialLoginActionState: LoginActionState = {
+  status: "IDLE",
+  message: null,
+};
 
 export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
   const [state, action, pending] = useActionState(

@@ -5,7 +5,6 @@ import { auth } from "@/lib/auth";
 import { authorizeMobileChallengeService, denyMobileChallengeService, getMobileAuthorizationEligibilityService } from "@/modules/mobile/mobile-auth.service";
 
 export type MobileAuthorizationState = { status: "IDLE" | "ERROR"; message: string | null };
-export const initialMobileAuthorizationState: MobileAuthorizationState = { status: "IDLE", message: null };
 
 export async function approveMobileAuthorization(_: MobileAuthorizationState, formData: FormData): Promise<MobileAuthorizationState> {
   const session = await auth();

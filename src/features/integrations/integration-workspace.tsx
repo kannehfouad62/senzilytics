@@ -3,7 +3,9 @@
 import { IntegrationApiScope, IntegrationWebhookEvent, IntegrationWebhookStatus } from "@prisma/client";
 import { useActionState } from "react";
 import type { InputHTMLAttributes } from "react";
-import { createIntegrationCredential, createIntegrationWebhook, initialIntegrationActionState, retryIntegrationWebhookDelivery, revokeIntegrationCredential, revokeIntegrationWebhook, rotateIntegrationWebhookSecret, setIntegrationWebhookStatus, type IntegrationActionState } from "@/features/integrations/actions";
+import { createIntegrationCredential, createIntegrationWebhook, retryIntegrationWebhookDelivery, revokeIntegrationCredential, revokeIntegrationWebhook, rotateIntegrationWebhookSecret, setIntegrationWebhookStatus, type IntegrationActionState } from "@/features/integrations/actions";
+
+const initialIntegrationActionState: IntegrationActionState = { status: "IDLE", message: null, secret: null };
 
 type Credential = { id: string; name: string; status: string; tokenPrefix: string; tokenLastFour: string; scopes: string[]; rateLimitPerMinute: number; expiresAt: string | null; lastUsedAt: string | null; createdAt: string; createdBy: { name: string }; requestCount: number };
 type Endpoint = { id: string; name: string; url: string; status: string; events: string[]; secretLastFour: string; createdAt: string; rotatedAt: string | null; createdBy: { name: string }; deliveryCount: number };
