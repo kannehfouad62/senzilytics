@@ -43,10 +43,13 @@
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "metadataPath": "./store.config.json"
-      }
+  "production": {
+    "android": {
+      "track": "internal"
+    },
+    "ios": {
+      "metadataPath": "./store.config.json"
     }
   }
+}
 }
