@@ -110,12 +110,23 @@ export async function recordAuditResponseService(input: {
 }) {
   const audit = await getAuthorizedAudit(input);
   if (audit.status !== EnterpriseAuditStatus.IN_PROGRESS) throw new Error("Start the Audit before recording responses.");
-  const question = await prisma.enterpriseAuditQuestion.findFirst({ where: { id: input.questionId, auditId: audit.id }, include: { options: true, findings: { select: { id: true } } } });
+  const question = await prisma.enterpriseAuditQuestion.findFirst({
+    where: { id: input.questionId, auditId: audit.id },
+    include: {
+      options: true,
+      findings: { select: { id: true } },
+      evidence: { select: { evidenceType: true } },
+    },
+  });
   if (!question) throw new Error("Audit question not found.");
   if (input.result === EnterpriseAuditResponseResult.NOT_APPLICABLE && !question.allowNotApplicable) throw new Error("Not applicable is not allowed for this question.");
   if (question.requireComment && !input.comments) throw new Error("A comment is required for this question.");
-  if (question.requireEvidence && !input.evidenceNote && !input.evidenceUrl) throw new Error("Evidence is required for this question.");
-  if (question.requirePhoto && !input.evidenceUrl) throw new Error("A photo or evidence URL is required for this question.");
+  const hasAttachedEvidence = question.evidence.length > 0;
+  const hasAttachedPhoto = question.evidence.some(
+    (item) => item.evidenceType === EnterpriseAuditEvidenceType.PHOTO
+  );
+  if (question.requireEvidence && !input.evidenceNote && !input.evidenceUrl && !hasAttachedEvidence) throw new Error("Evidence is required for this question.");
+  if (question.requirePhoto && !input.evidenceUrl && !hasAttachedPhoto) throw new Error("Photo evidence is required for this question.");
   const selectedOptions = question.options.filter((option) => input.selectedOptionValues.includes(option.value));
   if (input.selectedOptionValues.length !== selectedOptions.length) throw new Error("One or more selected options are invalid.");
 

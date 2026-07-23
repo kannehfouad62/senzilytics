@@ -231,7 +231,8 @@ export async function GET(request: Request) {
                           answeredAt: true,
                         },
                       },
-                      _count: { select: { evidence: true, findings: true } },
+                      evidence: { select: { evidenceType: true } },
+                      _count: { select: { findings: true } },
                     },
                     orderBy: { sequence: "asc" },
                   },
@@ -289,8 +290,12 @@ export async function GET(request: Request) {
                   : [],
               }
             : null,
-          evidenceCount: question._count.evidence,
+          evidenceCount: question.evidence.length,
+          photoEvidenceCount: question.evidence.filter(
+            (item) => item.evidenceType === "PHOTO"
+          ).length,
           findingCount: question._count.findings,
+          evidence: undefined,
           _count: undefined,
         })),
       })),

@@ -42,6 +42,10 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] Confirm unassigned, completed and closed inspections cannot be downloaded or synchronized by a field user.
 - [ ] Start an assigned Audit offline, answer multiple question types, reconnect, and verify start/response history is synchronized in order.
 - [ ] Confirm required comments, evidence, response options, not-applicable rules, scoring and automatic Audit findings match the web execution workspace.
+- [ ] Capture observation and incident photos offline, force-close/reopen, reconnect, and verify private evidence is linked to the synchronized record.
+- [ ] Select a permitted document and verify the 10 MB limit, unsupported-file feedback, encrypted queue count and private download path.
+- [ ] Complete an inspection photo question and a required-photo Audit question; verify evidence synchronizes before the dependent response.
+- [ ] Decline camera and photo access and confirm the app explains the limitation without crashing or blocking non-evidence workflows.
 - [ ] Confirm users without editable Audit membership cannot download or synchronize Audit execution data.
 - [ ] Confirm the 72-hour offline authorization policy and session revocation behavior.
 - [ ] Confirm one tenant cannot view or synchronize another tenant's cache, outbox, tasks or notifications.

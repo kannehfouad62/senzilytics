@@ -63,8 +63,10 @@ Google defines collection as transmitting data off device. Locally encrypted dat
 | Device or other IDs | Random app device ID; Expo push token when enabled | Collected; linked | Device ID required; push token optional | App functionality; Fraud prevention, security and compliance |
 | App activity — App interactions | Notification read state and synchronization actions | Collected; linked | Required for affected features | App functionality |
 | User-generated content — Other user-generated content | Observation descriptions, configured answers and immediate actions | Collected; linked | Optional submission | App functionality |
+| Photos and videos — Photos / Videos | Evidence captured or selected for authorized tenant records | Collected; linked | Optional unless a tenant Audit or inspection question requires it | App functionality |
+| Files and docs — Files and docs | Evidence documents selected for authorized tenant records | Collected; linked | Optional | App functionality |
 
-Do not declare photos, videos, audio, files, precise/coarse location, contacts, health, financial data, purchases or advertising identifiers for version 1.0.0 unless the final binary or tenant-configured forms actually collect them.
+Do not declare audio, precise/coarse location, contacts, health, financial data, purchases or advertising identifiers for version 1.0.0 unless the final binary or tenant-configured forms actually collect them. Camera, photo/video and document evidence are present and must be represented in the final Data safety answers.
 
 Before final submission, inspect every included SDK and production vendor. Update this worksheet if crash reporting, analytics, camera evidence, file upload, location capture or other collection is added.
 
@@ -98,3 +100,4 @@ The public page identifies Senzilytics, explains the organization-admin route, p
 - [ ] Store icon and feature graphic use the approved Senzilytics identity.
 - [ ] Content rating and target audience are completed accurately.
 - [ ] Physical-device push delivery, offline synchronization and sign-out are accepted.
+- [ ] Camera, photo selection and document evidence permissions are disclosed and accepted on physical devices.

@@ -17,6 +17,13 @@ import {
 import * as Network from "expo-network";
 import * as Linking from "expo-linking";
 import { beginMobileSignIn, clearMobileSession, getStoredMobileOwnerKey, loadMobileWorkspace, logoutMobileSession, mobileApi, MobileApiError, mobileWebUrl, restoreMobileSession } from "./src/api";
+import {
+  capturePhotoEvidence,
+  MAX_EVIDENCE_FILES_PER_RECORD,
+  pickEvidenceFiles,
+  pickPhotoEvidence,
+  type SelectedEvidence,
+} from "./src/evidence";
 import { registerForMobilePush, subscribeToMobileNotificationResponses } from "./src/push";
 import { MOBILE_WORKSPACE_MAX_OFFLINE_AGE_MS } from "./src/session-lifecycle";
 import {
@@ -239,6 +246,7 @@ function ObservationCaptureScreen({ workspace, ownerKey, online, onQueued, onSyn
   const [riskLevel, setRiskLevel] = useState<ObservationPayload["riskLevel"]>("MEDIUM");
   const [anonymous, setAnonymous] = useState(false);
   const [answers, setAnswers] = useState<Record<string, FieldValue>>({});
+  const [evidence, setEvidence] = useState<SelectedEvidence[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   if (!allowed) return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><EmptyState text="Your role does not include permission to create safety observations." /></ScrollView>;
@@ -251,15 +259,15 @@ function ObservationCaptureScreen({ workspace, ownerKey, online, onQueued, onSyn
     catch (reason) { setError(messageOf(reason)); return; }
     setSaving(true);
     try {
-      await queueObservation(ownerKey, { siteId, title: title.trim(), description: description.trim(), type, riskLevel, location: location.trim() || undefined, immediateAction: immediateAction.trim() || undefined, observedAt: new Date().toISOString(), isAnonymous: anonymous, customForms });
-      setTitle(""); setDescription(""); setLocation(""); setImmediateAction(""); setAnswers({});
+      await queueObservation(ownerKey, { siteId, title: title.trim(), description: description.trim(), type, riskLevel, location: location.trim() || undefined, immediateAction: immediateAction.trim() || undefined, observedAt: new Date().toISOString(), isAnonymous: anonymous, customForms }, evidence);
+      setTitle(""); setDescription(""); setLocation(""); setImmediateAction(""); setAnswers({}); setEvidence([]);
       await onQueued(online ? "Observation queued. Synchronizing now…" : "Observation saved offline and will synchronize when connectivity returns.");
       if (online) onSync();
     } catch (reason) { setError(messageOf(reason)); }
     finally { setSaving(false); }
   };
 
-  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><Text style={styles.eyebrow}>{online ? "ONLINE" : "OFFLINE READY"}</Text><Text style={styles.pageTitle}>Capture observation</Text><FieldLabel text="Site *" /><ChipGroup values={workspace.sites.map((site) => ({ value: site.id, label: site.name }))} selected={siteId} onSelect={setSiteId} /><FieldLabel text="Title *" /><Input value={title} onChangeText={setTitle} placeholder="What did you observe?" /><FieldLabel text="Description *" /><Input value={description} onChangeText={setDescription} placeholder="Describe the condition, behavior, or positive practice" multiline /><FieldLabel text="Observation type" /><ChipGroup values={observationTypes.map((value) => ({ value, label: humanize(value) }))} selected={type} onSelect={(value) => setType(value as ObservationPayload["type"])} /><FieldLabel text="Risk level" /><ChipGroup values={riskLevels.map((value) => ({ value, label: humanize(value) }))} selected={riskLevel} onSelect={(value) => setRiskLevel(value as ObservationPayload["riskLevel"])} /><FieldLabel text="Location" /><Input value={location} onChangeText={setLocation} placeholder="Area, building, or equipment" /><FieldLabel text="Immediate action" /><Input value={immediateAction} onChangeText={setImmediateAction} placeholder="What was done immediately?" multiline /><Pressable style={styles.checkRow} onPress={() => setAnonymous((value) => !value)}><View style={[styles.checkbox, anonymous && styles.checkboxOn]}>{anonymous ? <Text style={styles.checkmark}>✓</Text> : null}</View><Text style={styles.checkLabel}>Hide my identity from standard observation views</Text></Pressable>{workspace.observationForms.map((form) => <DynamicForm key={form.id} form={form} answers={answers} setAnswers={setAnswers} />)}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : online ? "Save and synchronize" : "Save offline"} disabled={saving} onPress={save} /></ScrollView></KeyboardAvoidingView>;
+  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><Text style={styles.eyebrow}>{online ? "ONLINE" : "OFFLINE READY"}</Text><Text style={styles.pageTitle}>Capture observation</Text><FieldLabel text="Site *" /><ChipGroup values={workspace.sites.map((site) => ({ value: site.id, label: site.name }))} selected={siteId} onSelect={setSiteId} /><FieldLabel text="Title *" /><Input value={title} onChangeText={setTitle} placeholder="What did you observe?" /><FieldLabel text="Description *" /><Input value={description} onChangeText={setDescription} placeholder="Describe the condition, behavior, or positive practice" multiline /><FieldLabel text="Observation type" /><ChipGroup values={observationTypes.map((value) => ({ value, label: humanize(value) }))} selected={type} onSelect={(value) => setType(value as ObservationPayload["type"])} /><FieldLabel text="Risk level" /><ChipGroup values={riskLevels.map((value) => ({ value, label: humanize(value) }))} selected={riskLevel} onSelect={(value) => setRiskLevel(value as ObservationPayload["riskLevel"])} /><FieldLabel text="Location" /><Input value={location} onChangeText={setLocation} placeholder="Area, building, or equipment" /><FieldLabel text="Immediate action" /><Input value={immediateAction} onChangeText={setImmediateAction} placeholder="What was done immediately?" multiline /><EvidenceAttachmentPicker value={evidence} onChange={setEvidence} label="Observation evidence" /><Pressable style={styles.checkRow} onPress={() => setAnonymous((value) => !value)}><View style={[styles.checkbox, anonymous && styles.checkboxOn]}>{anonymous ? <Text style={styles.checkmark}>✓</Text> : null}</View><Text style={styles.checkLabel}>Hide my identity from standard observation views</Text></Pressable>{workspace.observationForms.map((form) => <DynamicForm key={form.id} form={form} answers={answers} setAnswers={setAnswers} />)}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : online ? "Save and synchronize" : "Save offline"} disabled={saving} onPress={save} /></ScrollView></KeyboardAvoidingView>;
 }
 
 function IncidentCaptureScreen({ workspace, ownerKey, online, onQueued, onSync }: { workspace: MobileBootstrap; ownerKey: string; online: boolean; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
@@ -271,6 +279,7 @@ function IncidentCaptureScreen({ workspace, ownerKey, online, onQueued, onSync }
   const [type, setType] = useState<IncidentPayload["type"]>("NEAR_MISS");
   const [riskLevel, setRiskLevel] = useState<IncidentPayload["riskLevel"]>("MEDIUM");
   const [answers, setAnswers] = useState<Record<string, FieldValue>>({});
+  const [evidence, setEvidence] = useState<SelectedEvidence[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   if (!allowed) return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><EmptyState text="Your role does not include permission to create incidents or near misses." /></ScrollView>;
@@ -283,15 +292,15 @@ function IncidentCaptureScreen({ workspace, ownerKey, online, onQueued, onSync }
     catch (reason) { setError(messageOf(reason)); return; }
     setSaving(true);
     try {
-      await queueIncident(ownerKey, { siteId, title: title.trim(), description: description.trim(), type, riskLevel, location: location.trim() || undefined, occurredAt: new Date().toISOString(), customForms });
-      setTitle(""); setDescription(""); setLocation(""); setAnswers({});
+      await queueIncident(ownerKey, { siteId, title: title.trim(), description: description.trim(), type, riskLevel, location: location.trim() || undefined, occurredAt: new Date().toISOString(), customForms }, evidence);
+      setTitle(""); setDescription(""); setLocation(""); setAnswers({}); setEvidence([]);
       await onQueued(online ? "Incident queued. Synchronizing now…" : "Incident saved offline and will synchronize when connectivity returns.");
       if (online) onSync();
     } catch (reason) { setError(messageOf(reason)); }
     finally { setSaving(false); }
   };
 
-  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><Text style={styles.eyebrow}>{online ? "ONLINE" : "OFFLINE READY"}</Text><Text style={styles.pageTitle}>Report incident</Text><Text style={styles.muted}>Record an injury, near miss, environmental event, property damage, or other reportable event at the point of work.</Text><FieldLabel text="Site *" /><ChipGroup values={workspace.sites.map((site) => ({ value: site.id, label: site.name }))} selected={siteId} onSelect={setSiteId} /><FieldLabel text="Title *" /><Input value={title} onChangeText={setTitle} placeholder="Brief incident or near-miss title" /><FieldLabel text="Description *" /><Input value={description} onChangeText={setDescription} placeholder="Describe what happened and the immediate conditions" multiline /><FieldLabel text="Incident type" /><ChipGroup values={incidentTypes.map((value) => ({ value, label: humanize(value) }))} selected={type} onSelect={(value) => setType(value as IncidentPayload["type"])} /><FieldLabel text="Risk level" /><ChipGroup values={riskLevels.map((value) => ({ value, label: humanize(value) }))} selected={riskLevel} onSelect={(value) => setRiskLevel(value as IncidentPayload["riskLevel"])} /><FieldLabel text="Location" /><Input value={location} onChangeText={setLocation} placeholder="Area, building, vehicle, or equipment" />{(workspace.incidentForms ?? []).map((form) => <DynamicForm key={form.id} form={form} answers={answers} setAnswers={setAnswers} />)}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : online ? "Save and synchronize" : "Save offline"} disabled={saving} onPress={save} /></ScrollView></KeyboardAvoidingView>;
+  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><Text style={styles.eyebrow}>{online ? "ONLINE" : "OFFLINE READY"}</Text><Text style={styles.pageTitle}>Report incident</Text><Text style={styles.muted}>Record an injury, near miss, environmental event, property damage, or other reportable event at the point of work.</Text><FieldLabel text="Site *" /><ChipGroup values={workspace.sites.map((site) => ({ value: site.id, label: site.name }))} selected={siteId} onSelect={setSiteId} /><FieldLabel text="Title *" /><Input value={title} onChangeText={setTitle} placeholder="Brief incident or near-miss title" /><FieldLabel text="Description *" /><Input value={description} onChangeText={setDescription} placeholder="Describe what happened and the immediate conditions" multiline /><FieldLabel text="Incident type" /><ChipGroup values={incidentTypes.map((value) => ({ value, label: humanize(value) }))} selected={type} onSelect={(value) => setType(value as IncidentPayload["type"])} /><FieldLabel text="Risk level" /><ChipGroup values={riskLevels.map((value) => ({ value, label: humanize(value) }))} selected={riskLevel} onSelect={(value) => setRiskLevel(value as IncidentPayload["riskLevel"])} /><FieldLabel text="Location" /><Input value={location} onChangeText={setLocation} placeholder="Area, building, vehicle, or equipment" /><EvidenceAttachmentPicker value={evidence} onChange={setEvidence} label="Incident evidence" />{(workspace.incidentForms ?? []).map((form) => <DynamicForm key={form.id} form={form} answers={answers} setAnswers={setAnswers} />)}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : online ? "Save and synchronize" : "Save offline"} disabled={saving} onPress={save} /></ScrollView></KeyboardAvoidingView>;
 }
 
 function InspectionsScreen({ inspections, ownerKey, online, onBack, onQueued, onSync }: { inspections: MobileInspection[]; ownerKey: string; online: boolean; onBack: () => void; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
@@ -316,6 +325,7 @@ function InspectionItemEditor({ inspectionId, item, ownerKey, online, onQueued, 
   const [findingDescription, setFindingDescription] = useState("");
   const [findingRiskLevel, setFindingRiskLevel] = useState<NonNullable<InspectionResponsePayload["findingRiskLevel"]>>(item.response?.finding?.riskLevel ?? "MEDIUM");
   const [findingDueDate, setFindingDueDate] = useState("");
+  const [evidence, setEvidence] = useState<SelectedEvidence[]>([]);
   const [saving, setSaving] = useState(false);
   const [queued, setQueued] = useState(false);
   const [error, setError] = useState("");
@@ -324,6 +334,7 @@ function InspectionItemEditor({ inspectionId, item, ownerKey, online, onQueued, 
     setError("");
     if (!result) { setError("Select a result before saving this response."); return; }
     if (item.isRequired && item.questionType === "TEXT" && !responseText.trim()) { setError("A written response is required for this question."); return; }
+    if (item.questionType === "PHOTO" && !evidence.some((file) => file.kind === "PHOTO")) { setError("Capture or select a photo before saving this photo-verification question."); return; }
     const parsedNumber = numericValue.trim() ? Number(numericValue) : undefined;
     if (item.questionType === "NUMBER" && (parsedNumber === undefined || !Number.isFinite(parsedNumber))) { setError("Enter a valid numeric response."); return; }
     let dueDate: string | undefined;
@@ -347,15 +358,16 @@ function InspectionItemEditor({ inspectionId, item, ownerKey, online, onQueued, 
         findingDescription: findingDescription.trim() || undefined,
         findingRiskLevel,
         findingDueDate: dueDate,
-      });
+      }, evidence);
       setQueued(true);
+      setEvidence([]);
       await onQueued(online ? "Inspection response queued. Synchronizing now…" : "Inspection response saved securely on this device.");
       if (online) onSync();
     } catch (reason) { setError(messageOf(reason)); }
     finally { setSaving(false); }
   };
 
-  return <Card accent={queued || Boolean(item.response)}><Text style={styles.questionNumber}>Question {item.sequence}</Text><Text style={styles.cardTitle}>{item.questionText}{item.isRequired ? " *" : ""}</Text>{item.guidance ? <Text style={styles.fieldHelp}>{item.guidance}</Text> : null}<FieldLabel text="Result" /><ChipGroup values={[{ value: "COMPLIANT", label: item.questionType === "YES_NO" ? "Yes / compliant" : "Compliant" }, { value: "NON_COMPLIANT", label: item.questionType === "YES_NO" ? "No / noncompliant" : "Noncompliant" }, { value: "NOT_APPLICABLE", label: "Not applicable" }]} selected={result} onSelect={(value) => { setResult(value as InspectionResponsePayload["result"]); if (value !== "NON_COMPLIANT") setCreateFinding(false); }} />{item.questionType === "TEXT" ? <><FieldLabel text="Response" /><Input value={responseText} onChangeText={setResponseText} placeholder="Enter the inspection response" multiline /></> : null}{item.questionType === "NUMBER" ? <><FieldLabel text="Numeric response" /><Input value={numericValue} onChangeText={setNumericValue} placeholder="Enter a number" keyboardType="decimal-pad" /></> : null}{item.questionType === "PHOTO" ? <Text style={styles.fieldHelp}>Record the result and comments now. Photo evidence can be attached from the complete workspace after synchronization.</Text> : null}<FieldLabel text="Comments" /><Input value={comments} onChangeText={setComments} placeholder="Evidence, conditions, or follow-up notes" multiline />{result === "NON_COMPLIANT" ? <><Pressable style={styles.checkRow} onPress={() => setCreateFinding((value) => !value)}><View style={[styles.checkbox, createFinding && styles.checkboxOn]}>{createFinding ? <Text style={styles.checkmark}>✓</Text> : null}</View><Text style={styles.checkLabel}>Create a linked inspection finding</Text></Pressable>{createFinding ? <View style={styles.findingPanel}><FieldLabel text="Finding title" /><Input value={findingTitle} onChangeText={setFindingTitle} placeholder={`Noncompliance: ${item.questionText}`} /><FieldLabel text="Finding description" /><Input value={findingDescription} onChangeText={setFindingDescription} placeholder="Describe the deficiency and objective evidence" multiline /><FieldLabel text="Risk level" /><ChipGroup values={riskLevels.map((value) => ({ value, label: humanize(value) }))} selected={findingRiskLevel} onSelect={(value) => setFindingRiskLevel(value as NonNullable<InspectionResponsePayload["findingRiskLevel"]>)} /><FieldLabel text="Due date" /><Input value={findingDueDate} onChangeText={setFindingDueDate} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View> : null}</> : null}{queued ? <Text style={styles.successText}>Saved to the encrypted synchronization queue.</Text> : null}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : item.response ? "Save updated response" : "Save response"} disabled={saving} onPress={save} /></Card>;
+  return <Card accent={queued || Boolean(item.response)}><Text style={styles.questionNumber}>Question {item.sequence}</Text><Text style={styles.cardTitle}>{item.questionText}{item.isRequired ? " *" : ""}</Text>{item.guidance ? <Text style={styles.fieldHelp}>{item.guidance}</Text> : null}<FieldLabel text="Result" /><ChipGroup values={[{ value: "COMPLIANT", label: item.questionType === "YES_NO" ? "Yes / compliant" : "Compliant" }, { value: "NON_COMPLIANT", label: item.questionType === "YES_NO" ? "No / noncompliant" : "Noncompliant" }, { value: "NOT_APPLICABLE", label: "Not applicable" }]} selected={result} onSelect={(value) => { setResult(value as InspectionResponsePayload["result"]); if (value !== "NON_COMPLIANT") setCreateFinding(false); }} />{item.questionType === "TEXT" ? <><FieldLabel text="Response" /><Input value={responseText} onChangeText={setResponseText} placeholder="Enter the inspection response" multiline /></> : null}{item.questionType === "NUMBER" ? <><FieldLabel text="Numeric response" /><Input value={numericValue} onChangeText={setNumericValue} placeholder="Enter a number" keyboardType="decimal-pad" /></> : null}{item.questionType === "PHOTO" ? <Text style={styles.fieldHelp}>This verification requires a photo captured or selected below.</Text> : null}<FieldLabel text="Comments" /><Input value={comments} onChangeText={setComments} placeholder="Evidence, conditions, or follow-up notes" multiline /><EvidenceAttachmentPicker value={evidence} onChange={setEvidence} label={item.questionType === "PHOTO" ? "Photo evidence *" : "Inspection evidence"} />{result === "NON_COMPLIANT" ? <><Pressable style={styles.checkRow} onPress={() => setCreateFinding((value) => !value)}><View style={[styles.checkbox, createFinding && styles.checkboxOn]}>{createFinding ? <Text style={styles.checkmark}>✓</Text> : null}</View><Text style={styles.checkLabel}>Create a linked inspection finding</Text></Pressable>{createFinding ? <View style={styles.findingPanel}><FieldLabel text="Finding title" /><Input value={findingTitle} onChangeText={setFindingTitle} placeholder={`Noncompliance: ${item.questionText}`} /><FieldLabel text="Finding description" /><Input value={findingDescription} onChangeText={setFindingDescription} placeholder="Describe the deficiency and objective evidence" multiline /><FieldLabel text="Risk level" /><ChipGroup values={riskLevels.map((value) => ({ value, label: humanize(value) }))} selected={findingRiskLevel} onSelect={(value) => setFindingRiskLevel(value as NonNullable<InspectionResponsePayload["findingRiskLevel"]>)} /><FieldLabel text="Due date" /><Input value={findingDueDate} onChangeText={setFindingDueDate} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View> : null}</> : null}{queued ? <Text style={styles.successText}>Saved to the encrypted synchronization queue.</Text> : null}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : item.response ? "Save updated response" : "Save response"} disabled={saving} onPress={save} /></Card>;
 }
 
 function AuditsScreen({ audits, ownerKey, online, onBack, onQueued, onSync }: { audits: MobileAudit[]; ownerKey: string; online: boolean; onBack: () => void; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
@@ -394,6 +406,7 @@ function AuditQuestionEditor({ auditId, question, ownerKey, online, onQueued, on
   const [comments, setComments] = useState(question.response?.comments ?? "");
   const [evidenceNote, setEvidenceNote] = useState("");
   const [evidenceUrl, setEvidenceUrl] = useState("");
+  const [evidence, setEvidence] = useState<SelectedEvidence[]>([]);
   const [saving, setSaving] = useState(false);
   const [queued, setQueued] = useState(false);
   const [error, setError] = useState("");
@@ -406,8 +419,8 @@ function AuditQuestionEditor({ auditId, question, ownerKey, online, onQueued, on
     const parsedNumber = numericValue.trim() ? Number(numericValue) : undefined;
     if (question.responseType === "NUMERIC" && (parsedNumber === undefined || !Number.isFinite(parsedNumber))) { setError("Enter a valid numeric response."); return; }
     if (question.responseType === "MULTIPLE_CHOICE" && question.isRequired && selectedOptions.length === 0) { setError("Select at least one response option."); return; }
-    if (question.requireEvidence && !evidenceNote.trim() && !evidenceUrl.trim()) { setError("An evidence note or evidence URL is required."); return; }
-    if (question.requirePhoto && !evidenceUrl.trim()) { setError("A photo or evidence URL is required. Native camera uploads will be added in the media-evidence phase."); return; }
+    if (question.requireEvidence && !evidenceNote.trim() && !evidenceUrl.trim() && !evidence.length && !question.evidenceCount) { setError("Add an evidence note, file, photo, or approved evidence URL."); return; }
+    if (question.requirePhoto && !evidenceUrl.trim() && !evidence.some((file) => file.kind === "PHOTO") && !question.photoEvidenceCount) { setError("Capture or select a photo before saving this Audit response."); return; }
     if (evidenceUrl.trim()) {
       try {
         const parsedUrl = new URL(evidenceUrl.trim());
@@ -428,17 +441,18 @@ function AuditQuestionEditor({ auditId, question, ownerKey, online, onQueued, on
         comments: comments.trim() || undefined,
         evidenceNote: evidenceNote.trim() || undefined,
         evidenceUrl: evidenceUrl.trim() || undefined,
-      });
+      }, evidence);
       setQueued(true);
       setEvidenceNote("");
       setEvidenceUrl("");
+      setEvidence([]);
       await onQueued(online ? "Audit response queued. Synchronizing now…" : "Audit response saved securely on this device.");
       if (online) onSync();
     } catch (reason) { setError(messageOf(reason)); }
     finally { setSaving(false); }
   };
 
-  return <Card accent={queued || Boolean(question.response)}><Text style={styles.questionNumber}>Question {question.sequence}{question.standardClause ? ` · ${question.standardClause}` : ""}</Text><Text style={styles.cardTitle}>{question.questionText}{question.isRequired ? " *" : ""}</Text>{question.guidance ? <Text style={styles.fieldHelp}>{question.guidance}</Text> : null}<FieldLabel text="Assessment result" /><ChipGroup values={resultOptions.map((value) => ({ value, label: humanize(value) }))} selected={result} onSelect={(value) => setResult(value as AuditResponseResult)} />{question.responseType === "NUMERIC" ? <><FieldLabel text="Numeric value" /><Input value={numericValue} onChangeText={setNumericValue} placeholder={numericAuditPlaceholder(question)} keyboardType="decimal-pad" /></> : null}{question.options.length ? <View style={styles.fieldBlock}><FieldLabel text="Response options" /><View style={styles.chips}>{question.options.map((option) => { const selected = selectedOptions.includes(option.value); return <Pressable key={option.id} style={[styles.chip, selected && styles.chipOn]} onPress={() => setSelectedOptions((current) => selected ? current.filter((value) => value !== option.value) : [...current, option.value])}><Text style={[styles.chipText, selected && styles.chipTextOn]}>{option.label}{option.triggersFinding ? " · finding rule" : ""}</Text></Pressable>; })}</View></View> : null}<FieldLabel text="Response narrative" /><Input value={responseText} onChangeText={setResponseText} placeholder="Record the assessment narrative" multiline /><FieldLabel text={`Comments${question.requireComment ? " *" : ""}`} /><Input value={comments} onChangeText={setComments} placeholder="Record objective observations and follow-up context" multiline /><FieldLabel text={`Evidence note${question.requireEvidence ? " *" : ""}`} /><Input value={evidenceNote} onChangeText={setEvidenceNote} placeholder={question.evidenceCount ? `${question.evidenceCount} evidence record(s) already attached` : "Describe the evidence reviewed or collected"} multiline /><FieldLabel text={`Evidence URL${question.requirePhoto ? " *" : ""}`} /><Input value={evidenceUrl} onChangeText={setEvidenceUrl} placeholder="https://…" autoCapitalize="none" keyboardType="url" />{question.requirePhoto ? <Text style={styles.fieldHelp}>This question requires photo evidence. Until native encrypted media upload is enabled, provide an approved evidence URL or complete the photo attachment in the web workspace.</Text> : null}{question.findingCount ? <Text style={styles.due}>{question.findingCount} linked finding{question.findingCount === 1 ? "" : "s"}</Text> : null}{queued ? <Text style={styles.successText}>Saved to the encrypted synchronization queue.</Text> : null}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : question.response ? "Save updated response" : "Save Audit response"} disabled={saving} onPress={save} /></Card>;
+  return <Card accent={queued || Boolean(question.response)}><Text style={styles.questionNumber}>Question {question.sequence}{question.standardClause ? ` · ${question.standardClause}` : ""}</Text><Text style={styles.cardTitle}>{question.questionText}{question.isRequired ? " *" : ""}</Text>{question.guidance ? <Text style={styles.fieldHelp}>{question.guidance}</Text> : null}<FieldLabel text="Assessment result" /><ChipGroup values={resultOptions.map((value) => ({ value, label: humanize(value) }))} selected={result} onSelect={(value) => setResult(value as AuditResponseResult)} />{question.responseType === "NUMERIC" ? <><FieldLabel text="Numeric value" /><Input value={numericValue} onChangeText={setNumericValue} placeholder={numericAuditPlaceholder(question)} keyboardType="decimal-pad" /></> : null}{question.options.length ? <View style={styles.fieldBlock}><FieldLabel text="Response options" /><View style={styles.chips}>{question.options.map((option) => { const selected = selectedOptions.includes(option.value); return <Pressable key={option.id} style={[styles.chip, selected && styles.chipOn]} onPress={() => setSelectedOptions((current) => selected ? current.filter((value) => value !== option.value) : [...current, option.value])}><Text style={[styles.chipText, selected && styles.chipTextOn]}>{option.label}{option.triggersFinding ? " · finding rule" : ""}</Text></Pressable>; })}</View></View> : null}<FieldLabel text="Response narrative" /><Input value={responseText} onChangeText={setResponseText} placeholder="Record the assessment narrative" multiline /><FieldLabel text={`Comments${question.requireComment ? " *" : ""}`} /><Input value={comments} onChangeText={setComments} placeholder="Record objective observations and follow-up context" multiline /><FieldLabel text={`Evidence note${question.requireEvidence ? " *" : ""}`} /><Input value={evidenceNote} onChangeText={setEvidenceNote} placeholder={question.evidenceCount ? `${question.evidenceCount} evidence record(s) already attached` : "Describe the evidence reviewed or collected"} multiline /><EvidenceAttachmentPicker value={evidence} onChange={setEvidence} label={question.requirePhoto ? "Photo evidence *" : question.requireEvidence ? "Evidence file *" : "Audit evidence"} /><FieldLabel text="Approved evidence URL" /><Input value={evidenceUrl} onChangeText={setEvidenceUrl} placeholder="https://… (optional)" autoCapitalize="none" keyboardType="url" />{question.requirePhoto ? <Text style={styles.fieldHelp}>A securely captured photo, an existing photo attachment, or an approved HTTPS evidence URL satisfies this question.</Text> : null}{question.findingCount ? <Text style={styles.due}>{question.findingCount} linked finding{question.findingCount === 1 ? "" : "s"}</Text> : null}{queued ? <Text style={styles.successText}>Saved to the encrypted synchronization queue.</Text> : null}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : question.response ? "Save updated response" : "Save Audit response"} disabled={saving} onPress={save} /></Card>;
 }
 
 function auditResultsFor(question: MobileAuditQuestion): AuditResponseResult[] {
@@ -459,6 +473,41 @@ function numericAuditPlaceholder(question: MobileAuditQuestion) {
   return "Enter the measured value";
 }
 
+function EvidenceAttachmentPicker({
+  value,
+  onChange,
+  label,
+}: {
+  value: SelectedEvidence[];
+  onChange: (value: SelectedEvidence[]) => void;
+  label: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const add = async (source: "camera" | "photos" | "files") => {
+    setError("");
+    setBusy(true);
+    try {
+      const selected = source === "camera"
+        ? await capturePhotoEvidence()
+        : source === "photos"
+          ? await pickPhotoEvidence(MAX_EVIDENCE_FILES_PER_RECORD - value.length)
+          : await pickEvidenceFiles();
+      if (value.length + selected.length > MAX_EVIDENCE_FILES_PER_RECORD) {
+        throw new Error(`Attach no more than ${MAX_EVIDENCE_FILES_PER_RECORD} evidence files to one record.`);
+      }
+      onChange([...value, ...selected]);
+    } catch (reason) {
+      setError(messageOf(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <View style={styles.evidencePanel}><FieldLabel text={label} /><Text style={styles.fieldHelp}>Photos and documents are copied into the encrypted offline store, isolated to this tenant and user, and uploaded privately during synchronization. Maximum 10 MB per file.</Text><View style={styles.row}><SecondaryButton label={busy ? "Opening…" : "Take photo"} disabled={busy || value.length >= MAX_EVIDENCE_FILES_PER_RECORD} onPress={() => { void add("camera"); }} /><SecondaryButton label={busy ? "Opening…" : "Choose photos"} disabled={busy || value.length >= MAX_EVIDENCE_FILES_PER_RECORD} onPress={() => { void add("photos"); }} /><SecondaryButton label={busy ? "Opening…" : "Choose document"} disabled={busy || value.length >= MAX_EVIDENCE_FILES_PER_RECORD} onPress={() => { void add("files"); }} /></View>{value.map((file) => <View key={file.id} style={styles.evidenceFile}><View style={styles.evidenceFileCopy}><Text style={styles.evidenceFileName} numberOfLines={1}>{file.fileName}</Text><Text style={styles.fieldHelp}>{humanize(file.kind)} · {formatFileSize(file.sizeBytes)}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`Remove ${file.fileName}`} onPress={() => onChange(value.filter((item) => item.id !== file.id))}><Text style={styles.removeEvidence}>Remove</Text></Pressable></View>)}{error ? <Text style={styles.error}>{error}</Text> : null}</View>;
+}
+
 function DynamicForm({ form, answers, setAnswers }: { form: RuntimeForm; answers: Record<string, FieldValue>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, FieldValue>>> }) {
   return <Card><Text style={styles.cardTitle}>{form.name}</Text>{form.version.instructions ? <Text style={styles.muted}>{form.version.instructions}</Text> : null}{form.version.fields.filter((field) => isVisible(field, form, answers)).map((field) => <DynamicField key={field.id} field={field} value={answers[field.id]} onChange={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))} />)}</Card>;
 }
@@ -477,7 +526,7 @@ function NotificationsScreen({ notifications, onRead }: { notifications: MobileN
 }
 
 function SettingsScreen({ workspace, pending, onEnablePush, onLogout }: { workspace: MobileBootstrap; pending: number; onEnablePush: () => void; onLogout: () => void }) {
-  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><Text style={styles.eyebrow}>ACCOUNT</Text><Text style={styles.pageTitle}>Mobile settings</Text><Card><Text style={styles.cardTitle}>{workspace.user.name}</Text><Text style={styles.muted}>{workspace.user.email}</Text><Text style={styles.due}>{humanize(workspace.user.role)} · {workspace.organization.name}</Text></Card><Card><Text style={styles.cardTitle}>Data protection</Text><Text style={styles.muted}>Credentials are stored in the device Keychain or Android Keystore. Offline submissions are isolated by tenant and user. The server revalidates your access on every synchronization.</Text></Card><Card><Text style={styles.cardTitle}>Account switching</Text><Text style={styles.muted}>Signing out revokes this device session. The next sign-in screen will show the active browser identity and provide a clear option to use another Senzilytics, Microsoft, or Okta account.</Text></Card><Card><Text style={styles.cardTitle}>Offline queue</Text><Text style={styles.muted}>{pending} field record{pending === 1 ? "" : "s"} waiting on this device.</Text></Card><PrimaryButton label="Enable push notifications" onPress={onEnablePush} /><SecondaryButton label="Privacy policy" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/privacy"); }} /><SecondaryButton label="Support center" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/support"); }} /><SecondaryButton label="Account and data deletion" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/account-deletion"); }} /><SecondaryButton label="Sign out and choose another account" onPress={onLogout} /></ScrollView>;
+  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><Text style={styles.eyebrow}>ACCOUNT</Text><Text style={styles.pageTitle}>Mobile settings</Text><Card><Text style={styles.cardTitle}>{workspace.user.name}</Text><Text style={styles.muted}>{workspace.user.email}</Text><Text style={styles.due}>{humanize(workspace.user.role)} · {workspace.organization.name}</Text></Card><Card><Text style={styles.cardTitle}>Data protection</Text><Text style={styles.muted}>Credentials are stored in the device Keychain or Android Keystore. Offline records and evidence file bytes are encrypted and isolated by tenant and user. Private uploads revalidate your role, assignment, subscription, and record ownership.</Text></Card><Card><Text style={styles.cardTitle}>Account switching</Text><Text style={styles.muted}>Signing out revokes this device session. The next sign-in screen will show the active browser identity and provide a clear option to use another Senzilytics, Microsoft, or Okta account.</Text></Card><Card><Text style={styles.cardTitle}>Offline queue</Text><Text style={styles.muted}>{pending} queued field item{pending === 1 ? "" : "s"} waiting on this device.</Text></Card><PrimaryButton label="Enable push notifications" onPress={onEnablePush} /><SecondaryButton label="Privacy policy" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/privacy"); }} /><SecondaryButton label="Support center" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/support"); }} /><SecondaryButton label="Account and data deletion" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/account-deletion"); }} /><SecondaryButton label="Sign out and choose another account" onPress={onLogout} /></ScrollView>;
 }
 
 function buildCapturedForms(forms: RuntimeForm[], answers: Record<string, FieldValue>): CapturedForm[] {
@@ -517,6 +566,7 @@ function TabButton({ active, label, badge, onPress }: { active: boolean; label: 
 function EmptyState({ text }: { text: string }) { return <View style={styles.empty}><Text style={styles.muted}>{text}</Text></View>; }
 function humanize(value: string) { return value.toLowerCase().split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "); }
 function formatDate(value: string) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
+function formatFileSize(value: number) { return value >= 1024 * 1024 ? `${(value / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(value / 1024))} KB`; }
 function placeholderFor(type: RuntimeField["fieldType"]) { if (type === "DATE") return "YYYY-MM-DD"; if (type === "DATETIME") return "YYYY-MM-DDTHH:mm:ssZ"; if (type === "SIGNATURE") return "Type your full name"; return "Enter a response"; }
 function messageOf(error: unknown) { return error instanceof MobileApiError || error instanceof Error ? error.message : "Something went wrong."; }
 
@@ -532,6 +582,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 18, padding: 17, gap: 8, backgroundColor: "#0d1a2c", borderWidth: 1, borderColor: "#172a43" }, cardAccent: { borderColor: "#22d3ee" }, cardTitle: { color: "#f8fafc", fontWeight: "700", fontSize: 16 }, due: { color: "#67e8f9", fontSize: 12, marginTop: 3 }, sectionTitle: { color: "#e2e8f0", fontSize: 19, fontWeight: "700", marginTop: 8 }, empty: { borderWidth: 1, borderColor: "#1e293b", borderStyle: "dashed", borderRadius: 18, padding: 24 },
   moduleSection: { gap: 12 }, moduleHeading: { flexDirection: "row", alignItems: "flex-start", gap: 12 }, moduleMark: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#123047", borderWidth: 1, borderColor: "#1e7494" }, moduleMarkText: { color: "#67e8f9", fontSize: 16, fontWeight: "900" }, moduleCopy: { flex: 1, gap: 5 }, offlineBanner: { borderRadius: 16, borderWidth: 1, borderColor: "#f59e0b55", backgroundColor: "#78350f33", padding: 14 }, offlineBannerText: { color: "#fde68a", fontSize: 13, lineHeight: 19 },
   progressTrack: { height: 7, borderRadius: 999, overflow: "hidden", backgroundColor: "#1e293b", marginTop: 5 }, progressFill: { height: "100%", borderRadius: 999, backgroundColor: "#22d3ee" }, questionNumber: { color: "#67e8f9", fontSize: 11, fontWeight: "800", letterSpacing: 1.2 }, findingPanel: { gap: 8, borderTopWidth: 1, borderTopColor: "#263a55", marginTop: 3, paddingTop: 8 }, successText: { color: "#6ee7b7", fontSize: 13, lineHeight: 18 },
+  evidencePanel: { gap: 7, marginTop: 8, borderRadius: 15, borderWidth: 1, borderColor: "#263a55", backgroundColor: "#091525", padding: 13 }, evidenceFile: { flexDirection: "row", alignItems: "center", gap: 10, borderTopWidth: 1, borderTopColor: "#1e293b", paddingTop: 10 }, evidenceFileCopy: { flex: 1 }, evidenceFileName: { color: "#dbeafe", fontSize: 13, fontWeight: "700" }, removeEvidence: { color: "#fda4af", fontSize: 12, fontWeight: "700" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 7 },
   primaryButton: { minHeight: 52, borderRadius: 15, backgroundColor: "#67e8f9", alignItems: "center", justifyContent: "center", paddingHorizontal: 18, marginTop: 8 }, primaryButtonText: { color: "#07111f", fontWeight: "800", fontSize: 15 }, secondaryButton: { minHeight: 46, borderRadius: 13, borderWidth: 1, borderColor: "#2d4964", alignItems: "center", justifyContent: "center", paddingHorizontal: 16, marginTop: 8 }, secondaryButtonText: { color: "#bae6fd", fontWeight: "700", fontSize: 14 }, disabled: { opacity: 0.55 },
   fieldLabel: { color: "#dbeafe", fontWeight: "700", fontSize: 13, marginTop: 6 }, fieldHelp: { color: "#64748b", fontSize: 12 }, fieldBlock: { gap: 6, marginTop: 6 }, input: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: "#263a55", backgroundColor: "#091525", color: "#f8fafc", paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 }, multiline: { minHeight: 104, textAlignVertical: "top" },

@@ -79,7 +79,8 @@ The current first-party mobile code sends the following information to the Senzi
 | Contact Info — Email Address | Provisioned work email | Yes | Yes | No | App Functionality; Account Management |
 | Identifiers — User ID | Tenant-scoped user and organization IDs | Yes | Yes | No | App Functionality; Account Management; Security |
 | Identifiers — Device ID | Random app-generated device identifier; push token if enabled | Yes | Yes | No | App Functionality; Security; Notifications |
-| User Content — Other User Content | Observation descriptions, configured answers and immediate actions | Yes, when submitted | Yes | No | App Functionality |
+| User Content — Photos or Videos | Evidence captured or selected for authorized observations, incidents, inspections and Audits | Yes, when submitted | Yes | No | App Functionality |
+| User Content — Other User Content | Observation descriptions, configured answers, immediate actions and evidence documents | Yes, when submitted | Yes | No | App Functionality |
 | Usage Data — Product Interaction | Notification read state and synchronization actions | Yes | Yes | No | App Functionality |
 
 Items requiring final vendor and production-log verification:
@@ -89,13 +90,14 @@ Items requiring final vendor and production-log verification:
 - whether tenant-specific configurable forms collect additional categories such as health, sensitive, precise location or photos;
 - whether any vendor is a service provider or an independent third party under applicable contracts.
 
-Current mobile code does not request contacts, location, camera, microphone, photo library, health, payment or advertising permissions. It contains no advertising SDK and does not use data for cross-company tracking. Change these answers if the final binary or tenant-configured collection changes.
+Current mobile code requests camera access when a user chooses **Take photo** and photo-library/document access when a user chooses evidence files. Those permissions are optional until the user invokes an evidence action. The app does not request contacts, location, microphone, health, payment or advertising permissions. It contains no advertising SDK and does not use data for cross-company tracking. Change these answers if the final binary or tenant-configured collection changes.
 
 ## Security and encryption
 
 - API traffic uses HTTPS.
 - Refresh credentials use iOS protected storage with `WHEN_UNLOCKED_THIS_DEVICE_ONLY` accessibility.
 - Offline workspace data and the outbox use a SQLCipher database with a random protected key.
+- Offline evidence file bytes are copied into that SQLCipher database and uploaded to private tenant-scoped storage only during authorized synchronization.
 - Access and refresh tokens are device-bound, expiring and server-revocable.
 - Offline cached access is bounded to 72 hours after server verification.
 - The privacy manifest is configured in `app.config.ts`; it does not replace App Privacy questionnaire answers.

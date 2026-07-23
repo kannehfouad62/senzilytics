@@ -42,6 +42,12 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-secure-store",
+    ["expo-image-picker", {
+      photosPermission: "Allow Senzilytics to select photos used as evidence in your authorized EHS records.",
+      cameraPermission: "Allow Senzilytics to capture photos used as evidence in your authorized EHS records.",
+      microphonePermission: false,
+    }],
+    "expo-document-picker",
     ["expo-notifications", { icon: "./assets/notification-icon.png", color: "#22D3EE", defaultChannel: "default", mode: notificationMode }],
     ["expo-splash-screen", { image: "./assets/splash-icon.png", imageWidth: 220, resizeMode: "contain", backgroundColor: "#07111f" }],
     ["expo-sqlite", { useSQLCipher: true }],

@@ -144,6 +144,7 @@ export type MobileAuditQuestion = {
     answeredAt: string | null;
   } | null;
   evidenceCount: number;
+  photoEvidenceCount: number;
   findingCount: number;
 };
 

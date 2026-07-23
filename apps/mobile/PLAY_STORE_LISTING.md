@@ -12,7 +12,7 @@ Secure EHS, ESG, audit, risk and compliance intelligence for field teams.
 
 Senzilytics gives authorized users of Premium tenant organizations a secure field workspace for environmental, health, safety, ESG, audit, risk and compliance operations.
 
-Review assigned workflow tasks and alerts, capture governed safety observations, complete organization-configured fields and continue working when connectivity is unreliable. Encrypted offline submissions synchronize with the correct tenant and user workspace when connectivity returns.
+Review assigned workflow tasks and alerts, capture governed safety observations and incidents, execute assigned inspections and Audits, collect photo or document evidence, complete organization-configured fields and continue working when connectivity is unreliable. Encrypted offline submissions and evidence synchronize with the correct tenant and user workspace when connectivity returns.
 
 Security and governance are built into the experience:
 
@@ -48,8 +48,9 @@ Confirm the final answers in Google Play Console against the production build an
 | --- | --- | --- | --- | --- |
 | Personal information | Name, work email, organization and role | Account management and app functionality | Yes | No |
 | User IDs | Tenant user ID and generated device ID | Authentication, security and tenant isolation | Yes | No |
-| User-generated content | Safety observations, configured form answers and workflow activity | Core EHS and compliance functionality | Yes | No |
+| User-generated content | Observations, incidents, inspection and Audit responses, configured answers and evidence documents | Core EHS and compliance functionality | Yes | No |
+| Photos and videos | Photos captured or selected as authorized EHS evidence | Core EHS and compliance functionality | Yes | No |
 | Device identifiers | Expo push token, device name and platform | Security sessions and requested notifications | Yes | No |
 | Diagnostics and security events | Request timestamps, IP address, user agent and failure events | Security, fraud prevention and reliability | Usually | No |
 
-Data is encrypted in transit. Credentials use protected device storage and the offline database uses SQLCipher. The app currently does not request location, contacts, camera, microphone, health, advertising ID or payment permissions. Service-provider processing and any customer-specific configuration must be reflected accurately in the final disclosure.
+Data is encrypted in transit. Credentials use protected device storage and the offline database uses SQLCipher. The app requests camera, photo-library, or document access only when a user chooses the corresponding evidence action. It does not request location, contacts, microphone, health, advertising ID or payment permissions. Service-provider processing and any customer-specific configuration must be reflected accurately in the final disclosure.
