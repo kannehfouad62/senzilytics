@@ -17,7 +17,8 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "OBSERVATION_CAPTURE";
+  nativeCapability?: "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION";
+  nativePermission?: PermissionKey;
 };
 
 const modules: readonly MobileModuleDefinition[] = [
@@ -25,9 +26,9 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "assurance", label: "Operational Assurance", description: "Connected assurance performance and control effectiveness.", href: "/assurance", category: "COMMAND", permission: PermissionKey.VIEW_DASHBOARD },
   { key: "intelligence", label: "AI Intelligence", description: "Governed EHS intelligence, analysis, and decision support.", href: "/intelligence", category: "COMMAND", permission: PermissionKey.USE_AI },
   { key: "tasks", label: "My Tasks", description: "Assigned workflow steps, due work, and required actions.", href: "/tasks", category: "COMMAND" },
-  { key: "observations", label: "Safety Observations", description: "Capture, review, and manage safety observations.", href: "/observations", category: "SAFETY", anyPermissions: [PermissionKey.VIEW_OBSERVATIONS, PermissionKey.CREATE_OBSERVATION], nativeCapability: "OBSERVATION_CAPTURE" },
+  { key: "observations", label: "Safety Observations", description: "Capture, review, and manage safety observations.", href: "/observations", category: "SAFETY", anyPermissions: [PermissionKey.VIEW_OBSERVATIONS, PermissionKey.CREATE_OBSERVATION], nativeCapability: "OBSERVATION_CAPTURE", nativePermission: PermissionKey.CREATE_OBSERVATION },
   { key: "behavior-safety", label: "Behavior-Based Safety", description: "Behavior programs, coaching, trends, and interventions.", href: "/behavior-safety", category: "SAFETY", permission: PermissionKey.VIEW_BEHAVIOR_SAFETY },
-  { key: "incidents", label: "Incidents", description: "Report, investigate, and monitor incidents and near misses.", href: "/incidents", category: "SAFETY", permission: PermissionKey.VIEW_INCIDENT },
+  { key: "incidents", label: "Incidents", description: "Report, investigate, and monitor incidents and near misses.", href: "/incidents", category: "SAFETY", anyPermissions: [PermissionKey.VIEW_INCIDENT, PermissionKey.CREATE_INCIDENT], nativeCapability: "INCIDENT_CAPTURE", nativePermission: PermissionKey.CREATE_INCIDENT },
   { key: "corrective-actions", label: "Corrective Actions", description: "CAPA ownership, verification, closure, and overdue exposure.", href: "/actions", category: "SAFETY", anyPermissions: [PermissionKey.CREATE_CAPA, PermissionKey.UPDATE_CAPA, PermissionKey.CLOSE_CAPA, PermissionKey.VIEW_REPORTS] },
   { key: "risks", label: "Risk Register", description: "Enterprise hazards, controls, reviews, and residual risk.", href: "/risks", category: "SAFETY", permission: PermissionKey.VIEW_RISKS },
   { key: "jsa", label: "JSA / JHA", description: "Job steps, hazards, controls, approvals, and acknowledgements.", href: "/risks/jsa", category: "SAFETY", permission: PermissionKey.VIEW_RISKS },
@@ -39,7 +40,7 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "occupational-health", label: "Occupational Health", description: "Health surveillance programs and fitness controls.", href: "/occupational-health", category: "SAFETY", permission: PermissionKey.VIEW_OCCUPATIONAL_HEALTH },
   { key: "sif", label: "SIF Prevention", description: "Serious injury and fatality signals and critical controls.", href: "/assurance/sif", category: "ASSURANCE", permission: PermissionKey.VIEW_SIF_INTELLIGENCE },
   { key: "certification", label: "Certification Readiness", description: "Management-system readiness, evidence, and gap reviews.", href: "/assurance/certification", category: "ASSURANCE", permission: PermissionKey.VIEW_CERTIFICATION_READINESS },
-  { key: "inspections", label: "Inspections", description: "Inspection planning, checklist execution, and findings.", href: "/inspections", category: "ASSURANCE", permission: PermissionKey.VIEW_INSPECTIONS },
+  { key: "inspections", label: "Inspections", description: "Inspection planning, checklist execution, and findings.", href: "/inspections", category: "ASSURANCE", permission: PermissionKey.VIEW_INSPECTIONS, nativeCapability: "INSPECTION_EXECUTION", nativePermission: PermissionKey.MANAGE_INSPECTIONS },
   { key: "audits", label: "Audit Workspace", description: "Programs, protocols, schedules, execution, findings, and reports.", href: "/audits", category: "ASSURANCE", permission: PermissionKey.VIEW_AUDITS },
   { key: "compliance", label: "Compliance", description: "Legal obligations, evaluations, permits, and compliance status.", href: "/compliance", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE },
   { key: "compliance-calendar", label: "Compliance Calendar", description: "Daily through annual assigned obligations and completion tracking.", href: "/compliance/calendar", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE },
@@ -84,6 +85,8 @@ export function getMobileModuleCatalog(input: {
       description: module.description,
       href: module.href,
       category: module.category,
-      ...(module.nativeCapability ? { nativeCapability: module.nativeCapability } : {}),
+      ...(module.nativeCapability && (!module.nativePermission || granted.has(module.nativePermission))
+        ? { nativeCapability: module.nativeCapability }
+        : {}),
     }));
 }

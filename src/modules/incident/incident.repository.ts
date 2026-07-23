@@ -45,6 +45,7 @@ export async function createTenantIncident(input: {
   location: string;
   siteId: string;
   reportedById: string;
+  occurredAt?: Date;
 },db:Pick<Prisma.TransactionClient,"incident">=prisma) {
   return db.incident.create({
     data: {
@@ -54,7 +55,7 @@ export async function createTenantIncident(input: {
       riskLevel: input.riskLevel,
       status: Status.OPEN,
       location: input.location,
-      occurredAt: new Date(),
+      occurredAt: input.occurredAt ?? new Date(),
       siteId: input.siteId,
       reportedById: input.reportedById,
     },

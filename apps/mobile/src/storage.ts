@@ -2,8 +2,18 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import * as SQLite from "expo-sqlite";
 import { mobileApi } from "./api";
+import {
+  decodeOfflineEnvelope,
+  type OfflineRecordPayload,
+  type OfflineRecordType,
+} from "./offline-envelope";
 import { isMobileWorkspaceCacheFresh } from "./session-lifecycle";
-import type { MobileBootstrap, ObservationPayload } from "./types";
+import type {
+  IncidentPayload,
+  InspectionResponsePayload,
+  MobileBootstrap,
+  ObservationPayload,
+} from "./types";
 
 type QueueRow = { id: string; payload: string; captured_at: string };
 let database: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -45,27 +55,58 @@ export async function initializeOfflineStore() {
   `);
 }
 
-export async function queueObservation(ownerKey: string, payload: ObservationPayload) {
+async function queueOfflineItem(
+  ownerKey: string,
+  type: OfflineRecordType,
+  payload: OfflineRecordPayload
+) {
   const database = await db();
   const id = Crypto.randomUUID();
   const capturedAt = new Date().toISOString();
-  await database.runAsync("INSERT INTO mobile_outbox (id, owner_key, payload, captured_at) VALUES (?, ?, ?, ?)", id, ownerKey, JSON.stringify(payload), capturedAt);
+  await database.runAsync(
+    "INSERT INTO mobile_outbox (id, owner_key, payload, captured_at) VALUES (?, ?, ?, ?)",
+    id,
+    ownerKey,
+    JSON.stringify({ type, payload }),
+    capturedAt
+  );
   return id;
 }
 
-export async function pendingObservationCount(ownerKey: string) {
+export async function queueObservation(ownerKey: string, payload: ObservationPayload) {
+  return queueOfflineItem(ownerKey, "SAFETY_OBSERVATION", payload);
+}
+
+export async function queueIncident(ownerKey: string, payload: IncidentPayload) {
+  return queueOfflineItem(ownerKey, "INCIDENT", payload);
+}
+
+export async function queueInspectionResponse(ownerKey: string, payload: InspectionResponsePayload) {
+  return queueOfflineItem(ownerKey, "INSPECTION_RESPONSE", payload);
+}
+
+export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const row = await database.getFirstAsync<{ count: number }>("SELECT COUNT(*) AS count FROM mobile_outbox WHERE owner_key = ?", ownerKey);
   return row?.count ?? 0;
 }
 
-export async function synchronizeObservations(ownerKey: string) {
+export async function synchronizeOfflineItems(ownerKey: string) {
   const database = await db();
   const rows = await database.getAllAsync<QueueRow>("SELECT id, payload, captured_at FROM mobile_outbox WHERE owner_key = ? ORDER BY captured_at ASC LIMIT 50", ownerKey);
   if (!rows.length) return { synchronized: 0, failed: 0 };
+  const items = rows.map((row) => {
+    const envelope = decodeOfflineEnvelope(JSON.parse(row.payload));
+    return {
+      id: row.id,
+      type: envelope.type,
+      capturedAt: row.captured_at,
+      payload: envelope.payload,
+    };
+  });
   const response = await mobileApi<{ results: Array<{ id: string; status: string; error?: string }> }>("/api/mobile/sync", {
     method: "POST",
-    body: JSON.stringify({ items: rows.map((row) => ({ id: row.id, type: "SAFETY_OBSERVATION", capturedAt: row.captured_at, payload: JSON.parse(row.payload) })) }),
+    body: JSON.stringify({ items }),
   });
   let synchronized = 0;
   for (const result of response.results) {

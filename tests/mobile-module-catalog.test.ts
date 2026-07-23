@@ -65,3 +65,34 @@ test("every mobile module uses a local application path", () => {
   assert.ok(modules.length > 30);
   assert.equal(modules.every((module) => module.href.startsWith("/") && !module.href.startsWith("//") && !module.href.includes("..")), true);
 });
+
+test("native field capabilities require their write permissions", () => {
+  const modules = getMobileModuleCatalog({
+    permissions: [
+      PermissionKey.VIEW_INCIDENT,
+      PermissionKey.CREATE_INCIDENT,
+      PermissionKey.VIEW_INSPECTIONS,
+      PermissionKey.MANAGE_INSPECTIONS,
+    ],
+    user: {
+      email: "ehs@example.com",
+      role: UserRole.EHS_MANAGER,
+      isActive: true,
+      isPlatformAdmin: false,
+    },
+  });
+
+  assert.equal(modules.find((module) => module.key === "incidents")?.nativeCapability, "INCIDENT_CAPTURE");
+  assert.equal(modules.find((module) => module.key === "inspections")?.nativeCapability, "INSPECTION_EXECUTION");
+
+  const readOnly = getMobileModuleCatalog({
+    permissions: [PermissionKey.VIEW_INCIDENT, PermissionKey.VIEW_INSPECTIONS],
+    user: {
+      email: "viewer@example.com",
+      role: UserRole.AUDITOR,
+      isActive: true,
+      isPlatformAdmin: false,
+    },
+  });
+  assert.equal(readOnly.some((module) => module.nativeCapability), false);
+});

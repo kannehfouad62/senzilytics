@@ -301,7 +301,13 @@ export async function createIncidentService(input: {
   riskLevel: RiskLevel;
   siteId: string;
   location: string;
+  occurredAt?: Date;
   customSubmissions?: PreparedSubmission[];
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
 }) {
   const site = await prisma.site.findFirst({
     where: {
@@ -338,6 +344,8 @@ export async function createIncidentService(input: {
               siteId: input.siteId,
               reportedById:
                 input.userId,
+              occurredAt:
+                input.occurredAt,
             },
             tx
           );
@@ -381,6 +389,20 @@ export async function createIncidentService(input: {
             },
           },
         });
+
+        if (input.offlineSubmission) {
+          await tx.offlineSubmission.create({
+            data: {
+              id: input.offlineSubmission.id,
+              organizationId: input.organizationId,
+              userId: input.userId,
+              recordType: "INCIDENT",
+              recordId: created.id,
+              capturedAt: input.offlineSubmission.capturedAt,
+              payloadHash: input.offlineSubmission.payloadHash,
+            },
+          });
+        }
 
         return created;
       }

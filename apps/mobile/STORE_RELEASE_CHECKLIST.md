@@ -36,6 +36,10 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] Sign out, choose **Use another account**, and verify a second credentials or SSO user can authorize the same device.
 - [ ] Confirm each test role sees only its permitted modules in **Workspace** and can open the corresponding responsive workspace.
 - [ ] Capture an observation offline, restart offline and synchronize after reconnecting.
+- [ ] Capture an incident or near miss offline and verify its tenant, site, reporter, occurrence time and configurable-form answers after synchronization.
+- [ ] Confirm an assigned lead inspector and team member can execute an active inspection offline, including compliant, noncompliant and not-applicable responses.
+- [ ] Create a finding from a noncompliant mobile response and verify the response/finding relationship after synchronization.
+- [ ] Confirm unassigned, completed and closed inspections cannot be downloaded or synchronized by a field user.
 - [ ] Confirm the 72-hour offline authorization policy and session revocation behavior.
 - [ ] Confirm one tenant cannot view or synchronize another tenant's cache, outbox, tasks or notifications.
 - [ ] Register push on a physical device, deliver a test alert and tap it into the Notifications tab.

@@ -93,6 +93,11 @@ export async function saveInspectionResponseService(input: {
   findingDescription?: string | null;
   findingRiskLevel?: RiskLevel | null;
   findingDueDate?: Date | null;
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
 }) {
   const checklistItem =
     await prisma.inspectionChecklistItem.findFirst({
@@ -299,6 +304,20 @@ export async function saveInspectionResponseService(input: {
         null,
     },
   });
+
+  if (input.offlineSubmission) {
+    await prisma.offlineSubmission.create({
+      data: {
+        id: input.offlineSubmission.id,
+        organizationId: input.organizationId,
+        userId: input.userId,
+        recordType: "INSPECTION_RESPONSE",
+        recordId: response.id,
+        capturedAt: input.offlineSubmission.capturedAt,
+        payloadHash: input.offlineSubmission.payloadHash,
+      },
+    });
+  }
 
   return response;
 }
