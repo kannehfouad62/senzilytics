@@ -8,7 +8,7 @@
       "en-US": {
         "title": "Senzilytics",
         "subtitle": "EHS Intelligence in the Field",
-        "description": "Senzilytics gives authorized Premium tenant users secure mobile access to environmental, health, safety, ESG, risk, audit, and compliance workflows. Review assigned work and notifications, capture observations and incidents, execute assigned inspections and Audits, collect photo or document evidence, complete tenant-configured fields, work through unreliable connectivity, and synchronize protected field records with your organization's Senzilytics workspace.\n\nA provisioned Senzilytics Premium tenant account is required. Organization access, roles, permissions, subscription entitlements, account status, and session revocation are enforced by the Senzilytics platform.",
+        "description": "Senzilytics gives authorized Premium tenant users secure mobile access to environmental, health, safety, ESG, risk, audit, and compliance workflows. Review assigned workflow tasks, execute corrective actions, read notifications, capture observations and incidents, complete assigned inspections and Audits, collect photo or document evidence, complete tenant-configured fields, work through unreliable connectivity, and synchronize protected records with your organization's Senzilytics workspace.\n\nA provisioned Senzilytics Premium tenant account is required. Organization access, roles, permissions, subscription entitlements, account status, and session revocation are enforced by the Senzilytics platform.",
         "keywords": [
           "EHS",
           "ESG",

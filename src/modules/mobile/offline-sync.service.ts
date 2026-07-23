@@ -19,6 +19,7 @@ import {
   recordAuditResponseService,
   startAuditExecutionService,
 } from "@/modules/audit/audit-execution.service";
+import { updateCapaStatusService } from "@/modules/capa/capa.service";
 import {
   createPreparedSubmissions,
   prepareCapturedFormSubmissions,
@@ -137,12 +138,24 @@ const auditResponseItemSchema = z.object({
   }),
 });
 
+const capaStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("CAPA_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    actionId: z.string().min(1).max(200),
+    status: z.nativeEnum(Status),
+    comments: z.string().trim().max(5000).optional(),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
   inspectionResponseItemSchema,
   auditStartItemSchema,
   auditResponseItemSchema,
+  capaStatusItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -157,10 +170,18 @@ type SyncResult = {
   error?: string;
 };
 
-export function requiredOfflinePermission(type: OfflineItem["type"]) {
+export function requiredOfflinePermission(
+  type: OfflineItem["type"],
+  status?: Status
+) {
   if (type === "SAFETY_OBSERVATION") return PermissionKey.CREATE_OBSERVATION;
   if (type === "INCIDENT") return PermissionKey.CREATE_INCIDENT;
   if (type === "INSPECTION_RESPONSE") return PermissionKey.MANAGE_INSPECTIONS;
+  if (type === "CAPA_STATUS") {
+    return status === Status.COMPLETED || status === Status.CLOSED
+      ? PermissionKey.CLOSE_CAPA
+      : PermissionKey.UPDATE_CAPA;
+  }
   return PermissionKey.MANAGE_AUDITS;
 }
 
@@ -204,7 +225,11 @@ export async function syncOfflineSubmissionsService(input: {
 
   const results: SyncResult[] = [];
   for (const item of parsed.data.items) {
-    if (!granted.has(requiredOfflinePermission(item.type))) {
+    const requiredPermission = requiredOfflinePermission(
+      item.type,
+      item.type === "CAPA_STATUS" ? item.payload.status : undefined
+    );
+    if (!granted.has(requiredPermission)) {
       results.push({ id: item.id, status: "failed", error: "Your role cannot synchronize this record type." });
       continue;
     }
@@ -232,8 +257,10 @@ export async function syncOfflineSubmissionsService(input: {
         results.push(await syncInspectionResponse(input, item, payloadHash));
       } else if (item.type === "AUDIT_START") {
         results.push(await syncAuditStart(input, item, payloadHash));
-      } else {
+      } else if (item.type === "AUDIT_RESPONSE") {
         results.push(await syncAuditResponse(input, item, payloadHash));
+      } else {
+        results.push(await syncCapaStatus(input, item, payloadHash));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -476,9 +503,29 @@ async function syncAuditResponse(
   return { id: item.id, status: "synced", recordId };
 }
 
+async function syncCapaStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof capaStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const action = await updateCapaStatusService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    actionId: item.payload.actionId,
+    status: item.payload.status,
+    comments: item.payload.comments || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: action.id };
+}
+
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|assigned|authorized|planned|scheduled|started|completed|closed|site|organization|evidence|photo|comment|not applicable/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|assigned|authorized|planned|scheduled|started|completed|closed|site|organization|evidence|photo|comment|not applicable/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

@@ -13,6 +13,7 @@ import { isMobileWorkspaceCacheFresh } from "./session-lifecycle";
 import type {
   AuditResponsePayload,
   AuditStartPayload,
+  CapaStatusPayload,
   IncidentPayload,
   InspectionResponsePayload,
   MobileBootstrap,
@@ -24,7 +25,8 @@ type EvidenceTargetType =
   | "SAFETY_OBSERVATION"
   | "INCIDENT"
   | "INSPECTION"
-  | "AUDIT_QUESTION";
+  | "AUDIT_QUESTION"
+  | "CORRECTIVE_ACTION";
 type EvidenceRow = {
   id: string;
   parent_submission_id: string | null;
@@ -131,7 +133,9 @@ async function queueOfflineItem(
       await insertEvidence(transaction, ownerKey, {
         ...evidence,
         parentSubmissionId:
-          type === "SAFETY_OBSERVATION" || type === "INCIDENT"
+          type === "SAFETY_OBSERVATION" ||
+          type === "INCIDENT" ||
+          type === "CAPA_STATUS"
             ? id
             : undefined,
       });
@@ -200,6 +204,20 @@ export async function queueAuditResponse(
   });
 }
 
+export async function queueCapaStatus(
+  ownerKey: string,
+  payload: CapaStatusPayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "CAPA_STATUS", payload, {
+    files: evidence,
+    targetType: "CORRECTIVE_ACTION",
+    entityId: payload.actionId,
+    title: `CAPA evidence: ${payload.status.replaceAll("_", " ")}`,
+    description: payload.comments,
+  });
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([
@@ -229,11 +247,23 @@ export async function synchronizeOfflineItems(ownerKey: string) {
   );
   const responses = decoded.filter(({ envelope }) =>
     envelope.type === "INSPECTION_RESPONSE" ||
-    envelope.type === "AUDIT_RESPONSE"
+    envelope.type === "AUDIT_RESPONSE" ||
+    envelope.type === "CAPA_STATUS"
   );
   const first = await synchronizeRows(database, parents);
   const files = await synchronizeEvidence(database, ownerKey);
-  const last = await synchronizeRows(database, responses);
+  const pendingEvidenceParents = new Set(
+    (await database.getAllAsync<{ parent_submission_id: string }>(
+      `SELECT DISTINCT parent_submission_id
+       FROM mobile_evidence
+       WHERE owner_key = ? AND parent_submission_id IS NOT NULL`,
+      ownerKey
+    )).map((row) => row.parent_submission_id)
+  );
+  const last = await synchronizeRows(
+    database,
+    responses.filter(({ row }) => !pendingEvidenceParents.has(row.id))
+  );
   return {
     synchronized: first.synchronized + files.synchronized + last.synchronized,
     failed: first.failed + files.failed + last.failed,

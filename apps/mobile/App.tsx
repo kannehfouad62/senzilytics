@@ -17,6 +17,7 @@ import {
 import * as Network from "expo-network";
 import * as Linking from "expo-linking";
 import { beginMobileSignIn, clearMobileSession, getStoredMobileOwnerKey, loadMobileWorkspace, logoutMobileSession, mobileApi, MobileApiError, mobileWebUrl, restoreMobileSession } from "./src/api";
+import { ActionCenterScreen, type ActionCenterView } from "./src/action-center";
 import {
   capturePhotoEvidence,
   MAX_EVIDENCE_FILES_PER_RECORD,
@@ -52,13 +53,12 @@ import type {
   MobileInspection,
   MobileInspectionItem,
   MobileModule,
-  MobileNotification,
   ObservationPayload,
   RuntimeField,
   RuntimeForm,
 } from "./src/types";
 
-type Tab = "home" | "workspace" | "capture" | "inspections" | "audits" | "notifications" | "settings";
+type Tab = "home" | "workspace" | "capture" | "inspections" | "audits" | "actions" | "settings";
 type CaptureMode = "observation" | "incident";
 type FieldValue = string | boolean | string[];
 const observationTypes = ["UNSAFE_ACT", "UNSAFE_CONDITION", "POSITIVE_PRACTICE", "ENVIRONMENTAL", "QUALITY", "OTHER"] as const;
@@ -70,6 +70,7 @@ export default function App() {
   const [authState, setAuthState] = useState<"loading" | "signed-out" | "signed-in">("loading");
   const [workspace, setWorkspace] = useState<MobileBootstrap | null>(null);
   const [tab, setTab] = useState<Tab>("home");
+  const [actionCenterView, setActionCenterView] = useState<ActionCenterView>("tasks");
   const [captureMode, setCaptureMode] = useState<CaptureMode>("observation");
   const [pending, setPending] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -79,6 +80,17 @@ export default function App() {
 
   const ownerKey = workspace ? `${workspace.organization.id}:${workspace.user.id}` : "";
   const online = network.isConnected !== false && network.isInternetReachable !== false;
+  const openWorkspacePath = async (path: string) => {
+    if (!online) {
+      setNotice("Connect to the internet to open the complete operational workspace.");
+      return;
+    }
+    try {
+      await Linking.openURL(mobileWebUrl(path));
+    } catch (error) {
+      setNotice(messageOf(error));
+    }
+  };
 
   const refreshWorkspace = useCallback(async () => {
     const next = await loadMobileWorkspace();
@@ -151,7 +163,8 @@ export default function App() {
   }, [authState, online, ownerKey, sync]);
 
   useEffect(() => subscribeToMobileNotificationResponses(() => {
-    setTab("notifications");
+    setActionCenterView("alerts");
+    setTab("actions");
     if (authState === "signed-in" && online) void refreshWorkspace().catch((error) => setNotice(`Notification refresh paused: ${messageOf(error)}`));
   }), [authState, online, refreshWorkspace]);
 
@@ -187,18 +200,18 @@ export default function App() {
         <View style={[styles.onlineDot, { backgroundColor: network.isConnected === false ? "#fb7185" : "#34d399" }]} />
       </View>
       {notice ? <Pressable onPress={() => setNotice("")} style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
-      {tab === "home" && <HomeScreen workspace={workspace} pending={pending} busy={busy} onRefresh={async () => { try { return await refreshWorkspace(); } catch (error) { setNotice(`Refresh paused: ${messageOf(error)}`); return workspace; } }} onSync={sync} onNavigate={setTab} />}
-      {tab === "workspace" && <WorkspaceScreen modules={workspace.modules ?? []} online={online} onCapture={(mode) => { setCaptureMode(mode); setTab("capture"); }} onInspect={() => setTab("inspections")} onAudit={() => setTab("audits")} onOpen={async (module) => { if (!online) { setNotice("Connect to the internet to open the complete operational workspace. Offline field capture remains available."); return; } try { await Linking.openURL(mobileWebUrl(module.href)); } catch (error) { setNotice(messageOf(error)); } }} />}
+      {tab === "home" && <HomeScreen workspace={workspace} pending={pending} busy={busy} onRefresh={async () => { try { return await refreshWorkspace(); } catch (error) { setNotice(`Refresh paused: ${messageOf(error)}`); return workspace; } }} onSync={sync} onNavigate={setTab} onOpenActions={(view) => { setActionCenterView(view); setTab("actions"); }} />}
+      {tab === "workspace" && <WorkspaceScreen modules={workspace.modules ?? []} online={online} onCapture={(mode) => { setCaptureMode(mode); setTab("capture"); }} onInspect={() => setTab("inspections")} onAudit={() => setTab("audits")} onActions={(view) => { setActionCenterView(view); setTab("actions"); }} onOpen={async (module) => openWorkspacePath(module.href)} />}
       {tab === "capture" && <CaptureScreen mode={captureMode} onModeChange={setCaptureMode} workspace={workspace} ownerKey={ownerKey} online={online} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "inspections" && <InspectionsScreen inspections={workspace.inspections ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "audits" && <AuditsScreen audits={workspace.audits ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "notifications" && <NotificationsScreen notifications={workspace.notifications} onRead={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
+      {tab === "actions" && <ActionCenterScreen workspace={workspace} ownerKey={ownerKey} online={online} view={actionCenterView} onViewChange={setActionCenterView} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} onOpenPath={openWorkspacePath} onReadNotification={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
       {tab === "settings" && <SettingsScreen workspace={workspace} pending={pending} onEnablePush={async () => { setBusy(true); try { setNotice(await registerForMobilePush()); } catch (error) { setNotice(messageOf(error)); } finally { setBusy(false); } }} onLogout={async () => { setBusy(true); try { await logoutMobileSession(); await clearWorkspaceCache(ownerKey); setWorkspace(null); setVerifiedAt(null); setAuthState("signed-out"); setTab("home"); } finally { setBusy(false); } }} />}
       <View style={styles.tabs}>
         <TabButton active={tab === "home"} label="Home" onPress={() => setTab("home")} />
         <TabButton active={tab === "workspace"} label="Workspace" onPress={() => setTab("workspace")} />
         <TabButton active={tab === "capture" || tab === "inspections" || tab === "audits"} label="Capture" badge={pending || undefined} onPress={() => setTab("capture")} />
-        <TabButton active={tab === "notifications"} label="Alerts" badge={unread || undefined} onPress={() => setTab("notifications")} />
+        <TabButton active={tab === "actions"} label="Actions" badge={unread + workspace.tasks.length || undefined} onPress={() => setTab("actions")} />
         <TabButton active={tab === "settings"} label="Settings" onPress={() => setTab("settings")} />
       </View>
     </SafeAreaView>
@@ -211,18 +224,19 @@ function SignInScreen({ busy, notice, onSignIn }: { busy: boolean; notice: strin
   return <SafeAreaView style={[styles.app, styles.center]}><View style={styles.signInCard}><Image source={require("./assets/app-icon.png")} style={styles.logo} resizeMode="contain" /><Text style={styles.eyebrow}>SENZILYTICS · EHS INTELLIGENCE</Text><Text style={styles.signInTitle}>Your complete EHS workspace.</Text><Text style={styles.muted}>Use your Senzilytics, Microsoft, or Okta account. The authorization screen always identifies the active account and lets you choose a different user before access is issued.</Text>{notice ? <Text style={styles.error}>{notice}</Text> : null}<PrimaryButton label={busy ? "Opening account selection…" : "Choose account and sign in"} disabled={busy} onPress={onSignIn} /><Text style={styles.securityNote}>Device-bound session · Encrypted credential storage · Role-aware Premium access</Text></View></SafeAreaView>;
 }
 
-function HomeScreen({ workspace, pending, busy, onRefresh, onSync, onNavigate }: { workspace: MobileBootstrap; pending: number; busy: boolean; onRefresh: () => Promise<MobileBootstrap>; onSync: () => void; onNavigate: (tab: Tab) => void }) {
+function HomeScreen({ workspace, pending, busy, onRefresh, onSync, onNavigate, onOpenActions }: { workspace: MobileBootstrap; pending: number; busy: boolean; onRefresh: () => Promise<MobileBootstrap>; onSync: () => void; onNavigate: (tab: Tab) => void; onOpenActions: (view: ActionCenterView) => void }) {
   const [refreshing, setRefreshing] = useState(false);
   const unread = workspace.notifications.filter((item) => !item.readAt).length;
-  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} refreshControl={<RefreshControl tintColor="#67e8f9" refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await onRefresh(); } finally { setRefreshing(false); } }} />}><Text style={styles.eyebrow}>MOBILE COMMAND CENTER</Text><Text style={styles.pageTitle}>Welcome, {workspace.user.name.split(" ")[0]}</Text><Text style={styles.muted}>{workspace.organization.subscriptionPlan} workspace · {humanize(workspace.user.role)}</Text><View style={styles.metricGrid}><Metric label="Active tasks" value={workspace.tasks.length} /><Metric label="Unread alerts" value={unread} /><Metric label="Offline queue" value={pending} /><Metric label="Assigned field work" value={(workspace.inspections ?? []).length + (workspace.audits ?? []).length} /></View><Card accent><Text style={styles.cardTitle}>Your authorized workspace</Text><Text style={styles.muted}>Open every Senzilytics function assigned to your role. Modules and native actions you cannot access are automatically hidden.</Text><SecondaryButton label="Explore my workspace" onPress={() => onNavigate("workspace")} /></Card><Card><Text style={styles.cardTitle}>Fast field actions</Text><Text style={styles.muted}>Capture authorized field records and complete assigned inspections and Audits even when connectivity is unreliable. Every queued record remains tenant- and user-scoped.</Text><View style={styles.row}><SecondaryButton label="Open field workspace" onPress={() => onNavigate("workspace")} /><SecondaryButton label={busy ? "Syncing…" : "Sync now"} onPress={onSync} disabled={busy} /></View></Card><Text style={styles.sectionTitle}>Assigned workflow</Text>{workspace.tasks.length ? workspace.tasks.slice(0, 8).map((task) => <Card key={task.id}><Text style={styles.cardTitle}>{task.name}</Text><Text style={styles.muted}>{task.instance.template.name} · {humanize(task.instance.entityType)}</Text><Text style={styles.due}>{task.dueAt ? `Due ${formatDate(task.dueAt)}` : "No due date"}</Text></Card>) : <EmptyState text="No active workflow steps are assigned to you." />}</ScrollView>;
+  const assignedCapas = (workspace.correctiveActions ?? []).filter((action) => action.isAssignedToCurrentUser && !["COMPLETED", "CLOSED"].includes(action.status)).length;
+  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} refreshControl={<RefreshControl tintColor="#67e8f9" refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await onRefresh(); } finally { setRefreshing(false); } }} />}><Text style={styles.eyebrow}>MOBILE COMMAND CENTER</Text><Text style={styles.pageTitle}>Welcome, {workspace.user.name.split(" ")[0]}</Text><Text style={styles.muted}>{workspace.organization.subscriptionPlan} workspace · {humanize(workspace.user.role)}</Text><View style={styles.metricGrid}><Metric label="Workflow tasks" value={workspace.tasks.length} /><Metric label="My open CAPAs" value={assignedCapas} /><Metric label="Unread alerts" value={unread} /><Metric label="Offline queue" value={pending} /></View><Card accent><Text style={styles.cardTitle}>Your authorized workspace</Text><Text style={styles.muted}>Open every Senzilytics function assigned to your role. Modules and native actions you cannot access are automatically hidden.</Text><SecondaryButton label="Explore my workspace" onPress={() => onNavigate("workspace")} /></Card><Card accent><Text style={styles.cardTitle}>Native Action Center</Text><Text style={styles.muted}>Review assigned workflow steps, update corrective actions with evidence, and respond to notifications from one operational inbox.</Text><SecondaryButton label="Open my actions" onPress={() => onOpenActions("tasks")} /></Card><Card><Text style={styles.cardTitle}>Fast field actions</Text><Text style={styles.muted}>Capture authorized field records and complete assigned inspections and Audits even when connectivity is unreliable. Every queued record remains tenant- and user-scoped.</Text><View style={styles.row}><SecondaryButton label="Open field workspace" onPress={() => onNavigate("workspace")} /><SecondaryButton label={busy ? "Syncing…" : "Sync now"} onPress={onSync} disabled={busy} /></View></Card><Text style={styles.sectionTitle}>Assigned workflow</Text>{workspace.tasks.length ? workspace.tasks.slice(0, 8).map((task) => <Pressable key={task.id} onPress={() => onOpenActions("tasks")}><Card><Text style={styles.cardTitle}>{task.name}</Text><Text style={styles.muted}>{task.instance.template.name} · {humanize(task.instance.entityType)}</Text><Text style={styles.due}>{task.dueAt ? `Due ${formatDate(task.dueAt)}` : "No due date"}</Text></Card></Pressable>) : <EmptyState text="No active workflow steps are assigned to you." />}</ScrollView>;
 }
 
-function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onOpen }: { modules: MobileModule[]; online: boolean; onCapture: (mode: CaptureMode) => void; onInspect: () => void; onAudit: () => void; onOpen: (module: MobileModule) => Promise<void> }) {
+function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onActions, onOpen }: { modules: MobileModule[]; online: boolean; onCapture: (mode: CaptureMode) => void; onInspect: () => void; onAudit: () => void; onActions: (view: ActionCenterView) => void; onOpen: (module: MobileModule) => Promise<void> }) {
   const [query, setQuery] = useState("");
   const normalized = query.trim().toLowerCase();
   const visible = modules.filter((module) => !normalized || `${module.label} ${module.description} ${humanize(module.category)}`.toLowerCase().includes(normalized));
   const categories: MobileModule["category"][] = ["COMMAND", "SAFETY", "ASSURANCE", "GOVERNANCE", "ADMINISTRATION"];
-  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><Text style={styles.eyebrow}>ROLE-AWARE ACCESS</Text><Text style={styles.pageTitle}>My workspace</Text><Text style={styles.muted}>Your tenant and role determine what appears here. Operational pages open in Senzilytics&apos; responsive secure workspace; authorized native field workflows remain available offline.</Text><Input value={query} onChangeText={setQuery} placeholder="Search my authorized modules" autoCapitalize="none" />{!online ? <View style={styles.offlineBanner}><Text style={styles.offlineBannerText}>You are offline. Complete operational workspaces require a connection, but authorized capture, inspection, and Audit execution remain available.</Text></View> : null}{categories.map((category) => { const categoryModules = visible.filter((module) => module.category === category); if (!categoryModules.length) return null; return <View key={category} style={styles.moduleSection}><Text style={styles.sectionTitle}>{humanize(category)}</Text>{categoryModules.map((module) => <Card key={module.key} accent={Boolean(module.nativeCapability)}><View style={styles.moduleHeading}><View style={styles.moduleMark}><Text style={styles.moduleMarkText}>{module.label.slice(0, 1)}</Text></View><View style={styles.moduleCopy}><Text style={styles.cardTitle}>{module.label}</Text><Text style={styles.muted}>{module.description}</Text></View></View><View style={styles.row}>{module.nativeCapability === "OBSERVATION_CAPTURE" ? <SecondaryButton label="Capture observation" onPress={() => onCapture("observation")} /> : null}{module.nativeCapability === "INCIDENT_CAPTURE" ? <SecondaryButton label="Report incident" onPress={() => onCapture("incident")} /> : null}{module.nativeCapability === "INSPECTION_EXECUTION" ? <SecondaryButton label="Assigned inspections" onPress={onInspect} /> : null}{module.nativeCapability === "AUDIT_EXECUTION" ? <SecondaryButton label="Assigned Audits" onPress={onAudit} /> : null}<SecondaryButton label={online ? "Open workspace" : "Connection required"} disabled={!online} onPress={() => { void onOpen(module); }} /></View></Card>)}</View>; })}{!visible.length ? <EmptyState text="No authorized module matches your search." /> : null}</ScrollView>;
+  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><Text style={styles.eyebrow}>ROLE-AWARE ACCESS</Text><Text style={styles.pageTitle}>My workspace</Text><Text style={styles.muted}>Your tenant and role determine what appears here. Operational pages open in Senzilytics&apos; responsive secure workspace; authorized native field workflows remain available offline.</Text><Input value={query} onChangeText={setQuery} placeholder="Search my authorized modules" autoCapitalize="none" />{!online ? <View style={styles.offlineBanner}><Text style={styles.offlineBannerText}>You are offline. Native field capture, assigned inspections and Audits, and corrective-action progress remain available.</Text></View> : null}{categories.map((category) => { const categoryModules = visible.filter((module) => module.category === category); if (!categoryModules.length) return null; return <View key={category} style={styles.moduleSection}><Text style={styles.sectionTitle}>{humanize(category)}</Text>{categoryModules.map((module) => <Card key={module.key} accent={Boolean(module.nativeCapability)}><View style={styles.moduleHeading}><View style={styles.moduleMark}><Text style={styles.moduleMarkText}>{module.label.slice(0, 1)}</Text></View><View style={styles.moduleCopy}><Text style={styles.cardTitle}>{module.label}</Text><Text style={styles.muted}>{module.description}</Text></View></View><View style={styles.row}>{module.nativeCapability === "ACTION_CENTER" ? <SecondaryButton label="Open native task inbox" onPress={() => onActions("tasks")} /> : null}{module.nativeCapability === "CAPA_EXECUTION" ? <SecondaryButton label="Open native CAPA" onPress={() => onActions("capa")} /> : null}{module.nativeCapability === "OBSERVATION_CAPTURE" ? <SecondaryButton label="Capture observation" onPress={() => onCapture("observation")} /> : null}{module.nativeCapability === "INCIDENT_CAPTURE" ? <SecondaryButton label="Report incident" onPress={() => onCapture("incident")} /> : null}{module.nativeCapability === "INSPECTION_EXECUTION" ? <SecondaryButton label="Assigned inspections" onPress={onInspect} /> : null}{module.nativeCapability === "AUDIT_EXECUTION" ? <SecondaryButton label="Assigned Audits" onPress={onAudit} /> : null}<SecondaryButton label={online ? "Open workspace" : "Connection required"} disabled={!online} onPress={() => { void onOpen(module); }} /></View></Card>)}</View>; })}{!visible.length ? <EmptyState text="No authorized module matches your search." /> : null}</ScrollView>;
 }
 
 function CaptureScreen({ mode, onModeChange, ...props }: { mode: CaptureMode; onModeChange: (mode: CaptureMode) => void; workspace: MobileBootstrap; ownerKey: string; online: boolean; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
@@ -519,10 +533,6 @@ function DynamicField({ field, value, onChange }: { field: RuntimeField; value: 
   if (field.fieldType === "SINGLE_SELECT") return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><ChipGroup values={options.map((option) => ({ value: option, label: option }))} selected={typeof value === "string" ? value : ""} onSelect={onChange} /></View>;
   if (field.fieldType === "MULTI_SELECT") { const selected = Array.isArray(value) ? value : []; return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><View style={styles.chips}>{options.map((option) => <Pressable key={option} style={[styles.chip, selected.includes(option) && styles.chipOn]} onPress={() => onChange(selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option])}><Text style={[styles.chipText, selected.includes(option) && styles.chipTextOn]}>{option}</Text></Pressable>)}</View></View>; }
   return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} />{field.description ? <Text style={styles.fieldHelp}>{field.description}</Text> : null}<Input value={typeof value === "string" ? value : ""} onChangeText={onChange} placeholder={field.placeholder || placeholderFor(field.fieldType)} multiline={field.fieldType === "LONG_TEXT"} keyboardType={field.fieldType === "NUMBER" ? "decimal-pad" : field.fieldType === "EMAIL" ? "email-address" : field.fieldType === "PHONE" ? "phone-pad" : "default"} /></View>;
-}
-
-function NotificationsScreen({ notifications, onRead }: { notifications: MobileNotification[]; onRead: (id: string) => Promise<void> }) {
-  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><Text style={styles.eyebrow}>ACTION CENTER</Text><Text style={styles.pageTitle}>Notifications</Text>{notifications.length ? notifications.map((item) => <Pressable key={item.id} onPress={() => { if (!item.readAt) void onRead(item.id); }}><Card accent={!item.readAt}><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.muted}>{item.message}</Text><Text style={styles.due}>{formatDate(item.createdAt)}{item.readAt ? "" : " · New"}</Text></Card></Pressable>) : <EmptyState text="You have no notifications." />}</ScrollView>;
 }
 
 function SettingsScreen({ workspace, pending, onEnablePush, onLogout }: { workspace: MobileBootstrap; pending: number; onEnablePush: () => void; onLogout: () => void }) {

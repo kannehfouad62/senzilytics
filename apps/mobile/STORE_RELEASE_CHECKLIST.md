@@ -42,6 +42,10 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] Confirm unassigned, completed and closed inspections cannot be downloaded or synchronized by a field user.
 - [ ] Start an assigned Audit offline, answer multiple question types, reconnect, and verify start/response history is synchronized in order.
 - [ ] Confirm required comments, evidence, response options, not-applicable rules, scoring and automatic Audit findings match the web execution workspace.
+- [ ] Confirm **Actions** combines only the signed-in user’s authorized workflow tasks, CAPAs and notifications.
+- [ ] Record CAPA progress offline, attach evidence, reconnect, and verify every file is registered before the lifecycle status changes.
+- [ ] Confirm update-only roles cannot select **Completed** or **Closed**, while an authorized close role can complete and close the CAPA.
+- [ ] Confirm read-only CAPA roles see context and source traceability without mutation controls.
 - [ ] Capture observation and incident photos offline, force-close/reopen, reconnect, and verify private evidence is linked to the synchronized record.
 - [ ] Select a permitted document and verify the 10 MB limit, unsupported-file feedback, encrypted queue count and private download path.
 - [ ] Complete an inspection photo question and a required-photo Audit question; verify evidence synchronizes before the dependent response.
@@ -49,7 +53,7 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] Confirm users without editable Audit membership cannot download or synchronize Audit execution data.
 - [ ] Confirm the 72-hour offline authorization policy and session revocation behavior.
 - [ ] Confirm one tenant cannot view or synchronize another tenant's cache, outbox, tasks or notifications.
-- [ ] Register push on a physical device, deliver a test alert and tap it into the Notifications tab.
+- [ ] Register push on a physical device, deliver a test alert and tap it into the **Alerts** view inside **Actions**.
 - [ ] Test declined notification permission and confirm core app use remains available.
 - [ ] Sign out with and without connectivity and verify protected workspace access is removed.
 

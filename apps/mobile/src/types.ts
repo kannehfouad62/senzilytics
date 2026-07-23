@@ -42,9 +42,39 @@ export type MobileNotification = {
 export type MobileTask = {
   id: string;
   name: string;
+  stepType: string;
+  assignedRole: string | null;
   dueAt: string | null;
   status: string;
+  startedAt: string | null;
+  href: string | null;
   instance: { entityType: string; entityId: string; template: { name: string } };
+};
+
+export type MobileCorrectiveActionStatus =
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CLOSED"
+  | "OVERDUE";
+
+export type MobileCorrectiveAction = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: MobileCorrectiveActionStatus;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  dueDate: string;
+  assignedTo: { id: string; name: string };
+  isAssignedToCurrentUser: boolean;
+  source: { type: string; label: string; href: string };
+};
+
+export type MobileCapaCapabilities = {
+  canView: boolean;
+  canUpdate: boolean;
+  canClose: boolean;
+  allowedStatuses: MobileCorrectiveActionStatus[];
 };
 
 export type MobileModule = {
@@ -53,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION";
 };
 
 export type MobileInspectionResponse = {
@@ -189,6 +219,8 @@ export type MobileBootstrap = {
   incidentForms: RuntimeForm[];
   inspections: MobileInspection[];
   audits: MobileAudit[];
+  correctiveActions: MobileCorrectiveAction[];
+  capaCapabilities: MobileCapaCapabilities;
   notifications: MobileNotification[];
   tasks: MobileTask[];
   modules: MobileModule[];
@@ -252,4 +284,10 @@ export type AuditResponsePayload = {
   comments?: string;
   evidenceNote?: string;
   evidenceUrl?: string;
+};
+
+export type CapaStatusPayload = {
+  actionId: string;
+  status: MobileCorrectiveActionStatus;
+  comments?: string;
 };

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PermissionKey } from "@prisma/client";
+import { PermissionKey, Status } from "@prisma/client";
 import {
   offlineSyncRequestSchema,
   requiredOfflinePermission,
@@ -130,12 +130,43 @@ test("mobile Audit sync rejects unassessed results and malformed evidence URLs",
   }
 });
 
+test("mobile synchronization accepts governed CAPA progress and closure", () => {
+  const parsed = offlineSyncRequestSchema.safeParse({
+    items: [
+      {
+        id: "d55b0f7d-c75c-48ee-8f4e-9c106709f3ed",
+        type: "CAPA_STATUS",
+        capturedAt,
+        payload: {
+          actionId: "action-1",
+          status: "IN_PROGRESS",
+          comments: "Replacement guarding has been ordered.",
+        },
+      },
+      {
+        id: "23dd23ca-c46e-4b7f-a153-a15ce3810de8",
+        type: "CAPA_STATUS",
+        capturedAt,
+        payload: {
+          actionId: "action-2",
+          status: "CLOSED",
+          comments: "Verified effective during the follow-up inspection.",
+        },
+      },
+    ],
+  });
+  assert.equal(parsed.success, true);
+});
+
 test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("SAFETY_OBSERVATION"), PermissionKey.CREATE_OBSERVATION);
   assert.equal(requiredOfflinePermission("INCIDENT"), PermissionKey.CREATE_INCIDENT);
   assert.equal(requiredOfflinePermission("INSPECTION_RESPONSE"), PermissionKey.MANAGE_INSPECTIONS);
   assert.equal(requiredOfflinePermission("AUDIT_START"), PermissionKey.MANAGE_AUDITS);
   assert.equal(requiredOfflinePermission("AUDIT_RESPONSE"), PermissionKey.MANAGE_AUDITS);
+  assert.equal(requiredOfflinePermission("CAPA_STATUS", Status.IN_PROGRESS), PermissionKey.UPDATE_CAPA);
+  assert.equal(requiredOfflinePermission("CAPA_STATUS", Status.COMPLETED), PermissionKey.CLOSE_CAPA);
+  assert.equal(requiredOfflinePermission("CAPA_STATUS", Status.CLOSED), PermissionKey.CLOSE_CAPA);
 });
 
 test("mobile outbox decoder preserves legacy observation rows", () => {
@@ -151,5 +182,9 @@ test("mobile outbox decoder preserves legacy observation rows", () => {
   assert.deepEqual(decodeOfflineEnvelope({ type: "AUDIT_START", payload: { auditId: "audit-1" } }), {
     type: "AUDIT_START",
     payload: { auditId: "audit-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "CAPA_STATUS", payload: { actionId: "action-1", status: "IN_PROGRESS" } }), {
+    type: "CAPA_STATUS",
+    payload: { actionId: "action-1", status: "IN_PROGRESS" },
   });
 });

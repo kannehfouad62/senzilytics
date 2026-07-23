@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { authenticateMobileRequest, MobileAuthError } from "@/modules/mobile/mobile-auth.service";
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
+import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.service";
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, tasks, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -44,31 +45,11 @@ export async function GET(request: Request) {
         orderBy: { createdAt: "desc" },
         take: 25,
       }),
-      prisma.workflowInstanceStep.findMany({
-        where: {
-          status: "IN_PROGRESS",
-          instance: { organizationId: organization.id, status: "ACTIVE" },
-          OR: [
-            { assignedUserId: user.id },
-            { assignedRole: user.role },
-            { assignedUserId: null, assignedRole: null },
-          ],
-        },
-        select: {
-          id: true,
-          name: true,
-          dueAt: true,
-          status: true,
-          instance: {
-            select: {
-              entityType: true,
-              entityId: true,
-              template: { select: { name: true } },
-            },
-          },
-        },
-        orderBy: { dueAt: { sort: "asc", nulls: "last" } },
-        take: 25,
+      getMobileActionCenter({
+        organizationId: organization.id,
+        userId: user.id,
+        userRole: user.role,
+        permissions: assigned,
       }),
       canExecuteInspections
         ? prisma.inspection.findMany({
@@ -315,7 +296,9 @@ export async function GET(request: Request) {
       inspections,
       audits,
       notifications,
-      tasks,
+      tasks: actionCenter.tasks,
+      correctiveActions: actionCenter.correctiveActions,
+      capaCapabilities: actionCenter.capabilities,
       modules,
     }, { headers: { "cache-control": "no-store" } });
   } catch (error) {

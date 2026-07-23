@@ -17,7 +17,7 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION";
   nativePermission?: PermissionKey;
 };
 
@@ -25,11 +25,11 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "dashboard", label: "Executive Dashboard", description: "Enterprise EHS performance, risk signals, and leadership indicators.", href: "/dashboard", category: "COMMAND", permission: PermissionKey.VIEW_DASHBOARD },
   { key: "assurance", label: "Operational Assurance", description: "Connected assurance performance and control effectiveness.", href: "/assurance", category: "COMMAND", permission: PermissionKey.VIEW_DASHBOARD },
   { key: "intelligence", label: "AI Intelligence", description: "Governed EHS intelligence, analysis, and decision support.", href: "/intelligence", category: "COMMAND", permission: PermissionKey.USE_AI },
-  { key: "tasks", label: "My Tasks", description: "Assigned workflow steps, due work, and required actions.", href: "/tasks", category: "COMMAND" },
+  { key: "tasks", label: "My Tasks", description: "Assigned workflow steps, due work, and required actions.", href: "/tasks", category: "COMMAND", nativeCapability: "ACTION_CENTER" },
   { key: "observations", label: "Safety Observations", description: "Capture, review, and manage safety observations.", href: "/observations", category: "SAFETY", anyPermissions: [PermissionKey.VIEW_OBSERVATIONS, PermissionKey.CREATE_OBSERVATION], nativeCapability: "OBSERVATION_CAPTURE", nativePermission: PermissionKey.CREATE_OBSERVATION },
   { key: "behavior-safety", label: "Behavior-Based Safety", description: "Behavior programs, coaching, trends, and interventions.", href: "/behavior-safety", category: "SAFETY", permission: PermissionKey.VIEW_BEHAVIOR_SAFETY },
   { key: "incidents", label: "Incidents", description: "Report, investigate, and monitor incidents and near misses.", href: "/incidents", category: "SAFETY", anyPermissions: [PermissionKey.VIEW_INCIDENT, PermissionKey.CREATE_INCIDENT], nativeCapability: "INCIDENT_CAPTURE", nativePermission: PermissionKey.CREATE_INCIDENT },
-  { key: "corrective-actions", label: "Corrective Actions", description: "CAPA ownership, verification, closure, and overdue exposure.", href: "/actions", category: "SAFETY", anyPermissions: [PermissionKey.CREATE_CAPA, PermissionKey.UPDATE_CAPA, PermissionKey.CLOSE_CAPA, PermissionKey.VIEW_REPORTS] },
+  { key: "corrective-actions", label: "Corrective Actions", description: "CAPA ownership, verification, closure, and overdue exposure.", href: "/actions", category: "SAFETY", anyPermissions: [PermissionKey.CREATE_CAPA, PermissionKey.UPDATE_CAPA, PermissionKey.CLOSE_CAPA, PermissionKey.VIEW_REPORTS], nativeCapability: "CAPA_EXECUTION" },
   { key: "risks", label: "Risk Register", description: "Enterprise hazards, controls, reviews, and residual risk.", href: "/risks", category: "SAFETY", permission: PermissionKey.VIEW_RISKS },
   { key: "jsa", label: "JSA / JHA", description: "Job steps, hazards, controls, approvals, and acknowledgements.", href: "/risks/jsa", category: "SAFETY", permission: PermissionKey.VIEW_RISKS },
   { key: "moc", label: "Management of Change", description: "Change requests, risk reviews, approvals, and implementation tasks.", href: "/moc", category: "SAFETY", permission: PermissionKey.VIEW_MOC },

@@ -32,8 +32,8 @@ Create a dedicated non-production Premium tenant and a least-privilege review us
 Before submission, verify that the account:
 
 - remains active for the entire review period;
-- has permission to view tasks and notifications and create observations;
-- has at least two fictional sites, assigned tasks, notifications and published observation form fields;
+- has permission to view tasks and notifications, update assigned CAPAs, and create observations;
+- has at least two fictional sites, assigned tasks, assigned CAPAs, notifications and published observation form fields;
 - contains no employee, customer, medical, incident or operational production data;
 - is excluded from ordinary password-expiry or automated cleanup during review;
 - can be revoked immediately after review from the tenant user administration workflow.
@@ -58,10 +58,10 @@ Sign-in steps
 5. The browser returns to the app through the senzilytics://auth callback.
 
 Suggested review flow
-- Home: review fictional assigned workflow tasks and workspace metrics.
+- Home: review fictional assigned workflow tasks, CAPAs and workspace metrics.
+- Actions: inspect the workflow inbox, record fictional CAPA progress with evidence, and review tenant alerts.
 - Capture: select a fictional site and save a safety observation.
 - Offline behavior: saved records remain encrypted on device and synchronize when connectivity returns.
-- Alerts: review fictional tenant notifications.
 - Settings: inspect privacy, support, account/data deletion and sign-out controls.
 
 All review data is fictional. The app has no in-app purchases, advertisements, tracking or public account-registration flow. Contact [REVIEW_CONTACT_EMAIL] or [REVIEW_CONTACT_PHONE] if assistance is required.
@@ -79,8 +79,8 @@ The current first-party mobile code sends the following information to the Senzi
 | Contact Info — Email Address | Provisioned work email | Yes | Yes | No | App Functionality; Account Management |
 | Identifiers — User ID | Tenant-scoped user and organization IDs | Yes | Yes | No | App Functionality; Account Management; Security |
 | Identifiers — Device ID | Random app-generated device identifier; push token if enabled | Yes | Yes | No | App Functionality; Security; Notifications |
-| User Content — Photos or Videos | Evidence captured or selected for authorized observations, incidents, inspections and Audits | Yes, when submitted | Yes | No | App Functionality |
-| User Content — Other User Content | Observation descriptions, configured answers, immediate actions and evidence documents | Yes, when submitted | Yes | No | App Functionality |
+| User Content — Photos or Videos | Evidence captured or selected for authorized observations, incidents, inspections, Audits and corrective actions | Yes, when submitted | Yes | No | App Functionality |
+| User Content — Other User Content | Observation descriptions, configured answers, immediate actions, corrective-action progress and evidence documents | Yes, when submitted | Yes | No | App Functionality |
 | Usage Data — Product Interaction | Notification read state and synchronization actions | Yes | Yes | No | App Functionality |
 
 Items requiring final vendor and production-log verification:

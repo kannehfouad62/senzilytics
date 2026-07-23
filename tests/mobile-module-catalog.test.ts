@@ -75,6 +75,7 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.MANAGE_INSPECTIONS,
       PermissionKey.VIEW_AUDITS,
       PermissionKey.MANAGE_AUDITS,
+      PermissionKey.UPDATE_CAPA,
     ],
     user: {
       email: "ehs@example.com",
@@ -87,6 +88,8 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(modules.find((module) => module.key === "incidents")?.nativeCapability, "INCIDENT_CAPTURE");
   assert.equal(modules.find((module) => module.key === "inspections")?.nativeCapability, "INSPECTION_EXECUTION");
   assert.equal(modules.find((module) => module.key === "audits")?.nativeCapability, "AUDIT_EXECUTION");
+  assert.equal(modules.find((module) => module.key === "corrective-actions")?.nativeCapability, "CAPA_EXECUTION");
+  assert.equal(modules.find((module) => module.key === "tasks")?.nativeCapability, "ACTION_CENTER");
 
   const readOnly = getMobileModuleCatalog({
     permissions: [PermissionKey.VIEW_INCIDENT, PermissionKey.VIEW_INSPECTIONS, PermissionKey.VIEW_AUDITS],
@@ -97,5 +100,8 @@ test("native field capabilities require their write permissions", () => {
       isPlatformAdmin: false,
     },
   });
-  assert.equal(readOnly.some((module) => module.nativeCapability), false);
+  assert.equal(readOnly.find((module) => module.key === "tasks")?.nativeCapability, "ACTION_CENTER");
+  assert.equal(readOnly.find((module) => module.key === "incidents")?.nativeCapability, undefined);
+  assert.equal(readOnly.find((module) => module.key === "inspections")?.nativeCapability, undefined);
+  assert.equal(readOnly.find((module) => module.key === "audits")?.nativeCapability, undefined);
 });

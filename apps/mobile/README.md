@@ -10,13 +10,15 @@ This Expo/React Native application is the Premium native field workspace for iOS
 - Tenant, role, account-status, session-version, and Premium-entitlement checks
 - Searchable, permission-filtered access to every major Senzilytics operational workspace
 - Platform tenant provisioning visibility restricted to approved `@senzilytics.com` platform administrators
-- Assigned workflow tasks and in-app notifications
+- Native Action Center for assigned workflow tasks, CAPA execution, and in-app notifications
+- Role-aware CAPA progress, completion, and closure controls using the governed web lifecycle
 - Offline safety-observation and incident/near-miss capture using a tenant/user-scoped SQLCipher-encrypted outbox
 - Native execution of active inspections assigned to the signed-in lead inspector or team member
 - Offline checklist responses with optional linked finding creation and idempotent synchronization
 - Native offline Audit start and question execution for authorized managers, lead auditors, and editable Audit team members
 - Audit response scoring, required comments/evidence, response options, and automatic findings through the same governed web service
-- Native camera, photo-library, and document evidence capture for observations, incidents, inspections, and Audit questions
+- Native camera, photo-library, and document evidence capture for observations, incidents, inspections, Audit questions, and corrective actions
+- Offline CAPA evidence ordering that blocks the related status update until every queued file is securely registered
 - Private evidence uploads with a 10 MB per-file limit, tenant/user authorization revalidation, and SQLCipher-encrypted offline file bytes
 - Encrypted cached-workspace startup during a bounded 72-hour offline authorization window
 - Automatic idempotent synchronization when connectivity returns
@@ -91,4 +93,4 @@ npx eas-cli@latest submit --profile production --platform android
 
 `EXPO_PUBLIC_API_URL` is public configuration, not a secret. If you prefer to manage it in the Expo dashboard instead of `eas.json`, create the same value separately for the development, preview, and production environments and retain each profile's explicit `environment` selection. Confirm the active configuration before a release with `eas config --platform ios --profile production` and `eas config --platform android --profile production`.
 
-Release builds should be exercised against a staging tenant first. Verify sign-in and account switching for credentials, Microsoft, and Okta; role-filtered module visibility; tenant isolation; offline observation and incident capture; camera, photo-library, and document permission handling; encrypted evidence queuing; assigned inspection and Audit execution; required-photo validation; automatic finding creation; refresh-token rotation; session revocation; notification delivery; and synchronization after connectivity returns.
+Release builds should be exercised against a staging tenant first. Verify sign-in and account switching for credentials, Microsoft, and Okta; role-filtered module visibility; tenant isolation; offline observation and incident capture; camera, photo-library, and document permission handling; encrypted evidence queuing; assigned inspection and Audit execution; native workflow and CAPA visibility; CAPA progress, closure permissions, and evidence ordering; required-photo validation; automatic finding creation; refresh-token rotation; session revocation; notification delivery; and synchronization after connectivity returns.

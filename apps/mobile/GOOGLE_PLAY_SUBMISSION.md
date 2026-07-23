@@ -38,7 +38,7 @@ Organization: [FICTIONAL_REVIEW_ORGANIZATION]
 
 Tap “Sign in securely,” enter the credentials in the Senzilytics browser authorization page, approve mobile authorization if prompted, and allow the browser to return to the app. No one-time password, VPN, QR code, paid subscription or external hardware is required for this review account.
 
-The account contains only fictional data. Review Home, Capture, Alerts and Settings. Contact [REVIEW_CONTACT_EMAIL] if access assistance is required.
+The account contains only fictional data. Review Home, Workspace, Capture, Actions and Settings. Actions contains the workflow inbox, corrective actions and alerts. Contact [REVIEW_CONTACT_EMAIL] if access assistance is required.
 ```
 
 ## Data Safety proposed app-level answers
@@ -62,7 +62,7 @@ Google defines collection as transmitting data off device. Locally encrypted dat
 | Personal info — User IDs | Tenant user and organization identifiers | Collected; linked | Required | App functionality; Account management; Fraud prevention, security and compliance |
 | Device or other IDs | Random app device ID; Expo push token when enabled | Collected; linked | Device ID required; push token optional | App functionality; Fraud prevention, security and compliance |
 | App activity — App interactions | Notification read state and synchronization actions | Collected; linked | Required for affected features | App functionality |
-| User-generated content — Other user-generated content | Observation descriptions, configured answers and immediate actions | Collected; linked | Optional submission | App functionality |
+| User-generated content — Other user-generated content | Observation descriptions, configured answers, immediate actions and corrective-action progress | Collected; linked | Optional submission | App functionality |
 | Photos and videos — Photos / Videos | Evidence captured or selected for authorized tenant records | Collected; linked | Optional unless a tenant Audit or inspection question requires it | App functionality |
 | Files and docs — Files and docs | Evidence documents selected for authorized tenant records | Collected; linked | Optional | App functionality |
 

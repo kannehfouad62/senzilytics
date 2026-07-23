@@ -34,6 +34,7 @@ const targetTypeSchema = z.enum([
   "INCIDENT",
   "INSPECTION",
   "AUDIT_QUESTION",
+  "CORRECTIVE_ACTION",
 ]);
 
 export const mobileEvidencePayloadSchema = z.object({
@@ -63,7 +64,11 @@ export const mobileEvidencePayloadSchema = z.object({
     });
   }
   if (
-    (value.targetType === "INSPECTION" || value.targetType === "AUDIT_QUESTION") &&
+    (
+      value.targetType === "INSPECTION" ||
+      value.targetType === "AUDIT_QUESTION" ||
+      value.targetType === "CORRECTIVE_ACTION"
+    ) &&
     !value.entityId
   ) {
     context.addIssue({
@@ -107,6 +112,7 @@ export function requiredMobileEvidencePermission(
   if (targetType === "SAFETY_OBSERVATION") return PermissionKey.CREATE_OBSERVATION;
   if (targetType === "INCIDENT") return PermissionKey.CREATE_INCIDENT;
   if (targetType === "INSPECTION") return PermissionKey.MANAGE_INSPECTIONS;
+  if (targetType === "CORRECTIVE_ACTION") return PermissionKey.UPDATE_CAPA;
   return PermissionKey.MANAGE_AUDITS;
 }
 
@@ -191,7 +197,7 @@ export async function resolveMobileEvidenceTarget(input: {
       throw new Error("Inspection checklist item was not found.");
     }
     resolvedEntityId = inspection.id;
-  } else {
+  } else if (input.payload.targetType === "AUDIT_QUESTION") {
     const managementRole = new Set<UserRole>([
       UserRole.SUPER_ADMIN,
       UserRole.ORG_ADMIN,
@@ -222,6 +228,18 @@ export async function resolveMobileEvidenceTarget(input: {
     });
     if (!audit) throw new Error("This Audit question is not available for mobile evidence capture.");
     resolvedEntityId = audit.id;
+  } else {
+    const action = await prisma.correctiveAction.findFirst({
+      where: {
+        id: input.payload.entityId,
+        assignedTo: { organizationId: input.organizationId },
+      },
+      select: { id: true },
+    });
+    if (!action) {
+      throw new Error("This corrective action is not available for mobile evidence capture.");
+    }
+    resolvedEntityId = action.id;
   }
 
   return {
@@ -401,6 +419,9 @@ function documentTarget(
   }
   if (type === "AUDIT_QUESTION") {
     throw new Error("Audit question evidence must use the governed Audit evidence record.");
+  }
+  if (type === "CORRECTIVE_ACTION") {
+    return { entityType: DocumentEntityType.CORRECTIVE_ACTION };
   }
   return { entityType: DocumentEntityType.INSPECTION };
 }

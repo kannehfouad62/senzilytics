@@ -35,10 +35,16 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
     entityId: "audit-1",
     questionId: "question-1",
   });
+  const capa = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "CORRECTIVE_ACTION",
+    entityId: "action-1",
+  });
 
   assert.equal(observation.success, true);
   assert.equal(inspection.success, true);
   assert.equal(audit.success, true);
+  assert.equal(capa.success, true);
   assert.equal(mobileEvidencePayloadSchema.safeParse({
     ...base,
     targetType: "INCIDENT",
@@ -76,4 +82,5 @@ test("each mobile evidence target retains its governing permission", () => {
   assert.equal(requiredMobileEvidencePermission("INCIDENT"), PermissionKey.CREATE_INCIDENT);
   assert.equal(requiredMobileEvidencePermission("INSPECTION"), PermissionKey.MANAGE_INSPECTIONS);
   assert.equal(requiredMobileEvidencePermission("AUDIT_QUESTION"), PermissionKey.MANAGE_AUDITS);
+  assert.equal(requiredMobileEvidencePermission("CORRECTIVE_ACTION"), PermissionKey.UPDATE_CAPA);
 });

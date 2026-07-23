@@ -275,6 +275,12 @@ export async function updateCapaStatusService(
     userId: string;
     actionId: string;
     status: Status;
+    comments?: string | null;
+    offlineSubmission?: {
+      id: string;
+      capturedAt: Date;
+      payloadHash: string;
+    };
   }
 ) {
   const [action, updater] =
@@ -299,6 +305,38 @@ export async function updateCapaStatusService(
   }
 
   if (action.status === input.status) {
+    if (input.offlineSubmission) {
+      await prisma.$transaction(async (tx) => {
+        await tx.offlineSubmission.create({
+          data: {
+            id: input.offlineSubmission!.id,
+            organizationId: input.organizationId,
+            userId: input.userId,
+            recordType: "CAPA_STATUS",
+            recordId: action.id,
+            capturedAt: input.offlineSubmission!.capturedAt,
+            payloadHash: input.offlineSubmission!.payloadHash,
+          },
+        });
+        if (input.comments?.trim()) {
+          await tx.activityLog.create({
+            data: {
+              organizationId: input.organizationId,
+              userId: input.userId,
+              action: ActivityAction.UPDATE,
+              entityType: "CorrectiveAction",
+              entityId: action.id,
+              title: "Corrective action progress recorded",
+              description: input.comments.trim(),
+              metadata: {
+                status: action.status,
+                offlineSubmissionId: input.offlineSubmission!.id,
+              },
+            },
+          });
+        }
+      });
+    }
     return action;
   }
 
@@ -318,6 +356,20 @@ export async function updateCapaStatusService(
             },
           });
 
+        if (input.offlineSubmission) {
+          await tx.offlineSubmission.create({
+            data: {
+              id: input.offlineSubmission.id,
+              organizationId: input.organizationId,
+              userId: input.userId,
+              recordType: "CAPA_STATUS",
+              recordId: action.id,
+              capturedAt: input.offlineSubmission.capturedAt,
+              payloadHash: input.offlineSubmission.payloadHash,
+            },
+          });
+        }
+
         await tx.activityLog.create({
           data: {
             organizationId:
@@ -331,11 +383,17 @@ export async function updateCapaStatusService(
             title:
               "Corrective action status changed",
             description:
-              `${previousStatus} → ${input.status}`,
+              `${previousStatus} → ${input.status}${input.comments?.trim() ? ` — ${input.comments.trim()}` : ""}`,
             metadata: {
               previousStatus,
               newStatus:
                 input.status,
+              comments:
+                input.comments?.trim() ||
+                null,
+              offlineSubmissionId:
+                input.offlineSubmission?.id ??
+                null,
             },
           },
         });
