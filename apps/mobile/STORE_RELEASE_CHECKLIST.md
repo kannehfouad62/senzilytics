@@ -33,6 +33,8 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 
 - [ ] Test small and large phones plus an iPad or iPad simulator.
 - [ ] Sign in, force-close and reopen the app.
+- [ ] Sign out, choose **Use another account**, and verify a second credentials or SSO user can authorize the same device.
+- [ ] Confirm each test role sees only its permitted modules in **Workspace** and can open the corresponding responsive workspace.
 - [ ] Capture an observation offline, restart offline and synchronize after reconnecting.
 - [ ] Confirm the 72-hour offline authorization policy and session revocation behavior.
 - [ ] Confirm one tenant cannot view or synchronize another tenant's cache, outbox, tasks or notifications.

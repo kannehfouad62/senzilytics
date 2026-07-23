@@ -5,8 +5,11 @@ This Expo/React Native application is the Premium native field workspace for iOS
 ## Included foundation
 
 - Browser-based PKCE authorization without sharing passwords with the app
+- Explicit current-account confirmation and secure switching between credentials, Microsoft, and Okta users
 - Rotating, device-bound mobile sessions stored in iOS Keychain or Android Keystore
 - Tenant, role, account-status, session-version, and Premium-entitlement checks
+- Searchable, permission-filtered access to every major Senzilytics operational workspace
+- Platform tenant provisioning visibility restricted to approved `@senzilytics.com` platform administrators
 - Assigned workflow tasks and in-app notifications
 - Offline safety-observation capture using a tenant/user-scoped SQLCipher-encrypted outbox
 - Encrypted cached-workspace startup during a bounded 72-hour offline authorization window
@@ -80,4 +83,4 @@ npx eas-cli@latest submit --profile production --platform android
 
 `EXPO_PUBLIC_API_URL` is public configuration, not a secret. If you prefer to manage it in the Expo dashboard instead of `eas.json`, create the same value separately for the development, preview, and production environments and retain each profile's explicit `environment` selection. Confirm the active configuration before a release with `eas config --platform ios --profile production` and `eas config --platform android --profile production`.
 
-Release builds should be exercised against a staging tenant first. Verify sign-in for credentials, Microsoft, and Okta; tenant isolation; offline capture; refresh-token rotation; session revocation; notification delivery; and synchronization after connectivity returns.
+Release builds should be exercised against a staging tenant first. Verify sign-in and account switching for credentials, Microsoft, and Okta; role-filtered module visibility; tenant isolation; offline capture; refresh-token rotation; session revocation; notification delivery; and synchronization after connectivity returns.

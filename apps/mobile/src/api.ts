@@ -139,6 +139,13 @@ export async function mobileApi<T>(path: string, init: RequestInit = {}, retry =
 
 export function loadMobileWorkspace() { return mobileApi<MobileBootstrap>("/api/mobile/bootstrap"); }
 
+export function mobileWebUrl(path: string) {
+  if (!/^\/[A-Za-z0-9/_-]*$/.test(path) || path.startsWith("//") || path.includes("..")) {
+    throw new MobileApiError("The requested workspace link is invalid.", 400, "invalid_workspace_link");
+  }
+  return `${API_URL}${path}`;
+}
+
 export async function logoutMobileSession() {
   try { await mobileApi("/api/mobile/auth/logout", { method: "POST" }, false); }
   finally { await clearMobileSession(); }

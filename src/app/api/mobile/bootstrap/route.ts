@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { authenticateMobileRequest, MobileAuthError } from "@/modules/mobile/mobile-auth.service";
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
+import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +17,17 @@ export async function GET(request: Request) {
       prisma.notification.findMany({ where: { organizationId: organization.id, userId: user.id }, select: { id: true, type: true, title: true, message: true, link: true, readAt: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 25 }),
       prisma.workflowInstanceStep.findMany({ where: { status: "IN_PROGRESS", instance: { organizationId: organization.id, status: "ACTIVE" }, OR: [{ assignedUserId: user.id }, { assignedRole: user.role }, { assignedUserId: null, assignedRole: null }] }, select: { id: true, name: true, dueAt: true, status: true, instance: { select: { entityType: true, entityId: true, template: { select: { name: true } } } } }, orderBy: { dueAt: { sort: "asc", nulls: "last" } }, take: 25 }),
     ]);
+    const modules = getMobileModuleCatalog({
+      permissions: assigned,
+      user: {
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        isPlatformAdmin: user.isPlatformAdmin,
+      },
+    });
     const observationForms = forms.map((form) => ({ id: form.id, name: form.name, description: form.description, version: { id: form.version.id, version: form.version.version, instructions: form.version.instructions, fields: form.version.fields.map((field) => ({ id: field.id, key: field.key, label: field.label, description: field.description, placeholder: field.placeholder, fieldType: field.fieldType, isRequired: field.isRequired, options: field.options, visibilityRule: field.visibilityRule, sequence: field.sequence })) } }));
-    return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role }, organization: { id: organization.id, name: organization.name, subscriptionPlan: organization.subscriptionPlan }, permissions: assigned, sites, observationForms, notifications, tasks }, { headers: { "cache-control": "no-store" } });
+    return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role }, organization: { id: organization.id, name: organization.name, subscriptionPlan: organization.subscriptionPlan }, permissions: assigned, sites, observationForms, notifications, tasks, modules }, { headers: { "cache-control": "no-store" } });
   } catch (error) { return mobileError(error, "Mobile workspace could not be loaded."); }
 }
 

@@ -47,6 +47,15 @@ export type MobileTask = {
   instance: { entityType: string; entityId: string; template: { name: string } };
 };
 
+export type MobileModule = {
+  key: string;
+  label: string;
+  description: string;
+  href: string;
+  category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
+  nativeCapability?: "OBSERVATION_CAPTURE";
+};
+
 export type MobileBootstrap = {
   user: MobileUser;
   organization: { id: string; name: string; subscriptionPlan: string };
@@ -55,6 +64,7 @@ export type MobileBootstrap = {
   observationForms: RuntimeForm[];
   notifications: MobileNotification[];
   tasks: MobileTask[];
+  modules: MobileModule[];
 };
 
 export type CapturedAnswer = { fieldId: string; value: string | number | boolean | string[] };
