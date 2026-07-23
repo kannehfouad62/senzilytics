@@ -1,6 +1,8 @@
 import {
   ActivityAction,
   ConfigurableFormModule,
+  EnterpriseAuditResponseResult,
+  EnterpriseAuditStatus,
   IncidentType,
   InspectionResponseResult,
   PermissionKey,
@@ -13,6 +15,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSubscriptionFeature } from "@/lib/subscription";
+import {
+  recordAuditResponseService,
+  startAuditExecutionService,
+} from "@/modules/audit/audit-execution.service";
 import {
   createPreparedSubmissions,
   prepareCapturedFormSubmissions,
@@ -91,10 +97,52 @@ const inspectionResponseItemSchema = z.object({
   }),
 });
 
+const auditStartItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("AUDIT_START"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    auditId: z.string().min(1),
+  }),
+});
+
+const auditResponseItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("AUDIT_RESPONSE"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    auditId: z.string().min(1),
+    questionId: z.string().min(1),
+    result: z.enum([
+      EnterpriseAuditResponseResult.PASS,
+      EnterpriseAuditResponseResult.FAIL,
+      EnterpriseAuditResponseResult.YES,
+      EnterpriseAuditResponseResult.NO,
+      EnterpriseAuditResponseResult.COMPLIANT,
+      EnterpriseAuditResponseResult.NON_COMPLIANT,
+      EnterpriseAuditResponseResult.PARTIALLY_COMPLIANT,
+      EnterpriseAuditResponseResult.NOT_APPLICABLE,
+      EnterpriseAuditResponseResult.OBSERVATION,
+      EnterpriseAuditResponseResult.INFORMATION_ONLY,
+    ]),
+    responseText: z.string().max(5000).optional(),
+    numericValue: z.number().finite().optional(),
+    booleanValue: z.boolean().optional(),
+    selectedOptionValues: z.array(z.string().min(1).max(500)).max(100).default([]),
+    comments: z.string().max(5000).optional(),
+    evidenceNote: z.string().max(5000).optional(),
+    evidenceUrl: z.string().url().max(2000)
+      .refine((value) => URL.canParse(value) && new URL(value).protocol === "https:", "Evidence URL must use HTTPS.")
+      .optional(),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
   inspectionResponseItemSchema,
+  auditStartItemSchema,
+  auditResponseItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -112,7 +160,8 @@ type SyncResult = {
 export function requiredOfflinePermission(type: OfflineItem["type"]) {
   if (type === "SAFETY_OBSERVATION") return PermissionKey.CREATE_OBSERVATION;
   if (type === "INCIDENT") return PermissionKey.CREATE_INCIDENT;
-  return PermissionKey.MANAGE_INSPECTIONS;
+  if (type === "INSPECTION_RESPONSE") return PermissionKey.MANAGE_INSPECTIONS;
+  return PermissionKey.MANAGE_AUDITS;
 }
 
 export async function syncOfflineSubmissionsService(input: {
@@ -179,8 +228,12 @@ export async function syncOfflineSubmissionsService(input: {
         results.push(await syncObservation(input, item, payloadHash));
       } else if (item.type === "INCIDENT") {
         results.push(await syncIncident(input, item, payloadHash));
-      } else {
+      } else if (item.type === "INSPECTION_RESPONSE") {
         results.push(await syncInspectionResponse(input, item, payloadHash));
+      } else if (item.type === "AUDIT_START") {
+        results.push(await syncAuditStart(input, item, payloadHash));
+      } else {
+        results.push(await syncAuditResponse(input, item, payloadHash));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -339,9 +392,93 @@ async function syncInspectionResponse(
   return { id: item.id, status: "synced", recordId: response.id };
 }
 
+const auditManagementRoles = new Set<UserRole>([
+  UserRole.SUPER_ADMIN,
+  UserRole.ORG_ADMIN,
+  UserRole.EHS_MANAGER,
+]);
+
+async function syncAuditStart(
+  actor: { organizationId: string; userId: string; role: UserRole },
+  item: z.infer<typeof auditStartItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const editableAudit = await prisma.enterpriseAudit.findFirst({
+    where: {
+      id: item.payload.auditId,
+      organizationId: actor.organizationId,
+      ...(auditManagementRoles.has(actor.role)
+        ? {}
+        : {
+            OR: [
+              { leadAuditorId: actor.userId },
+              { teamMembers: { some: { userId: actor.userId, canEdit: true } } },
+            ],
+          }),
+    },
+    select: { id: true, status: true },
+  });
+  if (!editableAudit) {
+    return { id: item.id, status: "failed", error: "This Audit is not assigned to you for execution." };
+  }
+
+  const capturedAt = new Date(item.capturedAt);
+  if (editableAudit.status === EnterpriseAuditStatus.IN_PROGRESS) {
+    await prisma.offlineSubmission.create({
+      data: {
+        id: item.id,
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        recordType: item.type,
+        recordId: editableAudit.id,
+        capturedAt,
+        payloadHash,
+      },
+    });
+    return { id: item.id, status: "synced", recordId: editableAudit.id };
+  }
+
+  const audit = await startAuditExecutionService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    userRole: actor.role,
+    auditId: editableAudit.id,
+    offlineSubmission: { id: item.id, capturedAt, payloadHash },
+  });
+  return { id: item.id, status: "synced", recordId: audit.id };
+}
+
+async function syncAuditResponse(
+  actor: { organizationId: string; userId: string; role: UserRole },
+  item: z.infer<typeof auditResponseItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const recordId = await recordAuditResponseService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    userRole: actor.role,
+    auditId: item.payload.auditId,
+    questionId: item.payload.questionId,
+    result: item.payload.result,
+    responseText: item.payload.responseText || null,
+    numericValue: item.payload.numericValue ?? null,
+    booleanValue: item.payload.booleanValue ?? null,
+    selectedOptionValues: item.payload.selectedOptionValues,
+    comments: item.payload.comments || null,
+    evidenceNote: item.payload.evidenceNote || null,
+    evidenceUrl: item.payload.evidenceUrl || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId };
+}
+
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|assigned|completed|closed|site|organization/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|assigned|authorized|planned|scheduled|started|completed|closed|site|organization|evidence|photo|comment|not applicable/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

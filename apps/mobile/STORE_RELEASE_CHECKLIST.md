@@ -40,6 +40,9 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] Confirm an assigned lead inspector and team member can execute an active inspection offline, including compliant, noncompliant and not-applicable responses.
 - [ ] Create a finding from a noncompliant mobile response and verify the response/finding relationship after synchronization.
 - [ ] Confirm unassigned, completed and closed inspections cannot be downloaded or synchronized by a field user.
+- [ ] Start an assigned Audit offline, answer multiple question types, reconnect, and verify start/response history is synchronized in order.
+- [ ] Confirm required comments, evidence, response options, not-applicable rules, scoring and automatic Audit findings match the web execution workspace.
+- [ ] Confirm users without editable Audit membership cannot download or synchronize Audit execution data.
 - [ ] Confirm the 72-hour offline authorization policy and session revocation behavior.
 - [ ] Confirm one tenant cannot view or synchronize another tenant's cache, outbox, tasks or notifications.
 - [ ] Register push on a physical device, deliver a test alert and tap it into the Notifications tab.

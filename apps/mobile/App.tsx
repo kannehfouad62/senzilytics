@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -24,6 +24,8 @@ import {
   clearWorkspaceCache,
   initializeOfflineStore,
   pendingOfflineCount,
+  queueAuditResponse,
+  queueAuditStart,
   queueIncident,
   queueInspectionResponse,
   queueObservation,
@@ -31,11 +33,15 @@ import {
   synchronizeOfflineItems,
 } from "./src/storage";
 import type {
+  AuditResponsePayload,
+  AuditResponseResult,
   CapturedAnswer,
   CapturedForm,
   IncidentPayload,
   InspectionResponsePayload,
   MobileBootstrap,
+  MobileAudit,
+  MobileAuditQuestion,
   MobileInspection,
   MobileInspectionItem,
   MobileModule,
@@ -45,7 +51,7 @@ import type {
   RuntimeForm,
 } from "./src/types";
 
-type Tab = "home" | "workspace" | "capture" | "inspections" | "notifications" | "settings";
+type Tab = "home" | "workspace" | "capture" | "inspections" | "audits" | "notifications" | "settings";
 type CaptureMode = "observation" | "incident";
 type FieldValue = string | boolean | string[];
 const observationTypes = ["UNSAFE_ACT", "UNSAFE_CONDITION", "POSITIVE_PRACTICE", "ENVIRONMENTAL", "QUALITY", "OTHER"] as const;
@@ -175,15 +181,16 @@ export default function App() {
       </View>
       {notice ? <Pressable onPress={() => setNotice("")} style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
       {tab === "home" && <HomeScreen workspace={workspace} pending={pending} busy={busy} onRefresh={async () => { try { return await refreshWorkspace(); } catch (error) { setNotice(`Refresh paused: ${messageOf(error)}`); return workspace; } }} onSync={sync} onNavigate={setTab} />}
-      {tab === "workspace" && <WorkspaceScreen modules={workspace.modules ?? []} online={online} onCapture={(mode) => { setCaptureMode(mode); setTab("capture"); }} onInspect={() => setTab("inspections")} onOpen={async (module) => { if (!online) { setNotice("Connect to the internet to open the complete operational workspace. Offline field capture remains available."); return; } try { await Linking.openURL(mobileWebUrl(module.href)); } catch (error) { setNotice(messageOf(error)); } }} />}
+      {tab === "workspace" && <WorkspaceScreen modules={workspace.modules ?? []} online={online} onCapture={(mode) => { setCaptureMode(mode); setTab("capture"); }} onInspect={() => setTab("inspections")} onAudit={() => setTab("audits")} onOpen={async (module) => { if (!online) { setNotice("Connect to the internet to open the complete operational workspace. Offline field capture remains available."); return; } try { await Linking.openURL(mobileWebUrl(module.href)); } catch (error) { setNotice(messageOf(error)); } }} />}
       {tab === "capture" && <CaptureScreen mode={captureMode} onModeChange={setCaptureMode} workspace={workspace} ownerKey={ownerKey} online={online} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "inspections" && <InspectionsScreen inspections={workspace.inspections ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "audits" && <AuditsScreen audits={workspace.audits ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "notifications" && <NotificationsScreen notifications={workspace.notifications} onRead={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
       {tab === "settings" && <SettingsScreen workspace={workspace} pending={pending} onEnablePush={async () => { setBusy(true); try { setNotice(await registerForMobilePush()); } catch (error) { setNotice(messageOf(error)); } finally { setBusy(false); } }} onLogout={async () => { setBusy(true); try { await logoutMobileSession(); await clearWorkspaceCache(ownerKey); setWorkspace(null); setVerifiedAt(null); setAuthState("signed-out"); setTab("home"); } finally { setBusy(false); } }} />}
       <View style={styles.tabs}>
         <TabButton active={tab === "home"} label="Home" onPress={() => setTab("home")} />
         <TabButton active={tab === "workspace"} label="Workspace" onPress={() => setTab("workspace")} />
-        <TabButton active={tab === "capture" || tab === "inspections"} label="Capture" badge={pending || undefined} onPress={() => setTab("capture")} />
+        <TabButton active={tab === "capture" || tab === "inspections" || tab === "audits"} label="Capture" badge={pending || undefined} onPress={() => setTab("capture")} />
         <TabButton active={tab === "notifications"} label="Alerts" badge={unread || undefined} onPress={() => setTab("notifications")} />
         <TabButton active={tab === "settings"} label="Settings" onPress={() => setTab("settings")} />
       </View>
@@ -200,15 +207,15 @@ function SignInScreen({ busy, notice, onSignIn }: { busy: boolean; notice: strin
 function HomeScreen({ workspace, pending, busy, onRefresh, onSync, onNavigate }: { workspace: MobileBootstrap; pending: number; busy: boolean; onRefresh: () => Promise<MobileBootstrap>; onSync: () => void; onNavigate: (tab: Tab) => void }) {
   const [refreshing, setRefreshing] = useState(false);
   const unread = workspace.notifications.filter((item) => !item.readAt).length;
-  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} refreshControl={<RefreshControl tintColor="#67e8f9" refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await onRefresh(); } finally { setRefreshing(false); } }} />}><Text style={styles.eyebrow}>MOBILE COMMAND CENTER</Text><Text style={styles.pageTitle}>Welcome, {workspace.user.name.split(" ")[0]}</Text><Text style={styles.muted}>{workspace.organization.subscriptionPlan} workspace · {humanize(workspace.user.role)}</Text><View style={styles.metricGrid}><Metric label="Active tasks" value={workspace.tasks.length} /><Metric label="Unread alerts" value={unread} /><Metric label="Offline queue" value={pending} /><Metric label="Assigned inspections" value={(workspace.inspections ?? []).length} /></View><Card accent><Text style={styles.cardTitle}>Your authorized workspace</Text><Text style={styles.muted}>Open every Senzilytics function assigned to your role. Modules and native actions you cannot access are automatically hidden.</Text><SecondaryButton label="Explore my workspace" onPress={() => onNavigate("workspace")} /></Card><Card><Text style={styles.cardTitle}>Fast field actions</Text><Text style={styles.muted}>Capture authorized field records and complete assigned inspections even when connectivity is unreliable. Every queued record remains tenant- and user-scoped.</Text><View style={styles.row}><SecondaryButton label="Open field workspace" onPress={() => onNavigate("workspace")} /><SecondaryButton label={busy ? "Syncing…" : "Sync now"} onPress={onSync} disabled={busy} /></View></Card><Text style={styles.sectionTitle}>Assigned workflow</Text>{workspace.tasks.length ? workspace.tasks.slice(0, 8).map((task) => <Card key={task.id}><Text style={styles.cardTitle}>{task.name}</Text><Text style={styles.muted}>{task.instance.template.name} · {humanize(task.instance.entityType)}</Text><Text style={styles.due}>{task.dueAt ? `Due ${formatDate(task.dueAt)}` : "No due date"}</Text></Card>) : <EmptyState text="No active workflow steps are assigned to you." />}</ScrollView>;
+  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} refreshControl={<RefreshControl tintColor="#67e8f9" refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await onRefresh(); } finally { setRefreshing(false); } }} />}><Text style={styles.eyebrow}>MOBILE COMMAND CENTER</Text><Text style={styles.pageTitle}>Welcome, {workspace.user.name.split(" ")[0]}</Text><Text style={styles.muted}>{workspace.organization.subscriptionPlan} workspace · {humanize(workspace.user.role)}</Text><View style={styles.metricGrid}><Metric label="Active tasks" value={workspace.tasks.length} /><Metric label="Unread alerts" value={unread} /><Metric label="Offline queue" value={pending} /><Metric label="Assigned field work" value={(workspace.inspections ?? []).length + (workspace.audits ?? []).length} /></View><Card accent><Text style={styles.cardTitle}>Your authorized workspace</Text><Text style={styles.muted}>Open every Senzilytics function assigned to your role. Modules and native actions you cannot access are automatically hidden.</Text><SecondaryButton label="Explore my workspace" onPress={() => onNavigate("workspace")} /></Card><Card><Text style={styles.cardTitle}>Fast field actions</Text><Text style={styles.muted}>Capture authorized field records and complete assigned inspections and Audits even when connectivity is unreliable. Every queued record remains tenant- and user-scoped.</Text><View style={styles.row}><SecondaryButton label="Open field workspace" onPress={() => onNavigate("workspace")} /><SecondaryButton label={busy ? "Syncing…" : "Sync now"} onPress={onSync} disabled={busy} /></View></Card><Text style={styles.sectionTitle}>Assigned workflow</Text>{workspace.tasks.length ? workspace.tasks.slice(0, 8).map((task) => <Card key={task.id}><Text style={styles.cardTitle}>{task.name}</Text><Text style={styles.muted}>{task.instance.template.name} · {humanize(task.instance.entityType)}</Text><Text style={styles.due}>{task.dueAt ? `Due ${formatDate(task.dueAt)}` : "No due date"}</Text></Card>) : <EmptyState text="No active workflow steps are assigned to you." />}</ScrollView>;
 }
 
-function WorkspaceScreen({ modules, online, onCapture, onInspect, onOpen }: { modules: MobileModule[]; online: boolean; onCapture: (mode: CaptureMode) => void; onInspect: () => void; onOpen: (module: MobileModule) => Promise<void> }) {
+function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onOpen }: { modules: MobileModule[]; online: boolean; onCapture: (mode: CaptureMode) => void; onInspect: () => void; onAudit: () => void; onOpen: (module: MobileModule) => Promise<void> }) {
   const [query, setQuery] = useState("");
   const normalized = query.trim().toLowerCase();
   const visible = modules.filter((module) => !normalized || `${module.label} ${module.description} ${humanize(module.category)}`.toLowerCase().includes(normalized));
   const categories: MobileModule["category"][] = ["COMMAND", "SAFETY", "ASSURANCE", "GOVERNANCE", "ADMINISTRATION"];
-  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><Text style={styles.eyebrow}>ROLE-AWARE ACCESS</Text><Text style={styles.pageTitle}>My workspace</Text><Text style={styles.muted}>Your tenant and role determine what appears here. Operational pages open in Senzilytics&apos; responsive secure workspace; authorized native field workflows remain available offline.</Text><Input value={query} onChangeText={setQuery} placeholder="Search my authorized modules" autoCapitalize="none" />{!online ? <View style={styles.offlineBanner}><Text style={styles.offlineBannerText}>You are offline. Complete operational workspaces require a connection, but authorized capture and inspection work remain available.</Text></View> : null}{categories.map((category) => { const categoryModules = visible.filter((module) => module.category === category); if (!categoryModules.length) return null; return <View key={category} style={styles.moduleSection}><Text style={styles.sectionTitle}>{humanize(category)}</Text>{categoryModules.map((module) => <Card key={module.key} accent={Boolean(module.nativeCapability)}><View style={styles.moduleHeading}><View style={styles.moduleMark}><Text style={styles.moduleMarkText}>{module.label.slice(0, 1)}</Text></View><View style={styles.moduleCopy}><Text style={styles.cardTitle}>{module.label}</Text><Text style={styles.muted}>{module.description}</Text></View></View><View style={styles.row}>{module.nativeCapability === "OBSERVATION_CAPTURE" ? <SecondaryButton label="Capture observation" onPress={() => onCapture("observation")} /> : null}{module.nativeCapability === "INCIDENT_CAPTURE" ? <SecondaryButton label="Report incident" onPress={() => onCapture("incident")} /> : null}{module.nativeCapability === "INSPECTION_EXECUTION" ? <SecondaryButton label="Assigned inspections" onPress={onInspect} /> : null}<SecondaryButton label={online ? "Open workspace" : "Connection required"} disabled={!online} onPress={() => { void onOpen(module); }} /></View></Card>)}</View>; })}{!visible.length ? <EmptyState text="No authorized module matches your search." /> : null}</ScrollView>;
+  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><Text style={styles.eyebrow}>ROLE-AWARE ACCESS</Text><Text style={styles.pageTitle}>My workspace</Text><Text style={styles.muted}>Your tenant and role determine what appears here. Operational pages open in Senzilytics&apos; responsive secure workspace; authorized native field workflows remain available offline.</Text><Input value={query} onChangeText={setQuery} placeholder="Search my authorized modules" autoCapitalize="none" />{!online ? <View style={styles.offlineBanner}><Text style={styles.offlineBannerText}>You are offline. Complete operational workspaces require a connection, but authorized capture, inspection, and Audit execution remain available.</Text></View> : null}{categories.map((category) => { const categoryModules = visible.filter((module) => module.category === category); if (!categoryModules.length) return null; return <View key={category} style={styles.moduleSection}><Text style={styles.sectionTitle}>{humanize(category)}</Text>{categoryModules.map((module) => <Card key={module.key} accent={Boolean(module.nativeCapability)}><View style={styles.moduleHeading}><View style={styles.moduleMark}><Text style={styles.moduleMarkText}>{module.label.slice(0, 1)}</Text></View><View style={styles.moduleCopy}><Text style={styles.cardTitle}>{module.label}</Text><Text style={styles.muted}>{module.description}</Text></View></View><View style={styles.row}>{module.nativeCapability === "OBSERVATION_CAPTURE" ? <SecondaryButton label="Capture observation" onPress={() => onCapture("observation")} /> : null}{module.nativeCapability === "INCIDENT_CAPTURE" ? <SecondaryButton label="Report incident" onPress={() => onCapture("incident")} /> : null}{module.nativeCapability === "INSPECTION_EXECUTION" ? <SecondaryButton label="Assigned inspections" onPress={onInspect} /> : null}{module.nativeCapability === "AUDIT_EXECUTION" ? <SecondaryButton label="Assigned Audits" onPress={onAudit} /> : null}<SecondaryButton label={online ? "Open workspace" : "Connection required"} disabled={!online} onPress={() => { void onOpen(module); }} /></View></Card>)}</View>; })}{!visible.length ? <EmptyState text="No authorized module matches your search." /> : null}</ScrollView>;
 }
 
 function CaptureScreen({ mode, onModeChange, ...props }: { mode: CaptureMode; onModeChange: (mode: CaptureMode) => void; workspace: MobileBootstrap; ownerKey: string; online: boolean; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
@@ -349,6 +356,107 @@ function InspectionItemEditor({ inspectionId, item, ownerKey, online, onQueued, 
   };
 
   return <Card accent={queued || Boolean(item.response)}><Text style={styles.questionNumber}>Question {item.sequence}</Text><Text style={styles.cardTitle}>{item.questionText}{item.isRequired ? " *" : ""}</Text>{item.guidance ? <Text style={styles.fieldHelp}>{item.guidance}</Text> : null}<FieldLabel text="Result" /><ChipGroup values={[{ value: "COMPLIANT", label: item.questionType === "YES_NO" ? "Yes / compliant" : "Compliant" }, { value: "NON_COMPLIANT", label: item.questionType === "YES_NO" ? "No / noncompliant" : "Noncompliant" }, { value: "NOT_APPLICABLE", label: "Not applicable" }]} selected={result} onSelect={(value) => { setResult(value as InspectionResponsePayload["result"]); if (value !== "NON_COMPLIANT") setCreateFinding(false); }} />{item.questionType === "TEXT" ? <><FieldLabel text="Response" /><Input value={responseText} onChangeText={setResponseText} placeholder="Enter the inspection response" multiline /></> : null}{item.questionType === "NUMBER" ? <><FieldLabel text="Numeric response" /><Input value={numericValue} onChangeText={setNumericValue} placeholder="Enter a number" keyboardType="decimal-pad" /></> : null}{item.questionType === "PHOTO" ? <Text style={styles.fieldHelp}>Record the result and comments now. Photo evidence can be attached from the complete workspace after synchronization.</Text> : null}<FieldLabel text="Comments" /><Input value={comments} onChangeText={setComments} placeholder="Evidence, conditions, or follow-up notes" multiline />{result === "NON_COMPLIANT" ? <><Pressable style={styles.checkRow} onPress={() => setCreateFinding((value) => !value)}><View style={[styles.checkbox, createFinding && styles.checkboxOn]}>{createFinding ? <Text style={styles.checkmark}>✓</Text> : null}</View><Text style={styles.checkLabel}>Create a linked inspection finding</Text></Pressable>{createFinding ? <View style={styles.findingPanel}><FieldLabel text="Finding title" /><Input value={findingTitle} onChangeText={setFindingTitle} placeholder={`Noncompliance: ${item.questionText}`} /><FieldLabel text="Finding description" /><Input value={findingDescription} onChangeText={setFindingDescription} placeholder="Describe the deficiency and objective evidence" multiline /><FieldLabel text="Risk level" /><ChipGroup values={riskLevels.map((value) => ({ value, label: humanize(value) }))} selected={findingRiskLevel} onSelect={(value) => setFindingRiskLevel(value as NonNullable<InspectionResponsePayload["findingRiskLevel"]>)} /><FieldLabel text="Due date" /><Input value={findingDueDate} onChangeText={setFindingDueDate} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View> : null}</> : null}{queued ? <Text style={styles.successText}>Saved to the encrypted synchronization queue.</Text> : null}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : item.response ? "Save updated response" : "Save response"} disabled={saving} onPress={save} /></Card>;
+}
+
+function AuditsScreen({ audits, ownerKey, online, onBack, onQueued, onSync }: { audits: MobileAudit[]; ownerKey: string; online: boolean; onBack: () => void; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [locallyStarted, setLocallyStarted] = useState<string[]>([]);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState("");
+  const selected = audits.find((audit) => audit.id === selectedId) ?? null;
+
+  if (!selected) {
+    return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><SecondaryButton label="← Back to workspace" onPress={onBack} /><Text style={styles.eyebrow}>{online ? "ASSIGNED ASSURANCE WORK" : "OFFLINE AUDIT WORK"}</Text><Text style={styles.pageTitle}>My Audits</Text><Text style={styles.muted}>Active and startable Audits available through your management role, lead-auditor assignment, or editable Audit team membership are stored securely on this device.</Text>{audits.length ? audits.map((audit) => { const progress = audit.totalQuestionCount ? Math.round((audit.answeredQuestionCount / audit.totalQuestionCount) * 100) : 0; return <Card key={audit.id} accent><Text style={styles.questionNumber}>{audit.reference} · {humanize(audit.auditType)}</Text><Text style={styles.cardTitle}>{audit.title}</Text><Text style={styles.muted}>{audit.site.name}{audit.department ? ` · ${audit.department.name}` : ""}</Text><Text style={styles.due}>{audit.answeredQuestionCount} of {audit.totalQuestionCount} questions answered{audit.dueDate ? ` · Due ${formatDate(audit.dueDate)}` : ""}</Text><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View><PrimaryButton label={audit.status === "IN_PROGRESS" ? "Continue Audit" : "Review and start Audit"} onPress={() => setSelectedId(audit.id)} /></Card>; }) : <EmptyState text="No active Audits are assigned to you. Connect to refresh assignments or ask an Audit manager to grant editable team access." />}</ScrollView>;
+  }
+
+  const started = selected.status === "IN_PROGRESS" || locallyStarted.includes(selected.id);
+  const start = async () => {
+    setError("");
+    setStarting(true);
+    try {
+      await queueAuditStart(ownerKey, { auditId: selected.id });
+      setLocallyStarted((current) => current.includes(selected.id) ? current : [...current, selected.id]);
+      await onQueued(online ? "Audit start queued. Synchronizing now…" : "Audit started on this device. Responses will synchronize in order when connectivity returns.");
+      if (online) onSync();
+    } catch (reason) { setError(messageOf(reason)); }
+    finally { setStarting(false); }
+  };
+
+  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><SecondaryButton label="← All assigned Audits" onPress={() => setSelectedId(null)} /><Text style={styles.eyebrow}>{online ? "AUDIT EXECUTION" : "OFFLINE AUDIT EXECUTION"}</Text><Text style={styles.pageTitle}>{selected.title}</Text><Text style={styles.muted}>{selected.reference} · {selected.site.name}{selected.department ? ` · ${selected.department.name}` : ""}</Text>{selected.description ? <Text style={styles.muted}>{selected.description}</Text> : null}<View style={styles.metricGrid}><Metric label="Questions" value={selected.totalQuestionCount} /><Metric label="Answered" value={selected.answeredQuestionCount} /><Metric label="Failed" value={selected.failedQuestionCount} /><Metric label="Score" value={Math.round(selected.scorePercentage ?? 0)} /></View>{selected.scope || selected.objectives || selected.criteria ? <Card><Text style={styles.cardTitle}>Audit plan</Text>{selected.objectives ? <><FieldLabel text="Objectives" /><Text style={styles.muted}>{selected.objectives}</Text></> : null}{selected.scope ? <><FieldLabel text="Scope" /><Text style={styles.muted}>{selected.scope}</Text></> : null}{selected.criteria ? <><FieldLabel text="Criteria" /><Text style={styles.muted}>{selected.criteria}</Text></> : null}</Card> : null}{!started ? <Card accent><Text style={styles.cardTitle}>Start execution</Text><Text style={styles.muted}>Starting creates a governed Audit history entry. If offline, this action is queued before every response so synchronization preserves lifecycle order.</Text>{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={starting ? "Starting securely…" : online ? "Start Audit" : "Start Audit offline"} disabled={starting} onPress={start} /></Card> : selected.sections.map((section) => <View key={section.id} style={styles.moduleSection}><Text style={styles.sectionTitle}>{section.sequence}. {section.title}</Text>{section.guidance ? <Text style={styles.muted}>{section.guidance}</Text> : null}<Text style={styles.due}>{section.answeredQuestionCount} of {section.totalQuestionCount} answered</Text>{section.questions.map((question) => <AuditQuestionEditor key={question.id} auditId={selected.id} question={question} ownerKey={ownerKey} online={online} onQueued={onQueued} onSync={onSync} />)}</View>)}</ScrollView></KeyboardAvoidingView>;
+}
+
+function AuditQuestionEditor({ auditId, question, ownerKey, online, onQueued, onSync }: { auditId: string; question: MobileAuditQuestion; ownerKey: string; online: boolean; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
+  const initialResult = question.response?.result && question.response.result !== "NOT_ASSESSED" ? question.response.result : "";
+  const [result, setResult] = useState<AuditResponseResult | "">(initialResult);
+  const [responseText, setResponseText] = useState(question.response?.responseText ?? "");
+  const [numericValue, setNumericValue] = useState(question.response?.numericValue?.toString() ?? "");
+  const [selectedOptions, setSelectedOptions] = useState<string[]>(question.response?.selectedOptionValues ?? []);
+  const [comments, setComments] = useState(question.response?.comments ?? "");
+  const [evidenceNote, setEvidenceNote] = useState("");
+  const [evidenceUrl, setEvidenceUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [queued, setQueued] = useState(false);
+  const [error, setError] = useState("");
+  const resultOptions = auditResultsFor(question);
+
+  const save = async () => {
+    setError("");
+    if (!result) { setError("Select an assessment result."); return; }
+    if (question.requireComment && !comments.trim()) { setError("A comment is required for this Audit question."); return; }
+    const parsedNumber = numericValue.trim() ? Number(numericValue) : undefined;
+    if (question.responseType === "NUMERIC" && (parsedNumber === undefined || !Number.isFinite(parsedNumber))) { setError("Enter a valid numeric response."); return; }
+    if (question.responseType === "MULTIPLE_CHOICE" && question.isRequired && selectedOptions.length === 0) { setError("Select at least one response option."); return; }
+    if (question.requireEvidence && !evidenceNote.trim() && !evidenceUrl.trim()) { setError("An evidence note or evidence URL is required."); return; }
+    if (question.requirePhoto && !evidenceUrl.trim()) { setError("A photo or evidence URL is required. Native camera uploads will be added in the media-evidence phase."); return; }
+    if (evidenceUrl.trim()) {
+      try {
+        const parsedUrl = new URL(evidenceUrl.trim());
+        if (parsedUrl.protocol !== "https:") throw new Error("HTTPS is required.");
+      }
+      catch { setError("Evidence URL must be a complete https:// address."); return; }
+    }
+    setSaving(true);
+    try {
+      await queueAuditResponse(ownerKey, {
+        auditId,
+        questionId: question.id,
+        result,
+        responseText: responseText.trim() || undefined,
+        numericValue: parsedNumber,
+        booleanValue: question.responseType === "YES_NO" ? result === "YES" : undefined,
+        selectedOptionValues: selectedOptions,
+        comments: comments.trim() || undefined,
+        evidenceNote: evidenceNote.trim() || undefined,
+        evidenceUrl: evidenceUrl.trim() || undefined,
+      });
+      setQueued(true);
+      setEvidenceNote("");
+      setEvidenceUrl("");
+      await onQueued(online ? "Audit response queued. Synchronizing now…" : "Audit response saved securely on this device.");
+      if (online) onSync();
+    } catch (reason) { setError(messageOf(reason)); }
+    finally { setSaving(false); }
+  };
+
+  return <Card accent={queued || Boolean(question.response)}><Text style={styles.questionNumber}>Question {question.sequence}{question.standardClause ? ` · ${question.standardClause}` : ""}</Text><Text style={styles.cardTitle}>{question.questionText}{question.isRequired ? " *" : ""}</Text>{question.guidance ? <Text style={styles.fieldHelp}>{question.guidance}</Text> : null}<FieldLabel text="Assessment result" /><ChipGroup values={resultOptions.map((value) => ({ value, label: humanize(value) }))} selected={result} onSelect={(value) => setResult(value as AuditResponseResult)} />{question.responseType === "NUMERIC" ? <><FieldLabel text="Numeric value" /><Input value={numericValue} onChangeText={setNumericValue} placeholder={numericAuditPlaceholder(question)} keyboardType="decimal-pad" /></> : null}{question.options.length ? <View style={styles.fieldBlock}><FieldLabel text="Response options" /><View style={styles.chips}>{question.options.map((option) => { const selected = selectedOptions.includes(option.value); return <Pressable key={option.id} style={[styles.chip, selected && styles.chipOn]} onPress={() => setSelectedOptions((current) => selected ? current.filter((value) => value !== option.value) : [...current, option.value])}><Text style={[styles.chipText, selected && styles.chipTextOn]}>{option.label}{option.triggersFinding ? " · finding rule" : ""}</Text></Pressable>; })}</View></View> : null}<FieldLabel text="Response narrative" /><Input value={responseText} onChangeText={setResponseText} placeholder="Record the assessment narrative" multiline /><FieldLabel text={`Comments${question.requireComment ? " *" : ""}`} /><Input value={comments} onChangeText={setComments} placeholder="Record objective observations and follow-up context" multiline /><FieldLabel text={`Evidence note${question.requireEvidence ? " *" : ""}`} /><Input value={evidenceNote} onChangeText={setEvidenceNote} placeholder={question.evidenceCount ? `${question.evidenceCount} evidence record(s) already attached` : "Describe the evidence reviewed or collected"} multiline /><FieldLabel text={`Evidence URL${question.requirePhoto ? " *" : ""}`} /><Input value={evidenceUrl} onChangeText={setEvidenceUrl} placeholder="https://…" autoCapitalize="none" keyboardType="url" />{question.requirePhoto ? <Text style={styles.fieldHelp}>This question requires photo evidence. Until native encrypted media upload is enabled, provide an approved evidence URL or complete the photo attachment in the web workspace.</Text> : null}{question.findingCount ? <Text style={styles.due}>{question.findingCount} linked finding{question.findingCount === 1 ? "" : "s"}</Text> : null}{queued ? <Text style={styles.successText}>Saved to the encrypted synchronization queue.</Text> : null}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : question.response ? "Save updated response" : "Save Audit response"} disabled={saving} onPress={save} /></Card>;
+}
+
+function auditResultsFor(question: MobileAuditQuestion): AuditResponseResult[] {
+  let values: AuditResponseResult[];
+  if (question.responseType === "PASS_FAIL") values = ["PASS", "FAIL"];
+  else if (question.responseType === "YES_NO") values = ["YES", "NO"];
+  else if (question.responseType === "NOT_APPLICABLE") values = ["NOT_APPLICABLE"];
+  else if (question.responseType === "FREE_TEXT" || question.responseType === "OBSERVATION") values = ["OBSERVATION", "INFORMATION_ONLY", "COMPLIANT", "NON_COMPLIANT"];
+  else values = ["COMPLIANT", "PARTIALLY_COMPLIANT", "NON_COMPLIANT"];
+  if (question.allowNotApplicable && !values.includes("NOT_APPLICABLE")) values.push("NOT_APPLICABLE");
+  return values;
+}
+
+function numericAuditPlaceholder(question: MobileAuditQuestion) {
+  if (question.minimumNumericValue !== null && question.maximumNumericValue !== null) return `${question.minimumNumericValue}–${question.maximumNumericValue}`;
+  if (question.minimumNumericValue !== null) return `Minimum ${question.minimumNumericValue}`;
+  if (question.maximumNumericValue !== null) return `Maximum ${question.maximumNumericValue}`;
+  return "Enter the measured value";
 }
 
 function DynamicForm({ form, answers, setAnswers }: { form: RuntimeForm; answers: Record<string, FieldValue>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, FieldValue>>> }) {

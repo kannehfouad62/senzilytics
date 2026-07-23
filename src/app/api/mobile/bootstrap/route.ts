@@ -1,4 +1,10 @@
-import { ConfigurableFormModule, PermissionKey, Status, UserRole } from "@prisma/client";
+import {
+  ConfigurableFormModule,
+  EnterpriseAuditStatus,
+  PermissionKey,
+  Status,
+  UserRole,
+} from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { authenticateMobileRequest, MobileAuthError } from "@/modules/mobile/mobile-auth.service";
@@ -17,8 +23,14 @@ export async function GET(request: Request) {
           select: { permission: true },
         }).then((rows) => rows.map((row) => row.permission));
     const canExecuteInspections = assigned.includes(PermissionKey.MANAGE_INSPECTIONS);
+    const canExecuteAudits = assigned.includes(PermissionKey.MANAGE_AUDITS);
+    const auditManagementRole = new Set<UserRole>([
+      UserRole.SUPER_ADMIN,
+      UserRole.ORG_ADMIN,
+      UserRole.EHS_MANAGER,
+    ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, tasks, inspectionRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, tasks, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -124,6 +136,116 @@ export async function GET(request: Request) {
             take: 20,
           })
         : Promise.resolve([]),
+      canExecuteAudits
+        ? prisma.enterpriseAudit.findMany({
+            where: {
+              organizationId: organization.id,
+              status: {
+                in: [
+                  EnterpriseAuditStatus.DRAFT,
+                  EnterpriseAuditStatus.PLANNED,
+                  EnterpriseAuditStatus.SCHEDULED,
+                  EnterpriseAuditStatus.IN_PROGRESS,
+                ],
+              },
+              ...(auditManagementRole
+                ? {}
+                : {
+                    OR: [
+                      { leadAuditorId: user.id },
+                      { teamMembers: { some: { userId: user.id, canEdit: true } } },
+                    ],
+                  }),
+            },
+            select: {
+              id: true,
+              reference: true,
+              title: true,
+              description: true,
+              objectives: true,
+              scope: true,
+              criteria: true,
+              auditType: true,
+              status: true,
+              scheduledAt: true,
+              dueDate: true,
+              totalQuestionCount: true,
+              answeredQuestionCount: true,
+              failedQuestionCount: true,
+              scorePercentage: true,
+              site: { select: { id: true, name: true } },
+              department: { select: { id: true, name: true } },
+              leadAuditor: { select: { id: true, name: true } },
+              sections: {
+                where: { isActive: true },
+                select: {
+                  id: true,
+                  title: true,
+                  description: true,
+                  guidance: true,
+                  sequence: true,
+                  status: true,
+                  totalQuestionCount: true,
+                  answeredQuestionCount: true,
+                  questions: {
+                    where: { isActive: true },
+                    select: {
+                      id: true,
+                      questionText: true,
+                      description: true,
+                      guidance: true,
+                      standardClause: true,
+                      regulatoryRef: true,
+                      responseType: true,
+                      sequence: true,
+                      weight: true,
+                      isRequired: true,
+                      allowNotApplicable: true,
+                      requireComment: true,
+                      requireEvidence: true,
+                      requirePhoto: true,
+                      minimumNumericValue: true,
+                      maximumNumericValue: true,
+                      options: {
+                        select: {
+                          id: true,
+                          label: true,
+                          value: true,
+                          description: true,
+                          sequence: true,
+                          triggersFinding: true,
+                        },
+                        orderBy: { sequence: "asc" },
+                      },
+                      response: {
+                        select: {
+                          result: true,
+                          responseText: true,
+                          numericValue: true,
+                          booleanValue: true,
+                          selectedOptionValues: true,
+                          comments: true,
+                          scoreAwarded: true,
+                          isCompliant: true,
+                          requiresFollowUp: true,
+                          answeredAt: true,
+                        },
+                      },
+                      _count: { select: { evidence: true, findings: true } },
+                    },
+                    orderBy: { sequence: "asc" },
+                  },
+                },
+                orderBy: { sequence: "asc" },
+              },
+            },
+            orderBy: [
+              { dueDate: { sort: "asc", nulls: "last" } },
+              { scheduledAt: { sort: "asc", nulls: "last" } },
+            ],
+            take: 15,
+          })
+        : Promise.resolve([]),
     ]);
 
     const modules = getMobileModuleCatalog({
@@ -148,6 +270,31 @@ export async function GET(request: Request) {
           : null,
       })),
     }));
+    const audits = auditRecords.map((audit) => ({
+      ...audit,
+      scorePercentage: audit.scorePercentage === null ? null : Number(audit.scorePercentage),
+      sections: audit.sections.map((section) => ({
+        ...section,
+        questions: section.questions.map((question) => ({
+          ...question,
+          minimumNumericValue: question.minimumNumericValue === null ? null : Number(question.minimumNumericValue),
+          maximumNumericValue: question.maximumNumericValue === null ? null : Number(question.maximumNumericValue),
+          response: question.response
+            ? {
+                ...question.response,
+                numericValue: question.response.numericValue === null ? null : Number(question.response.numericValue),
+                scoreAwarded: question.response.scoreAwarded === null ? null : Number(question.response.scoreAwarded),
+                selectedOptionValues: Array.isArray(question.response.selectedOptionValues)
+                  ? question.response.selectedOptionValues.filter((value): value is string => typeof value === "string")
+                  : [],
+              }
+            : null,
+          evidenceCount: question._count.evidence,
+          findingCount: question._count.findings,
+          _count: undefined,
+        })),
+      })),
+    }));
 
     return NextResponse.json({
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
@@ -161,6 +308,7 @@ export async function GET(request: Request) {
       observationForms: serializeRuntimeForms(observationRuntimeForms),
       incidentForms: serializeRuntimeForms(incidentRuntimeForms),
       inspections,
+      audits,
       notifications,
       tasks,
       modules,

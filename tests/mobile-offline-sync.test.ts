@@ -64,10 +64,78 @@ test("mobile inspection sync rejects unanswered checklist states", () => {
   assert.equal(parsed.success, false);
 });
 
+test("mobile synchronization preserves Audit lifecycle order and assessed responses", () => {
+  const parsed = offlineSyncRequestSchema.safeParse({
+    items: [
+      {
+        id: "d55b0f7d-c75c-48ee-8f4e-9c106709f3ed",
+        type: "AUDIT_START",
+        capturedAt,
+        payload: { auditId: "audit-1" },
+      },
+      {
+        id: "23dd23ca-c46e-4b7f-a153-a15ce3810de8",
+        type: "AUDIT_RESPONSE",
+        capturedAt,
+        payload: {
+          auditId: "audit-1",
+          questionId: "question-1",
+          result: "FAIL",
+          selectedOptionValues: ["guarding-deficient"],
+          comments: "The fixed guard was not installed.",
+          evidenceNote: "Verified against equipment drawing EQ-42.",
+        },
+      },
+    ],
+  });
+
+  assert.equal(parsed.success, true);
+  if (parsed.success) {
+    assert.deepEqual(parsed.data.items.map((item) => item.type), ["AUDIT_START", "AUDIT_RESPONSE"]);
+  }
+});
+
+test("mobile Audit sync rejects unassessed results and malformed evidence URLs", () => {
+  for (const payload of [
+    {
+      auditId: "audit-1",
+      questionId: "question-1",
+      result: "NOT_ASSESSED",
+      selectedOptionValues: [],
+    },
+    {
+      auditId: "audit-1",
+      questionId: "question-1",
+      result: "PASS",
+      selectedOptionValues: [],
+      evidenceUrl: "not-a-url",
+    },
+    {
+      auditId: "audit-1",
+      questionId: "question-1",
+      result: "PASS",
+      selectedOptionValues: [],
+      evidenceUrl: "http://example.com/evidence",
+    },
+  ]) {
+    const parsed = offlineSyncRequestSchema.safeParse({
+      items: [{
+        id: "32bd4777-25bf-40db-9cac-462c8829d681",
+        type: "AUDIT_RESPONSE",
+        capturedAt,
+        payload,
+      }],
+    });
+    assert.equal(parsed.success, false);
+  }
+});
+
 test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("SAFETY_OBSERVATION"), PermissionKey.CREATE_OBSERVATION);
   assert.equal(requiredOfflinePermission("INCIDENT"), PermissionKey.CREATE_INCIDENT);
   assert.equal(requiredOfflinePermission("INSPECTION_RESPONSE"), PermissionKey.MANAGE_INSPECTIONS);
+  assert.equal(requiredOfflinePermission("AUDIT_START"), PermissionKey.MANAGE_AUDITS);
+  assert.equal(requiredOfflinePermission("AUDIT_RESPONSE"), PermissionKey.MANAGE_AUDITS);
 });
 
 test("mobile outbox decoder preserves legacy observation rows", () => {
@@ -79,5 +147,9 @@ test("mobile outbox decoder preserves legacy observation rows", () => {
   assert.deepEqual(decodeOfflineEnvelope({ type: "INCIDENT", payload: { title: "Near miss" } }), {
     type: "INCIDENT",
     payload: { title: "Near miss" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "AUDIT_START", payload: { auditId: "audit-1" } }), {
+    type: "AUDIT_START",
+    payload: { auditId: "audit-1" },
   });
 });

@@ -73,6 +73,8 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.CREATE_INCIDENT,
       PermissionKey.VIEW_INSPECTIONS,
       PermissionKey.MANAGE_INSPECTIONS,
+      PermissionKey.VIEW_AUDITS,
+      PermissionKey.MANAGE_AUDITS,
     ],
     user: {
       email: "ehs@example.com",
@@ -84,9 +86,10 @@ test("native field capabilities require their write permissions", () => {
 
   assert.equal(modules.find((module) => module.key === "incidents")?.nativeCapability, "INCIDENT_CAPTURE");
   assert.equal(modules.find((module) => module.key === "inspections")?.nativeCapability, "INSPECTION_EXECUTION");
+  assert.equal(modules.find((module) => module.key === "audits")?.nativeCapability, "AUDIT_EXECUTION");
 
   const readOnly = getMobileModuleCatalog({
-    permissions: [PermissionKey.VIEW_INCIDENT, PermissionKey.VIEW_INSPECTIONS],
+    permissions: [PermissionKey.VIEW_INCIDENT, PermissionKey.VIEW_INSPECTIONS, PermissionKey.VIEW_AUDITS],
     user: {
       email: "viewer@example.com",
       role: UserRole.AUDITOR,

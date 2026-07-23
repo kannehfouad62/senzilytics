@@ -53,7 +53,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION";
+  nativeCapability?: "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION";
 };
 
 export type MobileInspectionResponse = {
@@ -94,6 +94,91 @@ export type MobileInspection = {
   checklistItems: MobileInspectionItem[];
 };
 
+export type AuditResponseResult =
+  | "PASS"
+  | "FAIL"
+  | "YES"
+  | "NO"
+  | "COMPLIANT"
+  | "NON_COMPLIANT"
+  | "PARTIALLY_COMPLIANT"
+  | "NOT_APPLICABLE"
+  | "OBSERVATION"
+  | "INFORMATION_ONLY";
+
+export type MobileAuditQuestion = {
+  id: string;
+  questionText: string;
+  description: string | null;
+  guidance: string | null;
+  standardClause: string | null;
+  regulatoryRef: string | null;
+  responseType: "PASS_FAIL" | "YES_NO" | "NUMERIC" | "FREE_TEXT" | "OBSERVATION" | "MULTIPLE_CHOICE" | "RATING" | "NOT_APPLICABLE";
+  sequence: number;
+  weight: number;
+  isRequired: boolean;
+  allowNotApplicable: boolean;
+  requireComment: boolean;
+  requireEvidence: boolean;
+  requirePhoto: boolean;
+  minimumNumericValue: number | null;
+  maximumNumericValue: number | null;
+  options: Array<{
+    id: string;
+    label: string;
+    value: string;
+    description: string | null;
+    sequence: number;
+    triggersFinding: boolean;
+  }>;
+  response: {
+    result: "NOT_ASSESSED" | AuditResponseResult;
+    responseText: string | null;
+    numericValue: number | null;
+    booleanValue: boolean | null;
+    selectedOptionValues: string[];
+    comments: string | null;
+    scoreAwarded: number | null;
+    isCompliant: boolean | null;
+    requiresFollowUp: boolean;
+    answeredAt: string | null;
+  } | null;
+  evidenceCount: number;
+  findingCount: number;
+};
+
+export type MobileAudit = {
+  id: string;
+  reference: string;
+  title: string;
+  description: string | null;
+  objectives: string | null;
+  scope: string | null;
+  criteria: string | null;
+  auditType: string;
+  status: "DRAFT" | "PLANNED" | "SCHEDULED" | "IN_PROGRESS";
+  scheduledAt: string | null;
+  dueDate: string | null;
+  totalQuestionCount: number;
+  answeredQuestionCount: number;
+  failedQuestionCount: number;
+  scorePercentage: number | null;
+  site: { id: string; name: string };
+  department: { id: string; name: string } | null;
+  leadAuditor: { id: string; name: string } | null;
+  sections: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    guidance: string | null;
+    sequence: number;
+    status: string;
+    totalQuestionCount: number;
+    answeredQuestionCount: number;
+    questions: MobileAuditQuestion[];
+  }>;
+};
+
 export type MobileBootstrap = {
   user: MobileUser;
   organization: { id: string; name: string; subscriptionPlan: string };
@@ -102,6 +187,7 @@ export type MobileBootstrap = {
   observationForms: RuntimeForm[];
   incidentForms: RuntimeForm[];
   inspections: MobileInspection[];
+  audits: MobileAudit[];
   notifications: MobileNotification[];
   tasks: MobileTask[];
   modules: MobileModule[];
@@ -148,4 +234,21 @@ export type InspectionResponsePayload = {
   findingDescription?: string;
   findingRiskLevel?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   findingDueDate?: string;
+};
+
+export type AuditStartPayload = {
+  auditId: string;
+};
+
+export type AuditResponsePayload = {
+  auditId: string;
+  questionId: string;
+  result: AuditResponseResult;
+  responseText?: string;
+  numericValue?: number;
+  booleanValue?: boolean;
+  selectedOptionValues: string[];
+  comments?: string;
+  evidenceNote?: string;
+  evidenceUrl?: string;
 };

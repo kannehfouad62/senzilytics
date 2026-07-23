@@ -9,6 +9,8 @@ import {
 } from "./offline-envelope";
 import { isMobileWorkspaceCacheFresh } from "./session-lifecycle";
 import type {
+  AuditResponsePayload,
+  AuditStartPayload,
   IncidentPayload,
   InspectionResponsePayload,
   MobileBootstrap,
@@ -83,6 +85,14 @@ export async function queueIncident(ownerKey: string, payload: IncidentPayload) 
 
 export async function queueInspectionResponse(ownerKey: string, payload: InspectionResponsePayload) {
   return queueOfflineItem(ownerKey, "INSPECTION_RESPONSE", payload);
+}
+
+export async function queueAuditStart(ownerKey: string, payload: AuditStartPayload) {
+  return queueOfflineItem(ownerKey, "AUDIT_START", payload);
+}
+
+export async function queueAuditResponse(ownerKey: string, payload: AuditResponsePayload) {
+  return queueOfflineItem(ownerKey, "AUDIT_RESPONSE", payload);
 }
 
 export async function pendingOfflineCount(ownerKey: string) {

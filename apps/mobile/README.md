@@ -14,6 +14,8 @@ This Expo/React Native application is the Premium native field workspace for iOS
 - Offline safety-observation and incident/near-miss capture using a tenant/user-scoped SQLCipher-encrypted outbox
 - Native execution of active inspections assigned to the signed-in lead inspector or team member
 - Offline checklist responses with optional linked finding creation and idempotent synchronization
+- Native offline Audit start and question execution for authorized managers, lead auditors, and editable Audit team members
+- Audit response scoring, required comments/evidence, response options, and automatic findings through the same governed web service
 - Encrypted cached-workspace startup during a bounded 72-hour offline authorization window
 - Automatic idempotent synchronization when connectivity returns
 - Published configurable observation forms and custom field validation
@@ -85,4 +87,4 @@ npx eas-cli@latest submit --profile production --platform android
 
 `EXPO_PUBLIC_API_URL` is public configuration, not a secret. If you prefer to manage it in the Expo dashboard instead of `eas.json`, create the same value separately for the development, preview, and production environments and retain each profile's explicit `environment` selection. Confirm the active configuration before a release with `eas config --platform ios --profile production` and `eas config --platform android --profile production`.
 
-Release builds should be exercised against a staging tenant first. Verify sign-in and account switching for credentials, Microsoft, and Okta; role-filtered module visibility; tenant isolation; offline observation and incident capture; assigned inspection execution and finding creation; refresh-token rotation; session revocation; notification delivery; and synchronization after connectivity returns.
+Release builds should be exercised against a staging tenant first. Verify sign-in and account switching for credentials, Microsoft, and Okta; role-filtered module visibility; tenant isolation; offline observation and incident capture; assigned inspection and Audit execution; automatic finding creation; refresh-token rotation; session revocation; notification delivery; and synchronization after connectivity returns.

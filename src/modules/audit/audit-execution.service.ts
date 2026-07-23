@@ -32,13 +32,36 @@ async function getAuthorizedAudit(input: { organizationId: string; userId: strin
   return audit;
 }
 
-export async function startAuditExecutionService(input: { organizationId: string; userId: string; userRole: UserRole; auditId: string }) {
+export async function startAuditExecutionService(input: {
+  organizationId: string;
+  userId: string;
+  userRole: UserRole;
+  auditId: string;
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
+}) {
   const audit = await getAuthorizedAudit(input);
   if (!startableStatuses.has(audit.status)) throw new Error("Only a planned or scheduled Audit can be started.");
   const now = new Date();
   const updated = await prisma.$transaction(async (tx) => {
     const value = await tx.enterpriseAudit.update({ where: { id: audit.id }, data: { status: EnterpriseAuditStatus.IN_PROGRESS, startedAt: audit.startedAt ?? now, updatedById: input.userId } });
     await tx.enterpriseAuditHistory.create({ data: { organizationId: input.organizationId, auditId: audit.id, userId: input.userId, action: "STARTED", entityType: "EnterpriseAudit", entityId: audit.id, title: "Audit execution started" } });
+    if (input.offlineSubmission) {
+      await tx.offlineSubmission.create({
+        data: {
+          id: input.offlineSubmission.id,
+          organizationId: input.organizationId,
+          userId: input.userId,
+          recordType: "AUDIT_START",
+          recordId: audit.id,
+          capturedAt: input.offlineSubmission.capturedAt,
+          payloadHash: input.offlineSubmission.payloadHash,
+        },
+      });
+    }
     return value;
   });
   return updated;
@@ -79,6 +102,11 @@ export async function recordAuditResponseService(input: {
   comments?: string | null;
   evidenceNote?: string | null;
   evidenceUrl?: string | null;
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
 }) {
   const audit = await getAuthorizedAudit(input);
   if (audit.status !== EnterpriseAuditStatus.IN_PROGRESS) throw new Error("Start the Audit before recording responses.");
@@ -98,12 +126,14 @@ export async function recordAuditResponseService(input: {
   const previousFinding = findingRequired ? await prisma.enterpriseAuditFinding.findFirst({ where: { organizationId: input.organizationId, auditId: { not: audit.id }, OR: [...(question.standardClause ? [{ standardClause: question.standardClause }] : []), { question: { questionText: { equals: question.questionText, mode: "insensitive" } } }] }, select: { reference: true, recurrenceCount: true }, orderBy: { createdAt: "desc" } }) : null;
 
   let createdFindingReference: string | null = null;
+  let responseRecordId: string | null = null;
   await prisma.$transaction(async (tx) => {
     const response = await tx.enterpriseAuditResponse.upsert({
       where: { questionId: question.id },
       update: { answeredById: input.userId, result: input.result, responseText: input.responseText, numericValue: input.numericValue, booleanValue: input.booleanValue, selectedOptionValues: input.selectedOptionValues, comments: input.comments, scoreAwarded: score.awarded, maximumScore, isCompliant: score.compliant, requiresFollowUp: findingRequired, answeredAt: new Date() },
       create: { auditId: audit.id, questionId: question.id, answeredById: input.userId, result: input.result, responseText: input.responseText, numericValue: input.numericValue, booleanValue: input.booleanValue, selectedOptionValues: input.selectedOptionValues, comments: input.comments, scoreAwarded: score.awarded, maximumScore, isCompliant: score.compliant, requiresFollowUp: findingRequired, answeredAt: new Date() },
     });
+    responseRecordId = response.id;
     await tx.enterpriseAuditQuestion.update({ where: { id: question.id }, data: { status: input.result === EnterpriseAuditResponseResult.NOT_APPLICABLE ? EnterpriseAuditQuestionStatus.NOT_APPLICABLE : EnterpriseAuditQuestionStatus.ANSWERED } });
     if (input.evidenceNote) await tx.enterpriseAuditEvidence.create({ data: { organizationId: input.organizationId, auditId: audit.id, questionId: question.id, responseId: response.id, evidenceType: EnterpriseAuditEvidenceType.NOTE, title: "Response evidence note", description: input.evidenceNote, capturedAt: new Date(), capturedById: input.userId } });
     if (input.evidenceUrl) await tx.enterpriseAuditEvidence.create({ data: { organizationId: input.organizationId, auditId: audit.id, questionId: question.id, responseId: response.id, evidenceType: question.requirePhoto ? EnterpriseAuditEvidenceType.PHOTO : EnterpriseAuditEvidenceType.LINK, title: question.requirePhoto ? "Response photo evidence" : "Response evidence link", externalUrl: input.evidenceUrl, capturedAt: new Date(), capturedById: input.userId } });
@@ -114,12 +144,27 @@ export async function recordAuditResponseService(input: {
       await tx.enterpriseAuditHistory.create({ data: { organizationId: input.organizationId, auditId: audit.id, userId: input.userId, action: "FINDING_CREATED", entityType: "EnterpriseAuditFinding", entityId: finding.id, title: "Automatic Audit finding created", description: reference } });
     }
     await tx.enterpriseAuditHistory.create({ data: { organizationId: input.organizationId, auditId: audit.id, userId: input.userId, action: "RESPONSE_RECORDED", entityType: "EnterpriseAuditResponse", entityId: response.id, title: "Audit response recorded", description: question.questionText } });
+    if (input.offlineSubmission) {
+      await tx.offlineSubmission.create({
+        data: {
+          id: input.offlineSubmission.id,
+          organizationId: input.organizationId,
+          userId: input.userId,
+          recordType: "AUDIT_RESPONSE",
+          recordId: response.id,
+          capturedAt: input.offlineSubmission.capturedAt,
+          payloadHash: input.offlineSubmission.payloadHash,
+        },
+      });
+    }
   });
 
   await recalculateAuditProgress(audit.id);
   if (createdFindingReference && audit.leadAuditorId) {
     await createNotification({ organizationId: input.organizationId, userId: audit.leadAuditorId, type: severity === EnterpriseAuditSeverity.CRITICAL ? NotificationType.CRITICAL : NotificationType.WARNING, title: "Automatic Audit finding created", message: `${createdFindingReference} was generated from a nonconforming response.`, link: `/audits/${audit.id}` }).catch(() => undefined);
   }
+  if (!responseRecordId) throw new Error("The Audit response could not be recorded.");
+  return responseRecordId;
 }
 
 async function recalculateAuditProgress(auditId: string) {

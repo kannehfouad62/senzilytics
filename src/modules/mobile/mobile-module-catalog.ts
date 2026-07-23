@@ -17,7 +17,7 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION";
+  nativeCapability?: "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION";
   nativePermission?: PermissionKey;
 };
 
@@ -41,7 +41,7 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "sif", label: "SIF Prevention", description: "Serious injury and fatality signals and critical controls.", href: "/assurance/sif", category: "ASSURANCE", permission: PermissionKey.VIEW_SIF_INTELLIGENCE },
   { key: "certification", label: "Certification Readiness", description: "Management-system readiness, evidence, and gap reviews.", href: "/assurance/certification", category: "ASSURANCE", permission: PermissionKey.VIEW_CERTIFICATION_READINESS },
   { key: "inspections", label: "Inspections", description: "Inspection planning, checklist execution, and findings.", href: "/inspections", category: "ASSURANCE", permission: PermissionKey.VIEW_INSPECTIONS, nativeCapability: "INSPECTION_EXECUTION", nativePermission: PermissionKey.MANAGE_INSPECTIONS },
-  { key: "audits", label: "Audit Workspace", description: "Programs, protocols, schedules, execution, findings, and reports.", href: "/audits", category: "ASSURANCE", permission: PermissionKey.VIEW_AUDITS },
+  { key: "audits", label: "Audit Workspace", description: "Programs, protocols, schedules, execution, findings, and reports.", href: "/audits", category: "ASSURANCE", permission: PermissionKey.VIEW_AUDITS, nativeCapability: "AUDIT_EXECUTION", nativePermission: PermissionKey.MANAGE_AUDITS },
   { key: "compliance", label: "Compliance", description: "Legal obligations, evaluations, permits, and compliance status.", href: "/compliance", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE },
   { key: "compliance-calendar", label: "Compliance Calendar", description: "Daily through annual assigned obligations and completion tracking.", href: "/compliance/calendar", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE },
   { key: "regulatory", label: "Regulatory Intelligence", description: "Regulatory changes, applicability, impact, and response governance.", href: "/compliance/regulatory", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE },
