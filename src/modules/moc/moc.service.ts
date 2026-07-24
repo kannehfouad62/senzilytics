@@ -81,6 +81,10 @@ const allowedStatusTransitions: Record<
   [MocStatus.CANCELLED]: [],
 };
 
+export function getMocNextStatuses(status: MocStatus) {
+  return [...allowedStatusTransitions[status]];
+}
+
 async function validateMocScope(input: {
   organizationId: string;
   siteId: string;
@@ -644,6 +648,11 @@ export async function transitionMocStatusService(input: {
   mocId: string;
   status: MocStatus;
   comments?: string | null;
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
 }) {
   const moc =
     await findTenantMocById({
@@ -659,9 +668,9 @@ export async function transitionMocStatusService(input: {
   }
 
   const allowedStatuses =
-    allowedStatusTransitions[
+    getMocNextStatuses(
       moc.status
-    ];
+    );
 
   if (
     !allowedStatuses.includes(
@@ -763,42 +772,64 @@ export async function transitionMocStatusService(input: {
   const timestamp = new Date();
 
   const updatedMoc =
-    await prisma.managementOfChange.update({
-      where: {
-        id: input.mocId,
-      },
+    await prisma.$transaction(async transaction => {
+      const updated =
+        await transaction.managementOfChange.update({
+          where: {
+            id: input.mocId,
+          },
 
-      data: {
-        status: input.status,
+          data: {
+            status: input.status,
 
-        ...(input.status ===
-        MocStatus.IMPLEMENTATION
-          ? {
-              actualStartDate:
-                moc.actualStartDate ??
-                timestamp,
-            }
-          : {}),
+            ...(input.status ===
+            MocStatus.IMPLEMENTATION
+              ? {
+                  actualStartDate:
+                    moc.actualStartDate ??
+                    timestamp,
+                }
+              : {}),
 
-        ...(input.status ===
-        MocStatus.VERIFICATION
-          ? {
-              implementedAt:
-                moc.implementedAt ??
-                timestamp,
-            }
-          : {}),
+            ...(input.status ===
+            MocStatus.VERIFICATION
+              ? {
+                  implementedAt:
+                    moc.implementedAt ??
+                    timestamp,
+                }
+              : {}),
 
-        ...(input.status ===
-        MocStatus.CLOSED
-          ? {
-              verifiedAt:
-                moc.verifiedAt ??
-                timestamp,
-              closedAt: timestamp,
-            }
-          : {}),
-      },
+            ...(input.status ===
+            MocStatus.CLOSED
+              ? {
+                  verifiedAt:
+                    moc.verifiedAt ??
+                    timestamp,
+                  closedAt: timestamp,
+                }
+              : {}),
+          },
+        });
+
+      if (input.offlineSubmission) {
+        await transaction.offlineSubmission.create({
+          data: {
+            id: input.offlineSubmission.id,
+            organizationId:
+              input.organizationId,
+            userId: input.userId,
+            recordType: "MOC_STATUS",
+            recordId: updated.id,
+            capturedAt:
+              input.offlineSubmission.capturedAt,
+            payloadHash:
+              input.offlineSubmission.payloadHash,
+          },
+        });
+      }
+
+      return updated;
     });
 
     const lifecycleRecipients =
@@ -992,6 +1023,11 @@ export async function decideMocApprovalService(input: {
     | typeof MocApprovalStatus.APPROVED
     | typeof MocApprovalStatus.REJECTED;
   comments?: string | null;
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
 }) {
   const approval =
     await prisma.mocApproval.findFirst({
@@ -1040,21 +1076,44 @@ export async function decideMocApprovalService(input: {
   }
 
   const updatedApproval =
-    await prisma.mocApproval.update({
-      where: {
-        id: approval.id,
-      },
+    await prisma.$transaction(async transaction => {
+      const updated =
+        await transaction.mocApproval.update({
+          where: {
+            id: approval.id,
+          },
 
-      data: {
-        status: input.status,
-        comments:
-          input.comments,
-        approverId:
-          approval.approverId ??
-          input.userId,
-        decidedAt:
-          new Date(),
-      },
+          data: {
+            status: input.status,
+            comments:
+              input.comments,
+            approverId:
+              approval.approverId ??
+              input.userId,
+            decidedAt:
+              new Date(),
+          },
+        });
+
+      if (input.offlineSubmission) {
+        await transaction.offlineSubmission.create({
+          data: {
+            id: input.offlineSubmission.id,
+            organizationId:
+              input.organizationId,
+            userId: input.userId,
+            recordType:
+              "MOC_APPROVAL_DECISION",
+            recordId: updated.id,
+            capturedAt:
+              input.offlineSubmission.capturedAt,
+            payloadHash:
+              input.offlineSubmission.payloadHash,
+          },
+        });
+      }
+
+      return updated;
     });
 
     const notificationRecipients = new Set<string>();
@@ -1282,6 +1341,11 @@ export async function updateMocTaskService(input: {
     taskId: string;
     status: MocTaskStatus;
     evidenceNote?: string | null;
+    offlineSubmission?: {
+      id: string;
+      capturedAt: Date;
+      payloadHash: string;
+    };
   }) {
     const task =
       await prisma.mocTask.findFirst({
@@ -1313,38 +1377,60 @@ export async function updateMocTaskService(input: {
       MocTaskStatus.COMPLETED;
   
     const updatedTask =
-      await prisma.mocTask.update({
-        where: {
-          id: task.id,
-        },
-  
-        data: {
-          status: input.status,
-  
-          evidenceNote:
-            input.evidenceNote,
-  
-          startedAt:
-            isStarting &&
-            !task.startedAt
-              ? now
-              : task.startedAt,
-  
-          completedAt:
-            isCompleted
-              ? now
-              : null,
-  
-          verifiedAt:
-            isCompleted
-              ? now
-              : null,
-  
-          verifiedById:
-            isCompleted
-              ? input.userId
-              : null,
-        },
+      await prisma.$transaction(async transaction => {
+        const updated =
+          await transaction.mocTask.update({
+            where: {
+              id: task.id,
+            },
+
+            data: {
+              status: input.status,
+
+              evidenceNote:
+                input.evidenceNote,
+
+              startedAt:
+                isStarting &&
+                !task.startedAt
+                  ? now
+                  : task.startedAt,
+
+              completedAt:
+                isCompleted
+                  ? now
+                  : null,
+
+              verifiedAt:
+                isCompleted
+                  ? now
+                  : null,
+
+              verifiedById:
+                isCompleted
+                  ? input.userId
+                  : null,
+            },
+          });
+
+        if (input.offlineSubmission) {
+          await transaction.offlineSubmission.create({
+            data: {
+              id: input.offlineSubmission.id,
+              organizationId:
+                input.organizationId,
+              userId: input.userId,
+              recordType: "MOC_TASK_STATUS",
+              recordId: updated.id,
+              capturedAt:
+                input.offlineSubmission.capturedAt,
+              payloadHash:
+                input.offlineSubmission.payloadHash,
+            },
+          });
+        }
+
+        return updated;
       });
 
       if (

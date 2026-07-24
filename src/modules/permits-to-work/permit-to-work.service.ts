@@ -53,7 +53,19 @@ export async function createPermitToWorkService(input: {
   });
 }
 
-export async function transitionPermitToWorkService(input: { organizationId: string; userId: string; permitId: string; status: PermitToWorkStatus; comments?: string | null; closeoutNotes?: string | null }) {
+export async function transitionPermitToWorkService(input: {
+  organizationId: string;
+  userId: string;
+  permitId: string;
+  status: PermitToWorkStatus;
+  comments?: string | null;
+  closeoutNotes?: string | null;
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
+}) {
   const permit = await prisma.permitToWork.findFirst({ where: { id: input.permitId, organizationId: input.organizationId }, include: { controls: true, gasTests: { orderBy: { testedAt: "desc" }, take: 1 }, contractor: { include: { sites: true } }, workers: { include: { worker: true } } } });
   if (!permit) throw new Error("Permit to work not found in this organization.");
   if (!isPermitToWorkTransitionAllowed(permit.status, input.status)) throw new Error(`A ${permit.status.replaceAll("_", " ")} permit cannot move to ${input.status.replaceAll("_", " ")}.`);
@@ -93,6 +105,19 @@ export async function transitionPermitToWorkService(input: { organizationId: str
     } });
     await tx.permitToWorkHistory.create({ data: { permitId: permit.id, actorId: input.userId, fromStatus: permit.status, toStatus: input.status, comments: input.comments || input.closeoutNotes } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: ActivityAction.STATUS_CHANGE, entityType: "PermitToWork", entityId: permit.id, title: "Permit status changed", description: `${permit.status} → ${input.status}`, metadata: { comments: input.comments } } });
+    if (input.offlineSubmission) {
+      await tx.offlineSubmission.create({
+        data: {
+          id: input.offlineSubmission.id,
+          organizationId: input.organizationId,
+          userId: input.userId,
+          recordType: "PERMIT_STATUS",
+          recordId: updated.id,
+          capturedAt: input.offlineSubmission.capturedAt,
+          payloadHash: input.offlineSubmission.payloadHash,
+        },
+      });
+    }
     return updated;
   });
   if (permit.requestedById !== input.userId) {
@@ -102,14 +127,56 @@ export async function transitionPermitToWorkService(input: { organizationId: str
   return updated;
 }
 
-export async function verifyPermitControlService(input: { organizationId: string; userId: string; permitId: string; controlId: string; verified: boolean }) {
+export async function verifyPermitControlService(input: {
+  organizationId: string;
+  userId: string;
+  permitId: string;
+  controlId: string;
+  verified: boolean;
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
+}) {
   const control = await prisma.permitToWorkControl.findFirst({ where: { id: input.controlId, permitId: input.permitId, permit: { organizationId: input.organizationId } }, include: { permit: true } });
   if (!control) throw new Error("Permit control not found in this organization.");
   if (!([PermitToWorkStatus.APPROVED, PermitToWorkStatus.SUSPENDED] as PermitToWorkStatus[]).includes(control.permit.status)) throw new Error("Controls may only be verified on approved or suspended permits.");
-  return prisma.permitToWorkControl.update({ where: { id: control.id }, data: { isVerified: input.verified, verifiedById: input.verified ? input.userId : null, verifiedAt: input.verified ? new Date() : null } });
+  return prisma.$transaction(async tx => {
+    const updated = await tx.permitToWorkControl.update({ where: { id: control.id }, data: { isVerified: input.verified, verifiedById: input.verified ? input.userId : null, verifiedAt: input.verified ? new Date() : null } });
+    if (input.offlineSubmission) {
+      await tx.offlineSubmission.create({
+        data: {
+          id: input.offlineSubmission.id,
+          organizationId: input.organizationId,
+          userId: input.userId,
+          recordType: "PERMIT_CONTROL",
+          recordId: updated.id,
+          capturedAt: input.offlineSubmission.capturedAt,
+          payloadHash: input.offlineSubmission.payloadHash,
+        },
+      });
+    }
+    return updated;
+  });
 }
 
-export async function recordPermitGasTestService(input: { organizationId: string; userId: string; permitId: string; oxygenPercent?: number | null; lelPercent?: number | null; h2sPpm?: number | null; coPpm?: number | null; result: PermitGasTestResult; notes?: string | null }) {
+export async function recordPermitGasTestService(input: {
+  organizationId: string;
+  userId: string;
+  permitId: string;
+  oxygenPercent?: number | null;
+  lelPercent?: number | null;
+  h2sPpm?: number | null;
+  coPpm?: number | null;
+  result: PermitGasTestResult;
+  notes?: string | null;
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
+}) {
   const permit = await prisma.permitToWork.findFirst({ where: { id: input.permitId, organizationId: input.organizationId } });
   if (!permit) throw new Error("Permit to work not found in this organization.");
   if (!([PermitToWorkStatus.APPROVED, PermitToWorkStatus.ACTIVE, PermitToWorkStatus.SUSPENDED] as PermitToWorkStatus[]).includes(permit.status)) throw new Error("Gas tests can only be recorded after permit approval.");
@@ -123,6 +190,19 @@ export async function recordPermitGasTestService(input: { organizationId: string
       await tx.permitToWork.update({ where: { id: permit.id }, data: { status: PermitToWorkStatus.SUSPENDED, suspendedAt: now } });
       await tx.permitToWorkHistory.create({ data: { permitId: permit.id, actorId: input.userId, fromStatus: PermitToWorkStatus.ACTIVE, toStatus: PermitToWorkStatus.SUSPENDED, comments: input.notes || "Automatically suspended after a failed atmospheric test." } });
       await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: ActivityAction.STATUS_CHANGE, entityType: "PermitToWork", entityId: permit.id, title: "Permit automatically suspended", description: "A failed atmospheric test stopped the active permit.", metadata: { gasTestId: gasTest.id } } });
+    }
+    if (input.offlineSubmission) {
+      await tx.offlineSubmission.create({
+        data: {
+          id: input.offlineSubmission.id,
+          organizationId: input.organizationId,
+          userId: input.userId,
+          recordType: "PERMIT_GAS_TEST",
+          recordId: gasTest.id,
+          capturedAt: input.offlineSubmission.capturedAt,
+          payloadHash: input.offlineSubmission.payloadHash,
+        },
+      });
     }
     return gasTest;
   });

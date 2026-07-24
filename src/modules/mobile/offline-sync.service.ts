@@ -7,7 +7,12 @@ import {
   IncidentType,
   InspectionResponseResult,
   JsaStatus,
+  MocApprovalStatus,
+  MocStatus,
+  MocTaskStatus,
   PermissionKey,
+  PermitGasTestResult,
+  PermitToWorkStatus,
   RiskCategory,
   RiskControlEffectiveness,
   RiskImpact,
@@ -38,6 +43,16 @@ import {
   createRiskService,
 } from "@/modules/risk/risk.service";
 import { completeTrainingWithCompetenciesService } from "@/modules/training/competency.service";
+import {
+  decideMocApprovalService,
+  transitionMocStatusService,
+  updateMocTaskService,
+} from "@/modules/moc/moc.service";
+import {
+  recordPermitGasTestService,
+  transitionPermitToWorkService,
+  verifyPermitControlService,
+} from "@/modules/permits-to-work/permit-to-work.service";
 
 const customValue = z.union([
   z.string().max(5000),
@@ -267,6 +282,82 @@ const trainingCompletionItemSchema = z.object({
   }),
 });
 
+const mocStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("MOC_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    mocId: z.string().min(1).max(200),
+    status: z.nativeEnum(MocStatus),
+    comments: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const mocApprovalDecisionItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("MOC_APPROVAL_DECISION"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    mocId: z.string().min(1).max(200),
+    approvalId: z.string().min(1).max(200),
+    status: z.enum([
+      MocApprovalStatus.APPROVED,
+      MocApprovalStatus.REJECTED,
+    ]),
+    comments: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const mocTaskStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("MOC_TASK_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    mocId: z.string().min(1).max(200),
+    taskId: z.string().min(1).max(200),
+    status: z.nativeEnum(MocTaskStatus),
+    evidenceNote: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const permitStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("PERMIT_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    permitId: z.string().min(1).max(200),
+    status: z.nativeEnum(PermitToWorkStatus),
+    comments: z.string().trim().max(5000).optional(),
+    closeoutNotes: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const permitControlItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("PERMIT_CONTROL"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    permitId: z.string().min(1).max(200),
+    controlId: z.string().min(1).max(200),
+    verified: z.boolean(),
+  }),
+});
+
+const permitGasTestItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("PERMIT_GAS_TEST"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    permitId: z.string().min(1).max(200),
+    oxygenPercent: z.number().finite().min(0).max(100).optional(),
+    lelPercent: z.number().finite().min(0).optional(),
+    h2sPpm: z.number().finite().min(0).optional(),
+    coPpm: z.number().finite().min(0).optional(),
+    result: z.nativeEnum(PermitGasTestResult),
+    notes: z.string().trim().max(5000).optional(),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
@@ -281,6 +372,12 @@ const offlineItemSchema = z.discriminatedUnion("type", [
   complianceReviewItemSchema,
   trainingProgressItemSchema,
   trainingCompletionItemSchema,
+  mocStatusItemSchema,
+  mocApprovalDecisionItemSchema,
+  mocTaskStatusItemSchema,
+  permitStatusItemSchema,
+  permitControlItemSchema,
+  permitGasTestItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -310,6 +407,20 @@ export function requiredOfflinePermission(
   if (type === "COMPLIANCE_REVIEW") return PermissionKey.MANAGE_COMPLIANCE;
   if (type === "TRAINING_PROGRESS") return PermissionKey.VIEW_TRAINING;
   if (type === "TRAINING_COMPLETION") return PermissionKey.MANAGE_TRAINING;
+  if (
+    type === "MOC_STATUS" ||
+    type === "MOC_APPROVAL_DECISION" ||
+    type === "MOC_TASK_STATUS"
+  ) {
+    return PermissionKey.MANAGE_MOC;
+  }
+  if (
+    type === "PERMIT_STATUS" ||
+    type === "PERMIT_CONTROL" ||
+    type === "PERMIT_GAS_TEST"
+  ) {
+    return PermissionKey.MANAGE_PERMITS_TO_WORK;
+  }
   if (type === "CAPA_STATUS") {
     return status === Status.COMPLETED || status === Status.CLOSED
       ? PermissionKey.CLOSE_CAPA
@@ -422,8 +533,20 @@ export async function syncOfflineSubmissionsService(input: {
           item,
           payloadHash
         ));
-      } else {
+      } else if (item.type === "TRAINING_COMPLETION") {
         results.push(await syncTrainingCompletion(input, item, payloadHash));
+      } else if (item.type === "MOC_STATUS") {
+        results.push(await syncMocStatus(input, item, payloadHash));
+      } else if (item.type === "MOC_APPROVAL_DECISION") {
+        results.push(await syncMocApprovalDecision(input, item, payloadHash));
+      } else if (item.type === "MOC_TASK_STATUS") {
+        results.push(await syncMocTaskStatus(input, item, payloadHash));
+      } else if (item.type === "PERMIT_STATUS") {
+        results.push(await syncPermitStatus(input, item, payloadHash));
+      } else if (item.type === "PERMIT_CONTROL") {
+        results.push(await syncPermitControl(input, item, payloadHash));
+      } else {
+        results.push(await syncPermitGasTest(input, item, payloadHash));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -1130,6 +1253,133 @@ async function syncTrainingCompletion(
   };
 }
 
+async function syncMocStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof mocStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const updated = await transitionMocStatusService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    mocId: item.payload.mocId,
+    status: item.payload.status,
+    comments: item.payload.comments?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: updated.id };
+}
+
+async function syncMocApprovalDecision(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof mocApprovalDecisionItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const updated = await decideMocApprovalService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    mocId: item.payload.mocId,
+    approvalId: item.payload.approvalId,
+    status: item.payload.status,
+    comments: item.payload.comments?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: updated.id };
+}
+
+async function syncMocTaskStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof mocTaskStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const updated = await updateMocTaskService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    mocId: item.payload.mocId,
+    taskId: item.payload.taskId,
+    status: item.payload.status,
+    evidenceNote: item.payload.evidenceNote?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: updated.id };
+}
+
+async function syncPermitStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof permitStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const updated = await transitionPermitToWorkService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    permitId: item.payload.permitId,
+    status: item.payload.status,
+    comments: item.payload.comments?.trim() || null,
+    closeoutNotes: item.payload.closeoutNotes?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: updated.id };
+}
+
+async function syncPermitControl(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof permitControlItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const updated = await verifyPermitControlService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    permitId: item.payload.permitId,
+    controlId: item.payload.controlId,
+    verified: item.payload.verified,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: updated.id };
+}
+
+async function syncPermitGasTest(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof permitGasTestItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const gasTest = await recordPermitGasTestService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    permitId: item.payload.permitId,
+    oxygenPercent: item.payload.oxygenPercent ?? null,
+    lelPercent: item.payload.lelPercent ?? null,
+    h2sPpm: item.payload.h2sPpm ?? null,
+    coPpm: item.payload.coPpm ?? null,
+    result: item.payload.result,
+    notes: item.payload.notes?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: gasTest.id };
+}
+
 function parseDateOnly(value?: string) {
   return value ? new Date(`${value}T12:00:00.000Z`) : null;
 }
@@ -1144,7 +1394,7 @@ function parseFutureReviewDate(value: string | undefined, capturedAt: Date) {
 
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

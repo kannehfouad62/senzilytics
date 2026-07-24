@@ -76,6 +76,10 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.VIEW_AUDITS,
       PermissionKey.MANAGE_AUDITS,
       PermissionKey.VIEW_RISKS,
+      PermissionKey.VIEW_MOC,
+      PermissionKey.MANAGE_MOC,
+      PermissionKey.VIEW_PERMITS_TO_WORK,
+      PermissionKey.MANAGE_PERMITS_TO_WORK,
       PermissionKey.UPDATE_CAPA,
     ],
     user: {
@@ -93,6 +97,8 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(modules.find((module) => module.key === "tasks")?.nativeCapability, "ACTION_CENTER");
   assert.equal(modules.find((module) => module.key === "risks")?.nativeCapability, "RISK_FIELD");
   assert.equal(modules.find((module) => module.key === "jsa")?.nativeCapability, "JSA_FIELD");
+  assert.equal(modules.find((module) => module.key === "moc")?.nativeCapability, "MOC_EXECUTION");
+  assert.equal(modules.find((module) => module.key === "permits")?.nativeCapability, "PERMIT_TO_WORK_EXECUTION");
 
   const governance = getMobileModuleCatalog({
     permissions: [

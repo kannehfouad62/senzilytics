@@ -315,6 +315,105 @@ test("mobile compliance and training contracts reject unsafe evidence and invali
   assert.equal(invalidScore.success, false);
 });
 
+test("mobile synchronization accepts governed MOC and permit execution updates", () => {
+  const parsed = offlineSyncRequestSchema.safeParse({
+    items: [
+      {
+        id: "9f0b0bd5-27a2-45fa-b42c-698dcc948d7f",
+        type: "MOC_STATUS",
+        capturedAt,
+        payload: {
+          mocId: "moc-1",
+          status: "TECHNICAL_REVIEW",
+          comments: "Technical review package is ready.",
+        },
+      },
+      {
+        id: "5fe5aa14-f520-496f-b5fd-6fb7459cb248",
+        type: "MOC_APPROVAL_DECISION",
+        capturedAt,
+        payload: {
+          mocId: "moc-1",
+          approvalId: "approval-1",
+          status: "APPROVED",
+          comments: "Engineering controls are suitable.",
+        },
+      },
+      {
+        id: "5df39b1d-c47f-4bcf-a013-85778dd726a0",
+        type: "MOC_TASK_STATUS",
+        capturedAt,
+        payload: {
+          mocId: "moc-1",
+          taskId: "task-1",
+          status: "COMPLETED",
+          evidenceNote: "Updated drawing and field verification recorded.",
+        },
+      },
+      {
+        id: "1fe13048-439a-44ec-b365-bac2d36fbfc0",
+        type: "PERMIT_CONTROL",
+        capturedAt,
+        payload: {
+          permitId: "permit-1",
+          controlId: "control-1",
+          verified: true,
+        },
+      },
+      {
+        id: "75a1cc72-f565-49b1-8ac3-135228cf4f9f",
+        type: "PERMIT_GAS_TEST",
+        capturedAt,
+        payload: {
+          permitId: "permit-1",
+          oxygenPercent: 20.9,
+          lelPercent: 0,
+          h2sPpm: 0,
+          coPpm: 1,
+          result: "PASS",
+          notes: "Pre-entry atmospheric test.",
+        },
+      },
+      {
+        id: "926573ca-8175-4e70-9df9-e6e9413ac9e5",
+        type: "PERMIT_STATUS",
+        capturedAt,
+        payload: {
+          permitId: "permit-1",
+          status: "ACTIVE",
+          comments: "Work party briefed and controls verified.",
+        },
+      },
+    ],
+  });
+  assert.equal(parsed.success, true);
+});
+
+test("mobile permit gas-test contracts reject impossible readings", () => {
+  for (const payload of [
+    {
+      permitId: "permit-1",
+      oxygenPercent: 101,
+      result: "PASS",
+    },
+    {
+      permitId: "permit-1",
+      h2sPpm: -1,
+      result: "FAIL",
+    },
+  ]) {
+    const parsed = offlineSyncRequestSchema.safeParse({
+      items: [{
+        id,
+        type: "PERMIT_GAS_TEST",
+        capturedAt,
+        payload,
+      }],
+    });
+    assert.equal(parsed.success, false);
+  }
+});
+
 test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("SAFETY_OBSERVATION"), PermissionKey.CREATE_OBSERVATION);
   assert.equal(requiredOfflinePermission("INCIDENT"), PermissionKey.CREATE_INCIDENT);
@@ -331,6 +430,12 @@ test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("COMPLIANCE_REVIEW"), PermissionKey.MANAGE_COMPLIANCE);
   assert.equal(requiredOfflinePermission("TRAINING_PROGRESS"), PermissionKey.VIEW_TRAINING);
   assert.equal(requiredOfflinePermission("TRAINING_COMPLETION"), PermissionKey.MANAGE_TRAINING);
+  assert.equal(requiredOfflinePermission("MOC_STATUS"), PermissionKey.MANAGE_MOC);
+  assert.equal(requiredOfflinePermission("MOC_APPROVAL_DECISION"), PermissionKey.MANAGE_MOC);
+  assert.equal(requiredOfflinePermission("MOC_TASK_STATUS"), PermissionKey.MANAGE_MOC);
+  assert.equal(requiredOfflinePermission("PERMIT_STATUS"), PermissionKey.MANAGE_PERMITS_TO_WORK);
+  assert.equal(requiredOfflinePermission("PERMIT_CONTROL"), PermissionKey.MANAGE_PERMITS_TO_WORK);
+  assert.equal(requiredOfflinePermission("PERMIT_GAS_TEST"), PermissionKey.MANAGE_PERMITS_TO_WORK);
 });
 
 test("mobile outbox decoder preserves legacy observation rows", () => {
@@ -366,5 +471,13 @@ test("mobile outbox decoder preserves legacy observation rows", () => {
   assert.deepEqual(decodeOfflineEnvelope({ type: "TRAINING_COMPLETION", payload: { trainingRecordId: "training-1" } }), {
     type: "TRAINING_COMPLETION",
     payload: { trainingRecordId: "training-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "MOC_APPROVAL_DECISION", payload: { mocId: "moc-1" } }), {
+    type: "MOC_APPROVAL_DECISION",
+    payload: { mocId: "moc-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "PERMIT_GAS_TEST", payload: { permitId: "permit-1" } }), {
+    type: "PERMIT_GAS_TEST",
+    payload: { permitId: "permit-1" },
   });
 });

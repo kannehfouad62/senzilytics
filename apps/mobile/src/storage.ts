@@ -20,7 +20,13 @@ import type {
   InspectionResponsePayload,
   JsaAcknowledgmentPayload,
   MobileBootstrap,
+  MocApprovalDecisionPayload,
+  MocStatusPayload,
+  MocTaskStatusPayload,
   ObservationPayload,
+  PermitControlPayload,
+  PermitGasTestPayload,
+  PermitStatusPayload,
   RiskCapturePayload,
   RiskReviewPayload,
   TrainingCompletionPayload,
@@ -274,6 +280,48 @@ export async function queueTrainingCompletion(
   return queueOfflineItem(ownerKey, "TRAINING_COMPLETION", payload);
 }
 
+export async function queueMocStatus(
+  ownerKey: string,
+  payload: MocStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "MOC_STATUS", payload);
+}
+
+export async function queueMocApprovalDecision(
+  ownerKey: string,
+  payload: MocApprovalDecisionPayload
+) {
+  return queueOfflineItem(ownerKey, "MOC_APPROVAL_DECISION", payload);
+}
+
+export async function queueMocTaskStatus(
+  ownerKey: string,
+  payload: MocTaskStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "MOC_TASK_STATUS", payload);
+}
+
+export async function queuePermitStatus(
+  ownerKey: string,
+  payload: PermitStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "PERMIT_STATUS", payload);
+}
+
+export async function queuePermitControl(
+  ownerKey: string,
+  payload: PermitControlPayload
+) {
+  return queueOfflineItem(ownerKey, "PERMIT_CONTROL", payload);
+}
+
+export async function queuePermitGasTest(
+  ownerKey: string,
+  payload: PermitGasTestPayload
+) {
+  return queueOfflineItem(ownerKey, "PERMIT_GAS_TEST", payload);
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([
@@ -311,7 +359,13 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "COMPLIANCE_COMPLETION" ||
     envelope.type === "COMPLIANCE_REVIEW" ||
     envelope.type === "TRAINING_PROGRESS" ||
-    envelope.type === "TRAINING_COMPLETION"
+    envelope.type === "TRAINING_COMPLETION" ||
+    envelope.type === "MOC_STATUS" ||
+    envelope.type === "MOC_APPROVAL_DECISION" ||
+    envelope.type === "MOC_TASK_STATUS" ||
+    envelope.type === "PERMIT_STATUS" ||
+    envelope.type === "PERMIT_CONTROL" ||
+    envelope.type === "PERMIT_GAS_TEST"
   );
   const first = await synchronizeRows(database, parents);
   const files = await synchronizeEvidence(database, ownerKey);

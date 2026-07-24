@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION";
 };
 
 export type MobileDepartment = {
@@ -265,6 +265,202 @@ export type MobileComplianceTrainingCapabilities = {
   canManageTraining: boolean;
 };
 
+export type MobileMocStatus =
+  | "DRAFT"
+  | "TECHNICAL_REVIEW"
+  | "RISK_REVIEW"
+  | "PENDING_APPROVAL"
+  | "APPROVED"
+  | "IMPLEMENTATION"
+  | "VERIFICATION"
+  | "CLOSED"
+  | "REJECTED"
+  | "CANCELLED";
+
+export type MobileMocTaskStatus =
+  | "NOT_STARTED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "BLOCKED"
+  | "CANCELLED";
+
+export type MobileManagementOfChange = {
+  id: string;
+  reference: string;
+  title: string;
+  description: string;
+  businessJustification: string;
+  changeType: string;
+  changeDuration: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  status: MobileMocStatus;
+  emergencyJustification: string | null;
+  temporaryExpirationDate: string | null;
+  affectedProcess: string | null;
+  affectedEquipment: string | null;
+  affectedSystems: string | null;
+  affectedMaterials: string | null;
+  operationalImpact: string | null;
+  regulatoryImpact: string | null;
+  environmentalImpact: string | null;
+  safetyImpact: string | null;
+  qualityImpact: string | null;
+  initialScore: number;
+  initialRiskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  residualScore: number;
+  residualRiskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  proposedStartDate: string | null;
+  plannedCompletionDate: string | null;
+  actualStartDate: string | null;
+  implementedAt: string | null;
+  verifiedAt: string | null;
+  closedAt: string | null;
+  site: { id: string; name: string };
+  department: { id: string; name: string } | null;
+  requestor: { id: string; name: string };
+  owner: { id: string; name: string } | null;
+  nextStatuses: MobileMocStatus[];
+  isOwner: boolean;
+  isRequestor: boolean;
+  approvals: Array<{
+    id: string;
+    role: string;
+    status: "PENDING" | "APPROVED" | "REJECTED" | "NOT_REQUIRED";
+    sequence: number;
+    comments: string | null;
+    requestedAt: string;
+    decidedAt: string | null;
+    approver: { id: string; name: string } | null;
+    isAssignedToCurrentUser: boolean;
+  }>;
+  tasks: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    taskType: string;
+    status: MobileMocTaskStatus;
+    sequence: number | null;
+    isRequired: boolean;
+    dueDate: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    verifiedAt: string | null;
+    evidenceNote: string | null;
+    assignedTo: { id: string; name: string } | null;
+    verifiedBy: { id: string; name: string } | null;
+    isAssignedToCurrentUser: boolean;
+  }>;
+  riskLinks: Array<{
+    id: string;
+    relationshipNote: string | null;
+    risk: {
+      id: string;
+      reference: string;
+      title: string;
+      currentScore: number;
+      currentRiskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+      residualScore: number;
+      residualRiskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+    };
+  }>;
+};
+
+export type MobilePermitToWorkStatus =
+  | "DRAFT"
+  | "PENDING_APPROVAL"
+  | "APPROVED"
+  | "ACTIVE"
+  | "SUSPENDED"
+  | "CLOSED"
+  | "REJECTED"
+  | "EXPIRED"
+  | "CANCELLED";
+
+export type MobilePermitToWork = {
+  id: string;
+  reference: string;
+  title: string;
+  description: string | null;
+  type: string;
+  status: MobilePermitToWorkStatus;
+  responsiblePerson: string;
+  exactLocation: string;
+  workOrderReference: string | null;
+  plannedStartAt: string;
+  plannedEndAt: string;
+  hazardsSummary: string;
+  controlsSummary: string;
+  requiredPpe: string | null;
+  isolationDetails: string | null;
+  emergencyPlan: string | null;
+  gasTestingRequired: boolean;
+  approvedAt: string | null;
+  activatedAt: string | null;
+  suspendedAt: string | null;
+  closedAt: string | null;
+  closeoutNotes: string | null;
+  site: { id: string; name: string };
+  department: { id: string; name: string } | null;
+  contractor: {
+    id: string;
+    name: string;
+    status: string;
+    insuranceExpiresAt: string | null;
+  } | null;
+  requestedBy: { id: string; name: string };
+  issuedBy: { id: string; name: string } | null;
+  approvedBy: { id: string; name: string } | null;
+  closedBy: { id: string; name: string } | null;
+  nextStatuses: MobilePermitToWorkStatus[];
+  isRequestedByCurrentUser: boolean;
+  controls: Array<{
+    id: string;
+    description: string;
+    isRequired: boolean;
+    isVerified: boolean;
+    verifiedAt: string | null;
+    verifiedBy: { id: string; name: string } | null;
+  }>;
+  gasTests: Array<{
+    id: string;
+    testedAt: string;
+    oxygenPercent: number | null;
+    lelPercent: number | null;
+    h2sPpm: number | null;
+    coPpm: number | null;
+    result: "PASS" | "FAIL";
+    notes: string | null;
+    performedBy: { id: string; name: string };
+  }>;
+  workers: Array<{
+    id: string;
+    role: string | null;
+    worker: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      jobTitle: string | null;
+      status: string;
+      inductionExpiresAt: string | null;
+    };
+  }>;
+  history: Array<{
+    id: string;
+    fromStatus: MobilePermitToWorkStatus | null;
+    toStatus: MobilePermitToWorkStatus;
+    comments: string | null;
+    createdAt: string;
+    actor: { id: string; name: string };
+  }>;
+};
+
+export type MobileMocPermitCapabilities = {
+  canViewMoc: boolean;
+  canManageMoc: boolean;
+  canViewPermits: boolean;
+  canManagePermits: boolean;
+};
+
 export type MobileInspectionResponse = {
   result: "NOT_ASSESSED" | "COMPLIANT" | "NON_COMPLIANT" | "NOT_APPLICABLE";
   responseText: string | null;
@@ -405,6 +601,9 @@ export type MobileBootstrap = {
   complianceOccurrences: MobileComplianceOccurrence[];
   trainingAssignments: MobileTrainingAssignment[];
   complianceTrainingCapabilities: MobileComplianceTrainingCapabilities;
+  managementOfChanges: MobileManagementOfChange[];
+  permitsToWork: MobilePermitToWork[];
+  mocPermitCapabilities: MobileMocPermitCapabilities;
   correctiveActions: MobileCorrectiveAction[];
   capaCapabilities: MobileCapaCapabilities;
   notifications: MobileNotification[];
@@ -549,5 +748,48 @@ export type TrainingCompletionPayload = {
   completedAt: string;
   certificateNumber?: string;
   score?: number;
+  notes?: string;
+};
+
+export type MocStatusPayload = {
+  mocId: string;
+  status: MobileMocStatus;
+  comments?: string;
+};
+
+export type MocApprovalDecisionPayload = {
+  mocId: string;
+  approvalId: string;
+  status: "APPROVED" | "REJECTED";
+  comments?: string;
+};
+
+export type MocTaskStatusPayload = {
+  mocId: string;
+  taskId: string;
+  status: MobileMocTaskStatus;
+  evidenceNote?: string;
+};
+
+export type PermitStatusPayload = {
+  permitId: string;
+  status: MobilePermitToWorkStatus;
+  comments?: string;
+  closeoutNotes?: string;
+};
+
+export type PermitControlPayload = {
+  permitId: string;
+  controlId: string;
+  verified: boolean;
+};
+
+export type PermitGasTestPayload = {
+  permitId: string;
+  oxygenPercent?: number;
+  lelPercent?: number;
+  h2sPpm?: number;
+  coPpm?: number;
+  result: "PASS" | "FAIL";
   notes?: string;
 };

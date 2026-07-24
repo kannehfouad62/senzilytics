@@ -7,7 +7,13 @@ import type {
   IncidentPayload,
   InspectionResponsePayload,
   JsaAcknowledgmentPayload,
+  MocApprovalDecisionPayload,
+  MocStatusPayload,
+  MocTaskStatusPayload,
   ObservationPayload,
+  PermitControlPayload,
+  PermitGasTestPayload,
+  PermitStatusPayload,
   RiskCapturePayload,
   RiskReviewPayload,
   TrainingCompletionPayload,
@@ -27,7 +33,13 @@ export type OfflineRecordType =
   | "COMPLIANCE_COMPLETION"
   | "COMPLIANCE_REVIEW"
   | "TRAINING_PROGRESS"
-  | "TRAINING_COMPLETION";
+  | "TRAINING_COMPLETION"
+  | "MOC_STATUS"
+  | "MOC_APPROVAL_DECISION"
+  | "MOC_TASK_STATUS"
+  | "PERMIT_STATUS"
+  | "PERMIT_CONTROL"
+  | "PERMIT_GAS_TEST";
 
 export type OfflineRecordPayload =
   | ObservationPayload
@@ -42,7 +54,13 @@ export type OfflineRecordPayload =
   | ComplianceOccurrenceCompletionPayload
   | ComplianceOccurrenceReviewPayload
   | TrainingProgressPayload
-  | TrainingCompletionPayload;
+  | TrainingCompletionPayload
+  | MocStatusPayload
+  | MocApprovalDecisionPayload
+  | MocTaskStatusPayload
+  | PermitStatusPayload
+  | PermitControlPayload
+  | PermitGasTestPayload;
 
 export type OfflineEnvelope = {
   type: OfflineRecordType;
@@ -63,6 +81,12 @@ const recordTypes = new Set<OfflineRecordType>([
   "COMPLIANCE_REVIEW",
   "TRAINING_PROGRESS",
   "TRAINING_COMPLETION",
+  "MOC_STATUS",
+  "MOC_APPROVAL_DECISION",
+  "MOC_TASK_STATUS",
+  "PERMIT_STATUS",
+  "PERMIT_CONTROL",
+  "PERMIT_GAS_TEST",
 ]);
 
 export function decodeOfflineEnvelope(value: unknown): OfflineEnvelope {
