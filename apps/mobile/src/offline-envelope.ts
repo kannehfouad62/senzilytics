@@ -7,7 +7,13 @@ import type {
   AssetStatusPayload,
   AuditResponsePayload,
   AuditStartPayload,
+  BehaviorFollowUpPayload,
+  BehaviorProgramReviewPayload,
+  BehaviorRecognitionPayload,
+  BehaviorSessionPayload,
   CapaStatusPayload,
+  CertificationReviewApprovePayload,
+  CertificationReviewCompletePayload,
   ChemicalFormsPayload,
   ChemicalInventoryPayload,
   ChemicalStatusPayload,
@@ -36,6 +42,8 @@ import type {
   PermitStatusPayload,
   RiskCapturePayload,
   RiskReviewPayload,
+  SifSignalReviewPayload,
+  SifVerificationPayload,
   SurveillanceCompletionPayload,
   SurveillanceEnrollmentPayload,
   SurveillanceProgramStatusPayload,
@@ -87,7 +95,15 @@ export type OfflineRecordType =
   | "ESG_DATA"
   | "ESG_FORMS"
   | "ESG_DISCLOSURE_STATUS"
-  | "ESG_INITIATIVE_STATUS";
+  | "ESG_INITIATIVE_STATUS"
+  | "BEHAVIOR_SESSION"
+  | "BEHAVIOR_FOLLOW_UP"
+  | "BEHAVIOR_RECOGNITION"
+  | "BEHAVIOR_PROGRAM_REVIEW"
+  | "SIF_VERIFICATION"
+  | "SIF_SIGNAL_REVIEW"
+  | "CERTIFICATION_REVIEW_COMPLETE"
+  | "CERTIFICATION_REVIEW_APPROVE";
 
 export type OfflineRecordPayload =
   | ObservationPayload
@@ -132,7 +148,15 @@ export type OfflineRecordPayload =
   | EsgDataPayload
   | EsgFormsPayload
   | EsgDisclosureStatusPayload
-  | EsgInitiativeStatusPayload;
+  | EsgInitiativeStatusPayload
+  | BehaviorSessionPayload
+  | BehaviorFollowUpPayload
+  | BehaviorRecognitionPayload
+  | BehaviorProgramReviewPayload
+  | SifVerificationPayload
+  | SifSignalReviewPayload
+  | CertificationReviewCompletePayload
+  | CertificationReviewApprovePayload;
 
 export type OfflineEnvelope = {
   type: OfflineRecordType;
@@ -183,6 +207,14 @@ const recordTypes = new Set<OfflineRecordType>([
   "ESG_FORMS",
   "ESG_DISCLOSURE_STATUS",
   "ESG_INITIATIVE_STATUS",
+  "BEHAVIOR_SESSION",
+  "BEHAVIOR_FOLLOW_UP",
+  "BEHAVIOR_RECOGNITION",
+  "BEHAVIOR_PROGRAM_REVIEW",
+  "SIF_VERIFICATION",
+  "SIF_SIGNAL_REVIEW",
+  "CERTIFICATION_REVIEW_COMPLETE",
+  "CERTIFICATION_REVIEW_APPROVE",
 ]);
 
 export function decodeOfflineEnvelope(value: unknown): OfflineEnvelope {

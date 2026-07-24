@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PermissionKey, Status } from "@prisma/client";
+import {
+  PermissionKey,
+  SifSignalSourceType,
+  Status,
+} from "@prisma/client";
 import {
   offlineSyncRequestSchema,
   requiredOfflinePermission,
+  requiredSifSourcePermission,
 } from "../src/modules/mobile/offline-sync.service";
 import { decodeOfflineEnvelope } from "../apps/mobile/src/offline-envelope";
 
@@ -716,6 +721,24 @@ test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("ESG_FORMS"), PermissionKey.MANAGE_ESG);
   assert.equal(requiredOfflinePermission("ESG_DISCLOSURE_STATUS"), PermissionKey.MANAGE_ESG);
   assert.equal(requiredOfflinePermission("ESG_INITIATIVE_STATUS"), PermissionKey.MANAGE_ESG);
+  assert.equal(requiredOfflinePermission("BEHAVIOR_SESSION"), PermissionKey.RECORD_BEHAVIOR_COACHING);
+  assert.equal(requiredOfflinePermission("BEHAVIOR_FOLLOW_UP"), PermissionKey.RECORD_BEHAVIOR_COACHING);
+  assert.equal(requiredOfflinePermission("BEHAVIOR_RECOGNITION"), PermissionKey.RECORD_BEHAVIOR_COACHING);
+  assert.equal(requiredOfflinePermission("BEHAVIOR_PROGRAM_REVIEW"), PermissionKey.MANAGE_BEHAVIOR_SAFETY);
+  assert.equal(requiredOfflinePermission("SIF_VERIFICATION"), PermissionKey.MANAGE_CRITICAL_CONTROLS);
+  assert.equal(requiredOfflinePermission("SIF_SIGNAL_REVIEW"), PermissionKey.MANAGE_CRITICAL_CONTROLS);
+  assert.equal(requiredOfflinePermission("CERTIFICATION_REVIEW_COMPLETE"), PermissionKey.MANAGE_CERTIFICATION_READINESS);
+  assert.equal(requiredOfflinePermission("CERTIFICATION_REVIEW_APPROVE"), PermissionKey.MANAGE_CERTIFICATION_READINESS);
+});
+
+test("SIF signal review retains access to its source module", () => {
+  assert.equal(requiredSifSourcePermission(SifSignalSourceType.OBSERVATION), PermissionKey.VIEW_OBSERVATIONS);
+  assert.equal(requiredSifSourcePermission(SifSignalSourceType.INCIDENT), PermissionKey.VIEW_INCIDENT);
+  assert.equal(requiredSifSourcePermission(SifSignalSourceType.AUDIT_FINDING), PermissionKey.VIEW_AUDITS);
+  assert.equal(requiredSifSourcePermission(SifSignalSourceType.INSPECTION_FINDING), PermissionKey.VIEW_INSPECTIONS);
+  assert.equal(requiredSifSourcePermission(SifSignalSourceType.RISK), PermissionKey.VIEW_RISKS);
+  assert.equal(requiredSifSourcePermission(SifSignalSourceType.PERMIT_TO_WORK), PermissionKey.VIEW_PERMITS_TO_WORK);
+  assert.equal(requiredSifSourcePermission(SifSignalSourceType.CONTROL_VERIFICATION), null);
 });
 
 test("ESG offline contracts enforce finite governed disclosure data", () => {
@@ -842,6 +865,164 @@ test("chemical inventory and environmental data offline contracts reject unsafe 
   assert.equal(reversedPeriod.success, false);
 });
 
+test("mobile synchronization accepts governed behavior and assurance records", () => {
+  const capturedAt = "2026-07-24T12:00:00.000Z";
+  const parsed = offlineSyncRequestSchema.safeParse({
+    items: [
+      {
+        id: "731bb544-2ded-484a-9eec-98db0ec0f07c",
+        type: "BEHAVIOR_SESSION",
+        capturedAt,
+        payload: {
+          programId: "program-1",
+          siteId: "site-1",
+          isParticipantAnonymous: true,
+          observedAt: capturedAt,
+          coachingType: "POSITIVE_REINFORCEMENT",
+          createSafetyObservation: false,
+          customForms: [],
+          results: [
+            {
+              behaviorId: "behavior-1",
+              outcome: "SAFE",
+              note: "Worker verified the isolation before starting.",
+            },
+          ],
+        },
+      },
+      {
+        id: "05305e8d-c556-4472-9008-6d331c5fd6b1",
+        type: "BEHAVIOR_FOLLOW_UP",
+        capturedAt,
+        payload: {
+          sessionId: "session-1",
+          status: "COMPLETED",
+          note: "Supervisor confirmed the agreed action.",
+        },
+      },
+      {
+        id: "f26dc615-8575-4620-84d4-1ea9ddf86f4f",
+        type: "BEHAVIOR_RECOGNITION",
+        capturedAt,
+        payload: {
+          sessionId: "session-1",
+          nominatedUserId: "user-1",
+          reason: "Consistently demonstrated the critical safe behavior.",
+        },
+      },
+      {
+        id: "4ef7b125-7c00-45fb-ad89-597a0d54cc11",
+        type: "BEHAVIOR_PROGRAM_REVIEW",
+        capturedAt,
+        payload: {
+          programId: "program-1",
+          reviewNotes: "Leading indicators remain stable.",
+          nextReviewAt: "2026-10-24T12:00:00.000Z",
+        },
+      },
+      {
+        id: "e5a3bb22-e05f-4465-80a2-6a54ef190c5b",
+        type: "SIF_VERIFICATION",
+        capturedAt,
+        payload: {
+          controlId: "control-1",
+          verifiedAt: capturedAt,
+          result: "EFFECTIVE",
+          evidenceReference: "Field test FT-2026-104",
+          customForms: [],
+        },
+      },
+      {
+        id: "4c78e36e-fd8a-4525-81b1-98d90d2950c5",
+        type: "SIF_SIGNAL_REVIEW",
+        capturedAt,
+        payload: {
+          sourceType: "INCIDENT",
+          sourceId: "incident-1",
+          classification: "POTENTIAL_SIF",
+          exposureCategory: "MOBILE_EQUIPMENT",
+          potentialSeverity: "CRITICAL",
+          rationale: "The event had credible fatal-energy potential.",
+        },
+      },
+      {
+        id: "32bc4678-cd06-46cd-b331-41a6a93787c4",
+        type: "CERTIFICATION_REVIEW_COMPLETE",
+        capturedAt,
+        payload: {
+          reviewId: "review-1",
+          auditResultsSummary: "Internal audit objectives were achieved.",
+          complianceStatusSummary: "Applicable obligations were evaluated.",
+          objectivesPerformance: "Core objectives are on plan.",
+          risksAndOpportunities: "Operational risks remain controlled.",
+          resourceAdequacy: "Resources are adequate for the next period.",
+          decisions: "Continue the current improvement program.",
+          improvementOpportunities: "Improve evidence indexing.",
+          conclusion: "EFFECTIVE",
+          nextReviewAt: "2026-10-24T12:00:00.000Z",
+          customForms: [],
+        },
+      },
+      {
+        id: "6a427a73-1025-4bd9-8ed5-b9f978eac4d0",
+        type: "CERTIFICATION_REVIEW_APPROVE",
+        capturedAt,
+        payload: { reviewId: "review-1" },
+      },
+    ],
+  });
+
+  assert.equal(parsed.success, true);
+});
+
+test("behavior and assurance contracts enforce critical evidence and review completeness", () => {
+  const capturedAt = "2026-07-24T12:00:00.000Z";
+  const effectiveWithoutEvidence = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id: "5ca5fc74-fb24-4422-9f64-5c9724fab9d6",
+      type: "SIF_VERIFICATION",
+      capturedAt,
+      payload: {
+        controlId: "control-1",
+        verifiedAt: capturedAt,
+        result: "EFFECTIVE",
+        customForms: [],
+      },
+    }],
+  });
+  const failedWithoutFindings = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id: "f9b2e34b-52c8-412c-a7b2-7ea18e7c667f",
+      type: "SIF_VERIFICATION",
+      capturedAt,
+      payload: {
+        controlId: "control-1",
+        verifiedAt: capturedAt,
+        result: "FAILED",
+        customForms: [],
+      },
+    }],
+  });
+  const incompleteCertification = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id: "cbaeeaf0-527f-43e5-85ea-afb52961daf9",
+      type: "CERTIFICATION_REVIEW_COMPLETE",
+      capturedAt,
+      payload: {
+        reviewId: "review-1",
+        auditResultsSummary: "Complete",
+        conclusion: "EFFECTIVE",
+        nextReviewAt: "2026-10-24T12:00:00.000Z",
+        customForms: [],
+      },
+    }],
+  });
+
+  assert.equal(effectiveWithoutEvidence.success, false);
+  assert.equal(failedWithoutFindings.success, false);
+  assert.equal(incompleteCertification.success, false);
+});
+
 test("mobile outbox decoder preserves legacy observation rows", () => {
   const legacy = { siteId: "site-1", title: "Legacy observation" };
   assert.deepEqual(decodeOfflineEnvelope(legacy), {
@@ -899,5 +1080,17 @@ test("mobile outbox decoder preserves legacy observation rows", () => {
   assert.deepEqual(decodeOfflineEnvelope({ type: "OH_ENROLLMENT_COMPLETE", payload: { enrollmentId: "enrollment-1" } }), {
     type: "OH_ENROLLMENT_COMPLETE",
     payload: { enrollmentId: "enrollment-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "BEHAVIOR_SESSION", payload: { programId: "program-1" } }), {
+    type: "BEHAVIOR_SESSION",
+    payload: { programId: "program-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "SIF_VERIFICATION", payload: { controlId: "control-1" } }), {
+    type: "SIF_VERIFICATION",
+    payload: { controlId: "control-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "CERTIFICATION_REVIEW_COMPLETE", payload: { reviewId: "review-1" } }), {
+    type: "CERTIFICATION_REVIEW_COMPLETE",
+    payload: { reviewId: "review-1" },
   });
 });

@@ -4,10 +4,14 @@ import {
   AssetInspectionResult,
   AssetMaintenanceStatus,
   AssetStatus,
+  BehaviorCoachingType,
+  BehaviorFollowUpStatus,
+  BehaviorObservationOutcome,
   ComplianceCalendarOccurrenceStatus,
   ChemicalApprovalStatus,
   ConfigurableFormModule,
   ContractorStatus,
+  CriticalControlVerificationResult,
   EnterpriseAuditResponseResult,
   EnterpriseAuditStatus,
   EnvironmentalDataQuality,
@@ -21,6 +25,7 @@ import {
   IncidentType,
   InspectionResponseResult,
   JsaStatus,
+  ManagementSystemConclusion,
   MocApprovalStatus,
   MocStatus,
   MocTaskStatus,
@@ -34,6 +39,9 @@ import {
   RiskLevel,
   RiskReviewFrequency,
   SafetyObservationType,
+  SifExposureCategory,
+  SifSignalClassification,
+  SifSignalSourceType,
   Status,
   SurveillanceProgramStatus,
   UserRole,
@@ -104,6 +112,20 @@ import {
   transitionEsgDisclosureService,
   transitionEsgInitiativeService,
 } from "@/modules/esg/esg-disclosure.service";
+import {
+  nominateBehaviorRecognitionService,
+  recordBehaviorCoachingSessionService,
+  recordBehaviorProgramReviewService,
+  updateBehaviorFollowUpService,
+} from "@/modules/behavior-safety/behavior-safety.service";
+import {
+  recordCriticalControlVerificationService,
+  reviewSifSignalService,
+} from "@/modules/assurance/critical-control.service";
+import {
+  approveCertificationManagementReviewService,
+  completeCertificationManagementReviewService,
+} from "@/modules/assurance/certification-readiness.service";
 
 const customValue = z.union([
   z.string().max(5000),
@@ -746,6 +768,166 @@ const esgInitiativeStatusItemSchema = z.object({
   }),
 });
 
+const behaviorSessionItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("BEHAVIOR_SESSION"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    programId: z.string().min(1).max(200),
+    siteId: z.string().min(1).max(200),
+    departmentId: z.string().min(1).max(200).optional(),
+    participantId: z.string().min(1).max(200).optional(),
+    isParticipantAnonymous: z.boolean(),
+    workGroup: z.string().trim().max(300).optional(),
+    observedAt: z.string().datetime(),
+    location: z.string().trim().max(300).optional(),
+    coachingType: z.nativeEnum(BehaviorCoachingType),
+    discussionSummary: z.string().trim().max(5000).optional(),
+    workerCommitment: z.string().trim().max(5000).optional(),
+    immediateAction: z.string().trim().max(5000).optional(),
+    followUpOwnerId: z.string().min(1).max(200).optional(),
+    followUpDueAt: z.string().datetime().optional(),
+    createSafetyObservation: z.boolean().default(false),
+    customForms: z.array(capturedFormSchema).max(20).default([]),
+    results: z.array(z.object({
+      behaviorId: z.string().min(1).max(200),
+      outcome: z.nativeEnum(BehaviorObservationOutcome),
+      note: z.string().trim().max(5000).optional(),
+      immediateAction: z.string().trim().max(5000).optional(),
+    })).min(1).max(250),
+  }).superRefine((value, context) => {
+    if (!value.isParticipantAnonymous && !value.participantId) return;
+    if (value.isParticipantAnonymous && value.participantId) {
+      context.addIssue({
+        code: "custom",
+        path: ["participantId"],
+        message: "Anonymous coaching cannot identify a participant.",
+      });
+    }
+  }),
+});
+
+const behaviorFollowUpItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("BEHAVIOR_FOLLOW_UP"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    sessionId: z.string().min(1).max(200),
+    status: z.enum([
+      BehaviorFollowUpStatus.IN_PROGRESS,
+      BehaviorFollowUpStatus.COMPLETED,
+    ]),
+    note: z.string().trim().min(2).max(5000),
+  }),
+});
+
+const behaviorRecognitionItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("BEHAVIOR_RECOGNITION"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    sessionId: z.string().min(1).max(200),
+    nominatedUserId: z.string().min(1).max(200),
+    reason: z.string().trim().min(2).max(5000),
+  }),
+});
+
+const behaviorProgramReviewItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("BEHAVIOR_PROGRAM_REVIEW"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    programId: z.string().min(1).max(200),
+    reviewNotes: z.string().trim().min(2).max(5000),
+    nextReviewAt: z.string().datetime(),
+  }),
+});
+
+const sifVerificationItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("SIF_VERIFICATION"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    controlId: z.string().min(1).max(200),
+    verifiedAt: z.string().datetime(),
+    result: z.nativeEnum(CriticalControlVerificationResult),
+    evidenceReference: z.string().trim().max(2000).optional(),
+    findings: z.string().trim().max(5000).optional(),
+    immediateAction: z.string().trim().max(5000).optional(),
+    customForms: z.array(capturedFormSchema).max(20).default([]),
+  }).superRefine((value, context) => {
+    if (
+      value.result === CriticalControlVerificationResult.EFFECTIVE &&
+      !value.evidenceReference
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["evidenceReference"],
+        message: "Effective control verification requires evidence.",
+      });
+    }
+    if (
+      (
+        value.result === CriticalControlVerificationResult.DEGRADED ||
+        value.result === CriticalControlVerificationResult.FAILED
+      ) &&
+      !value.findings
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["findings"],
+        message: "Describe degraded or failed control findings.",
+      });
+    }
+  }),
+});
+
+const sifSignalReviewItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("SIF_SIGNAL_REVIEW"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    sourceType: z.nativeEnum(SifSignalSourceType),
+    sourceId: z.string().min(1).max(200),
+    classification: z.nativeEnum(SifSignalClassification),
+    exposureCategory: z.nativeEnum(SifExposureCategory),
+    potentialSeverity: z.nativeEnum(RiskLevel),
+    rationale: z.string().trim().min(2).max(5000),
+    controlFailureNotes: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const certificationReviewCompleteItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("CERTIFICATION_REVIEW_COMPLETE"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    reviewId: z.string().min(1).max(200),
+    attendees: z.string().trim().max(5000).optional(),
+    auditResultsSummary: z.string().trim().min(2).max(10000),
+    complianceStatusSummary: z.string().trim().min(2).max(10000),
+    objectivesPerformance: z.string().trim().min(2).max(10000),
+    stakeholderFeedback: z.string().trim().max(10000).optional(),
+    changesInContext: z.string().trim().max(10000).optional(),
+    risksAndOpportunities: z.string().trim().min(2).max(10000),
+    resourceAdequacy: z.string().trim().min(2).max(10000),
+    decisions: z.string().trim().min(2).max(10000),
+    improvementOpportunities: z.string().trim().min(2).max(10000),
+    conclusion: z.nativeEnum(ManagementSystemConclusion),
+    nextReviewAt: z.string().datetime(),
+    customForms: z.array(capturedFormSchema).max(20).default([]),
+  }),
+});
+
+const certificationReviewApproveItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("CERTIFICATION_REVIEW_APPROVE"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    reviewId: z.string().min(1).max(200),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
@@ -790,6 +972,14 @@ const offlineItemSchema = z.discriminatedUnion("type", [
   esgFormsItemSchema,
   esgDisclosureStatusItemSchema,
   esgInitiativeStatusItemSchema,
+  behaviorSessionItemSchema,
+  behaviorFollowUpItemSchema,
+  behaviorRecognitionItemSchema,
+  behaviorProgramReviewItemSchema,
+  sifVerificationItemSchema,
+  sifSignalReviewItemSchema,
+  certificationReviewCompleteItemSchema,
+  certificationReviewApproveItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -883,12 +1073,55 @@ export function requiredOfflinePermission(
   ) {
     return PermissionKey.MANAGE_ESG;
   }
+  if (
+    type === "BEHAVIOR_SESSION" ||
+    type === "BEHAVIOR_FOLLOW_UP" ||
+    type === "BEHAVIOR_RECOGNITION"
+  ) {
+    return PermissionKey.RECORD_BEHAVIOR_COACHING;
+  }
+  if (type === "BEHAVIOR_PROGRAM_REVIEW") {
+    return PermissionKey.MANAGE_BEHAVIOR_SAFETY;
+  }
+  if (type === "SIF_VERIFICATION" || type === "SIF_SIGNAL_REVIEW") {
+    return PermissionKey.MANAGE_CRITICAL_CONTROLS;
+  }
+  if (
+    type === "CERTIFICATION_REVIEW_COMPLETE" ||
+    type === "CERTIFICATION_REVIEW_APPROVE"
+  ) {
+    return PermissionKey.MANAGE_CERTIFICATION_READINESS;
+  }
   if (type === "CAPA_STATUS") {
     return status === Status.COMPLETED || status === Status.CLOSED
       ? PermissionKey.CLOSE_CAPA
       : PermissionKey.UPDATE_CAPA;
   }
   return PermissionKey.MANAGE_AUDITS;
+}
+
+export function requiredSifSourcePermission(
+  sourceType: SifSignalSourceType
+) {
+  if (sourceType === SifSignalSourceType.OBSERVATION) {
+    return PermissionKey.VIEW_OBSERVATIONS;
+  }
+  if (sourceType === SifSignalSourceType.INCIDENT) {
+    return PermissionKey.VIEW_INCIDENT;
+  }
+  if (sourceType === SifSignalSourceType.AUDIT_FINDING) {
+    return PermissionKey.VIEW_AUDITS;
+  }
+  if (sourceType === SifSignalSourceType.INSPECTION_FINDING) {
+    return PermissionKey.VIEW_INSPECTIONS;
+  }
+  if (sourceType === SifSignalSourceType.RISK) {
+    return PermissionKey.VIEW_RISKS;
+  }
+  if (sourceType === SifSignalSourceType.PERMIT_TO_WORK) {
+    return PermissionKey.VIEW_PERMITS_TO_WORK;
+  }
+  return null;
 }
 
 export async function syncOfflineSubmissionsService(input: {
@@ -938,6 +1171,19 @@ export async function syncOfflineSubmissionsService(input: {
     if (!granted.has(requiredPermission)) {
       results.push({ id: item.id, status: "failed", error: "Your role cannot synchronize this record type." });
       continue;
+    }
+    if (item.type === "SIF_SIGNAL_REVIEW") {
+      const sourcePermission = requiredSifSourcePermission(
+        item.payload.sourceType
+      );
+      if (sourcePermission && !granted.has(sourcePermission)) {
+        results.push({
+          id: item.id,
+          status: "failed",
+          error: "Your role cannot review this SIF signal source.",
+        });
+        continue;
+      }
     }
 
     const existing = await prisma.offlineSubmission.findUnique({ where: { id: item.id } });
@@ -1055,8 +1301,40 @@ export async function syncOfflineSubmissionsService(input: {
         results.push(await syncEsgForms(input, item, payloadHash));
       } else if (item.type === "ESG_DISCLOSURE_STATUS") {
         results.push(await syncEsgDisclosureStatus(input, item, payloadHash));
-      } else {
+      } else if (item.type === "ESG_INITIATIVE_STATUS") {
         results.push(await syncEsgInitiativeStatus(input, item, payloadHash));
+      } else if (item.type === "BEHAVIOR_SESSION") {
+        results.push(await syncBehaviorSession(input, item, payloadHash));
+      } else if (item.type === "BEHAVIOR_FOLLOW_UP") {
+        results.push(await syncBehaviorFollowUp(
+          {
+            organizationId: input.organizationId,
+            userId: input.userId,
+            canManage: granted.has(PermissionKey.MANAGE_BEHAVIOR_SAFETY),
+          },
+          item,
+          payloadHash
+        ));
+      } else if (item.type === "BEHAVIOR_RECOGNITION") {
+        results.push(await syncBehaviorRecognition(input, item, payloadHash));
+      } else if (item.type === "BEHAVIOR_PROGRAM_REVIEW") {
+        results.push(await syncBehaviorProgramReview(input, item, payloadHash));
+      } else if (item.type === "SIF_VERIFICATION") {
+        results.push(await syncSifVerification(input, item, payloadHash));
+      } else if (item.type === "SIF_SIGNAL_REVIEW") {
+        results.push(await syncSifSignalReview(input, item, payloadHash));
+      } else if (item.type === "CERTIFICATION_REVIEW_COMPLETE") {
+        results.push(await syncCertificationReviewComplete(
+          input,
+          item,
+          payloadHash
+        ));
+      } else {
+        results.push(await syncCertificationReviewApprove(
+          input,
+          item,
+          payloadHash
+        ));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -2455,6 +2733,214 @@ async function syncEsgInitiativeStatus(
   return { id: item.id, status: "synced", recordId: initiative.id };
 }
 
+async function syncBehaviorSession(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof behaviorSessionItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const submissions = await prepareCapturedFormSubmissions({
+    organizationId: actor.organizationId,
+    module: ConfigurableFormModule.BEHAVIOR_SAFETY,
+    capturedAt,
+    forms: item.payload.customForms,
+  });
+  const session = await recordBehaviorCoachingSessionService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    programId: item.payload.programId,
+    siteId: item.payload.siteId,
+    departmentId: item.payload.departmentId?.trim() || null,
+    participantId: item.payload.participantId?.trim() || null,
+    isParticipantAnonymous: item.payload.isParticipantAnonymous,
+    workGroup: item.payload.workGroup?.trim() || null,
+    observedAt: new Date(item.payload.observedAt),
+    location: item.payload.location?.trim() || null,
+    coachingType: item.payload.coachingType,
+    discussionSummary: item.payload.discussionSummary?.trim() || null,
+    workerCommitment: item.payload.workerCommitment?.trim() || null,
+    immediateAction: item.payload.immediateAction?.trim() || null,
+    followUpOwnerId: item.payload.followUpOwnerId?.trim() || null,
+    followUpDueAt: item.payload.followUpDueAt
+      ? new Date(item.payload.followUpDueAt)
+      : null,
+    createSafetyObservation: item.payload.createSafetyObservation,
+    customSubmissions: submissions,
+    results: item.payload.results.map((result) => ({
+      behaviorId: result.behaviorId,
+      outcome: result.outcome,
+      note: result.note?.trim() || null,
+      immediateAction: result.immediateAction?.trim() || null,
+    })),
+    offlineSubmission: { id: item.id, capturedAt, payloadHash },
+  });
+  return { id: item.id, status: "synced", recordId: session.id };
+}
+
+async function syncBehaviorFollowUp(
+  actor: { organizationId: string; userId: string; canManage: boolean },
+  item: z.infer<typeof behaviorFollowUpItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const session = await updateBehaviorFollowUpService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    canManage: actor.canManage,
+    sessionId: item.payload.sessionId,
+    status: item.payload.status,
+    note: item.payload.note,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: session.id };
+}
+
+async function syncBehaviorRecognition(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof behaviorRecognitionItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const recognition = await nominateBehaviorRecognitionService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    sessionId: item.payload.sessionId,
+    nominatedUserId: item.payload.nominatedUserId,
+    reason: item.payload.reason,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: recognition.id };
+}
+
+async function syncBehaviorProgramReview(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof behaviorProgramReviewItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const program = await recordBehaviorProgramReviewService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    programId: item.payload.programId,
+    reviewNotes: item.payload.reviewNotes,
+    nextReviewAt: new Date(item.payload.nextReviewAt),
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: program.id };
+}
+
+async function syncSifVerification(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof sifVerificationItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const submissions = await prepareCapturedFormSubmissions({
+    organizationId: actor.organizationId,
+    module: ConfigurableFormModule.SIF_ASSURANCE,
+    capturedAt,
+    forms: item.payload.customForms,
+  });
+  const verification = await recordCriticalControlVerificationService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    controlId: item.payload.controlId,
+    verifiedAt: new Date(item.payload.verifiedAt),
+    result: item.payload.result,
+    evidenceReference: item.payload.evidenceReference?.trim() || null,
+    findings: item.payload.findings?.trim() || null,
+    immediateAction: item.payload.immediateAction?.trim() || null,
+    customSubmissions: submissions,
+    offlineSubmission: { id: item.id, capturedAt, payloadHash },
+  });
+  return { id: item.id, status: "synced", recordId: verification.id };
+}
+
+async function syncSifSignalReview(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof sifSignalReviewItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const review = await reviewSifSignalService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    sourceType: item.payload.sourceType,
+    sourceId: item.payload.sourceId,
+    classification: item.payload.classification,
+    exposureCategory: item.payload.exposureCategory,
+    potentialSeverity: item.payload.potentialSeverity,
+    rationale: item.payload.rationale,
+    controlFailureNotes: item.payload.controlFailureNotes?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: review.id };
+}
+
+async function syncCertificationReviewComplete(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof certificationReviewCompleteItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const submissions = await prepareCapturedFormSubmissions({
+    organizationId: actor.organizationId,
+    module: ConfigurableFormModule.CERTIFICATION_READINESS,
+    capturedAt,
+    forms: item.payload.customForms,
+  });
+  const review = await completeCertificationManagementReviewService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    reviewId: item.payload.reviewId,
+    attendees: item.payload.attendees?.trim() || null,
+    auditResultsSummary: item.payload.auditResultsSummary,
+    complianceStatusSummary: item.payload.complianceStatusSummary,
+    objectivesPerformance: item.payload.objectivesPerformance,
+    stakeholderFeedback: item.payload.stakeholderFeedback?.trim() || null,
+    changesInContext: item.payload.changesInContext?.trim() || null,
+    risksAndOpportunities: item.payload.risksAndOpportunities,
+    resourceAdequacy: item.payload.resourceAdequacy,
+    decisions: item.payload.decisions,
+    improvementOpportunities: item.payload.improvementOpportunities,
+    conclusion: item.payload.conclusion,
+    nextReviewAt: new Date(item.payload.nextReviewAt),
+    customSubmissions: submissions,
+    offlineSubmission: { id: item.id, capturedAt, payloadHash },
+  });
+  return { id: item.id, status: "synced", recordId: review.id };
+}
+
+async function syncCertificationReviewApprove(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof certificationReviewApproveItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const review = await approveCertificationManagementReviewService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    reviewId: item.payload.reviewId,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: review.id };
+}
+
 function parseDateOnly(value?: string) {
   return value ? new Date(`${value}T12:00:00.000Z`) : null;
 }
@@ -2469,7 +2955,7 @@ function parseFutureReviewDate(value: string | undefined, capturedAt: Date) {
 
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction|exposure|hygiene|sample|surveillance|fitness|restriction|certificate|provider|chemical|inventory|sds|environmental|metric|reporting period|emission|waste|water|energy|esg|disclosure|initiative|pillar/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction|exposure|hygiene|sample|surveillance|fitness|restriction|certificate|provider|chemical|inventory|sds|environmental|metric|reporting period|emission|waste|water|energy|esg|disclosure|initiative|pillar|behavior|coaching|follow-up|recognition|sif|critical control|signal|certification|management review|readiness/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

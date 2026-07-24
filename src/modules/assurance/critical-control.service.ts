@@ -2,6 +2,10 @@ import { createNotification } from "@/core/notifications/notifications.service";
 import { prisma } from "@/lib/prisma";
 import { createPreparedSubmissions, type PreparedSubmission } from "@/modules/forms/runtime-form.service";
 import {
+  recordMobileOfflineSubmission,
+  type MobileOfflineSubmission,
+} from "@/modules/mobile/mobile-offline-record";
+import {
   ActivityAction,
   ConfigurableFormModule,
   CriticalControlVerificationResult,
@@ -58,6 +62,7 @@ export async function recordCriticalControlVerificationService(input: {
   findings?: string | null;
   immediateAction?: string | null;
   customSubmissions?: PreparedSubmission[];
+  offlineSubmission?: MobileOfflineSubmission;
 }) {
   const [control, verifier] = await Promise.all([
     prisma.criticalControlStandard.findFirst({ where: { id: input.controlId, organizationId: input.organizationId, isActive: true }, include: { owner: true } }),
@@ -73,6 +78,7 @@ export async function recordCriticalControlVerificationService(input: {
     await createPreparedSubmissions(tx, { organizationId: input.organizationId, userId: verifier.id, module: ConfigurableFormModule.SIF_ASSURANCE, entityId: record.id, submissions: input.customSubmissions ?? [] });
     await tx.criticalControlStandard.update({ where: { id: control.id }, data: { nextVerificationDueAt: nextDueAt, reminderSentAt: null, overdueNotifiedAt: null } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: verifier.id, action: ActivityAction.UPDATE, entityType: "CriticalControlVerification", entityId: record.id, title: "Critical control verified", description: `${control.code} — ${control.name}: ${record.result}`, metadata: { controlId: control.id, result: record.result, nextDueAt, customFormCount: input.customSubmissions?.length ?? 0 } } });
+    await recordMobileOfflineSubmission(tx, input, "SIF_VERIFICATION", record.id);
     return record;
   });
   if (control.ownerId && (verification.result === CriticalControlVerificationResult.DEGRADED || verification.result === CriticalControlVerificationResult.FAILED)) await createNotification({ organizationId: input.organizationId, userId: control.ownerId, type: verification.result === CriticalControlVerificationResult.FAILED ? NotificationType.CRITICAL : NotificationType.WARNING, title: `Critical control ${verification.result.toLowerCase()}`, message: `${control.code} — ${control.name} requires corrective attention.`, link: `/assurance/sif/controls/${control.id}` }).catch(() => undefined);
@@ -101,6 +107,7 @@ export async function reviewSifSignalService(input: {
   potentialSeverity: RiskLevel;
   rationale: string;
   controlFailureNotes?: string | null;
+  offlineSubmission?: MobileOfflineSubmission;
 }) {
   const [reviewer, validSource] = await Promise.all([prisma.user.findFirst({ where: { id: input.userId, organizationId: input.organizationId, isActive: true } }), validTenantSource(input.organizationId, input.sourceType, input.sourceId)]);
   if (!reviewer || !validSource) throw new Error("The signal source is not available in this organization.");
@@ -108,6 +115,7 @@ export async function reviewSifSignalService(input: {
   return prisma.$transaction(async (tx) => {
     const review = await tx.sifSignalReview.upsert({ where: { organizationId_sourceType_sourceId: { organizationId: input.organizationId, sourceType: input.sourceType, sourceId: input.sourceId } }, update: { classification: input.classification, exposureCategory: input.exposureCategory, potentialSeverity: input.potentialSeverity, rationale: input.rationale, controlFailureNotes: input.controlFailureNotes, reviewedById: reviewer.id, reviewedAt: new Date() }, create: { organizationId: input.organizationId, sourceType: input.sourceType, sourceId: input.sourceId, classification: input.classification, exposureCategory: input.exposureCategory, potentialSeverity: input.potentialSeverity, rationale: input.rationale, controlFailureNotes: input.controlFailureNotes, reviewedById: reviewer.id } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: reviewer.id, action: ActivityAction.UPDATE, entityType: "SifSignalReview", entityId: review.id, title: "SIF signal classification recorded", description: `${input.sourceType}: ${input.classification}`, metadata: { sourceId: input.sourceId, exposureCategory: input.exposureCategory, potentialSeverity: input.potentialSeverity } } });
+    await recordMobileOfflineSubmission(tx, input, "SIF_SIGNAL_REVIEW", review.id);
     return review;
   });
 }

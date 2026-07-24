@@ -85,6 +85,21 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
     targetType: "ESG",
     parentSubmissionId: "a8b19d39-97dc-46f0-b7f4-cc94439fc345",
   });
+  const behavior = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "BEHAVIOR_SAFETY",
+    parentSubmissionId: "4ee9a6cf-d9da-4414-97c3-07843ae04f82",
+  });
+  const sif = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "SIF_ASSURANCE",
+    parentSubmissionId: "b9460312-9007-4bc5-bc55-458705c74c8b",
+  });
+  const certification = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "CERTIFICATION_READINESS",
+    parentSubmissionId: "25b670fe-878d-45f3-a924-f587865ca4a4",
+  });
 
   assert.equal(observation.success, true);
   assert.equal(inspection.success, true);
@@ -99,6 +114,9 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
   assert.equal(environmentalOffline.success, true);
   assert.equal(esgExisting.success, true);
   assert.equal(esgOffline.success, true);
+  assert.equal(behavior.success, true);
+  assert.equal(sif.success, true);
+  assert.equal(certification.success, true);
   assert.equal(mobileEvidencePayloadSchema.safeParse({
     ...base,
     targetType: "INCIDENT",
@@ -129,6 +147,21 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
     ...base,
     targetType: "ASSET_DEFECT",
     entityId: "asset-1",
+  }).success, false);
+  assert.equal(mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "BEHAVIOR_SAFETY",
+    entityId: "session-1",
+  }).success, false);
+  assert.equal(mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "SIF_ASSURANCE",
+    entityId: "verification-1",
+  }).success, false);
+  assert.equal(mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "CERTIFICATION_READINESS",
+    entityId: "review-1",
   }).success, false);
 });
 
@@ -166,4 +199,7 @@ test("each mobile evidence target retains its governing permission", () => {
   assert.equal(requiredMobileEvidencePermission("CHEMICAL"), PermissionKey.MANAGE_CHEMICALS);
   assert.equal(requiredMobileEvidencePermission("ENVIRONMENTAL"), PermissionKey.MANAGE_ENVIRONMENTAL);
   assert.equal(requiredMobileEvidencePermission("ESG"), PermissionKey.MANAGE_ESG);
+  assert.equal(requiredMobileEvidencePermission("BEHAVIOR_SAFETY"), PermissionKey.RECORD_BEHAVIOR_COACHING);
+  assert.equal(requiredMobileEvidencePermission("SIF_ASSURANCE"), PermissionKey.MANAGE_CRITICAL_CONTROLS);
+  assert.equal(requiredMobileEvidencePermission("CERTIFICATION_READINESS"), PermissionKey.MANAGE_CERTIFICATION_READINESS);
 });

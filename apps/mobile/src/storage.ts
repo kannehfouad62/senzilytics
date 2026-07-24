@@ -19,7 +19,13 @@ import type {
   AssetStatusPayload,
   AuditResponsePayload,
   AuditStartPayload,
+  BehaviorFollowUpPayload,
+  BehaviorProgramReviewPayload,
+  BehaviorRecognitionPayload,
+  BehaviorSessionPayload,
   CapaStatusPayload,
+  CertificationReviewApprovePayload,
+  CertificationReviewCompletePayload,
   ChemicalFormsPayload,
   ChemicalInventoryPayload,
   ChemicalStatusPayload,
@@ -49,6 +55,8 @@ import type {
   PermitStatusPayload,
   RiskCapturePayload,
   RiskReviewPayload,
+  SifSignalReviewPayload,
+  SifVerificationPayload,
   SurveillanceCompletionPayload,
   SurveillanceEnrollmentPayload,
   SurveillanceProgramStatusPayload,
@@ -70,7 +78,10 @@ type EvidenceTargetType =
   | "INDUSTRIAL_HYGIENE"
   | "CHEMICAL"
   | "ENVIRONMENTAL"
-  | "ESG";
+  | "ESG"
+  | "BEHAVIOR_SAFETY"
+  | "SIF_ASSURANCE"
+  | "CERTIFICATION_READINESS";
 type EvidenceRow = {
   id: string;
   parent_submission_id: string | null;
@@ -185,7 +196,10 @@ async function queueOfflineItem(
           type === "ASSET_MAINTENANCE_COMPLETE" ||
           type === "IH_SAMPLE" ||
           type === "ENVIRONMENTAL_DATA" ||
-          type === "ESG_DATA"
+          type === "ESG_DATA" ||
+          type === "BEHAVIOR_SESSION" ||
+          type === "SIF_VERIFICATION" ||
+          type === "CERTIFICATION_REVIEW_COMPLETE"
             ? id
             : undefined,
       });
@@ -623,6 +637,80 @@ export async function queueEsgEvidence(
   );
 }
 
+export async function queueBehaviorSession(
+  ownerKey: string,
+  payload: BehaviorSessionPayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "BEHAVIOR_SESSION", payload, {
+    files: evidence,
+    targetType: "BEHAVIOR_SAFETY",
+    title: "Behavior coaching evidence",
+    description: payload.discussionSummary || payload.immediateAction,
+  });
+}
+
+export async function queueBehaviorFollowUp(
+  ownerKey: string,
+  payload: BehaviorFollowUpPayload
+) {
+  return queueOfflineItem(ownerKey, "BEHAVIOR_FOLLOW_UP", payload);
+}
+
+export async function queueBehaviorRecognition(
+  ownerKey: string,
+  payload: BehaviorRecognitionPayload
+) {
+  return queueOfflineItem(ownerKey, "BEHAVIOR_RECOGNITION", payload);
+}
+
+export async function queueBehaviorProgramReview(
+  ownerKey: string,
+  payload: BehaviorProgramReviewPayload
+) {
+  return queueOfflineItem(ownerKey, "BEHAVIOR_PROGRAM_REVIEW", payload);
+}
+
+export async function queueSifVerification(
+  ownerKey: string,
+  payload: SifVerificationPayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "SIF_VERIFICATION", payload, {
+    files: evidence,
+    targetType: "SIF_ASSURANCE",
+    title: "Critical-control verification evidence",
+    description: payload.findings || payload.immediateAction,
+  });
+}
+
+export async function queueSifSignalReview(
+  ownerKey: string,
+  payload: SifSignalReviewPayload
+) {
+  return queueOfflineItem(ownerKey, "SIF_SIGNAL_REVIEW", payload);
+}
+
+export async function queueCertificationReviewComplete(
+  ownerKey: string,
+  payload: CertificationReviewCompletePayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "CERTIFICATION_REVIEW_COMPLETE", payload, {
+    files: evidence,
+    targetType: "CERTIFICATION_READINESS",
+    title: "Management-review evidence",
+    description: payload.decisions,
+  });
+}
+
+export async function queueCertificationReviewApprove(
+  ownerKey: string,
+  payload: CertificationReviewApprovePayload
+) {
+  return queueOfflineItem(ownerKey, "CERTIFICATION_REVIEW_APPROVE", payload);
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([
@@ -655,7 +743,10 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "ASSET_MAINTENANCE_COMPLETE" ||
     envelope.type === "IH_SAMPLE" ||
     envelope.type === "ENVIRONMENTAL_DATA" ||
-    envelope.type === "ESG_DATA"
+    envelope.type === "ESG_DATA" ||
+    envelope.type === "BEHAVIOR_SESSION" ||
+    envelope.type === "SIF_VERIFICATION" ||
+    envelope.type === "CERTIFICATION_REVIEW_COMPLETE"
   );
   const responses = decoded.filter(({ envelope }) =>
     envelope.type === "INSPECTION_RESPONSE" ||
@@ -690,7 +781,12 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "ENVIRONMENTAL_FORMS" ||
     envelope.type === "ESG_FORMS" ||
     envelope.type === "ESG_DISCLOSURE_STATUS" ||
-    envelope.type === "ESG_INITIATIVE_STATUS"
+    envelope.type === "ESG_INITIATIVE_STATUS" ||
+    envelope.type === "BEHAVIOR_FOLLOW_UP" ||
+    envelope.type === "BEHAVIOR_RECOGNITION" ||
+    envelope.type === "BEHAVIOR_PROGRAM_REVIEW" ||
+    envelope.type === "SIF_SIGNAL_REVIEW" ||
+    envelope.type === "CERTIFICATION_REVIEW_APPROVE"
   );
   const first = await synchronizeRows(database, parents);
   const files = await synchronizeEvidence(database, ownerKey);

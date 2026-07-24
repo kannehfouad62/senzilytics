@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { calculateCertificationReadiness, operationalControlScore, protocolFoundationScore } from "@/modules/assurance/certification-readiness";
 import { createPreparedSubmissions, type PreparedSubmission } from "@/modules/forms/runtime-form.service";
 import {
+  recordMobileOfflineSubmission,
+  type MobileOfflineSubmission,
+} from "@/modules/mobile/mobile-offline-record";
+import {
   ActivityAction,
   CertificationManagementReviewStatus,
   ConfigurableFormModule,
@@ -141,7 +145,7 @@ export async function createCertificationManagementReviewService(input: { organi
   return review;
 }
 
-export async function completeCertificationManagementReviewService(input: { organizationId: string; userId: string; reviewId: string; attendees?: string | null; auditResultsSummary: string; complianceStatusSummary: string; objectivesPerformance: string; stakeholderFeedback?: string | null; changesInContext?: string | null; risksAndOpportunities: string; resourceAdequacy: string; decisions: string; improvementOpportunities: string; conclusion: ManagementSystemConclusion; nextReviewAt: Date; customSubmissions?: PreparedSubmission[] }) {
+export async function completeCertificationManagementReviewService(input: { organizationId: string; userId: string; reviewId: string; attendees?: string | null; auditResultsSummary: string; complianceStatusSummary: string; objectivesPerformance: string; stakeholderFeedback?: string | null; changesInContext?: string | null; risksAndOpportunities: string; resourceAdequacy: string; decisions: string; improvementOpportunities: string; conclusion: ManagementSystemConclusion; nextReviewAt: Date; customSubmissions?: PreparedSubmission[]; offlineSubmission?: MobileOfflineSubmission }) {
   const [review, completer] = await Promise.all([
     prisma.certificationManagementReview.findFirst({ where: { id: input.reviewId, organizationId: input.organizationId }, include: { program: true } }),
     prisma.user.findFirst({ where: { id: input.userId, organizationId: input.organizationId, isActive: true } }),
@@ -154,11 +158,12 @@ export async function completeCertificationManagementReviewService(input: { orga
     const completed = await tx.certificationManagementReview.update({ where: { id: review.id }, data: { status: CertificationManagementReviewStatus.COMPLETED, attendees: input.attendees, auditResultsSummary: input.auditResultsSummary, complianceStatusSummary: input.complianceStatusSummary, objectivesPerformance: input.objectivesPerformance, stakeholderFeedback: input.stakeholderFeedback, changesInContext: input.changesInContext, risksAndOpportunities: input.risksAndOpportunities, resourceAdequacy: input.resourceAdequacy, decisions: input.decisions, improvementOpportunities: input.improvementOpportunities, conclusion: input.conclusion, readinessScore: overview.readiness.total, readinessSnapshot: { band: overview.readiness.band, dimensions: overview.readiness.dimensions, evidence: overview.evidence, generatedAt: new Date().toISOString() }, nextReviewAt: input.nextReviewAt, completedById: completer.id, completedAt: new Date(), reminderSentAt: null, overdueNotifiedAt: null } });
     await createPreparedSubmissions(tx, { organizationId: input.organizationId, userId: completer.id, module: ConfigurableFormModule.CERTIFICATION_READINESS, entityId: completed.id, submissions: input.customSubmissions ?? [] });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: completer.id, action: ActivityAction.UPDATE, entityType: "CertificationManagementReview", entityId: completed.id, title: "Certification management review completed", description: `${completed.reference} recorded a ${completed.conclusion?.replaceAll("_", " ")} conclusion.`, metadata: { programId: completed.programId, readinessScore: completed.readinessScore, conclusion: completed.conclusion, nextReviewAt: completed.nextReviewAt } } });
+    await recordMobileOfflineSubmission(tx, input, "CERTIFICATION_REVIEW_COMPLETE", completed.id);
     return completed;
   });
 }
 
-export async function approveCertificationManagementReviewService(input: { organizationId: string; userId: string; reviewId: string }) {
+export async function approveCertificationManagementReviewService(input: { organizationId: string; userId: string; reviewId: string; offlineSubmission?: MobileOfflineSubmission }) {
   const [review, approver] = await Promise.all([
     prisma.certificationManagementReview.findFirst({ where: { id: input.reviewId, organizationId: input.organizationId }, include: { chair: true } }),
     prisma.user.findFirst({ where: { id: input.userId, organizationId: input.organizationId, isActive: true } }),
@@ -170,6 +175,7 @@ export async function approveCertificationManagementReviewService(input: { organ
   const approved = await prisma.$transaction(async (tx) => {
     const updated = await tx.certificationManagementReview.update({ where: { id: review.id }, data: { status: CertificationManagementReviewStatus.APPROVED, approvedById: approver.id, approvedAt: new Date() } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: approver.id, action: ActivityAction.STATUS_CHANGE, entityType: "CertificationManagementReview", entityId: updated.id, title: "Certification management review approved", description: `${updated.reference} was approved.`, metadata: { programId: updated.programId, readinessScore: updated.readinessScore } } });
+    await recordMobileOfflineSubmission(tx, input, "CERTIFICATION_REVIEW_APPROVE", updated.id);
     return updated;
   });
   if (review.chairId !== approver.id) await createNotification({ organizationId: input.organizationId, userId: review.chairId, type: NotificationType.SUCCESS, title: "Management review approved", message: `${review.reference} — ${review.title} was approved.`, link: `/assurance/certification/reviews/${review.id}` }).catch(() => undefined);

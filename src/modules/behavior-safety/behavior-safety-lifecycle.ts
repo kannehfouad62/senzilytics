@@ -9,6 +9,9 @@ const programTransitions: Record<BehaviorProgramStatus, BehaviorProgramStatus[]>
 
 export const canTransitionBehaviorProgram = (from: BehaviorProgramStatus, to: BehaviorProgramStatus) => programTransitions[from].includes(to);
 
+export const getBehaviorProgramNextStatuses = (status: BehaviorProgramStatus) =>
+  [...programTransitions[status]];
+
 export type BehaviorResultInput = { outcome: BehaviorObservationOutcome; isCritical: boolean };
 
 export function summarizeBehaviorResults(results: BehaviorResultInput[]) {

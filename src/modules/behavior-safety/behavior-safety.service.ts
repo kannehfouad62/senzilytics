@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { canTransitionBehaviorProgram, summarizeBehaviorResults } from "@/modules/behavior-safety/behavior-safety-lifecycle";
 import { createPreparedSubmissions, type PreparedSubmission } from "@/modules/forms/runtime-form.service";
 import {
+  recordMobileOfflineSubmission,
+  type MobileOfflineSubmission,
+} from "@/modules/mobile/mobile-offline-record";
+import {
   ActivityAction,
   BehaviorCoachingType,
   BehaviorFollowUpStatus,
@@ -73,7 +77,7 @@ export async function changeBehaviorProgramStatusService(input: { organizationId
   });
 }
 
-export async function recordBehaviorProgramReviewService(input: { organizationId: string; userId: string; programId: string; reviewNotes: string; nextReviewAt: Date }) {
+export async function recordBehaviorProgramReviewService(input: { organizationId: string; userId: string; programId: string; reviewNotes: string; nextReviewAt: Date; offlineSubmission?: MobileOfflineSubmission }) {
   const [program, user] = await Promise.all([prisma.behaviorSafetyProgram.findFirst({ where: { id: input.programId, organizationId: input.organizationId } }), tenantUser(input.organizationId, input.userId)]);
   if (!program || !user) throw new Error("Behavior-safety program not found in this organization.");
   if (program.status === BehaviorProgramStatus.ARCHIVED) throw new Error("Archived programs cannot be reviewed.");
@@ -82,6 +86,7 @@ export async function recordBehaviorProgramReviewService(input: { organizationId
   return prisma.$transaction(async tx => {
     const updated = await tx.behaviorSafetyProgram.update({ where: { id: program.id }, data: { nextReviewAt: input.nextReviewAt, reviewReminderAt: null } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: user.id, action: ActivityAction.UPDATE, entityType: "BehaviorSafetyProgram", entityId: program.id, title: "Behavior-safety program reviewed", description: input.reviewNotes, metadata: { previousReviewDueAt: program.nextReviewAt, nextReviewAt: updated.nextReviewAt } } });
+    await recordMobileOfflineSubmission(tx, input, "BEHAVIOR_PROGRAM_REVIEW", updated.id);
     return updated;
   });
 }
@@ -92,6 +97,7 @@ export async function recordBehaviorCoachingSessionService(input: {
   discussionSummary?: string | null; workerCommitment?: string | null; immediateAction?: string | null; followUpOwnerId?: string | null;
   followUpDueAt?: Date | null; createSafetyObservation: boolean; customSubmissions?: PreparedSubmission[];
   results: Array<{ behaviorId: string; outcome: BehaviorObservationOutcome; note?: string | null; immediateAction?: string | null }>;
+  offlineSubmission?: MobileOfflineSubmission;
 }) {
   const [program, observer, site, department, participant, followUpOwner] = await Promise.all([
     prisma.behaviorSafetyProgram.findFirst({ where: { id: input.programId, organizationId: input.organizationId }, include: { behaviors: { where: { isActive: true } } } }),
@@ -125,13 +131,14 @@ export async function recordBehaviorCoachingSessionService(input: {
     const created = await tx.behaviorCoachingSession.create({ data: { organizationId: input.organizationId, reference: sessionReference, programId: program.id, siteId: site.id, departmentId: input.departmentId, observerId: observer.id, participantId: input.isParticipantAnonymous ? null : input.participantId, isParticipantAnonymous: input.isParticipantAnonymous, workGroup: input.workGroup, observedAt: input.observedAt, location: input.location, coachingType: input.coachingType, ...summary, discussionSummary: input.discussionSummary, workerCommitment: input.workerCommitment, immediateAction: input.immediateAction, followUpStatus: summary.atRiskCount ? BehaviorFollowUpStatus.OPEN : BehaviorFollowUpStatus.NOT_REQUIRED, followUpOwnerId: summary.atRiskCount ? input.followUpOwnerId : null, followUpDueAt: summary.atRiskCount ? input.followUpDueAt : null, safetyObservationId, results: { create: input.results.map(result => ({ behaviorId: result.behaviorId, outcome: result.outcome, note: result.note, immediateAction: result.immediateAction })) } } });
     await createPreparedSubmissions(tx, { organizationId: input.organizationId, userId: observer.id, module: ConfigurableFormModule.BEHAVIOR_SAFETY, entityId: created.id, submissions: input.customSubmissions ?? [] });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: observer.id, action: ActivityAction.CREATE, entityType: "BehaviorCoachingSession", entityId: created.id, title: "Behavior coaching session recorded", description: `${created.reference} — ${program.name}`, metadata: { programId: program.id, siteId: site.id, safeCount: created.safeCount, atRiskCount: created.atRiskCount, criticalAtRiskCount: created.criticalAtRiskCount, safetyObservationId } } });
+    await recordMobileOfflineSubmission(tx, input, "BEHAVIOR_SESSION", created.id);
     return created;
   });
   if (session.followUpOwnerId) await createNotification({ organizationId: input.organizationId, userId: session.followUpOwnerId, type: summary.criticalAtRiskCount ? NotificationType.CRITICAL : NotificationType.ASSIGNMENT, title: "Behavior-safety follow-up assigned", message: `${session.reference} requires follow-up by ${session.followUpDueAt?.toLocaleDateString("en-US")}.`, link: `/behavior-safety/sessions/${session.id}` }).catch(() => undefined);
   return session;
 }
 
-export async function updateBehaviorFollowUpService(input: { organizationId: string; userId: string; canManage: boolean; sessionId: string; status: BehaviorFollowUpStatus; note: string }) {
+export async function updateBehaviorFollowUpService(input: { organizationId: string; userId: string; canManage: boolean; sessionId: string; status: BehaviorFollowUpStatus; note: string; offlineSubmission?: MobileOfflineSubmission }) {
   const [session, user] = await Promise.all([prisma.behaviorCoachingSession.findFirst({ where: { id: input.sessionId, organizationId: input.organizationId } }), tenantUser(input.organizationId, input.userId)]);
   if (!session || !user) throw new Error("Behavior coaching session not found in this organization.");
   if (session.followUpOwnerId !== user.id && !input.canManage) throw new Error("Only the assigned follow-up owner or a behavior-safety manager can update this follow-up.");
@@ -142,6 +149,7 @@ export async function updateBehaviorFollowUpService(input: { organizationId: str
   return prisma.$transaction(async tx => {
     const updated = await tx.behaviorCoachingSession.update({ where: { id: session.id }, data: { followUpStatus: input.status, followUpCompletedAt: input.status === BehaviorFollowUpStatus.COMPLETED ? new Date() : null } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: user.id, action: ActivityAction.STATUS_CHANGE, entityType: "BehaviorCoachingSession", entityId: session.id, title: "Behavior follow-up updated", description: `${session.reference}: ${session.followUpStatus} → ${updated.followUpStatus}. ${input.note}`, metadata: { previousStatus: session.followUpStatus, status: updated.followUpStatus, note: input.note } } });
+    await recordMobileOfflineSubmission(tx, input, "BEHAVIOR_FOLLOW_UP", updated.id);
     return updated;
   });
 }
@@ -162,7 +170,7 @@ export async function createCapaFromBehaviorSessionService(input: { organization
   return action;
 }
 
-export async function nominateBehaviorRecognitionService(input: { organizationId: string; userId: string; sessionId: string; nominatedUserId: string; reason: string }) {
+export async function nominateBehaviorRecognitionService(input: { organizationId: string; userId: string; sessionId: string; nominatedUserId: string; reason: string; offlineSubmission?: MobileOfflineSubmission }) {
   const [session, nominator, nominee] = await Promise.all([prisma.behaviorCoachingSession.findFirst({ where: { id: input.sessionId, organizationId: input.organizationId } }), tenantUser(input.organizationId, input.userId), tenantUser(input.organizationId, input.nominatedUserId)]);
   if (!session || !nominator || !nominee) throw new Error("Select a valid tenant coaching session and recognition nominee.");
   if (!session.safeCount) throw new Error("Recognition requires at least one safe behavior result.");
@@ -173,6 +181,7 @@ export async function nominateBehaviorRecognitionService(input: { organizationId
   return prisma.$transaction(async tx => {
     const recognition = await tx.behaviorRecognition.create({ data: { organizationId: input.organizationId, sessionId: session.id, nominatedUserId: nominee.id, nominatedById: nominator.id, reason: input.reason } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: nominator.id, action: ActivityAction.CREATE, entityType: "BehaviorRecognition", entityId: recognition.id, title: "Safety recognition nominated", description: `${session.reference} — ${nominee.name}`, metadata: { sessionId: session.id, nominatedUserId: nominee.id } } });
+    await recordMobileOfflineSubmission(tx, input, "BEHAVIOR_RECOGNITION", recognition.id);
     return recognition;
   });
 }

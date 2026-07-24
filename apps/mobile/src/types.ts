@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE";
 };
 
 export type MobileDepartment = {
@@ -1093,6 +1093,253 @@ export type MobileEsgCapabilities = {
   canManage: boolean;
 };
 
+export type MobileBehaviorOutcome = "SAFE" | "AT_RISK" | "NOT_OBSERVED";
+export type MobileBehaviorFollowUpStatus =
+  | "NOT_REQUIRED"
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "COMPLETED";
+
+export type MobileBehaviorDefinition = {
+  id: string;
+  code: string;
+  title: string;
+  category: string;
+  prompt: string;
+  safeDescription: string;
+  atRiskDescription: string;
+  isCritical: boolean;
+  sequence: number;
+};
+
+export type MobileBehaviorSession = {
+  id: string;
+  reference: string;
+  isParticipantAnonymous: boolean;
+  workGroup: string | null;
+  observedAt: string;
+  location: string | null;
+  coachingType: string;
+  overallOutcome: MobileBehaviorOutcome;
+  safeCount: number;
+  atRiskCount: number;
+  criticalAtRiskCount: number;
+  discussionSummary: string | null;
+  workerCommitment: string | null;
+  immediateAction: string | null;
+  followUpStatus: MobileBehaviorFollowUpStatus;
+  followUpDueAt: string | null;
+  followUpCompletedAt: string | null;
+  safetyObservationId: string | null;
+  correctiveActionId: string | null;
+  site: { id: string; name: string };
+  department: { id: string; name: string } | null;
+  observer: { id: string; name: string };
+  participant: { id: string; name: string } | null;
+  followUpOwner: { id: string; name: string } | null;
+  isFollowUpOwner: boolean;
+  missingFormDefinitionIds: string[];
+  results: Array<{
+    id: string;
+    behaviorId: string;
+    outcome: MobileBehaviorOutcome;
+    note: string | null;
+    immediateAction: string | null;
+    behavior: {
+      code: string;
+      title: string;
+      category: string;
+      isCritical: boolean;
+    };
+  }>;
+  recognitions: Array<{
+    id: string;
+    reason: string;
+    status: "NOMINATED" | "APPROVED" | "DECLINED";
+    awardedAt: string | null;
+    nominatedUser: { id: string; name: string };
+    nominatedBy: { id: string; name: string };
+  }>;
+};
+
+export type MobileBehaviorProgram = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  objective: string | null;
+  status: "DRAFT" | "ACTIVE" | "PAUSED" | "ARCHIVED";
+  targetSessionsPerMonth: number;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  nextReviewAt: string | null;
+  site: { id: string; name: string } | null;
+  department: { id: string; name: string } | null;
+  owner: { id: string; name: string };
+  behaviors: MobileBehaviorDefinition[];
+  sessions: MobileBehaviorSession[];
+  nextStatuses: Array<"DRAFT" | "ACTIVE" | "PAUSED" | "ARCHIVED">;
+};
+
+export type MobileSifSignal = {
+  id: string;
+  sourceType: string;
+  sourceId: string;
+  sourceLabel: string;
+  title: string;
+  detail: string;
+  href: string;
+  siteId: string | null;
+  siteName: string | null;
+  occurredAt: string;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  category: string;
+  score: number;
+  confidence: "LOW" | "MEDIUM" | "HIGH";
+  reasons: string[];
+  review: {
+    classification: string;
+    rationale: string;
+    controlFailureNotes: string | null;
+    reviewedAt: string;
+    reviewedBy: { name: string };
+  } | null;
+};
+
+export type MobileCriticalControl = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  description: string | null;
+  performanceStandard: string;
+  verificationPrompt: string;
+  verificationFrequencyDays: number;
+  nextVerificationDueAt: string;
+  isActive: boolean;
+  isOverdue: boolean;
+  site: { id: string; name: string } | null;
+  owner: { id: string; name: string } | null;
+  latestVerification: {
+    id: string;
+    result: "EFFECTIVE" | "DEGRADED" | "FAILED" | "NOT_VERIFIED";
+    verifiedAt: string;
+    nextDueAt: string;
+    evidenceReference: string | null;
+    findings: string | null;
+    immediateAction: string | null;
+    correctiveActionId: string | null;
+  } | null;
+};
+
+export type MobileSifAssurance = {
+  generatedAt: string;
+  windowDays: number;
+  metrics: {
+    activeSignals: number;
+    unreviewed: number;
+    highConfidence: number;
+    potentialSif: number;
+    precursors: number;
+    criticalClusters: number;
+    activeControls: number;
+    effectiveControls: number;
+    degradedOrFailed: number;
+    overdueVerifications: number;
+    controlCoveragePercent: number;
+  };
+  signals: MobileSifSignal[];
+  clusters: Array<{
+    id: string;
+    siteId: string | null;
+    siteName: string;
+    category: string;
+    count: number;
+    score: number;
+    highConfidence: number;
+    trend: "RISING" | "FALLING" | "STABLE";
+    controlCount: number;
+    effectiveControls: number;
+    failedControls: number;
+    coveragePercent: number;
+    pressure: "CRITICAL" | "ELEVATED" | "WATCH";
+  }>;
+  controls: MobileCriticalControl[];
+};
+
+export type MobileCertificationReview = {
+  id: string;
+  reference: string;
+  title: string;
+  status: "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "APPROVED" | "CANCELLED";
+  periodStart: string;
+  periodEnd: string;
+  scheduledAt: string;
+  attendees: string | null;
+  auditResultsSummary: string | null;
+  complianceStatusSummary: string | null;
+  objectivesPerformance: string | null;
+  stakeholderFeedback: string | null;
+  changesInContext: string | null;
+  risksAndOpportunities: string | null;
+  resourceAdequacy: string | null;
+  decisions: string | null;
+  improvementOpportunities: string | null;
+  conclusion: "EFFECTIVE" | "NEEDS_IMPROVEMENT" | "NOT_EFFECTIVE" | null;
+  readinessScore: number | null;
+  nextReviewAt: string | null;
+  completedAt: string | null;
+  approvedAt: string | null;
+  chair: { id: string; name: string };
+  approvedBy: { id: string; name: string } | null;
+  actionCount: number;
+  canComplete: boolean;
+  canApprove: boolean;
+};
+
+export type MobileCertificationProgram = {
+  id: string;
+  code: string | null;
+  name: string;
+  description: string | null;
+  standardName: string | null;
+  standardVersion: string | null;
+  framework: string | null;
+  owner: { id: string; name: string } | null;
+  readiness: {
+    total: number;
+    band: "READY_FOR_FORMAL_REVIEW" | "NEEDS_ATTENTION" | "NOT_READY";
+    dimensions: Array<{
+      key: string;
+      score: number;
+      weight: number;
+      contribution: number;
+    }>;
+  };
+  gaps: string[];
+  evidence: Record<string, number>;
+  sections: Array<{
+    id: string;
+    title: string;
+    standardRef: string | null;
+    questionCount: number;
+    executedQuestionCount: number;
+    answeredPercent: number;
+    conformancePercent: number;
+  }>;
+  reviews: MobileCertificationReview[];
+};
+
+export type MobileBehaviorAssuranceCapabilities = {
+  canViewBehavior: boolean;
+  canRecordBehavior: boolean;
+  canManageBehavior: boolean;
+  canViewSif: boolean;
+  canManageCriticalControls: boolean;
+  canViewCertification: boolean;
+  canManageCertification: boolean;
+};
+
 export type MobileBootstrap = {
   user: MobileUser;
   organization: { id: string; name: string; subscriptionPlan: string };
@@ -1134,6 +1381,14 @@ export type MobileBootstrap = {
   esgInitiatives: MobileEsgInitiative[];
   esgCapabilities: MobileEsgCapabilities;
   esgForms: RuntimeForm[];
+  behaviorPrograms: MobileBehaviorProgram[];
+  behaviorAssurancePeople: Array<{ id: string; name: string }>;
+  behaviorAssuranceCapabilities: MobileBehaviorAssuranceCapabilities;
+  behaviorForms: RuntimeForm[];
+  sifAssurance: MobileSifAssurance | null;
+  sifForms: RuntimeForm[];
+  certificationPrograms: MobileCertificationProgram[];
+  certificationForms: RuntimeForm[];
   correctiveActions: MobileCorrectiveAction[];
   capaCapabilities: MobileCapaCapabilities;
   notifications: MobileNotification[];
@@ -1510,4 +1765,92 @@ export type EsgDisclosureStatusPayload = {
 export type EsgInitiativeStatusPayload = {
   initiativeId: string;
   status: MobileEsgInitiativeStatus;
+};
+
+export type BehaviorSessionPayload = {
+  programId: string;
+  siteId: string;
+  departmentId?: string;
+  participantId?: string;
+  isParticipantAnonymous: boolean;
+  workGroup?: string;
+  observedAt: string;
+  location?: string;
+  coachingType:
+    | "POSITIVE_REINFORCEMENT"
+    | "CORRECTIVE_COACHING"
+    | "PEER_DISCUSSION"
+    | "STOP_WORK";
+  discussionSummary?: string;
+  workerCommitment?: string;
+  immediateAction?: string;
+  followUpOwnerId?: string;
+  followUpDueAt?: string;
+  createSafetyObservation: boolean;
+  customForms: CapturedForm[];
+  results: Array<{
+    behaviorId: string;
+    outcome: MobileBehaviorOutcome;
+    note?: string;
+    immediateAction?: string;
+  }>;
+};
+
+export type BehaviorFollowUpPayload = {
+  sessionId: string;
+  status: "IN_PROGRESS" | "COMPLETED";
+  note: string;
+};
+
+export type BehaviorRecognitionPayload = {
+  sessionId: string;
+  nominatedUserId: string;
+  reason: string;
+};
+
+export type BehaviorProgramReviewPayload = {
+  programId: string;
+  reviewNotes: string;
+  nextReviewAt: string;
+};
+
+export type SifVerificationPayload = {
+  controlId: string;
+  verifiedAt: string;
+  result: "EFFECTIVE" | "DEGRADED" | "FAILED" | "NOT_VERIFIED";
+  evidenceReference?: string;
+  findings?: string;
+  immediateAction?: string;
+  customForms: CapturedForm[];
+};
+
+export type SifSignalReviewPayload = {
+  sourceType: string;
+  sourceId: string;
+  classification: "POTENTIAL_SIF" | "PRECURSOR" | "ROUTINE" | "DISMISSED";
+  exposureCategory: string;
+  potentialSeverity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  rationale: string;
+  controlFailureNotes?: string;
+};
+
+export type CertificationReviewCompletePayload = {
+  reviewId: string;
+  attendees?: string;
+  auditResultsSummary: string;
+  complianceStatusSummary: string;
+  objectivesPerformance: string;
+  stakeholderFeedback?: string;
+  changesInContext?: string;
+  risksAndOpportunities: string;
+  resourceAdequacy: string;
+  decisions: string;
+  improvementOpportunities: string;
+  conclusion: "EFFECTIVE" | "NEEDS_IMPROVEMENT" | "NOT_EFFECTIVE";
+  nextReviewAt: string;
+  customForms: CapturedForm[];
+};
+
+export type CertificationReviewApprovePayload = {
+  reviewId: string;
 };

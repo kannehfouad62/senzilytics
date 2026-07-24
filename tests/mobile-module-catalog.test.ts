@@ -94,6 +94,12 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.MANAGE_ENVIRONMENTAL,
       PermissionKey.VIEW_ESG,
       PermissionKey.MANAGE_ESG,
+      PermissionKey.VIEW_BEHAVIOR_SAFETY,
+      PermissionKey.RECORD_BEHAVIOR_COACHING,
+      PermissionKey.VIEW_SIF_INTELLIGENCE,
+      PermissionKey.MANAGE_CRITICAL_CONTROLS,
+      PermissionKey.VIEW_CERTIFICATION_READINESS,
+      PermissionKey.MANAGE_CERTIFICATION_READINESS,
       PermissionKey.UPDATE_CAPA,
     ],
     user: {
@@ -120,6 +126,9 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(modules.find((module) => module.key === "chemicals")?.nativeCapability, "CHEMICAL_FIELD");
   assert.equal(modules.find((module) => module.key === "environmental")?.nativeCapability, "ENVIRONMENTAL_FIELD");
   assert.equal(modules.find((module) => module.key === "esg")?.nativeCapability, "ESG_FIELD");
+  assert.equal(modules.find((module) => module.key === "behavior-safety")?.nativeCapability, "BEHAVIOR_SAFETY_FIELD");
+  assert.equal(modules.find((module) => module.key === "sif")?.nativeCapability, "SIF_ASSURANCE_FIELD");
+  assert.equal(modules.find((module) => module.key === "certification")?.nativeCapability, "CERTIFICATION_ASSURANCE");
 
   const governance = getMobileModuleCatalog({
     permissions: [
@@ -155,6 +164,9 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.VIEW_CHEMICALS,
       PermissionKey.VIEW_ENVIRONMENTAL,
       PermissionKey.VIEW_ESG,
+      PermissionKey.VIEW_BEHAVIOR_SAFETY,
+      PermissionKey.VIEW_SIF_INTELLIGENCE,
+      PermissionKey.VIEW_CERTIFICATION_READINESS,
     ],
     user: {
       email: "viewer@example.com",
@@ -174,4 +186,7 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(readOnly.find((module) => module.key === "chemicals")?.nativeCapability, "CHEMICAL_FIELD");
   assert.equal(readOnly.find((module) => module.key === "environmental")?.nativeCapability, "ENVIRONMENTAL_FIELD");
   assert.equal(readOnly.find((module) => module.key === "esg")?.nativeCapability, "ESG_FIELD");
+  assert.equal(readOnly.find((module) => module.key === "behavior-safety")?.nativeCapability, "BEHAVIOR_SAFETY_FIELD");
+  assert.equal(readOnly.find((module) => module.key === "sif")?.nativeCapability, "SIF_ASSURANCE_FIELD");
+  assert.equal(readOnly.find((module) => module.key === "certification")?.nativeCapability, "CERTIFICATION_ASSURANCE");
 });

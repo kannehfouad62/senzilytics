@@ -11,6 +11,7 @@ import { authenticateMobileRequest, MobileAuthError } from "@/modules/mobile/mob
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.service";
 import { getMobileAssetContractorWorkspace } from "@/modules/mobile/mobile-asset-contractor.service";
+import { getMobileBehaviorAssuranceWorkspace } from "@/modules/mobile/mobile-behavior-assurance.service";
 import { getMobileComplianceTraining } from "@/modules/mobile/mobile-compliance-training.service";
 import { getMobileChemicalEnvironmentalWorkspace } from "@/modules/mobile/mobile-chemical-environmental.service";
 import { getMobileEsgWorkspace } from "@/modules/mobile/mobile-esg.service";
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, hygieneHealth, chemicalEnvironmental, esg, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, hygieneHealth, chemicalEnvironmental, esg, behaviorAssurance, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -89,6 +90,11 @@ export async function GET(request: Request) {
       }),
       getMobileEsgWorkspace({
         organizationId: organization.id,
+        permissions: assigned,
+      }),
+      getMobileBehaviorAssuranceWorkspace({
+        organizationId: organization.id,
+        userId: user.id,
         permissions: assigned,
       }),
       canExecuteInspections
@@ -373,6 +379,16 @@ export async function GET(request: Request) {
       esgInitiatives: esg.initiatives,
       esgCapabilities: esg.capabilities,
       esgForms: serializeRuntimeForms(esg.forms),
+      behaviorPrograms: behaviorAssurance.behaviorPrograms,
+      behaviorAssurancePeople: behaviorAssurance.people,
+      behaviorAssuranceCapabilities: behaviorAssurance.capabilities,
+      behaviorForms: serializeRuntimeForms(behaviorAssurance.behaviorForms),
+      sifAssurance: behaviorAssurance.sif,
+      sifForms: serializeRuntimeForms(behaviorAssurance.sifForms),
+      certificationPrograms: behaviorAssurance.certificationPrograms,
+      certificationForms: serializeRuntimeForms(
+        behaviorAssurance.certificationForms
+      ),
       notifications,
       tasks: actionCenter.tasks,
       correctiveActions: actionCenter.correctiveActions,

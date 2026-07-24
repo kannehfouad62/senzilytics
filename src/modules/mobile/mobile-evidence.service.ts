@@ -42,6 +42,9 @@ const targetTypeSchema = z.enum([
   "CHEMICAL",
   "ENVIRONMENTAL",
   "ESG",
+  "BEHAVIOR_SAFETY",
+  "SIF_ASSURANCE",
+  "CERTIFICATION_READINESS",
 ]);
 
 export const mobileEvidencePayloadSchema = z.object({
@@ -67,7 +70,10 @@ export const mobileEvidencePayloadSchema = z.object({
       value.targetType === "ASSET_INSPECTION" ||
       value.targetType === "ASSET_DEFECT" ||
       value.targetType === "ASSET_MAINTENANCE" ||
-      value.targetType === "INDUSTRIAL_HYGIENE"
+      value.targetType === "INDUSTRIAL_HYGIENE" ||
+      value.targetType === "BEHAVIOR_SAFETY" ||
+      value.targetType === "SIF_ASSURANCE" ||
+      value.targetType === "CERTIFICATION_READINESS"
     ) &&
     !value.parentSubmissionId
   ) {
@@ -168,6 +174,15 @@ export function requiredMobileEvidencePermission(
   }
   if (targetType === "ESG") {
     return PermissionKey.MANAGE_ESG;
+  }
+  if (targetType === "BEHAVIOR_SAFETY") {
+    return PermissionKey.RECORD_BEHAVIOR_COACHING;
+  }
+  if (targetType === "SIF_ASSURANCE") {
+    return PermissionKey.MANAGE_CRITICAL_CONTROLS;
+  }
+  if (targetType === "CERTIFICATION_READINESS") {
+    return PermissionKey.MANAGE_CERTIFICATION_READINESS;
   }
   return PermissionKey.MANAGE_AUDITS;
 }
@@ -301,13 +316,23 @@ export async function resolveMobileEvidenceTarget(input: {
     input.payload.targetType === "ASSET_INSPECTION" ||
     input.payload.targetType === "ASSET_DEFECT" ||
     input.payload.targetType === "ASSET_MAINTENANCE" ||
-    input.payload.targetType === "INDUSTRIAL_HYGIENE"
+    input.payload.targetType === "INDUSTRIAL_HYGIENE" ||
+    input.payload.targetType === "BEHAVIOR_SAFETY" ||
+    input.payload.targetType === "SIF_ASSURANCE" ||
+    input.payload.targetType === "CERTIFICATION_READINESS"
   ) {
+    const parentRecordTypes = {
+      ASSET_MAINTENANCE: "ASSET_MAINTENANCE_COMPLETE",
+      INDUSTRIAL_HYGIENE: "IH_SAMPLE",
+      BEHAVIOR_SAFETY: "BEHAVIOR_SESSION",
+      SIF_ASSURANCE: "SIF_VERIFICATION",
+      CERTIFICATION_READINESS: "CERTIFICATION_REVIEW_COMPLETE",
+    } as const;
     const parentRecordType =
-      input.payload.targetType === "ASSET_MAINTENANCE"
-        ? "ASSET_MAINTENANCE_COMPLETE"
-        : input.payload.targetType === "INDUSTRIAL_HYGIENE"
-          ? "IH_SAMPLE"
+      input.payload.targetType in parentRecordTypes
+        ? parentRecordTypes[
+            input.payload.targetType as keyof typeof parentRecordTypes
+          ]
         : input.payload.targetType;
     const parent = await prisma.offlineSubmission.findFirst({
       where: {
@@ -362,6 +387,39 @@ export async function resolveMobileEvidenceTarget(input: {
       });
       if (!sample) {
         throw new Error("The synchronized industrial hygiene sample is unavailable.");
+      }
+    } else if (input.payload.targetType === "BEHAVIOR_SAFETY") {
+      const session = await prisma.behaviorCoachingSession.findFirst({
+        where: {
+          id: parent.recordId,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!session) {
+        throw new Error("The synchronized behavior coaching session is unavailable.");
+      }
+    } else if (input.payload.targetType === "SIF_ASSURANCE") {
+      const verification = await prisma.criticalControlVerification.findFirst({
+        where: {
+          id: parent.recordId,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!verification) {
+        throw new Error("The synchronized critical-control verification is unavailable.");
+      }
+    } else if (input.payload.targetType === "CERTIFICATION_READINESS") {
+      const review = await prisma.certificationManagementReview.findFirst({
+        where: {
+          id: parent.recordId,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!review) {
+        throw new Error("The synchronized management review is unavailable.");
       }
     }
     resolvedEntityId = parent.recordId;
@@ -640,6 +698,15 @@ function documentTarget(
   }
   if (type === "ESG") {
     return { entityType: DocumentEntityType.ESG };
+  }
+  if (type === "BEHAVIOR_SAFETY") {
+    return { entityType: DocumentEntityType.BEHAVIOR_SAFETY };
+  }
+  if (type === "SIF_ASSURANCE") {
+    return { entityType: DocumentEntityType.SIF_ASSURANCE };
+  }
+  if (type === "CERTIFICATION_READINESS") {
+    return { entityType: DocumentEntityType.CERTIFICATION_READINESS };
   }
   return { entityType: DocumentEntityType.INSPECTION };
 }
