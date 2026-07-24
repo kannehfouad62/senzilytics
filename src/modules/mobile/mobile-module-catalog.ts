@@ -17,7 +17,7 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD";
   nativePermission?: PermissionKey;
 };
 
@@ -36,8 +36,8 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "assets", label: "Assets & Equipment", description: "Asset lifecycle, condition, inspections, and maintenance exposure.", href: "/assets", category: "SAFETY", permission: PermissionKey.VIEW_ASSETS, nativeCapability: "ASSET_FIELD" },
   { key: "contractors", label: "Contractors", description: "Contractor qualification, access, performance, and compliance.", href: "/contractors", category: "SAFETY", permission: PermissionKey.VIEW_CONTRACTORS, nativeCapability: "CONTRACTOR_FIELD" },
   { key: "permits", label: "Permit to Work", description: "Controlled work permits, hazards, controls, and authorizations.", href: "/permits-to-work", category: "SAFETY", permission: PermissionKey.VIEW_PERMITS_TO_WORK, nativeCapability: "PERMIT_TO_WORK_EXECUTION" },
-  { key: "industrial-hygiene", label: "Industrial Hygiene", description: "Exposure assessments, samples, limits, and surveillance.", href: "/industrial-hygiene", category: "SAFETY", permission: PermissionKey.VIEW_INDUSTRIAL_HYGIENE },
-  { key: "occupational-health", label: "Occupational Health", description: "Health surveillance programs and fitness controls.", href: "/occupational-health", category: "SAFETY", permission: PermissionKey.VIEW_OCCUPATIONAL_HEALTH },
+  { key: "industrial-hygiene", label: "Industrial Hygiene", description: "Exposure assessments, samples, limits, and surveillance.", href: "/industrial-hygiene", category: "SAFETY", permission: PermissionKey.VIEW_INDUSTRIAL_HYGIENE, nativeCapability: "INDUSTRIAL_HYGIENE_FIELD" },
+  { key: "occupational-health", label: "Occupational Health", description: "Health surveillance programs and fitness controls.", href: "/occupational-health", category: "SAFETY", permission: PermissionKey.VIEW_OCCUPATIONAL_HEALTH, nativeCapability: "OCCUPATIONAL_HEALTH_FIELD" },
   { key: "sif", label: "SIF Prevention", description: "Serious injury and fatality signals and critical controls.", href: "/assurance/sif", category: "ASSURANCE", permission: PermissionKey.VIEW_SIF_INTELLIGENCE },
   { key: "certification", label: "Certification Readiness", description: "Management-system readiness, evidence, and gap reviews.", href: "/assurance/certification", category: "ASSURANCE", permission: PermissionKey.VIEW_CERTIFICATION_READINESS },
   { key: "inspections", label: "Inspections", description: "Inspection planning, checklist execution, and findings.", href: "/inspections", category: "ASSURANCE", permission: PermissionKey.VIEW_INSPECTIONS, nativeCapability: "INSPECTION_EXECUTION", nativePermission: PermissionKey.MANAGE_INSPECTIONS },

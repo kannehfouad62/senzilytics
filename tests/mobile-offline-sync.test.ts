@@ -535,6 +535,141 @@ test("mobile asset contracts reject unsafe inspection and maintenance values", (
   assert.equal(invalidDowntime.success, false);
 });
 
+test("mobile synchronization accepts governed hygiene and occupational-health updates", () => {
+  const parsed = offlineSyncRequestSchema.safeParse({
+    items: [
+      {
+        id: "a5d6fbf1-158c-46ea-a82a-859a1574e003",
+        type: "IH_ASSESSMENT_STATUS",
+        capturedAt,
+        payload: {
+          assessmentId: "assessment-1",
+          status: "IN_PROGRESS",
+          observations: "Baseline walkthrough complete.",
+        },
+      },
+      {
+        id: "b99c9d24-7dc5-49d0-96ed-ed93f6f999c9",
+        type: "IH_SAMPLE",
+        capturedAt,
+        payload: {
+          assessmentId: "assessment-1",
+          agentId: "agent-1",
+          sampleType: "PERSONAL",
+          sampleReference: "COC-2048",
+          sampledAt: capturedAt,
+          durationMinutes: 480,
+          resultValue: 0.42,
+          reportingLimit: 0.01,
+          occupationalLimit: 0.5,
+          actionLevel: 0.25,
+          unit: "mg/m³",
+        },
+      },
+      {
+        id: "ef93e096-6e94-41b1-8222-61752835118d",
+        type: "IH_FORMS",
+        capturedAt,
+        payload: {
+          assessmentId: "assessment-1",
+          customForms: [{
+            definitionId: "definition-1",
+            versionId: "version-1",
+            answers: [{ fieldId: "field-1", value: true }],
+          }],
+        },
+      },
+      {
+        id: "c7618a12-0d69-48e2-8096-a9f795626b64",
+        type: "OH_PROGRAM_STATUS",
+        capturedAt,
+        payload: {
+          programId: "program-1",
+          status: "ACTIVE",
+        },
+      },
+      {
+        id: "345771af-15dc-4437-a30e-394695478141",
+        type: "OH_ENROLLMENT",
+        capturedAt,
+        payload: {
+          programId: "program-1",
+          enrolledUserId: "user-1",
+          nextDueAt: "2026-08-15",
+          notes: "Appointment coordination requested.",
+        },
+      },
+      {
+        id: "fd9e50f2-41ae-4881-84c1-0f2784601903",
+        type: "OH_ENROLLMENT_COMPLETE",
+        capturedAt,
+        payload: {
+          enrollmentId: "enrollment-1",
+          completedAt: "2026-07-22",
+          fitnessOutcome: "CLEARED_WITH_RESTRICTIONS",
+          workRestrictions: "No respirator use pending provider reassessment.",
+          certificateReference: "FIT-2048",
+        },
+      },
+      {
+        id: "40c74379-e5a0-4eb0-9cbc-7a350a112ec8",
+        type: "OH_ENROLLMENT_REMOVE",
+        capturedAt,
+        payload: {
+          enrollmentId: "enrollment-2",
+          reason: "Worker transferred outside the exposure group.",
+        },
+      },
+    ],
+  });
+  assert.equal(parsed.success, true);
+});
+
+test("mobile hygiene and health contracts reject unsafe or clinical-state values", () => {
+  const negativeSample = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id,
+      type: "IH_SAMPLE",
+      capturedAt,
+      payload: {
+        assessmentId: "assessment-1",
+        agentId: "agent-1",
+        sampleType: "PERSONAL",
+        sampledAt: capturedAt,
+        durationMinutes: -1,
+        resultValue: -0.1,
+      },
+    }],
+  });
+  const invalidOutcome = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id,
+      type: "OH_ENROLLMENT_COMPLETE",
+      capturedAt,
+      payload: {
+        enrollmentId: "enrollment-1",
+        completedAt: "2026-07-22",
+        fitnessOutcome: "NOT_ASSESSED",
+      },
+    }],
+  });
+  const missingRestrictions = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id,
+      type: "OH_ENROLLMENT_COMPLETE",
+      capturedAt,
+      payload: {
+        enrollmentId: "enrollment-1",
+        completedAt: "2026-07-22",
+        fitnessOutcome: "TEMPORARILY_NOT_CLEARED",
+      },
+    }],
+  });
+  assert.equal(negativeSample.success, false);
+  assert.equal(invalidOutcome.success, false);
+  assert.equal(missingRestrictions.success, false);
+});
+
 test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("SAFETY_OBSERVATION"), PermissionKey.CREATE_OBSERVATION);
   assert.equal(requiredOfflinePermission("INCIDENT"), PermissionKey.CREATE_INCIDENT);
@@ -564,6 +699,13 @@ test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("ASSET_MAINTENANCE_STATUS"), PermissionKey.MANAGE_ASSETS);
   assert.equal(requiredOfflinePermission("ASSET_MAINTENANCE_COMPLETE"), PermissionKey.MANAGE_ASSETS);
   assert.equal(requiredOfflinePermission("CONTRACTOR_STATUS"), PermissionKey.MANAGE_CONTRACTORS);
+  assert.equal(requiredOfflinePermission("IH_ASSESSMENT_STATUS"), PermissionKey.MANAGE_INDUSTRIAL_HYGIENE);
+  assert.equal(requiredOfflinePermission("IH_SAMPLE"), PermissionKey.MANAGE_INDUSTRIAL_HYGIENE);
+  assert.equal(requiredOfflinePermission("IH_FORMS"), PermissionKey.MANAGE_INDUSTRIAL_HYGIENE);
+  assert.equal(requiredOfflinePermission("OH_PROGRAM_STATUS"), PermissionKey.MANAGE_OCCUPATIONAL_HEALTH);
+  assert.equal(requiredOfflinePermission("OH_ENROLLMENT"), PermissionKey.MANAGE_OCCUPATIONAL_HEALTH);
+  assert.equal(requiredOfflinePermission("OH_ENROLLMENT_COMPLETE"), PermissionKey.MANAGE_OCCUPATIONAL_HEALTH);
+  assert.equal(requiredOfflinePermission("OH_ENROLLMENT_REMOVE"), PermissionKey.MANAGE_OCCUPATIONAL_HEALTH);
 });
 
 test("mobile outbox decoder preserves legacy observation rows", () => {
@@ -615,5 +757,13 @@ test("mobile outbox decoder preserves legacy observation rows", () => {
   assert.deepEqual(decodeOfflineEnvelope({ type: "CONTRACTOR_STATUS", payload: { contractorId: "contractor-1" } }), {
     type: "CONTRACTOR_STATUS",
     payload: { contractorId: "contractor-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "IH_SAMPLE", payload: { assessmentId: "assessment-1" } }), {
+    type: "IH_SAMPLE",
+    payload: { assessmentId: "assessment-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "OH_ENROLLMENT_COMPLETE", payload: { enrollmentId: "enrollment-1" } }), {
+    type: "OH_ENROLLMENT_COMPLETE",
+    payload: { enrollmentId: "enrollment-1" },
   });
 });

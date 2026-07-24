@@ -9,6 +9,9 @@ import {
   ContractorStatus,
   EnterpriseAuditResponseResult,
   EnterpriseAuditStatus,
+  ExposureAssessmentStatus,
+  ExposureSampleType,
+  FitnessOutcome,
   IncidentType,
   InspectionResponseResult,
   JsaStatus,
@@ -26,6 +29,7 @@ import {
   RiskReviewFrequency,
   SafetyObservationType,
   Status,
+  SurveillanceProgramStatus,
   UserRole,
 } from "@prisma/client";
 import { createHash, randomUUID } from "node:crypto";
@@ -67,6 +71,17 @@ import {
   updateAssetDefectService,
 } from "@/modules/assets/asset.service";
 import { updateContractorStatusService } from "@/modules/contractors/contractor.service";
+import {
+  addExposureSampleService,
+  completeExposureAssessmentFormsService,
+  transitionExposureAssessmentService,
+} from "@/modules/industrial-hygiene/industrial-hygiene.service";
+import {
+  completeSurveillanceEnrollmentService,
+  enrollSurveillanceUserService,
+  removeSurveillanceEnrollmentService,
+  updateSurveillanceProgramStatusService,
+} from "@/modules/occupational-health/occupational-health.service";
 
 const customValue = z.union([
   z.string().max(5000),
@@ -468,6 +483,119 @@ const contractorStatusItemSchema = z.object({
   }),
 });
 
+const hygieneAssessmentStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("IH_ASSESSMENT_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    assessmentId: z.string().min(1).max(200),
+    status: z.nativeEnum(ExposureAssessmentStatus),
+    observations: z.string().trim().max(5000).optional(),
+    conclusions: z.string().trim().max(5000).optional(),
+    recommendations: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const hygieneSampleItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("IH_SAMPLE"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    assessmentId: z.string().min(1).max(200),
+    agentId: z.string().min(1).max(200),
+    sampleType: z.nativeEnum(ExposureSampleType),
+    sampleReference: z.string().trim().max(200).optional(),
+    sampledWorkerId: z.string().min(1).max(200).optional(),
+    location: z.string().trim().max(300).optional(),
+    task: z.string().trim().max(500).optional(),
+    sampledAt: z.string().datetime(),
+    durationMinutes: z.number().int().positive().max(100_000).optional(),
+    resultValue: z.number().finite().nonnegative().optional(),
+    reportingLimit: z.number().finite().nonnegative().optional(),
+    occupationalLimit: z.number().finite().nonnegative().optional(),
+    actionLevel: z.number().finite().nonnegative().optional(),
+    unit: z.string().trim().max(100).optional(),
+    laboratory: z.string().trim().max(300).optional(),
+    analyticalMethod: z.string().trim().max(500).optional(),
+    analyzedAt: z.string().datetime().optional(),
+    notes: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const hygieneFormsItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("IH_FORMS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    assessmentId: z.string().min(1).max(200),
+    customForms: z.array(capturedFormSchema).min(1).max(20),
+  }),
+});
+
+const surveillanceProgramStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("OH_PROGRAM_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    programId: z.string().min(1).max(200),
+    status: z.nativeEnum(SurveillanceProgramStatus),
+  }),
+});
+
+const surveillanceEnrollmentItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("OH_ENROLLMENT"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    programId: z.string().min(1).max(200),
+    enrolledUserId: z.string().min(1).max(200),
+    nextDueAt: dateOnly,
+    notes: z.string().trim().max(1000).optional(),
+  }),
+});
+
+const surveillanceCompletionItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("OH_ENROLLMENT_COMPLETE"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    enrollmentId: z.string().min(1).max(200),
+    completedAt: dateOnly,
+    fitnessOutcome: z.enum([
+      FitnessOutcome.CLEARED,
+      FitnessOutcome.CLEARED_WITH_RESTRICTIONS,
+      FitnessOutcome.TEMPORARILY_NOT_CLEARED,
+    ]),
+    workRestrictions: z.string().trim().max(2000).optional(),
+    certificateReference: z.string().trim().max(500).optional(),
+    notes: z.string().trim().max(1000).optional(),
+  }).superRefine((value, context) => {
+    if (
+      (
+        value.fitnessOutcome === FitnessOutcome.CLEARED_WITH_RESTRICTIONS ||
+        value.fitnessOutcome === FitnessOutcome.TEMPORARILY_NOT_CLEARED
+      ) &&
+      !value.workRestrictions
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["workRestrictions"],
+        message: "Provider-issued work restrictions are required for this outcome.",
+      });
+    }
+  }),
+});
+
+const surveillanceRemovalItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("OH_ENROLLMENT_REMOVE"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    enrollmentId: z.string().min(1).max(200),
+    reason: z.string().trim().min(2).max(1000),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
@@ -495,6 +623,13 @@ const offlineItemSchema = z.discriminatedUnion("type", [
   assetMaintenanceStatusItemSchema,
   assetMaintenanceCompletionItemSchema,
   contractorStatusItemSchema,
+  hygieneAssessmentStatusItemSchema,
+  hygieneSampleItemSchema,
+  hygieneFormsItemSchema,
+  surveillanceProgramStatusItemSchema,
+  surveillanceEnrollmentItemSchema,
+  surveillanceCompletionItemSchema,
+  surveillanceRemovalItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -550,6 +685,21 @@ export function requiredOfflinePermission(
   }
   if (type === "CONTRACTOR_STATUS") {
     return PermissionKey.MANAGE_CONTRACTORS;
+  }
+  if (
+    type === "IH_ASSESSMENT_STATUS" ||
+    type === "IH_SAMPLE" ||
+    type === "IH_FORMS"
+  ) {
+    return PermissionKey.MANAGE_INDUSTRIAL_HYGIENE;
+  }
+  if (
+    type === "OH_PROGRAM_STATUS" ||
+    type === "OH_ENROLLMENT" ||
+    type === "OH_ENROLLMENT_COMPLETE" ||
+    type === "OH_ENROLLMENT_REMOVE"
+  ) {
+    return PermissionKey.MANAGE_OCCUPATIONAL_HEALTH;
   }
   if (type === "CAPA_STATUS") {
     return status === Status.COMPLETED || status === Status.CLOSED
@@ -689,8 +839,22 @@ export async function syncOfflineSubmissionsService(input: {
         results.push(await syncAssetMaintenanceStatus(input, item, payloadHash));
       } else if (item.type === "ASSET_MAINTENANCE_COMPLETE") {
         results.push(await syncAssetMaintenanceCompletion(input, item, payloadHash));
-      } else {
+      } else if (item.type === "CONTRACTOR_STATUS") {
         results.push(await syncContractorStatus(input, item, payloadHash));
+      } else if (item.type === "IH_ASSESSMENT_STATUS") {
+        results.push(await syncHygieneAssessmentStatus(input, item, payloadHash));
+      } else if (item.type === "IH_SAMPLE") {
+        results.push(await syncHygieneSample(input, item, payloadHash));
+      } else if (item.type === "IH_FORMS") {
+        results.push(await syncHygieneForms(input, item, payloadHash));
+      } else if (item.type === "OH_PROGRAM_STATUS") {
+        results.push(await syncSurveillanceProgramStatus(input, item, payloadHash));
+      } else if (item.type === "OH_ENROLLMENT") {
+        results.push(await syncSurveillanceEnrollment(input, item, payloadHash));
+      } else if (item.type === "OH_ENROLLMENT_COMPLETE") {
+        results.push(await syncSurveillanceCompletion(input, item, payloadHash));
+      } else {
+        results.push(await syncSurveillanceRemoval(input, item, payloadHash));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -1688,6 +1852,176 @@ async function syncContractorStatus(
   return { id: item.id, status: "synced", recordId: contractor.id };
 }
 
+async function syncHygieneAssessmentStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof hygieneAssessmentStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const assessment = await transitionExposureAssessmentService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    assessmentId: item.payload.assessmentId,
+    status: item.payload.status,
+    observations: item.payload.observations?.trim() || null,
+    conclusions: item.payload.conclusions?.trim() || null,
+    recommendations: item.payload.recommendations?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: assessment.id };
+}
+
+async function syncHygieneSample(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof hygieneSampleItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const sample = await addExposureSampleService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    assessmentId: item.payload.assessmentId,
+    agentId: item.payload.agentId,
+    sampleType: item.payload.sampleType,
+    sampleReference: item.payload.sampleReference?.trim() || null,
+    sampledWorkerId: item.payload.sampledWorkerId || null,
+    location: item.payload.location?.trim() || null,
+    task: item.payload.task?.trim() || null,
+    sampledAt: new Date(item.payload.sampledAt),
+    durationMinutes: item.payload.durationMinutes ?? null,
+    resultValue: item.payload.resultValue ?? null,
+    reportingLimit: item.payload.reportingLimit ?? null,
+    occupationalLimit: item.payload.occupationalLimit ?? null,
+    actionLevel: item.payload.actionLevel ?? null,
+    unit: item.payload.unit?.trim() || null,
+    laboratory: item.payload.laboratory?.trim() || null,
+    analyticalMethod: item.payload.analyticalMethod?.trim() || null,
+    analyzedAt: item.payload.analyzedAt
+      ? new Date(item.payload.analyzedAt)
+      : null,
+    notes: item.payload.notes?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: sample.id };
+}
+
+async function syncHygieneForms(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof hygieneFormsItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const submissions = await prepareCapturedFormSubmissions({
+    organizationId: actor.organizationId,
+    module: ConfigurableFormModule.INDUSTRIAL_HYGIENE,
+    capturedAt: new Date(item.capturedAt),
+    forms: item.payload.customForms,
+  });
+  await completeExposureAssessmentFormsService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    assessmentId: item.payload.assessmentId,
+    submissions,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return {
+    id: item.id,
+    status: "synced",
+    recordId: item.payload.assessmentId,
+  };
+}
+
+async function syncSurveillanceProgramStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof surveillanceProgramStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const program = await updateSurveillanceProgramStatusService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    programId: item.payload.programId,
+    status: item.payload.status,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: program.id };
+}
+
+async function syncSurveillanceEnrollment(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof surveillanceEnrollmentItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const enrollment = await enrollSurveillanceUserService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    programId: item.payload.programId,
+    enrolledUserId: item.payload.enrolledUserId,
+    nextDueAt: parseDateOnly(item.payload.nextDueAt)!,
+    notes: item.payload.notes?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: enrollment.id };
+}
+
+async function syncSurveillanceCompletion(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof surveillanceCompletionItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const enrollment = await completeSurveillanceEnrollmentService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    enrollmentId: item.payload.enrollmentId,
+    completedAt: parseDateOnly(item.payload.completedAt)!,
+    fitnessOutcome: item.payload.fitnessOutcome,
+    workRestrictions: item.payload.workRestrictions?.trim() || null,
+    certificateReference: item.payload.certificateReference?.trim() || null,
+    notes: item.payload.notes?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: enrollment.id };
+}
+
+async function syncSurveillanceRemoval(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof surveillanceRemovalItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const enrollment = await removeSurveillanceEnrollmentService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    enrollmentId: item.payload.enrollmentId,
+    reason: item.payload.reason.trim(),
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: enrollment.id };
+}
+
 function parseDateOnly(value?: string) {
   return value ? new Date(`${value}T12:00:00.000Z`) : null;
 }
@@ -1702,7 +2036,7 @@ function parseFutureReviewDate(value: string | undefined, capturedAt: Date) {
 
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction|exposure|hygiene|sample|surveillance|fitness|restriction|certificate|provider/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

@@ -84,6 +84,10 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.MANAGE_ASSETS,
       PermissionKey.VIEW_CONTRACTORS,
       PermissionKey.MANAGE_CONTRACTORS,
+      PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
+      PermissionKey.MANAGE_INDUSTRIAL_HYGIENE,
+      PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
+      PermissionKey.MANAGE_OCCUPATIONAL_HEALTH,
       PermissionKey.UPDATE_CAPA,
     ],
     user: {
@@ -105,6 +109,8 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(modules.find((module) => module.key === "permits")?.nativeCapability, "PERMIT_TO_WORK_EXECUTION");
   assert.equal(modules.find((module) => module.key === "assets")?.nativeCapability, "ASSET_FIELD");
   assert.equal(modules.find((module) => module.key === "contractors")?.nativeCapability, "CONTRACTOR_FIELD");
+  assert.equal(modules.find((module) => module.key === "industrial-hygiene")?.nativeCapability, "INDUSTRIAL_HYGIENE_FIELD");
+  assert.equal(modules.find((module) => module.key === "occupational-health")?.nativeCapability, "OCCUPATIONAL_HEALTH_FIELD");
 
   const governance = getMobileModuleCatalog({
     permissions: [
@@ -135,6 +141,8 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.VIEW_AUDITS,
       PermissionKey.VIEW_ASSETS,
       PermissionKey.VIEW_CONTRACTORS,
+      PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
+      PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
     ],
     user: {
       email: "viewer@example.com",
@@ -149,4 +157,6 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(readOnly.find((module) => module.key === "audits")?.nativeCapability, undefined);
   assert.equal(readOnly.find((module) => module.key === "assets")?.nativeCapability, "ASSET_FIELD");
   assert.equal(readOnly.find((module) => module.key === "contractors")?.nativeCapability, "CONTRACTOR_FIELD");
+  assert.equal(readOnly.find((module) => module.key === "industrial-hygiene")?.nativeCapability, "INDUSTRIAL_HYGIENE_FIELD");
+  assert.equal(readOnly.find((module) => module.key === "occupational-health")?.nativeCapability, "OCCUPATIONAL_HEALTH_FIELD");
 });

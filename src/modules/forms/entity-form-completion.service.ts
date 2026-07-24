@@ -17,6 +17,12 @@ export async function completeMissingEntityForms(input: {
   activityTitle: string;
   formLabel: string;
   submissions: PreparedSubmission[];
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
+  offlineRecordType?: string;
 }) {
   const existing = await prisma.configurableFormSubmission.findMany({
     where: {
@@ -62,5 +68,18 @@ export async function completeMissingEntityForms(input: {
         metadata: { formCount: missing.length },
       },
     });
+    if (input.offlineSubmission && input.offlineRecordType) {
+      await tx.offlineSubmission.create({
+        data: {
+          id: input.offlineSubmission.id,
+          organizationId: input.organizationId,
+          userId: input.userId,
+          recordType: input.offlineRecordType,
+          recordId: input.entityId,
+          capturedAt: input.offlineSubmission.capturedAt,
+          payloadHash: input.offlineSubmission.payloadHash,
+        },
+      });
+    }
   });
 }

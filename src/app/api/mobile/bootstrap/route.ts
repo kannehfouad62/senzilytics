@@ -12,6 +12,7 @@ import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.service";
 import { getMobileAssetContractorWorkspace } from "@/modules/mobile/mobile-asset-contractor.service";
 import { getMobileComplianceTraining } from "@/modules/mobile/mobile-compliance-training.service";
+import { getMobileHygieneHealthWorkspace } from "@/modules/mobile/mobile-hygiene-health.service";
 import { getMobileMocPermitWorkspace } from "@/modules/mobile/mobile-moc-permit.service";
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
 import { getMobileRiskField } from "@/modules/mobile/mobile-risk-field.service";
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, hygieneHealth, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -71,6 +72,11 @@ export async function GET(request: Request) {
         permissions: assigned,
       }),
       getMobileAssetContractorWorkspace({
+        organizationId: organization.id,
+        userId: user.id,
+        permissions: assigned,
+      }),
+      getMobileHygieneHealthWorkspace({
         organizationId: organization.id,
         userId: user.id,
         permissions: assigned,
@@ -335,6 +341,11 @@ export async function GET(request: Request) {
       assetInspectionForms: serializeRuntimeForms(
         assetContractors.assetInspectionForms
       ),
+      exposureAssessments: hygieneHealth.assessments,
+      surveillancePrograms: hygieneHealth.programs,
+      hygieneHealthPeople: hygieneHealth.people,
+      hygieneHealthCapabilities: hygieneHealth.capabilities,
+      industrialHygieneForms: serializeRuntimeForms(hygieneHealth.forms),
       notifications,
       tasks: actionCenter.tasks,
       correctiveActions: actionCenter.correctiveActions,

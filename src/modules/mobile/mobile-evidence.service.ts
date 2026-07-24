@@ -38,6 +38,7 @@ const targetTypeSchema = z.enum([
   "ASSET_INSPECTION",
   "ASSET_DEFECT",
   "ASSET_MAINTENANCE",
+  "INDUSTRIAL_HYGIENE",
 ]);
 
 export const mobileEvidencePayloadSchema = z.object({
@@ -62,7 +63,8 @@ export const mobileEvidencePayloadSchema = z.object({
       value.targetType === "INCIDENT" ||
       value.targetType === "ASSET_INSPECTION" ||
       value.targetType === "ASSET_DEFECT" ||
-      value.targetType === "ASSET_MAINTENANCE"
+      value.targetType === "ASSET_MAINTENANCE" ||
+      value.targetType === "INDUSTRIAL_HYGIENE"
     ) &&
     !value.parentSubmissionId
   ) {
@@ -129,6 +131,9 @@ export function requiredMobileEvidencePermission(
   ) {
     return PermissionKey.MANAGE_ASSETS;
   }
+  if (targetType === "INDUSTRIAL_HYGIENE") {
+    return PermissionKey.MANAGE_INDUSTRIAL_HYGIENE;
+  }
   return PermissionKey.MANAGE_AUDITS;
 }
 
@@ -172,11 +177,14 @@ export async function resolveMobileEvidenceTarget(input: {
     input.payload.targetType === "INCIDENT" ||
     input.payload.targetType === "ASSET_INSPECTION" ||
     input.payload.targetType === "ASSET_DEFECT" ||
-    input.payload.targetType === "ASSET_MAINTENANCE"
+    input.payload.targetType === "ASSET_MAINTENANCE" ||
+    input.payload.targetType === "INDUSTRIAL_HYGIENE"
   ) {
     const parentRecordType =
       input.payload.targetType === "ASSET_MAINTENANCE"
         ? "ASSET_MAINTENANCE_COMPLETE"
+        : input.payload.targetType === "INDUSTRIAL_HYGIENE"
+          ? "IH_SAMPLE"
         : input.payload.targetType;
     const parent = await prisma.offlineSubmission.findFirst({
       where: {
@@ -220,6 +228,17 @@ export async function resolveMobileEvidenceTarget(input: {
       });
       if (!maintenance) {
         throw new Error("The synchronized maintenance record is unavailable.");
+      }
+    } else if (input.payload.targetType === "INDUSTRIAL_HYGIENE") {
+      const sample = await prisma.exposureSample.findFirst({
+        where: {
+          id: parent.recordId,
+          assessment: { organizationId: input.organizationId },
+        },
+        select: { id: true },
+      });
+      if (!sample) {
+        throw new Error("The synchronized industrial hygiene sample is unavailable.");
       }
     }
     resolvedEntityId = parent.recordId;
@@ -486,6 +505,9 @@ function documentTarget(
     type === "ASSET_MAINTENANCE"
   ) {
     return { entityType: DocumentEntityType.ASSET_SAFETY };
+  }
+  if (type === "INDUSTRIAL_HYGIENE") {
+    return { entityType: DocumentEntityType.INDUSTRIAL_HYGIENE };
   }
   return { entityType: DocumentEntityType.INSPECTION };
 }

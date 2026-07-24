@@ -55,6 +55,11 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
     targetType: "ASSET_MAINTENANCE",
     parentSubmissionId: "94ee294c-5711-4947-baba-0e0d850988fb",
   });
+  const hygieneSample = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "INDUSTRIAL_HYGIENE",
+    parentSubmissionId: "aaf85f1a-1257-4a93-9be9-ad2c779270c4",
+  });
 
   assert.equal(observation.success, true);
   assert.equal(inspection.success, true);
@@ -63,9 +68,15 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
   assert.equal(assetInspection.success, true);
   assert.equal(assetDefect.success, true);
   assert.equal(assetMaintenance.success, true);
+  assert.equal(hygieneSample.success, true);
   assert.equal(mobileEvidencePayloadSchema.safeParse({
     ...base,
     targetType: "INCIDENT",
+  }).success, false);
+  assert.equal(mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "INDUSTRIAL_HYGIENE",
+    entityId: "assessment-1",
   }).success, false);
   assert.equal(mobileEvidencePayloadSchema.safeParse({
     ...base,
@@ -109,4 +120,5 @@ test("each mobile evidence target retains its governing permission", () => {
   assert.equal(requiredMobileEvidencePermission("ASSET_INSPECTION"), PermissionKey.MANAGE_ASSETS);
   assert.equal(requiredMobileEvidencePermission("ASSET_DEFECT"), PermissionKey.MANAGE_ASSETS);
   assert.equal(requiredMobileEvidencePermission("ASSET_MAINTENANCE"), PermissionKey.MANAGE_ASSETS);
+  assert.equal(requiredMobileEvidencePermission("INDUSTRIAL_HYGIENE"), PermissionKey.MANAGE_INDUSTRIAL_HYGIENE);
 });

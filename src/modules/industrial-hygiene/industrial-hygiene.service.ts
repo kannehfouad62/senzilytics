@@ -5,7 +5,37 @@ import { completeMissingEntityForms } from "@/modules/forms/entity-form-completi
 import { type PreparedSubmission, createPreparedSubmissions } from "@/modules/forms/runtime-form.service";
 import { exposureRatio, classifyExposureResult } from "@/modules/industrial-hygiene/exposure-classification";
 import { isExposureAssessmentTransitionAllowed } from "@/modules/industrial-hygiene/exposure-assessment-lifecycle";
-import { ActivityAction, ConfigurableFormModule, ExposureAssessmentStatus, ExposureResultClassification, ExposureSampleType, HygieneAgentCategory, NotificationType } from "@prisma/client";
+import { ActivityAction, ConfigurableFormModule, ExposureAssessmentStatus, ExposureResultClassification, ExposureSampleType, HygieneAgentCategory, NotificationType, Prisma } from "@prisma/client";
+
+type OfflineSubmissionInput = {
+  id: string;
+  capturedAt: Date;
+  payloadHash: string;
+};
+
+async function recordIndustrialHygieneOfflineSubmission(
+  tx: Prisma.TransactionClient,
+  input: {
+    organizationId: string;
+    userId: string;
+    offlineSubmission?: OfflineSubmissionInput;
+  },
+  recordType: string,
+  recordId: string
+) {
+  if (!input.offlineSubmission) return;
+  await tx.offlineSubmission.create({
+    data: {
+      id: input.offlineSubmission.id,
+      organizationId: input.organizationId,
+      userId: input.userId,
+      recordType,
+      recordId,
+      capturedAt: input.offlineSubmission.capturedAt,
+      payloadHash: input.offlineSubmission.payloadHash,
+    },
+  });
+}
 
 export async function createHygieneAgentService(input: { organizationId: string; userId: string; name: string; category: HygieneAgentCategory; casNumber?: string | null; description?: string | null; healthEffects?: string | null; exposureRoutes?: string | null; occupationalLimit?: number | null; actionLevel?: number | null; ceilingLimit?: number | null; unit?: string | null; limitSource?: string | null; samplingMethod?: string | null; analyticalMethod?: string | null; requiresSurveillance: boolean }) {
   const limits = [input.occupationalLimit, input.actionLevel, input.ceilingLimit].filter((value): value is number => value !== null && value !== undefined);
@@ -52,7 +82,7 @@ export async function createExposureAssessmentService(input: { organizationId: s
   });
 }
 
-export async function addExposureSampleService(input: { organizationId: string; userId: string; assessmentId: string; agentId: string; sampleType: ExposureSampleType; sampleReference?: string | null; sampledWorkerId?: string | null; location?: string | null; task?: string | null; sampledAt: Date; durationMinutes?: number | null; resultValue?: number | null; reportingLimit?: number | null; occupationalLimit?: number | null; actionLevel?: number | null; unit?: string | null; laboratory?: string | null; analyticalMethod?: string | null; analyzedAt?: Date | null; notes?: string | null }) {
+export async function addExposureSampleService(input: { organizationId: string; userId: string; assessmentId: string; agentId: string; sampleType: ExposureSampleType; sampleReference?: string | null; sampledWorkerId?: string | null; location?: string | null; task?: string | null; sampledAt: Date; durationMinutes?: number | null; resultValue?: number | null; reportingLimit?: number | null; occupationalLimit?: number | null; actionLevel?: number | null; unit?: string | null; laboratory?: string | null; analyticalMethod?: string | null; analyzedAt?: Date | null; notes?: string | null; offlineSubmission?: OfflineSubmissionInput }) {
   const [assessment, agent, worker] = await Promise.all([
     prisma.exposureAssessment.findFirst({ where: { id: input.assessmentId, organizationId: input.organizationId }, include: { group: { include: { agents: true } } } }),
     prisma.hygieneAgent.findFirst({ where: { id: input.agentId, organizationId: input.organizationId } }),
@@ -76,13 +106,14 @@ export async function addExposureSampleService(input: { organizationId: string; 
   const sample = await prisma.$transaction(async tx => {
     const created = await tx.exposureSample.create({ data: { assessmentId: assessment.id, agentId: agent.id, sampleType: input.sampleType, sampleReference: input.sampleReference, sampledWorkerId: input.sampledWorkerId, location: input.location, task: input.task, sampledAt: input.sampledAt, durationMinutes: input.durationMinutes, resultValue, reportingLimit: input.reportingLimit, occupationalLimit, actionLevel, unit: input.unit ?? agent.unit, exposureRatio: ratio, classification, laboratory: input.laboratory, analyticalMethod: input.analyticalMethod ?? agent.analyticalMethod, analyzedAt: input.analyzedAt, notes: input.notes, createdById: input.userId } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: ActivityAction.CREATE, entityType: "ExposureSample", entityId: created.id, title: "Exposure sample recorded", description: `${assessment.reference} — ${agent.name}`, metadata: { assessmentId: assessment.id, classification, exposureRatio: ratio } } });
+    await recordIndustrialHygieneOfflineSubmission(tx, input, "IH_SAMPLE", created.id);
     return created;
   });
   if ((classification === ExposureResultClassification.ABOVE_LIMIT || classification === ExposureResultClassification.AT_OR_ABOVE_ACTION_LEVEL) && assessment.assessorId) await createNotification({ organizationId: input.organizationId, userId: assessment.assessorId, type: classification === ExposureResultClassification.ABOVE_LIMIT ? NotificationType.CRITICAL : NotificationType.WARNING, title: "Exposure result requires review", message: `${assessment.reference}: ${agent.name} was classified ${classification.replaceAll("_", " ")}.`, link: `/industrial-hygiene/${assessment.id}` }).catch(() => undefined);
   return sample;
 }
 
-export async function transitionExposureAssessmentService(input: { organizationId: string; userId: string; assessmentId: string; status: ExposureAssessmentStatus; observations?: string | null; conclusions?: string | null; recommendations?: string | null }) {
+export async function transitionExposureAssessmentService(input: { organizationId: string; userId: string; assessmentId: string; status: ExposureAssessmentStatus; observations?: string | null; conclusions?: string | null; recommendations?: string | null; offlineSubmission?: OfflineSubmissionInput }) {
   const assessment = await prisma.exposureAssessment.findFirst({ where: { id: input.assessmentId, organizationId: input.organizationId }, include: { samples: true } });
   if (!assessment) throw new Error("Exposure assessment not found in this organization.");
   if (!isExposureAssessmentTransitionAllowed(assessment.status, input.status)) throw new Error(`A ${assessment.status.replaceAll("_", " ")} assessment cannot move to ${input.status.replaceAll("_", " ")}.`);
@@ -92,12 +123,13 @@ export async function transitionExposureAssessmentService(input: { organizationI
   return prisma.$transaction(async tx => {
     const updated = await tx.exposureAssessment.update({ where: { id: assessment.id }, data: { status: input.status, observations: input.observations ?? assessment.observations, conclusions: input.conclusions ?? assessment.conclusions, recommendations: input.recommendations ?? assessment.recommendations, startedAt: input.status === ExposureAssessmentStatus.IN_PROGRESS ? (assessment.startedAt ?? now) : assessment.startedAt, completedAt: input.status === ExposureAssessmentStatus.COMPLETED ? now : assessment.completedAt } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: ActivityAction.STATUS_CHANGE, entityType: "ExposureAssessment", entityId: assessment.id, title: "Exposure assessment status changed", description: `${assessment.status} → ${input.status}`, metadata: { previousStatus: assessment.status, newStatus: input.status } } });
+    await recordIndustrialHygieneOfflineSubmission(tx, input, "IH_ASSESSMENT_STATUS", updated.id);
     return updated;
   });
 }
 
-export async function completeExposureAssessmentFormsService(input: { organizationId: string; userId: string; assessmentId: string; submissions: PreparedSubmission[] }) {
+export async function completeExposureAssessmentFormsService(input: { organizationId: string; userId: string; assessmentId: string; submissions: PreparedSubmission[]; offlineSubmission?: OfflineSubmissionInput }) {
   const assessment = await prisma.exposureAssessment.findFirst({ where: { id: input.assessmentId, organizationId: input.organizationId }, select: { id: true } });
   if (!assessment) throw new Error("Exposure assessment not found in this organization.");
-  await completeMissingEntityForms({ organizationId: input.organizationId, userId: input.userId, module: ConfigurableFormModule.INDUSTRIAL_HYGIENE, entityId: assessment.id, activityEntityType: "ExposureAssessment", activityTitle: "Exposure assessment forms captured", formLabel: "industrial-hygiene", submissions: input.submissions });
+  await completeMissingEntityForms({ organizationId: input.organizationId, userId: input.userId, module: ConfigurableFormModule.INDUSTRIAL_HYGIENE, entityId: assessment.id, activityEntityType: "ExposureAssessment", activityTitle: "Exposure assessment forms captured", formLabel: "industrial-hygiene", submissions: input.submissions, offlineSubmission: input.offlineSubmission, offlineRecordType: input.offlineSubmission ? "IH_FORMS" : undefined });
 }

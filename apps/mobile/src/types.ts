@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD";
 };
 
 export type MobileDepartment = {
@@ -633,6 +633,147 @@ export type MobileAssetContractorCapabilities = {
   canManageContractors: boolean;
 };
 
+export type MobileExposureAssessmentStatus =
+  | "DRAFT"
+  | "PLANNED"
+  | "IN_PROGRESS"
+  | "UNDER_REVIEW"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type MobileExposureAssessment = {
+  id: string;
+  reference: string;
+  title: string;
+  description: string | null;
+  status: MobileExposureAssessmentStatus;
+  scheduledAt: string | null;
+  dueDate: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  scope: string | null;
+  samplingPlan: string | null;
+  observations: string | null;
+  conclusions: string | null;
+  recommendations: string | null;
+  site: { id: string; name: string };
+  department: { id: string; name: string } | null;
+  assessor: { id: string; name: string } | null;
+  group: {
+    id: string;
+    name: string;
+    code: string | null;
+    description: string | null;
+    jobRoles: string | null;
+    tasks: string | null;
+    locations: string | null;
+    exposedHeadcount: number | null;
+    existingControls: string | null;
+    requiredPpe: string | null;
+    reviewDueDate: string | null;
+    owner: { id: string; name: string } | null;
+    agents: Array<{
+      agent: {
+        id: string;
+        name: string;
+        category: string;
+        casNumber: string | null;
+        description: string | null;
+        healthEffects: string | null;
+        exposureRoutes: string | null;
+        occupationalLimit: number | null;
+        actionLevel: number | null;
+        ceilingLimit: number | null;
+        unit: string | null;
+        limitSource: string | null;
+        samplingMethod: string | null;
+        analyticalMethod: string | null;
+        requiresSurveillance: boolean;
+      };
+    }>;
+  };
+  samples: Array<{
+    id: string;
+    sampleType: "PERSONAL" | "AREA" | "TASK" | "DIRECT_READING" | "WIPE";
+    sampleReference: string | null;
+    location: string | null;
+    task: string | null;
+    sampledAt: string;
+    durationMinutes: number | null;
+    resultValue: number | null;
+    reportingLimit: number | null;
+    occupationalLimit: number | null;
+    actionLevel: number | null;
+    unit: string | null;
+    exposureRatio: number | null;
+    classification:
+      | "BELOW_DETECTION"
+      | "BELOW_ACTION_LEVEL"
+      | "AT_OR_ABOVE_ACTION_LEVEL"
+      | "ABOVE_LIMIT"
+      | "NOT_EVALUATED";
+    laboratory: string | null;
+    analyticalMethod: string | null;
+    analyzedAt: string | null;
+    notes: string | null;
+    agent: { id: string; name: string; category: string };
+    sampledWorker: { id: string; name: string } | null;
+    createdBy: { id: string; name: string };
+  }>;
+  nextStatuses: MobileExposureAssessmentStatus[];
+  isAssignedToCurrentUser: boolean;
+  missingFormDefinitionIds: string[];
+};
+
+export type MobileSurveillanceProgramStatus =
+  | "DRAFT"
+  | "ACTIVE"
+  | "PAUSED"
+  | "ARCHIVED";
+
+export type MobileSurveillanceProgram = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: MobileSurveillanceProgramStatus;
+  regulatoryBasis: string | null;
+  protocolReference: string | null;
+  providerName: string | null;
+  frequencyMonths: number;
+  leadDays: number;
+  isActive: boolean;
+  agent: { id: string; name: string; category: string } | null;
+  group: { id: string; name: string; code: string | null } | null;
+  responsibleUser: { id: string; name: string };
+  nextStatuses: MobileSurveillanceProgramStatus[];
+  isResponsibleUser: boolean;
+  enrollments: Array<{
+    id: string;
+    status: "ENROLLED" | "DUE" | "COMPLETED" | "OVERDUE" | "REMOVED";
+    enrolledAt: string;
+    lastCompletedAt: string | null;
+    nextDueAt: string;
+    fitnessOutcome:
+      | "NOT_ASSESSED"
+      | "CLEARED"
+      | "CLEARED_WITH_RESTRICTIONS"
+      | "TEMPORARILY_NOT_CLEARED";
+    workRestrictions: string | null;
+    certificateReference: string | null;
+    removedAt: string | null;
+    user: { id: string; name: string };
+    completedBy: { id: string; name: string } | null;
+    isCurrentUser: boolean;
+  }>;
+};
+
+export type MobileHygieneHealthCapabilities = {
+  canViewIndustrialHygiene: boolean;
+  canManageIndustrialHygiene: boolean;
+  canViewOccupationalHealth: boolean;
+  canManageOccupationalHealth: boolean;
+};
+
 export type MobileInspectionResponse = {
   result: "NOT_ASSESSED" | "COMPLIANT" | "NON_COMPLIANT" | "NOT_APPLICABLE";
   responseText: string | null;
@@ -780,6 +921,11 @@ export type MobileBootstrap = {
   contractors: MobileContractor[];
   assetContractorCapabilities: MobileAssetContractorCapabilities;
   assetInspectionForms: RuntimeForm[];
+  exposureAssessments: MobileExposureAssessment[];
+  surveillancePrograms: MobileSurveillanceProgram[];
+  hygieneHealthPeople: Array<{ id: string; name: string }>;
+  hygieneHealthCapabilities: MobileHygieneHealthCapabilities;
+  industrialHygieneForms: RuntimeForm[];
   correctiveActions: MobileCorrectiveAction[];
   capaCapabilities: MobileCapaCapabilities;
   notifications: MobileNotification[];
@@ -1022,4 +1168,67 @@ export type ContractorStatusPayload = {
   contractorId: string;
   status: MobileContractorStatus;
   reason?: string;
+};
+
+export type HygieneAssessmentStatusPayload = {
+  assessmentId: string;
+  status: MobileExposureAssessmentStatus;
+  observations?: string;
+  conclusions?: string;
+  recommendations?: string;
+};
+
+export type HygieneSamplePayload = {
+  assessmentId: string;
+  agentId: string;
+  sampleType: "PERSONAL" | "AREA" | "TASK" | "DIRECT_READING" | "WIPE";
+  sampleReference?: string;
+  sampledWorkerId?: string;
+  location?: string;
+  task?: string;
+  sampledAt: string;
+  durationMinutes?: number;
+  resultValue?: number;
+  reportingLimit?: number;
+  occupationalLimit?: number;
+  actionLevel?: number;
+  unit?: string;
+  laboratory?: string;
+  analyticalMethod?: string;
+  analyzedAt?: string;
+  notes?: string;
+};
+
+export type HygieneFormsPayload = {
+  assessmentId: string;
+  customForms: CapturedForm[];
+};
+
+export type SurveillanceProgramStatusPayload = {
+  programId: string;
+  status: MobileSurveillanceProgramStatus;
+};
+
+export type SurveillanceEnrollmentPayload = {
+  programId: string;
+  enrolledUserId: string;
+  nextDueAt: string;
+  notes?: string;
+};
+
+export type SurveillanceCompletionPayload = {
+  enrollmentId: string;
+  completedAt: string;
+  fitnessOutcome:
+    | "CLEARED"
+    | "CLEARED_WITH_RESTRICTIONS"
+    | "TEMPORARILY_NOT_CLEARED";
+  workRestrictions?: string;
+  certificateReference?: string;
+  notes?: string;
+};
+
+export type SurveillanceRemovalPayload = {
+  enrollmentId: string;
+  reason: string;
 };

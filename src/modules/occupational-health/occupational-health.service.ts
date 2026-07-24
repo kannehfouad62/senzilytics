@@ -2,7 +2,37 @@ import { createNotification } from "@/core/notifications/notifications.service";
 import { prisma } from "@/lib/prisma";
 import { addSurveillanceMonths } from "@/modules/occupational-health/surveillance-recurrence";
 import { isSurveillanceProgramTransitionAllowed } from "@/modules/occupational-health/surveillance-program-lifecycle";
-import { ActivityAction, FitnessOutcome, NotificationType, SurveillanceEnrollmentStatus, SurveillanceProgramStatus } from "@prisma/client";
+import { ActivityAction, FitnessOutcome, NotificationType, Prisma, SurveillanceEnrollmentStatus, SurveillanceProgramStatus } from "@prisma/client";
+
+type OfflineSubmissionInput = {
+  id: string;
+  capturedAt: Date;
+  payloadHash: string;
+};
+
+async function recordOccupationalHealthOfflineSubmission(
+  tx: Prisma.TransactionClient,
+  input: {
+    organizationId: string;
+    userId: string;
+    offlineSubmission?: OfflineSubmissionInput;
+  },
+  recordType: string,
+  recordId: string
+) {
+  if (!input.offlineSubmission) return;
+  await tx.offlineSubmission.create({
+    data: {
+      id: input.offlineSubmission.id,
+      organizationId: input.organizationId,
+      userId: input.userId,
+      recordType,
+      recordId,
+      capturedAt: input.offlineSubmission.capturedAt,
+      payloadHash: input.offlineSubmission.payloadHash,
+    },
+  });
+}
 
 export async function createSurveillanceProgramService(input: { organizationId: string; userId: string; name: string; description?: string | null; regulatoryBasis?: string | null; protocolReference?: string | null; providerName?: string | null; frequencyMonths: number; leadDays: number; agentId?: string | null; groupId?: string | null; responsibleUserId: string }) {
   if (!Number.isInteger(input.frequencyMonths) || input.frequencyMonths < 1 || input.frequencyMonths > 60) throw new Error("Surveillance frequency must be between 1 and 60 months.");
@@ -24,19 +54,32 @@ export async function createSurveillanceProgramService(input: { organizationId: 
   });
 }
 
-export async function updateSurveillanceProgramStatusService(input: { organizationId: string; userId: string; programId: string; status: SurveillanceProgramStatus }) {
+export async function updateSurveillanceProgramStatusService(input: { organizationId: string; userId: string; programId: string; status: SurveillanceProgramStatus; offlineSubmission?: OfflineSubmissionInput }) {
   const program = await prisma.medicalSurveillanceProgram.findFirst({ where: { id: input.programId, organizationId: input.organizationId } });
   if (!program) throw new Error("Surveillance program not found in this organization.");
-  if (program.status === input.status) return program;
+  if (program.status === input.status) {
+    if (input.offlineSubmission) {
+      await prisma.$transaction((tx) =>
+        recordOccupationalHealthOfflineSubmission(
+          tx,
+          input,
+          "OH_PROGRAM_STATUS",
+          program.id
+        )
+      );
+    }
+    return program;
+  }
   if (!isSurveillanceProgramTransitionAllowed(program.status, input.status)) throw new Error(`A ${program.status.toLowerCase()} surveillance program cannot move to ${input.status.toLowerCase()}.`);
   return prisma.$transaction(async tx => {
     const updated = await tx.medicalSurveillanceProgram.update({ where: { id: program.id }, data: { status: input.status, isActive: input.status !== SurveillanceProgramStatus.ARCHIVED } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: ActivityAction.STATUS_CHANGE, entityType: "MedicalSurveillanceProgram", entityId: program.id, title: "Surveillance program status changed", description: `${program.status} → ${input.status}` } });
+    await recordOccupationalHealthOfflineSubmission(tx, input, "OH_PROGRAM_STATUS", updated.id);
     return updated;
   });
 }
 
-export async function enrollSurveillanceUserService(input: { organizationId: string; userId: string; programId: string; enrolledUserId: string; nextDueAt: Date; notes?: string | null }) {
+export async function enrollSurveillanceUserService(input: { organizationId: string; userId: string; programId: string; enrolledUserId: string; nextDueAt: Date; notes?: string | null; offlineSubmission?: OfflineSubmissionInput }) {
   const [program, enrolledUser, existing] = await Promise.all([
     prisma.medicalSurveillanceProgram.findFirst({ where: { id: input.programId, organizationId: input.organizationId, status: { not: SurveillanceProgramStatus.ARCHIVED } } }),
     prisma.user.findFirst({ where: { id: input.enrolledUserId, organizationId: input.organizationId, isActive: true } }),
@@ -48,11 +91,12 @@ export async function enrollSurveillanceUserService(input: { organizationId: str
   return prisma.$transaction(async tx => {
     const enrollment = await tx.medicalSurveillanceEnrollment.upsert({ where: { programId_userId: { programId: program.id, userId: enrolledUser.id } }, update: { status, enrolledAt: now, lastCompletedAt: null, nextDueAt: input.nextDueAt, fitnessOutcome: FitnessOutcome.NOT_ASSESSED, workRestrictions: null, certificateReference: null, completedById: null, removedAt: null, notes: input.notes }, create: { programId: program.id, userId: enrolledUser.id, status, nextDueAt: input.nextDueAt, notes: input.notes } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: ActivityAction.ASSIGN, entityType: "MedicalSurveillanceEnrollment", entityId: enrollment.id, title: "Surveillance enrollment created", description: program.name, metadata: { programId: program.id, nextDueAt: input.nextDueAt } } });
+    await recordOccupationalHealthOfflineSubmission(tx, input, "OH_ENROLLMENT", enrollment.id);
     return enrollment;
   });
 }
 
-export async function completeSurveillanceEnrollmentService(input: { organizationId: string; userId: string; enrollmentId: string; completedAt: Date; fitnessOutcome: FitnessOutcome; workRestrictions?: string | null; certificateReference?: string | null; notes?: string | null }) {
+export async function completeSurveillanceEnrollmentService(input: { organizationId: string; userId: string; enrollmentId: string; completedAt: Date; fitnessOutcome: FitnessOutcome; workRestrictions?: string | null; certificateReference?: string | null; notes?: string | null; offlineSubmission?: OfflineSubmissionInput }) {
   const enrollment = await prisma.medicalSurveillanceEnrollment.findFirst({ where: { id: input.enrollmentId, program: { organizationId: input.organizationId } }, include: { program: true } });
   if (!enrollment) throw new Error("Surveillance enrollment not found in this organization.");
   if (enrollment.status === SurveillanceEnrollmentStatus.REMOVED) throw new Error("A removed enrollment cannot be completed.");
@@ -65,16 +109,18 @@ export async function completeSurveillanceEnrollmentService(input: { organizatio
   return prisma.$transaction(async tx => {
     const updated = await tx.medicalSurveillanceEnrollment.update({ where: { id: enrollment.id }, data: { status: SurveillanceEnrollmentStatus.COMPLETED, lastCompletedAt: input.completedAt, nextDueAt, fitnessOutcome: input.fitnessOutcome, workRestrictions: input.workRestrictions, certificateReference: input.certificateReference, completedById: input.userId, notes: input.notes } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: ActivityAction.UPDATE, entityType: "MedicalSurveillanceEnrollment", entityId: enrollment.id, title: "Surveillance completion recorded", description: enrollment.program.name, metadata: { nextDueAt } } });
+    await recordOccupationalHealthOfflineSubmission(tx, input, "OH_ENROLLMENT_COMPLETE", updated.id);
     return updated;
   });
 }
 
-export async function removeSurveillanceEnrollmentService(input: { organizationId: string; userId: string; enrollmentId: string; reason: string }) {
+export async function removeSurveillanceEnrollmentService(input: { organizationId: string; userId: string; enrollmentId: string; reason: string; offlineSubmission?: OfflineSubmissionInput }) {
   const enrollment = await prisma.medicalSurveillanceEnrollment.findFirst({ where: { id: input.enrollmentId, program: { organizationId: input.organizationId } }, include: { program: true } });
   if (!enrollment) throw new Error("Surveillance enrollment not found in this organization.");
   return prisma.$transaction(async tx => {
     const updated = await tx.medicalSurveillanceEnrollment.update({ where: { id: enrollment.id }, data: { status: SurveillanceEnrollmentStatus.REMOVED, removedAt: new Date(), notes: input.reason } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: input.userId, action: ActivityAction.STATUS_CHANGE, entityType: "MedicalSurveillanceEnrollment", entityId: enrollment.id, title: "Surveillance enrollment removed", description: enrollment.program.name } });
+    await recordOccupationalHealthOfflineSubmission(tx, input, "OH_ENROLLMENT_REMOVE", updated.id);
     return updated;
   });
 }

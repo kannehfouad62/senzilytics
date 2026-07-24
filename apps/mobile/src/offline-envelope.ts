@@ -11,6 +11,9 @@ import type {
   ComplianceOccurrenceCompletionPayload,
   ComplianceOccurrenceReviewPayload,
   ContractorStatusPayload,
+  HygieneAssessmentStatusPayload,
+  HygieneFormsPayload,
+  HygieneSamplePayload,
   IncidentPayload,
   InspectionResponsePayload,
   JsaAcknowledgmentPayload,
@@ -23,6 +26,10 @@ import type {
   PermitStatusPayload,
   RiskCapturePayload,
   RiskReviewPayload,
+  SurveillanceCompletionPayload,
+  SurveillanceEnrollmentPayload,
+  SurveillanceProgramStatusPayload,
+  SurveillanceRemovalPayload,
   TrainingCompletionPayload,
   TrainingProgressPayload,
 } from "./types";
@@ -53,7 +60,14 @@ export type OfflineRecordType =
   | "ASSET_DEFECT_STATUS"
   | "ASSET_MAINTENANCE_STATUS"
   | "ASSET_MAINTENANCE_COMPLETE"
-  | "CONTRACTOR_STATUS";
+  | "CONTRACTOR_STATUS"
+  | "IH_ASSESSMENT_STATUS"
+  | "IH_SAMPLE"
+  | "IH_FORMS"
+  | "OH_PROGRAM_STATUS"
+  | "OH_ENROLLMENT"
+  | "OH_ENROLLMENT_COMPLETE"
+  | "OH_ENROLLMENT_REMOVE";
 
 export type OfflineRecordPayload =
   | ObservationPayload
@@ -81,7 +95,14 @@ export type OfflineRecordPayload =
   | AssetDefectStatusPayload
   | AssetMaintenanceStatusPayload
   | AssetMaintenanceCompletionPayload
-  | ContractorStatusPayload;
+  | ContractorStatusPayload
+  | HygieneAssessmentStatusPayload
+  | HygieneSamplePayload
+  | HygieneFormsPayload
+  | SurveillanceProgramStatusPayload
+  | SurveillanceEnrollmentPayload
+  | SurveillanceCompletionPayload
+  | SurveillanceRemovalPayload;
 
 export type OfflineEnvelope = {
   type: OfflineRecordType;
@@ -115,6 +136,13 @@ const recordTypes = new Set<OfflineRecordType>([
   "ASSET_MAINTENANCE_STATUS",
   "ASSET_MAINTENANCE_COMPLETE",
   "CONTRACTOR_STATUS",
+  "IH_ASSESSMENT_STATUS",
+  "IH_SAMPLE",
+  "IH_FORMS",
+  "OH_PROGRAM_STATUS",
+  "OH_ENROLLMENT",
+  "OH_ENROLLMENT_COMPLETE",
+  "OH_ENROLLMENT_REMOVE",
 ]);
 
 export function decodeOfflineEnvelope(value: unknown): OfflineEnvelope {

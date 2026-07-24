@@ -23,6 +23,9 @@ import type {
   ComplianceOccurrenceCompletionPayload,
   ComplianceOccurrenceReviewPayload,
   ContractorStatusPayload,
+  HygieneAssessmentStatusPayload,
+  HygieneFormsPayload,
+  HygieneSamplePayload,
   IncidentPayload,
   InspectionResponsePayload,
   JsaAcknowledgmentPayload,
@@ -36,6 +39,10 @@ import type {
   PermitStatusPayload,
   RiskCapturePayload,
   RiskReviewPayload,
+  SurveillanceCompletionPayload,
+  SurveillanceEnrollmentPayload,
+  SurveillanceProgramStatusPayload,
+  SurveillanceRemovalPayload,
   TrainingCompletionPayload,
   TrainingProgressPayload,
 } from "./types";
@@ -49,7 +56,8 @@ type EvidenceTargetType =
   | "CORRECTIVE_ACTION"
   | "ASSET_INSPECTION"
   | "ASSET_DEFECT"
-  | "ASSET_MAINTENANCE";
+  | "ASSET_MAINTENANCE"
+  | "INDUSTRIAL_HYGIENE";
 type EvidenceRow = {
   id: string;
   parent_submission_id: string | null;
@@ -161,7 +169,8 @@ async function queueOfflineItem(
           type === "CAPA_STATUS" ||
           type === "ASSET_INSPECTION" ||
           type === "ASSET_DEFECT" ||
-          type === "ASSET_MAINTENANCE_COMPLETE"
+          type === "ASSET_MAINTENANCE_COMPLETE" ||
+          type === "IH_SAMPLE"
             ? id
             : undefined,
       });
@@ -404,6 +413,62 @@ export async function queueContractorStatus(
   return queueOfflineItem(ownerKey, "CONTRACTOR_STATUS", payload);
 }
 
+export async function queueHygieneAssessmentStatus(
+  ownerKey: string,
+  payload: HygieneAssessmentStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "IH_ASSESSMENT_STATUS", payload);
+}
+
+export async function queueHygieneSample(
+  ownerKey: string,
+  payload: HygieneSamplePayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "IH_SAMPLE", payload, {
+    files: evidence,
+    targetType: "INDUSTRIAL_HYGIENE",
+    entityId: payload.assessmentId,
+    title: `Industrial hygiene sample evidence${payload.sampleReference ? `: ${payload.sampleReference}` : ""}`,
+    description: payload.notes,
+  });
+}
+
+export async function queueHygieneForms(
+  ownerKey: string,
+  payload: HygieneFormsPayload
+) {
+  return queueOfflineItem(ownerKey, "IH_FORMS", payload);
+}
+
+export async function queueSurveillanceProgramStatus(
+  ownerKey: string,
+  payload: SurveillanceProgramStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "OH_PROGRAM_STATUS", payload);
+}
+
+export async function queueSurveillanceEnrollment(
+  ownerKey: string,
+  payload: SurveillanceEnrollmentPayload
+) {
+  return queueOfflineItem(ownerKey, "OH_ENROLLMENT", payload);
+}
+
+export async function queueSurveillanceCompletion(
+  ownerKey: string,
+  payload: SurveillanceCompletionPayload
+) {
+  return queueOfflineItem(ownerKey, "OH_ENROLLMENT_COMPLETE", payload);
+}
+
+export async function queueSurveillanceRemoval(
+  ownerKey: string,
+  payload: SurveillanceRemovalPayload
+) {
+  return queueOfflineItem(ownerKey, "OH_ENROLLMENT_REMOVE", payload);
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([
@@ -433,7 +498,8 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "RISK_CAPTURE" ||
     envelope.type === "ASSET_INSPECTION" ||
     envelope.type === "ASSET_DEFECT" ||
-    envelope.type === "ASSET_MAINTENANCE_COMPLETE"
+    envelope.type === "ASSET_MAINTENANCE_COMPLETE" ||
+    envelope.type === "IH_SAMPLE"
   );
   const responses = decoded.filter(({ envelope }) =>
     envelope.type === "INSPECTION_RESPONSE" ||
@@ -454,7 +520,13 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "ASSET_STATUS" ||
     envelope.type === "ASSET_DEFECT_STATUS" ||
     envelope.type === "ASSET_MAINTENANCE_STATUS" ||
-    envelope.type === "CONTRACTOR_STATUS"
+    envelope.type === "CONTRACTOR_STATUS" ||
+    envelope.type === "IH_ASSESSMENT_STATUS" ||
+    envelope.type === "IH_FORMS" ||
+    envelope.type === "OH_PROGRAM_STATUS" ||
+    envelope.type === "OH_ENROLLMENT" ||
+    envelope.type === "OH_ENROLLMENT_COMPLETE" ||
+    envelope.type === "OH_ENROLLMENT_REMOVE"
   );
   const first = await synchronizeRows(database, parents);
   const files = await synchronizeEvidence(database, ownerKey);
