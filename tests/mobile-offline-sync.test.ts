@@ -158,6 +158,86 @@ test("mobile synchronization accepts governed CAPA progress and closure", () => 
   assert.equal(parsed.success, true);
 });
 
+test("mobile synchronization accepts field risk capture, review, and JSA acknowledgment", () => {
+  const parsed = offlineSyncRequestSchema.safeParse({
+    items: [
+      {
+        id: "2bed2fa7-f2a5-4ed9-b2b4-6e82de255f25",
+        type: "RISK_CAPTURE",
+        capturedAt,
+        payload: {
+          siteId: "site-1",
+          departmentId: "department-1",
+          title: "Pedestrian and forklift interaction",
+          description: "Mixed pedestrian and powered industrial truck traffic at dispatch.",
+          category: "SAFETY",
+          hazardType: "Mobile equipment",
+          process: "Dispatch",
+          initialLikelihood: "LIKELY",
+          initialImpact: "MAJOR",
+          residualLikelihood: "UNLIKELY",
+          residualImpact: "MODERATE",
+          reviewFrequency: "QUARTERLY",
+          nextReviewDate: "2026-10-22",
+        },
+      },
+      {
+        id: "19873e10-fe75-416c-89cf-f13c9aa206a5",
+        type: "RISK_REVIEW",
+        capturedAt,
+        payload: {
+          riskId: "risk-1",
+          likelihood: "POSSIBLE",
+          impact: "MAJOR",
+          controlEffectiveness: "PARTIALLY_EFFECTIVE",
+          trend: "IMPROVING",
+          notes: "Barriers were installed; one crossing still needs warning lights.",
+          nextReviewDate: "2026-10-22",
+        },
+      },
+      {
+        id: "ac029077-bd0c-444a-be7e-a737a17b9f78",
+        type: "JSA_ACKNOWLEDGMENT",
+        capturedAt,
+        payload: {
+          jsaId: "jsa-1",
+          statement: "I understand the hazards and required controls.",
+        },
+      },
+    ],
+  });
+  assert.equal(parsed.success, true);
+});
+
+test("mobile field risk contracts reject malformed dates and incomplete acknowledgments", () => {
+  const invalidDate = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id,
+      type: "RISK_REVIEW",
+      capturedAt,
+      payload: {
+        riskId: "risk-1",
+        likelihood: "POSSIBLE",
+        impact: "MAJOR",
+        nextReviewDate: "10/22/2026",
+      },
+    }],
+  });
+  const invalidAcknowledgment = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id,
+      type: "JSA_ACKNOWLEDGMENT",
+      capturedAt,
+      payload: {
+        jsaId: "jsa-1",
+        statement: "yes",
+      },
+    }],
+  });
+  assert.equal(invalidDate.success, false);
+  assert.equal(invalidAcknowledgment.success, false);
+});
+
 test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("SAFETY_OBSERVATION"), PermissionKey.CREATE_OBSERVATION);
   assert.equal(requiredOfflinePermission("INCIDENT"), PermissionKey.CREATE_INCIDENT);
@@ -167,6 +247,9 @@ test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("CAPA_STATUS", Status.IN_PROGRESS), PermissionKey.UPDATE_CAPA);
   assert.equal(requiredOfflinePermission("CAPA_STATUS", Status.COMPLETED), PermissionKey.CLOSE_CAPA);
   assert.equal(requiredOfflinePermission("CAPA_STATUS", Status.CLOSED), PermissionKey.CLOSE_CAPA);
+  assert.equal(requiredOfflinePermission("RISK_CAPTURE"), PermissionKey.MANAGE_RISKS);
+  assert.equal(requiredOfflinePermission("RISK_REVIEW"), PermissionKey.MANAGE_RISKS);
+  assert.equal(requiredOfflinePermission("JSA_ACKNOWLEDGMENT"), PermissionKey.VIEW_RISKS);
 });
 
 test("mobile outbox decoder preserves legacy observation rows", () => {
@@ -186,5 +269,13 @@ test("mobile outbox decoder preserves legacy observation rows", () => {
   assert.deepEqual(decodeOfflineEnvelope({ type: "CAPA_STATUS", payload: { actionId: "action-1", status: "IN_PROGRESS" } }), {
     type: "CAPA_STATUS",
     payload: { actionId: "action-1", status: "IN_PROGRESS" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "RISK_REVIEW", payload: { riskId: "risk-1" } }), {
+    type: "RISK_REVIEW",
+    payload: { riskId: "risk-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "JSA_ACKNOWLEDGMENT", payload: { jsaId: "jsa-1" } }), {
+    type: "JSA_ACKNOWLEDGMENT",
+    payload: { jsaId: "jsa-1" },
   });
 });

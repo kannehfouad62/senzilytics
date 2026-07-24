@@ -5,8 +5,14 @@ import {
   EnterpriseAuditStatus,
   IncidentType,
   InspectionResponseResult,
+  JsaStatus,
   PermissionKey,
+  RiskCategory,
+  RiskControlEffectiveness,
+  RiskImpact,
+  RiskLikelihood,
   RiskLevel,
+  RiskReviewFrequency,
   SafetyObservationType,
   Status,
   UserRole,
@@ -26,6 +32,10 @@ import {
 } from "@/modules/forms/runtime-form.service";
 import { createIncidentService } from "@/modules/incident/incident.service";
 import { saveInspectionResponseService } from "@/modules/inspection/inspection-execution.service";
+import {
+  createRiskReviewService,
+  createRiskService,
+} from "@/modules/risk/risk.service";
 
 const customValue = z.union([
   z.string().max(5000),
@@ -149,6 +159,57 @@ const capaStatusItemSchema = z.object({
   }),
 });
 
+const dateOnly = z.string().regex(
+  /^\d{4}-\d{2}-\d{2}$/,
+  "Use a YYYY-MM-DD date."
+);
+
+const riskCaptureItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("RISK_CAPTURE"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    siteId: z.string().min(1).max(200),
+    departmentId: z.string().min(1).max(200).optional(),
+    title: z.string().trim().min(2).max(200),
+    description: z.string().trim().min(2).max(5000),
+    category: z.nativeEnum(RiskCategory),
+    hazardType: z.string().trim().max(300).optional(),
+    process: z.string().trim().max(300).optional(),
+    initialLikelihood: z.nativeEnum(RiskLikelihood),
+    initialImpact: z.nativeEnum(RiskImpact),
+    residualLikelihood: z.nativeEnum(RiskLikelihood),
+    residualImpact: z.nativeEnum(RiskImpact),
+    reviewFrequency: z.nativeEnum(RiskReviewFrequency),
+    nextReviewDate: dateOnly.optional(),
+  }),
+});
+
+const riskReviewItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("RISK_REVIEW"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    riskId: z.string().min(1).max(200),
+    likelihood: z.nativeEnum(RiskLikelihood),
+    impact: z.nativeEnum(RiskImpact),
+    controlEffectiveness: z.nativeEnum(RiskControlEffectiveness).optional(),
+    trend: z.enum(["IMPROVING", "STABLE", "DETERIORATING"]).optional(),
+    notes: z.string().trim().max(5000).optional(),
+    nextReviewDate: dateOnly.optional(),
+  }),
+});
+
+const jsaAcknowledgmentItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("JSA_ACKNOWLEDGMENT"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    jsaId: z.string().min(1).max(200),
+    statement: z.string().trim().min(5).max(1000),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
@@ -156,6 +217,9 @@ const offlineItemSchema = z.discriminatedUnion("type", [
   auditStartItemSchema,
   auditResponseItemSchema,
   capaStatusItemSchema,
+  riskCaptureItemSchema,
+  riskReviewItemSchema,
+  jsaAcknowledgmentItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -177,6 +241,10 @@ export function requiredOfflinePermission(
   if (type === "SAFETY_OBSERVATION") return PermissionKey.CREATE_OBSERVATION;
   if (type === "INCIDENT") return PermissionKey.CREATE_INCIDENT;
   if (type === "INSPECTION_RESPONSE") return PermissionKey.MANAGE_INSPECTIONS;
+  if (type === "RISK_CAPTURE" || type === "RISK_REVIEW") {
+    return PermissionKey.MANAGE_RISKS;
+  }
+  if (type === "JSA_ACKNOWLEDGMENT") return PermissionKey.VIEW_RISKS;
   if (type === "CAPA_STATUS") {
     return status === Status.COMPLETED || status === Status.CLOSED
       ? PermissionKey.CLOSE_CAPA
@@ -259,8 +327,14 @@ export async function syncOfflineSubmissionsService(input: {
         results.push(await syncAuditStart(input, item, payloadHash));
       } else if (item.type === "AUDIT_RESPONSE") {
         results.push(await syncAuditResponse(input, item, payloadHash));
-      } else {
+      } else if (item.type === "CAPA_STATUS") {
         results.push(await syncCapaStatus(input, item, payloadHash));
+      } else if (item.type === "RISK_CAPTURE") {
+        results.push(await syncRiskCapture(input, item, payloadHash));
+      } else if (item.type === "RISK_REVIEW") {
+        results.push(await syncRiskReview(input, item, payloadHash));
+      } else {
+        results.push(await syncJsaAcknowledgment(input, item, payloadHash));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -523,9 +597,168 @@ async function syncCapaStatus(
   return { id: item.id, status: "synced", recordId: action.id };
 }
 
+async function syncRiskCapture(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof riskCaptureItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const risk = await createRiskService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    title: item.payload.title,
+    description: item.payload.description,
+    category: item.payload.category,
+    hazardType: item.payload.hazardType || null,
+    process: item.payload.process || null,
+    siteId: item.payload.siteId,
+    departmentId: item.payload.departmentId || null,
+    ownerId: actor.userId,
+    initialLikelihood: item.payload.initialLikelihood,
+    initialImpact: item.payload.initialImpact,
+    currentLikelihood: item.payload.initialLikelihood,
+    currentImpact: item.payload.initialImpact,
+    residualLikelihood: item.payload.residualLikelihood,
+    residualImpact: item.payload.residualImpact,
+    reviewFrequency: item.payload.reviewFrequency,
+    nextReviewDate: parseFutureReviewDate(
+      item.payload.nextReviewDate,
+      capturedAt
+    ),
+    offlineSubmission: {
+      id: item.id,
+      capturedAt,
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: risk.id };
+}
+
+async function syncRiskReview(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof riskReviewItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const review = await createRiskReviewService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    riskId: item.payload.riskId,
+    likelihood: item.payload.likelihood,
+    impact: item.payload.impact,
+    controlEffectiveness:
+      item.payload.controlEffectiveness ?? null,
+    trend: item.payload.trend ?? null,
+    notes: item.payload.notes || null,
+    nextReviewDate: parseFutureReviewDate(
+      item.payload.nextReviewDate,
+      capturedAt
+    ),
+    offlineSubmission: {
+      id: item.id,
+      capturedAt,
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: review.id };
+}
+
+async function syncJsaAcknowledgment(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof jsaAcknowledgmentItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const jsa = await prisma.jobSafetyAnalysis.findFirst({
+    where: {
+      id: item.payload.jsaId,
+      organizationId: actor.organizationId,
+      status: JsaStatus.ACTIVE,
+    },
+    select: {
+      id: true,
+      reference: true,
+      title: true,
+    },
+  });
+  if (!jsa) {
+    return {
+      id: item.id,
+      status: "failed",
+      error: "Only an active JSA in this organization can be acknowledged.",
+    };
+  }
+
+  const acknowledgedAt = new Date(item.capturedAt);
+  const acknowledgment = await prisma.$transaction(async (transaction) => {
+    const record = await transaction.jsaAcknowledgment.upsert({
+      where: {
+        jsaId_userId: {
+          jsaId: jsa.id,
+          userId: actor.userId,
+        },
+      },
+      update: {
+        acknowledgedAt,
+        statement: item.payload.statement,
+      },
+      create: {
+        jsaId: jsa.id,
+        userId: actor.userId,
+        acknowledgedAt,
+        statement: item.payload.statement,
+      },
+    });
+    await transaction.offlineSubmission.create({
+      data: {
+        id: item.id,
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        recordType: item.type,
+        recordId: record.id,
+        capturedAt: acknowledgedAt,
+        payloadHash,
+      },
+    });
+    await transaction.activityLog.create({
+      data: {
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        action: ActivityAction.UPDATE,
+        entityType: "JobSafetyAnalysis",
+        entityId: jsa.id,
+        title: "JSA acknowledged from mobile",
+        description: `${jsa.reference}: ${jsa.title}`,
+        metadata: {
+          offlineSubmissionId: item.id,
+          acknowledgmentId: record.id,
+          acknowledgedAt: acknowledgedAt.toISOString(),
+        },
+      },
+    });
+    return record;
+  });
+  return {
+    id: item.id,
+    status: "synced",
+    recordId: acknowledgment.id,
+  };
+}
+
+function parseDateOnly(value?: string) {
+  return value ? new Date(`${value}T12:00:00.000Z`) : null;
+}
+
+function parseFutureReviewDate(value: string | undefined, capturedAt: Date) {
+  const reviewDate = parseDateOnly(value);
+  if (reviewDate && reviewDate.getTime() <= capturedAt.getTime()) {
+    throw new Error("Next review date must be after the field capture date.");
+  }
+  return reviewDate;
+}
+
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|assigned|authorized|planned|scheduled|started|completed|closed|site|organization|evidence|photo|comment|not applicable/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

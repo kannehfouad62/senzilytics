@@ -17,7 +17,7 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD";
   nativePermission?: PermissionKey;
 };
 
@@ -30,8 +30,8 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "behavior-safety", label: "Behavior-Based Safety", description: "Behavior programs, coaching, trends, and interventions.", href: "/behavior-safety", category: "SAFETY", permission: PermissionKey.VIEW_BEHAVIOR_SAFETY },
   { key: "incidents", label: "Incidents", description: "Report, investigate, and monitor incidents and near misses.", href: "/incidents", category: "SAFETY", anyPermissions: [PermissionKey.VIEW_INCIDENT, PermissionKey.CREATE_INCIDENT], nativeCapability: "INCIDENT_CAPTURE", nativePermission: PermissionKey.CREATE_INCIDENT },
   { key: "corrective-actions", label: "Corrective Actions", description: "CAPA ownership, verification, closure, and overdue exposure.", href: "/actions", category: "SAFETY", anyPermissions: [PermissionKey.CREATE_CAPA, PermissionKey.UPDATE_CAPA, PermissionKey.CLOSE_CAPA, PermissionKey.VIEW_REPORTS], nativeCapability: "CAPA_EXECUTION" },
-  { key: "risks", label: "Risk Register", description: "Enterprise hazards, controls, reviews, and residual risk.", href: "/risks", category: "SAFETY", permission: PermissionKey.VIEW_RISKS },
-  { key: "jsa", label: "JSA / JHA", description: "Job steps, hazards, controls, approvals, and acknowledgements.", href: "/risks/jsa", category: "SAFETY", permission: PermissionKey.VIEW_RISKS },
+  { key: "risks", label: "Risk Register", description: "Enterprise hazards, controls, reviews, and residual risk.", href: "/risks", category: "SAFETY", permission: PermissionKey.VIEW_RISKS, nativeCapability: "RISK_FIELD" },
+  { key: "jsa", label: "JSA / JHA", description: "Job steps, hazards, controls, approvals, and acknowledgements.", href: "/risks/jsa", category: "SAFETY", permission: PermissionKey.VIEW_RISKS, nativeCapability: "JSA_FIELD" },
   { key: "moc", label: "Management of Change", description: "Change requests, risk reviews, approvals, and implementation tasks.", href: "/moc", category: "SAFETY", permission: PermissionKey.VIEW_MOC },
   { key: "assets", label: "Assets & Equipment", description: "Asset lifecycle, condition, inspections, and maintenance exposure.", href: "/assets", category: "SAFETY", permission: PermissionKey.VIEW_ASSETS },
   { key: "contractors", label: "Contractors", description: "Contractor qualification, access, performance, and compliance.", href: "/contractors", category: "SAFETY", permission: PermissionKey.VIEW_CONTRACTORS },

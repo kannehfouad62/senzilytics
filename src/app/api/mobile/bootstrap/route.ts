@@ -11,6 +11,7 @@ import { authenticateMobileRequest, MobileAuthError } from "@/modules/mobile/mob
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.service";
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
+import { getMobileRiskField } from "@/modules/mobile/mobile-risk-field.service";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -49,6 +50,11 @@ export async function GET(request: Request) {
         organizationId: organization.id,
         userId: user.id,
         userRole: user.role,
+        permissions: assigned,
+      }),
+      getMobileRiskField({
+        organizationId: organization.id,
+        userId: user.id,
         permissions: assigned,
       }),
       canExecuteInspections
@@ -295,6 +301,10 @@ export async function GET(request: Request) {
       incidentForms: serializeRuntimeForms(incidentRuntimeForms),
       inspections,
       audits,
+      departments: riskField.departments,
+      risks: riskField.risks,
+      jsas: riskField.jsas,
+      riskCapabilities: riskField.capabilities,
       notifications,
       tasks: actionCenter.tasks,
       correctiveActions: actionCenter.correctiveActions,

@@ -17,6 +17,9 @@ This Expo/React Native application is the Premium native field workspace for iOS
 - Offline checklist responses with optional linked finding creation and idempotent synchronization
 - Native offline Audit start and question execution for authorized managers, lead auditors, and editable Audit team members
 - Audit response scoring, required comments/evidence, response options, and automatic findings through the same governed web service
+- Native Risk Register with field risk capture, current/residual ratings, control visibility, and governed offline risk reviews
+- Native active JSA/JHA briefings with complete job-step, hazard, control, PPE, competency, and emergency-requirement visibility
+- Offline JSA/JHA worker acknowledgments preserved against the authenticated tenant user and synchronized idempotently
 - Native camera, photo-library, and document evidence capture for observations, incidents, inspections, Audit questions, and corrective actions
 - Offline CAPA evidence ordering that blocks the related status update until every queued file is securely registered
 - Private evidence uploads with a 10 MB per-file limit, tenant/user authorization revalidation, and SQLCipher-encrypted offline file bytes
@@ -93,4 +96,4 @@ npx eas-cli@latest submit --profile production --platform android
 
 `EXPO_PUBLIC_API_URL` is public configuration, not a secret. If you prefer to manage it in the Expo dashboard instead of `eas.json`, create the same value separately for the development, preview, and production environments and retain each profile's explicit `environment` selection. Confirm the active configuration before a release with `eas config --platform ios --profile production` and `eas config --platform android --profile production`.
 
-Release builds should be exercised against a staging tenant first. Verify sign-in and account switching for credentials, Microsoft, and Okta; role-filtered module visibility; tenant isolation; offline observation and incident capture; camera, photo-library, and document permission handling; encrypted evidence queuing; assigned inspection and Audit execution; native workflow and CAPA visibility; CAPA progress, closure permissions, and evidence ordering; required-photo validation; automatic finding creation; refresh-token rotation; session revocation; notification delivery; and synchronization after connectivity returns.
+Release builds should be exercised against a staging tenant first. Verify sign-in and account switching for credentials, Microsoft, and Okta; role-filtered module visibility; tenant isolation; offline observation and incident capture; native Risk Register capture and review; JSA/JHA briefing and acknowledgment; camera, photo-library, and document permission handling; encrypted evidence queuing; assigned inspection and Audit execution; native workflow and CAPA visibility; CAPA progress, closure permissions, and evidence ordering; required-photo validation; automatic finding creation; refresh-token rotation; session revocation; notification delivery; and synchronization after connectivity returns.

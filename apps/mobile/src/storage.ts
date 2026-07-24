@@ -16,8 +16,11 @@ import type {
   CapaStatusPayload,
   IncidentPayload,
   InspectionResponsePayload,
+  JsaAcknowledgmentPayload,
   MobileBootstrap,
   ObservationPayload,
+  RiskCapturePayload,
+  RiskReviewPayload,
 } from "./types";
 
 type QueueRow = { id: string; payload: string; captured_at: string };
@@ -218,6 +221,27 @@ export async function queueCapaStatus(
   });
 }
 
+export async function queueRiskCapture(
+  ownerKey: string,
+  payload: RiskCapturePayload
+) {
+  return queueOfflineItem(ownerKey, "RISK_CAPTURE", payload);
+}
+
+export async function queueRiskReview(
+  ownerKey: string,
+  payload: RiskReviewPayload
+) {
+  return queueOfflineItem(ownerKey, "RISK_REVIEW", payload);
+}
+
+export async function queueJsaAcknowledgment(
+  ownerKey: string,
+  payload: JsaAcknowledgmentPayload
+) {
+  return queueOfflineItem(ownerKey, "JSA_ACKNOWLEDGMENT", payload);
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([
@@ -243,12 +267,15 @@ export async function synchronizeOfflineItems(ownerKey: string) {
   const parents = decoded.filter(({ envelope }) =>
     envelope.type === "SAFETY_OBSERVATION" ||
     envelope.type === "INCIDENT" ||
-    envelope.type === "AUDIT_START"
+    envelope.type === "AUDIT_START" ||
+    envelope.type === "RISK_CAPTURE"
   );
   const responses = decoded.filter(({ envelope }) =>
     envelope.type === "INSPECTION_RESPONSE" ||
     envelope.type === "AUDIT_RESPONSE" ||
-    envelope.type === "CAPA_STATUS"
+    envelope.type === "CAPA_STATUS" ||
+    envelope.type === "RISK_REVIEW" ||
+    envelope.type === "JSA_ACKNOWLEDGMENT"
   );
   const first = await synchronizeRows(database, parents);
   const files = await synchronizeEvidence(database, ownerKey);

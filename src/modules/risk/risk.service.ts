@@ -46,6 +46,11 @@ export async function createRiskService(input: {
   reviewFrequency: RiskReviewFrequency;
   nextReviewDate?: Date | null;
   customSubmissions?: PreparedSubmission[];
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
 }) {
   const [
     site,
@@ -248,6 +253,20 @@ export async function createRiskService(input: {
               [],
           }
         );
+
+        if (input.offlineSubmission) {
+          await tx.offlineSubmission.create({
+            data: {
+              id: input.offlineSubmission.id,
+              organizationId: input.organizationId,
+              userId: input.userId,
+              recordType: "RISK_CAPTURE",
+              recordId: created.id,
+              capturedAt: input.offlineSubmission.capturedAt,
+              payloadHash: input.offlineSubmission.payloadHash,
+            },
+          });
+        }
 
         await tx.activityLog.create({
           data: {
@@ -738,6 +757,11 @@ export async function createRiskReviewService(input: {
   controlEffectiveness?: RiskControlEffectiveness | null;
   trend?: string | null;
   nextReviewDate?: Date | null;
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
 }) {
   const risk =
     await findTenantRiskById({
@@ -815,6 +839,20 @@ export async function createRiskReviewService(input: {
                 : risk.status,
           },
         });
+
+        if (input.offlineSubmission) {
+          await transaction.offlineSubmission.create({
+            data: {
+              id: input.offlineSubmission.id,
+              organizationId: input.organizationId,
+              userId: input.userId,
+              recordType: "RISK_REVIEW",
+              recordId: createdReview.id,
+              capturedAt: input.offlineSubmission.capturedAt,
+              payloadHash: input.offlineSubmission.payloadHash,
+            },
+          });
+        }
 
         return createdReview;
       }

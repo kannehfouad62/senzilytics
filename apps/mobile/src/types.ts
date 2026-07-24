@@ -83,7 +83,113 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD";
+};
+
+export type MobileDepartment = {
+  id: string;
+  name: string;
+  siteId: string;
+};
+
+export type RiskLikelihood =
+  | "RARE"
+  | "UNLIKELY"
+  | "POSSIBLE"
+  | "LIKELY"
+  | "ALMOST_CERTAIN";
+
+export type RiskImpact =
+  | "INSIGNIFICANT"
+  | "MINOR"
+  | "MODERATE"
+  | "MAJOR"
+  | "CATASTROPHIC";
+
+export type MobileRisk = {
+  id: string;
+  reference: string;
+  title: string;
+  description: string;
+  category: string;
+  hazardType: string | null;
+  process: string | null;
+  status: string;
+  currentLikelihood: RiskLikelihood;
+  currentImpact: RiskImpact;
+  currentScore: number;
+  currentRiskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  residualLikelihood: RiskLikelihood;
+  residualImpact: RiskImpact;
+  residualScore: number;
+  residualRiskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  reviewFrequency: string;
+  lastReviewedAt: string | null;
+  nextReviewDate: string | null;
+  site: { id: string; name: string } | null;
+  department: { id: string; name: string } | null;
+  owner: { id: string; name: string } | null;
+  controls: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    controlType: string;
+    hierarchy: string;
+    effectiveness: string;
+    status: string;
+    dueDate: string | null;
+  }>;
+  reviewCount: number;
+};
+
+export type MobileJsa = {
+  id: string;
+  reference: string;
+  version: number;
+  title: string;
+  jobDescription: string;
+  workLocation: string | null;
+  requiredCompetency: string | null;
+  requiredPpe: string | null;
+  emergencyRequirements: string | null;
+  status: string;
+  effectiveDate: string | null;
+  reviewDueDate: string | null;
+  site: { id: string; name: string };
+  department: { id: string; name: string } | null;
+  owner: { id: string; name: string } | null;
+  acknowledgment: {
+    acknowledgedAt: string;
+    statement: string | null;
+  } | null;
+  steps: Array<{
+    id: string;
+    sequence: number;
+    taskStep: string;
+    hazards: Array<{
+      id: string;
+      hazard: string;
+      potentialConsequence: string;
+      initialLikelihood: RiskLikelihood;
+      initialImpact: RiskImpact;
+      initialScore: number;
+      residualLikelihood: RiskLikelihood;
+      residualImpact: RiskImpact;
+      residualScore: number;
+      controls: Array<{
+        id: string;
+        hierarchy: string;
+        description: string;
+        responsibleRole: string | null;
+        verificationRequired: boolean;
+      }>;
+    }>;
+  }>;
+};
+
+export type MobileRiskCapabilities = {
+  canView: boolean;
+  canManage: boolean;
 };
 
 export type MobileInspectionResponse = {
@@ -219,6 +325,10 @@ export type MobileBootstrap = {
   incidentForms: RuntimeForm[];
   inspections: MobileInspection[];
   audits: MobileAudit[];
+  departments: MobileDepartment[];
+  risks: MobileRisk[];
+  jsas: MobileJsa[];
+  riskCapabilities: MobileRiskCapabilities;
   correctiveActions: MobileCorrectiveAction[];
   capaCapabilities: MobileCapaCapabilities;
   notifications: MobileNotification[];
@@ -290,4 +400,53 @@ export type CapaStatusPayload = {
   actionId: string;
   status: MobileCorrectiveActionStatus;
   comments?: string;
+};
+
+export type RiskCapturePayload = {
+  siteId: string;
+  departmentId?: string;
+  title: string;
+  description: string;
+  category:
+    | "SAFETY"
+    | "ENVIRONMENTAL"
+    | "OCCUPATIONAL_HEALTH"
+    | "OPERATIONAL"
+    | "COMPLIANCE"
+    | "SECURITY"
+    | "QUALITY"
+    | "STRATEGIC"
+    | "REPUTATIONAL"
+    | "FINANCIAL"
+    | "TECHNOLOGY"
+    | "OTHER";
+  hazardType?: string;
+  process?: string;
+  initialLikelihood: RiskLikelihood;
+  initialImpact: RiskImpact;
+  residualLikelihood: RiskLikelihood;
+  residualImpact: RiskImpact;
+  reviewFrequency: "MONTHLY" | "QUARTERLY" | "SEMIANNUAL" | "ANNUAL" | "BIENNIAL" | "AD_HOC";
+  nextReviewDate?: string;
+};
+
+export type RiskReviewPayload = {
+  riskId: string;
+  likelihood: RiskLikelihood;
+  impact: RiskImpact;
+  controlEffectiveness?:
+    | "INEFFECTIVE"
+    | "WEAK"
+    | "PARTIALLY_EFFECTIVE"
+    | "EFFECTIVE"
+    | "HIGHLY_EFFECTIVE"
+    | "NOT_ASSESSED";
+  trend?: "IMPROVING" | "STABLE" | "DETERIORATING";
+  notes?: string;
+  nextReviewDate?: string;
+};
+
+export type JsaAcknowledgmentPayload = {
+  jsaId: string;
+  statement: string;
 };

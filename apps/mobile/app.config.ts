@@ -48,6 +48,7 @@ const config: ExpoConfig = {
       microphonePermission: false,
     }],
     "expo-document-picker",
+    "expo-web-browser",
     ["expo-notifications", { icon: "./assets/notification-icon.png", color: "#22D3EE", defaultChannel: "default", mode: notificationMode }],
     ["expo-splash-screen", { image: "./assets/splash-icon.png", imageWidth: 220, resizeMode: "contain", backgroundColor: "#07111f" }],
     ["expo-sqlite", { useSQLCipher: true }],
