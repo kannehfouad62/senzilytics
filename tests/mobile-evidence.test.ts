@@ -75,6 +75,16 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
     targetType: "ENVIRONMENTAL",
     parentSubmissionId: "e806a511-8667-4f77-b13d-b8d63d23f405",
   });
+  const esgExisting = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "ESG",
+    entityId: "period-1",
+  });
+  const esgOffline = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "ESG",
+    parentSubmissionId: "a8b19d39-97dc-46f0-b7f4-cc94439fc345",
+  });
 
   assert.equal(observation.success, true);
   assert.equal(inspection.success, true);
@@ -87,6 +97,8 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
   assert.equal(chemical.success, true);
   assert.equal(environmentalExisting.success, true);
   assert.equal(environmentalOffline.success, true);
+  assert.equal(esgExisting.success, true);
+  assert.equal(esgOffline.success, true);
   assert.equal(mobileEvidencePayloadSchema.safeParse({
     ...base,
     targetType: "INCIDENT",
@@ -98,6 +110,10 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
   assert.equal(mobileEvidencePayloadSchema.safeParse({
     ...base,
     targetType: "ENVIRONMENTAL",
+  }).success, false);
+  assert.equal(mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "ESG",
   }).success, false);
   assert.equal(mobileEvidencePayloadSchema.safeParse({
     ...base,
@@ -149,4 +165,5 @@ test("each mobile evidence target retains its governing permission", () => {
   assert.equal(requiredMobileEvidencePermission("INDUSTRIAL_HYGIENE"), PermissionKey.MANAGE_INDUSTRIAL_HYGIENE);
   assert.equal(requiredMobileEvidencePermission("CHEMICAL"), PermissionKey.MANAGE_CHEMICALS);
   assert.equal(requiredMobileEvidencePermission("ENVIRONMENTAL"), PermissionKey.MANAGE_ENVIRONMENTAL);
+  assert.equal(requiredMobileEvidencePermission("ESG"), PermissionKey.MANAGE_ESG);
 });

@@ -92,6 +92,8 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.MANAGE_CHEMICALS,
       PermissionKey.VIEW_ENVIRONMENTAL,
       PermissionKey.MANAGE_ENVIRONMENTAL,
+      PermissionKey.VIEW_ESG,
+      PermissionKey.MANAGE_ESG,
       PermissionKey.UPDATE_CAPA,
     ],
     user: {
@@ -117,6 +119,7 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(modules.find((module) => module.key === "occupational-health")?.nativeCapability, "OCCUPATIONAL_HEALTH_FIELD");
   assert.equal(modules.find((module) => module.key === "chemicals")?.nativeCapability, "CHEMICAL_FIELD");
   assert.equal(modules.find((module) => module.key === "environmental")?.nativeCapability, "ENVIRONMENTAL_FIELD");
+  assert.equal(modules.find((module) => module.key === "esg")?.nativeCapability, "ESG_FIELD");
 
   const governance = getMobileModuleCatalog({
     permissions: [
@@ -151,6 +154,7 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
       PermissionKey.VIEW_CHEMICALS,
       PermissionKey.VIEW_ENVIRONMENTAL,
+      PermissionKey.VIEW_ESG,
     ],
     user: {
       email: "viewer@example.com",
@@ -169,4 +173,5 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(readOnly.find((module) => module.key === "occupational-health")?.nativeCapability, "OCCUPATIONAL_HEALTH_FIELD");
   assert.equal(readOnly.find((module) => module.key === "chemicals")?.nativeCapability, "CHEMICAL_FIELD");
   assert.equal(readOnly.find((module) => module.key === "environmental")?.nativeCapability, "ENVIRONMENTAL_FIELD");
+  assert.equal(readOnly.find((module) => module.key === "esg")?.nativeCapability, "ESG_FIELD");
 });

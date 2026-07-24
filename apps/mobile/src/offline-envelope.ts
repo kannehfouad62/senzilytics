@@ -20,6 +20,10 @@ import type {
   EnvironmentalDataPayload,
   EnvironmentalFormsPayload,
   EnvironmentalReviewPayload,
+  EsgDataPayload,
+  EsgDisclosureStatusPayload,
+  EsgFormsPayload,
+  EsgInitiativeStatusPayload,
   IncidentPayload,
   InspectionResponsePayload,
   JsaAcknowledgmentPayload,
@@ -79,7 +83,11 @@ export type OfflineRecordType =
   | "CHEMICAL_FORMS"
   | "ENVIRONMENTAL_DATA"
   | "ENVIRONMENTAL_REVIEW"
-  | "ENVIRONMENTAL_FORMS";
+  | "ENVIRONMENTAL_FORMS"
+  | "ESG_DATA"
+  | "ESG_FORMS"
+  | "ESG_DISCLOSURE_STATUS"
+  | "ESG_INITIATIVE_STATUS";
 
 export type OfflineRecordPayload =
   | ObservationPayload
@@ -120,7 +128,11 @@ export type OfflineRecordPayload =
   | ChemicalFormsPayload
   | EnvironmentalDataPayload
   | EnvironmentalReviewPayload
-  | EnvironmentalFormsPayload;
+  | EnvironmentalFormsPayload
+  | EsgDataPayload
+  | EsgFormsPayload
+  | EsgDisclosureStatusPayload
+  | EsgInitiativeStatusPayload;
 
 export type OfflineEnvelope = {
   type: OfflineRecordType;
@@ -167,6 +179,10 @@ const recordTypes = new Set<OfflineRecordType>([
   "ENVIRONMENTAL_DATA",
   "ENVIRONMENTAL_REVIEW",
   "ENVIRONMENTAL_FORMS",
+  "ESG_DATA",
+  "ESG_FORMS",
+  "ESG_DISCLOSURE_STATUS",
+  "ESG_INITIATIVE_STATUS",
 ]);
 
 export function decodeOfflineEnvelope(value: unknown): OfflineEnvelope {

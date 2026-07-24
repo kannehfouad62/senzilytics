@@ -1,14 +1,44 @@
 "use client";
 
 import { initialFormActionState } from "@/core/actions/action-state";
-import { approveEsgPeriod } from "@/features/esg/actions";
+import { transitionEsgPeriod } from "@/features/esg/actions";
+import type { EsgDisclosureStatus } from "@prisma/client";
 import { useActionState } from "react";
 
-export function EsgPeriodApprovalForm({ periodId }: { periodId: string }) {
+const actions: Partial<
+  Record<
+    EsgDisclosureStatus,
+    Array<{ status: EsgDisclosureStatus; label: string; primary?: boolean }>
+  >
+> = {
+  DATA_COLLECTION: [
+    {
+      status: "UNDER_REVIEW",
+      label: "Submit Complete Period for Review",
+      primary: true,
+    },
+  ],
+  UNDER_REVIEW: [
+    { status: "DATA_COLLECTION", label: "Return to Data Collection" },
+    { status: "APPROVED", label: "Approve Complete Period", primary: true },
+  ],
+  APPROVED: [
+    { status: "PUBLISHED", label: "Publish Approved Period", primary: true },
+  ],
+};
+
+export function EsgPeriodApprovalForm({
+  periodId,
+  status,
+}: {
+  periodId: string;
+  status: EsgDisclosureStatus;
+}) {
   const [state, action, pending] = useActionState(
-    approveEsgPeriod,
+    transitionEsgPeriod,
     initialFormActionState
   );
+  const available = actions[status] ?? [];
 
   return (
     <form action={action} aria-busy={pending}>
@@ -25,12 +55,23 @@ export function EsgPeriodApprovalForm({ periodId }: { periodId: string }) {
           {state.message}
         </p>
       )}
-      <button
-        disabled={pending}
-        className="rounded-xl bg-emerald-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50"
-      >
-        {pending ? "Checking…" : "Approve Complete Period"}
-      </button>
+      <div className="flex flex-wrap gap-2">
+        {available.map((item) => (
+          <button
+            key={item.status}
+            name="status"
+            value={item.status}
+            disabled={pending}
+            className={`rounded-xl px-4 py-2 font-semibold disabled:opacity-50 ${
+              item.primary
+                ? "bg-emerald-300 text-slate-950"
+                : "border border-white/10 text-slate-100"
+            }`}
+          >
+            {pending ? "Checking…" : item.label}
+          </button>
+        ))}
+      </div>
     </form>
   );
 }

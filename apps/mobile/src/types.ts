@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD";
 };
 
 export type MobileDepartment = {
@@ -996,6 +996,103 @@ export type MobileChemicalEnvironmentalCapabilities = {
   canManageEnvironmental: boolean;
 };
 
+export type MobileEsgDisclosureStatus =
+  | "DRAFT"
+  | "DATA_COLLECTION"
+  | "UNDER_REVIEW"
+  | "APPROVED"
+  | "PUBLISHED"
+  | "ARCHIVED";
+
+export type MobileEsgInitiativeStatus =
+  | "PLANNED"
+  | "IN_PROGRESS"
+  | "ON_HOLD"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type MobileEsgDataQuality =
+  | "VERIFIED"
+  | "MEASURED"
+  | "CALCULATED"
+  | "ESTIMATED"
+  | "EXTERNAL_SOURCE";
+
+export type MobileEsgMetric = {
+  id: string;
+  code: string;
+  name: string;
+  pillar: "ENVIRONMENTAL" | "SOCIAL" | "GOVERNANCE";
+  unit: string;
+  disclosureReference: string | null;
+  methodology: string | null;
+  framework: {
+    id: string;
+    code: string;
+    name: string;
+    version: string | null;
+  } | null;
+};
+
+export type MobileEsgPeriod = {
+  id: string;
+  name: string;
+  periodStart: string;
+  periodEnd: string;
+  boundaryDescription: string;
+  status: MobileEsgDisclosureStatus;
+  approvedAt: string | null;
+  publishedAt: string | null;
+  approvedBy: { id: string; name: string } | null;
+  publishedBy: { id: string; name: string } | null;
+  nextStatuses: MobileEsgDisclosureStatus[];
+  missingMetricIds: string[];
+  missingFormDefinitionIds: string[];
+  completenessPercent: number;
+  dataPoints: Array<{
+    id: string;
+    metricId: string;
+    value: number;
+    quality: MobileEsgDataQuality;
+    evidenceSummary: string | null;
+    sourceDescription: string | null;
+    isAutoCalculated: boolean;
+    sourceRecordCount: number;
+    enteredBy: { id: string; name: string };
+    createdAt: string;
+    updatedAt: string;
+  }>;
+};
+
+export type MobileEsgTarget = {
+  id: string;
+  metricId: string;
+  baselineYear: number;
+  baselineValue: number;
+  targetYear: number;
+  targetValue: number;
+  description: string | null;
+};
+
+export type MobileEsgInitiative = {
+  id: string;
+  name: string;
+  description: string | null;
+  pillar: "ENVIRONMENTAL" | "SOCIAL" | "GOVERNANCE";
+  status: MobileEsgInitiativeStatus;
+  startDate: string | null;
+  targetDate: string | null;
+  budget: number | null;
+  expectedOutcome: string | null;
+  owner: { id: string; name: string } | null;
+  nextStatuses: MobileEsgInitiativeStatus[];
+};
+
+export type MobileEsgCapabilities = {
+  canView: boolean;
+  canManage: boolean;
+};
+
 export type MobileBootstrap = {
   user: MobileUser;
   organization: { id: string; name: string; subscriptionPlan: string };
@@ -1031,6 +1128,12 @@ export type MobileBootstrap = {
     MobileChemicalEnvironmentalCapabilities;
   chemicalForms: RuntimeForm[];
   environmentalForms: RuntimeForm[];
+  esgPeriods: MobileEsgPeriod[];
+  esgMetrics: MobileEsgMetric[];
+  esgTargets: MobileEsgTarget[];
+  esgInitiatives: MobileEsgInitiative[];
+  esgCapabilities: MobileEsgCapabilities;
+  esgForms: RuntimeForm[];
   correctiveActions: MobileCorrectiveAction[];
   capaCapabilities: MobileCapaCapabilities;
   notifications: MobileNotification[];
@@ -1383,4 +1486,28 @@ export type EnvironmentalReviewPayload = {
 export type EnvironmentalFormsPayload = {
   dataPointId: string;
   customForms: CapturedForm[];
+};
+
+export type EsgDataPayload = {
+  periodId: string;
+  metricId: string;
+  value: number;
+  quality: MobileEsgDataQuality;
+  evidenceSummary?: string;
+  sourceDescription?: string;
+};
+
+export type EsgFormsPayload = {
+  periodId: string;
+  customForms: CapturedForm[];
+};
+
+export type EsgDisclosureStatusPayload = {
+  periodId: string;
+  status: MobileEsgDisclosureStatus;
+};
+
+export type EsgInitiativeStatusPayload = {
+  initiativeId: string;
+  status: MobileEsgInitiativeStatus;
 };

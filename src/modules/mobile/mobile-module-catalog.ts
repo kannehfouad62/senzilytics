@@ -17,7 +17,7 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD";
   nativePermission?: PermissionKey;
 };
 
@@ -47,7 +47,7 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "regulatory", label: "Regulatory Intelligence", description: "Regulatory changes, applicability, impact, and response governance.", href: "/compliance/regulatory", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE },
   { key: "training", label: "Training", description: "Courses, requirements, assignments, competence, and compliance.", href: "/training", category: "GOVERNANCE", permission: PermissionKey.VIEW_TRAINING, nativeCapability: "TRAINING_ASSIGNMENTS" },
   { key: "environmental", label: "Environmental Metrics", description: "Environmental data, targets, controls, and disclosures.", href: "/environmental", category: "GOVERNANCE", permission: PermissionKey.VIEW_ENVIRONMENTAL, nativeCapability: "ENVIRONMENTAL_FIELD" },
-  { key: "esg", label: "Sustainability & ESG", description: "Frameworks, disclosures, governance, and ESG performance.", href: "/esg", category: "GOVERNANCE", permission: PermissionKey.VIEW_ESG },
+  { key: "esg", label: "Sustainability & ESG", description: "Frameworks, disclosures, governance, and ESG performance.", href: "/esg", category: "GOVERNANCE", permission: PermissionKey.VIEW_ESG, nativeCapability: "ESG_FIELD" },
   { key: "chemicals", label: "Chemicals & SDS", description: "Chemical inventory, SDS records, approvals, and monitoring.", href: "/chemicals", category: "GOVERNANCE", permission: PermissionKey.VIEW_CHEMICALS, nativeCapability: "CHEMICAL_FIELD" },
   { key: "reports", label: "Reports", description: "Operational and executive reporting across EHS modules.", href: "/reports", category: "GOVERNANCE", permission: PermissionKey.VIEW_REPORTS },
   { key: "documents", label: "Documents", description: "Controlled documents, evidence, previews, and version history.", href: "/documents", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_DOCUMENTS },

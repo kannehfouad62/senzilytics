@@ -712,6 +712,65 @@ test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("ENVIRONMENTAL_DATA"), PermissionKey.MANAGE_ENVIRONMENTAL);
   assert.equal(requiredOfflinePermission("ENVIRONMENTAL_REVIEW"), PermissionKey.MANAGE_ENVIRONMENTAL);
   assert.equal(requiredOfflinePermission("ENVIRONMENTAL_FORMS"), PermissionKey.MANAGE_ENVIRONMENTAL);
+  assert.equal(requiredOfflinePermission("ESG_DATA"), PermissionKey.MANAGE_ESG);
+  assert.equal(requiredOfflinePermission("ESG_FORMS"), PermissionKey.MANAGE_ESG);
+  assert.equal(requiredOfflinePermission("ESG_DISCLOSURE_STATUS"), PermissionKey.MANAGE_ESG);
+  assert.equal(requiredOfflinePermission("ESG_INITIATIVE_STATUS"), PermissionKey.MANAGE_ESG);
+});
+
+test("ESG offline contracts enforce finite governed disclosure data", () => {
+  const capturedAt = "2026-07-24T12:00:00.000Z";
+  const valid = offlineSyncRequestSchema.safeParse({
+    items: [
+      {
+        id: "907ba83a-da5c-4efe-988e-7fdd28681bd9",
+        type: "ESG_DATA",
+        capturedAt,
+        payload: {
+          periodId: "period-1",
+          metricId: "metric-1",
+          value: 42.5,
+          quality: "VERIFIED",
+          evidenceSummary: "Assured source register",
+        },
+      },
+      {
+        id: "b5f7a6a0-a9d4-40cf-964d-63bf7b69b88c",
+        type: "ESG_DISCLOSURE_STATUS",
+        capturedAt,
+        payload: {
+          periodId: "period-1",
+          status: "UNDER_REVIEW",
+        },
+      },
+      {
+        id: "de95473f-011b-40ad-a089-d6a02ece7b47",
+        type: "ESG_INITIATIVE_STATUS",
+        capturedAt,
+        payload: {
+          initiativeId: "initiative-1",
+          status: "IN_PROGRESS",
+        },
+      },
+    ],
+  });
+  const invalidQuality = offlineSyncRequestSchema.safeParse({
+    items: [
+      {
+        id: "8d4fc5ec-a18c-4a00-99d5-a79eeff2e93a",
+        type: "ESG_DATA",
+        capturedAt,
+        payload: {
+          periodId: "period-1",
+          metricId: "metric-1",
+          value: 10,
+          quality: "UNVERIFIED",
+        },
+      },
+    ],
+  });
+  assert.equal(valid.success, true);
+  assert.equal(invalidQuality.success, false);
 });
 
 test("chemical inventory and environmental data offline contracts reject unsafe field values", () => {

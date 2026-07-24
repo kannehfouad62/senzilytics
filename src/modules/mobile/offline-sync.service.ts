@@ -12,6 +12,9 @@ import {
   EnterpriseAuditStatus,
   EnvironmentalDataQuality,
   EnvironmentalDataStatus,
+  EsgDataQuality,
+  EsgDisclosureStatus,
+  EsgInitiativeStatus,
   ExposureAssessmentStatus,
   ExposureSampleType,
   FitnessOutcome,
@@ -95,6 +98,12 @@ import {
   recordEnvironmentalDataService,
   reviewEnvironmentalDataService,
 } from "@/modules/environmental/environmental-data.service";
+import {
+  completeEsgFormsService,
+  recordEsgDataService,
+  transitionEsgDisclosureService,
+  transitionEsgInitiativeService,
+} from "@/modules/esg/esg-disclosure.service";
 
 const customValue = z.union([
   z.string().max(5000),
@@ -693,6 +702,50 @@ const environmentalFormsItemSchema = z.object({
   }),
 });
 
+const esgDataItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ESG_DATA"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    periodId: z.string().min(1).max(200),
+    metricId: z.string().min(1).max(200),
+    value: z.number().finite(),
+    quality: z.nativeEnum(EsgDataQuality),
+    evidenceSummary: z.string().trim().max(5000).optional(),
+    sourceDescription: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const esgFormsItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ESG_FORMS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    periodId: z.string().min(1).max(200),
+    customForms: z.array(capturedFormSchema).min(1).max(20),
+  }),
+});
+
+const esgDisclosureStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ESG_DISCLOSURE_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    periodId: z.string().min(1).max(200),
+    status: z.nativeEnum(EsgDisclosureStatus),
+  }),
+});
+
+const esgInitiativeStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ESG_INITIATIVE_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    initiativeId: z.string().min(1).max(200),
+    status: z.nativeEnum(EsgInitiativeStatus),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
@@ -733,6 +786,10 @@ const offlineItemSchema = z.discriminatedUnion("type", [
   environmentalDataItemSchema,
   environmentalReviewItemSchema,
   environmentalFormsItemSchema,
+  esgDataItemSchema,
+  esgFormsItemSchema,
+  esgDisclosureStatusItemSchema,
+  esgInitiativeStatusItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -817,6 +874,14 @@ export function requiredOfflinePermission(
     type === "ENVIRONMENTAL_FORMS"
   ) {
     return PermissionKey.MANAGE_ENVIRONMENTAL;
+  }
+  if (
+    type === "ESG_DATA" ||
+    type === "ESG_FORMS" ||
+    type === "ESG_DISCLOSURE_STATUS" ||
+    type === "ESG_INITIATIVE_STATUS"
+  ) {
+    return PermissionKey.MANAGE_ESG;
   }
   if (type === "CAPA_STATUS") {
     return status === Status.COMPLETED || status === Status.CLOSED
@@ -982,8 +1047,16 @@ export async function syncOfflineSubmissionsService(input: {
         results.push(await syncEnvironmentalData(input, item, payloadHash));
       } else if (item.type === "ENVIRONMENTAL_REVIEW") {
         results.push(await syncEnvironmentalReview(input, item, payloadHash));
-      } else {
+      } else if (item.type === "ENVIRONMENTAL_FORMS") {
         results.push(await syncEnvironmentalForms(input, item, payloadHash));
+      } else if (item.type === "ESG_DATA") {
+        results.push(await syncEsgData(input, item, payloadHash));
+      } else if (item.type === "ESG_FORMS") {
+        results.push(await syncEsgForms(input, item, payloadHash));
+      } else if (item.type === "ESG_DISCLOSURE_STATUS") {
+        results.push(await syncEsgDisclosureStatus(input, item, payloadHash));
+      } else {
+        results.push(await syncEsgInitiativeStatus(input, item, payloadHash));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -2295,6 +2368,93 @@ async function syncEnvironmentalForms(
   };
 }
 
+async function syncEsgData(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof esgDataItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const point = await recordEsgDataService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    periodId: item.payload.periodId,
+    metricId: item.payload.metricId,
+    value: item.payload.value,
+    quality: item.payload.quality,
+    evidenceSummary: item.payload.evidenceSummary?.trim() || null,
+    sourceDescription: item.payload.sourceDescription?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: point.id };
+}
+
+async function syncEsgForms(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof esgFormsItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const submissions = await prepareCapturedFormSubmissions({
+    organizationId: actor.organizationId,
+    module: ConfigurableFormModule.ESG,
+    capturedAt,
+    forms: item.payload.customForms,
+  });
+  await completeEsgFormsService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    periodId: item.payload.periodId,
+    submissions,
+    offlineSubmission: { id: item.id, capturedAt, payloadHash },
+  });
+  return {
+    id: item.id,
+    status: "synced",
+    recordId: item.payload.periodId,
+  };
+}
+
+async function syncEsgDisclosureStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof esgDisclosureStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const period = await transitionEsgDisclosureService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    periodId: item.payload.periodId,
+    status: item.payload.status,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: period.id };
+}
+
+async function syncEsgInitiativeStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof esgInitiativeStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const initiative = await transitionEsgInitiativeService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    initiativeId: item.payload.initiativeId,
+    status: item.payload.status,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: initiative.id };
+}
+
 function parseDateOnly(value?: string) {
   return value ? new Date(`${value}T12:00:00.000Z`) : null;
 }
@@ -2309,7 +2469,7 @@ function parseFutureReviewDate(value: string | undefined, capturedAt: Date) {
 
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction|exposure|hygiene|sample|surveillance|fitness|restriction|certificate|provider|chemical|inventory|sds|environmental|metric|reporting period|emission|waste|water|energy/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction|exposure|hygiene|sample|surveillance|fitness|restriction|certificate|provider|chemical|inventory|sds|environmental|metric|reporting period|emission|waste|water|energy|esg|disclosure|initiative|pillar/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

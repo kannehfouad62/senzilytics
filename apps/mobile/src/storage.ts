@@ -29,6 +29,10 @@ import type {
   EnvironmentalDataPayload,
   EnvironmentalFormsPayload,
   EnvironmentalReviewPayload,
+  EsgDataPayload,
+  EsgDisclosureStatusPayload,
+  EsgFormsPayload,
+  EsgInitiativeStatusPayload,
   HygieneAssessmentStatusPayload,
   HygieneFormsPayload,
   HygieneSamplePayload,
@@ -65,7 +69,8 @@ type EvidenceTargetType =
   | "ASSET_MAINTENANCE"
   | "INDUSTRIAL_HYGIENE"
   | "CHEMICAL"
-  | "ENVIRONMENTAL";
+  | "ENVIRONMENTAL"
+  | "ESG";
 type EvidenceRow = {
   id: string;
   parent_submission_id: string | null;
@@ -179,7 +184,8 @@ async function queueOfflineItem(
           type === "ASSET_DEFECT" ||
           type === "ASSET_MAINTENANCE_COMPLETE" ||
           type === "IH_SAMPLE" ||
-          type === "ENVIRONMENTAL_DATA"
+          type === "ENVIRONMENTAL_DATA" ||
+          type === "ESG_DATA"
             ? id
             : undefined,
       });
@@ -564,6 +570,59 @@ export async function queueEnvironmentalEvidence(
   );
 }
 
+export async function queueEsgData(
+  ownerKey: string,
+  payload: EsgDataPayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "ESG_DATA", payload, {
+    files: evidence,
+    targetType: "ESG",
+    title: "ESG disclosure evidence",
+    description: payload.evidenceSummary || payload.sourceDescription,
+  });
+}
+
+export async function queueEsgForms(
+  ownerKey: string,
+  payload: EsgFormsPayload
+) {
+  return queueOfflineItem(ownerKey, "ESG_FORMS", payload);
+}
+
+export async function queueEsgDisclosureStatus(
+  ownerKey: string,
+  payload: EsgDisclosureStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "ESG_DISCLOSURE_STATUS", payload);
+}
+
+export async function queueEsgInitiativeStatus(
+  ownerKey: string,
+  payload: EsgInitiativeStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "ESG_INITIATIVE_STATUS", payload);
+}
+
+export async function queueEsgEvidence(
+  ownerKey: string,
+  periodId: string,
+  files: SelectedEvidence[],
+  title: string,
+  description?: string
+) {
+  const database = await db();
+  await database.withExclusiveTransactionAsync((transaction) =>
+    insertEvidence(transaction, ownerKey, {
+      files,
+      targetType: "ESG",
+      entityId: periodId,
+      title,
+      description,
+    })
+  );
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([
@@ -595,7 +654,8 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "ASSET_DEFECT" ||
     envelope.type === "ASSET_MAINTENANCE_COMPLETE" ||
     envelope.type === "IH_SAMPLE" ||
-    envelope.type === "ENVIRONMENTAL_DATA"
+    envelope.type === "ENVIRONMENTAL_DATA" ||
+    envelope.type === "ESG_DATA"
   );
   const responses = decoded.filter(({ envelope }) =>
     envelope.type === "INSPECTION_RESPONSE" ||
@@ -627,7 +687,10 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "CHEMICAL_STATUS" ||
     envelope.type === "CHEMICAL_FORMS" ||
     envelope.type === "ENVIRONMENTAL_REVIEW" ||
-    envelope.type === "ENVIRONMENTAL_FORMS"
+    envelope.type === "ENVIRONMENTAL_FORMS" ||
+    envelope.type === "ESG_FORMS" ||
+    envelope.type === "ESG_DISCLOSURE_STATUS" ||
+    envelope.type === "ESG_INITIATIVE_STATUS"
   );
   const first = await synchronizeRows(database, parents);
   const files = await synchronizeEvidence(database, ownerKey);

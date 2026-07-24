@@ -13,6 +13,7 @@ import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.ser
 import { getMobileAssetContractorWorkspace } from "@/modules/mobile/mobile-asset-contractor.service";
 import { getMobileComplianceTraining } from "@/modules/mobile/mobile-compliance-training.service";
 import { getMobileChemicalEnvironmentalWorkspace } from "@/modules/mobile/mobile-chemical-environmental.service";
+import { getMobileEsgWorkspace } from "@/modules/mobile/mobile-esg.service";
 import { getMobileHygieneHealthWorkspace } from "@/modules/mobile/mobile-hygiene-health.service";
 import { getMobileMocPermitWorkspace } from "@/modules/mobile/mobile-moc-permit.service";
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, hygieneHealth, chemicalEnvironmental, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, hygieneHealth, chemicalEnvironmental, esg, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -83,6 +84,10 @@ export async function GET(request: Request) {
         permissions: assigned,
       }),
       getMobileChemicalEnvironmentalWorkspace({
+        organizationId: organization.id,
+        permissions: assigned,
+      }),
+      getMobileEsgWorkspace({
         organizationId: organization.id,
         permissions: assigned,
       }),
@@ -362,6 +367,12 @@ export async function GET(request: Request) {
       environmentalForms: serializeRuntimeForms(
         chemicalEnvironmental.environmentalForms
       ),
+      esgPeriods: esg.periods,
+      esgMetrics: esg.metrics,
+      esgTargets: esg.targets,
+      esgInitiatives: esg.initiatives,
+      esgCapabilities: esg.capabilities,
+      esgForms: serializeRuntimeForms(esg.forms),
       notifications,
       tasks: actionCenter.tasks,
       correctiveActions: actionCenter.correctiveActions,

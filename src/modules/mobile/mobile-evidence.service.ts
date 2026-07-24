@@ -41,6 +41,7 @@ const targetTypeSchema = z.enum([
   "INDUSTRIAL_HYGIENE",
   "CHEMICAL",
   "ENVIRONMENTAL",
+  "ESG",
 ]);
 
 export const mobileEvidencePayloadSchema = z.object({
@@ -109,6 +110,17 @@ export const mobileEvidencePayloadSchema = z.object({
       message: "The environmental evidence target is required.",
     });
   }
+  if (
+    value.targetType === "ESG" &&
+    !value.entityId &&
+    !value.parentSubmissionId
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["entityId"],
+      message: "The ESG disclosure evidence target is required.",
+    });
+  }
 });
 
 export type MobileEvidencePayload = z.infer<typeof mobileEvidencePayloadSchema>;
@@ -153,6 +165,9 @@ export function requiredMobileEvidencePermission(
   }
   if (targetType === "ENVIRONMENTAL") {
     return PermissionKey.MANAGE_ENVIRONMENTAL;
+  }
+  if (targetType === "ESG") {
+    return PermissionKey.MANAGE_ESG;
   }
   return PermissionKey.MANAGE_AUDITS;
 }
@@ -237,6 +252,49 @@ export async function resolveMobileEvidenceTarget(input: {
       );
     }
     resolvedEntityId = point.id;
+  } else if (input.payload.targetType === "ESG") {
+    if (input.payload.parentSubmissionId) {
+      const parent = await prisma.offlineSubmission.findFirst({
+        where: {
+          id: input.payload.parentSubmissionId,
+          organizationId: input.organizationId,
+          userId: input.userId,
+          recordType: "ESG_DATA",
+        },
+        select: { recordId: true },
+      });
+      if (!parent) {
+        throw new Error(
+          "Synchronize the ESG data record before uploading its evidence."
+        );
+      }
+      const point = await prisma.esgDataPoint.findFirst({
+        where: {
+          id: parent.recordId,
+          period: { organizationId: input.organizationId },
+        },
+        select: { periodId: true },
+      });
+      if (!point) {
+        throw new Error(
+          "The synchronized ESG data record is no longer available."
+        );
+      }
+      resolvedEntityId = point.periodId;
+    }
+    const period = await prisma.esgDisclosurePeriod.findFirst({
+      where: {
+        id: resolvedEntityId,
+        organizationId: input.organizationId,
+      },
+      select: { id: true },
+    });
+    if (!period) {
+      throw new Error(
+        "This ESG disclosure period is not available for mobile evidence capture."
+      );
+    }
+    resolvedEntityId = period.id;
   } else if (
     input.payload.targetType === "SAFETY_OBSERVATION" ||
     input.payload.targetType === "INCIDENT" ||
@@ -579,6 +637,9 @@ function documentTarget(
   }
   if (type === "ENVIRONMENTAL") {
     return { entityType: DocumentEntityType.ENVIRONMENTAL };
+  }
+  if (type === "ESG") {
+    return { entityType: DocumentEntityType.ESG };
   }
   return { entityType: DocumentEntityType.INSPECTION };
 }

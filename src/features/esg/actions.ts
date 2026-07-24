@@ -7,6 +7,8 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import {
   completeEsgFormsService,
   createEsgDisclosurePeriodService,
+  recordEsgDataService,
+  transitionEsgDisclosureService,
 } from "@/modules/esg/esg-disclosure.service";
 import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
 import {
@@ -186,17 +188,9 @@ export async function recordEsgData(data: FormData) {
   const periodId = required(data, "periodId");
   const metricId = required(data, "metricId");
   const quality = required(data, "quality") as EsgDataQuality;
-  const [period, metric] = await Promise.all([
-    prisma.esgDisclosurePeriod.findFirst({
-      where: { id: periodId, organizationId },
-    }),
-    prisma.esgMetricDefinition.findFirst({
-      where: { id: metricId, organizationId },
-    }),
-  ]);
 
-  if (!period || !metric || !Object.values(EsgDataQuality).includes(quality)) {
-    throw new Error("Select a valid period, metric, and quality.");
+  if (!Object.values(EsgDataQuality).includes(quality)) {
+    throw new Error("Select a valid ESG data quality.");
   }
 
   const value = Number(required(data, "value"));
@@ -205,65 +199,38 @@ export async function recordEsgData(data: FormData) {
     throw new Error("Enter a valid ESG metric value.");
   }
 
-  await prisma.esgDataPoint.upsert({
-    where: { periodId_metricId: { periodId, metricId } },
-    update: {
-      value,
-      quality,
-      evidenceSummary: optional(data, "evidenceSummary"),
-      sourceDescription: optional(data, "sourceDescription"),
-      enteredById: user.id,
-    },
-    create: {
-      periodId,
-      metricId,
-      value,
-      quality,
-      evidenceSummary: optional(data, "evidenceSummary"),
-      sourceDescription: optional(data, "sourceDescription"),
-      enteredById: user.id,
-    },
+  await recordEsgDataService({
+    organizationId,
+    userId: user.id,
+    periodId,
+    metricId,
+    value,
+    quality,
+    evidenceSummary: optional(data, "evidenceSummary"),
+    sourceDescription: optional(data, "sourceDescription"),
   });
 
   revalidatePath("/esg");
   revalidatePath(`/esg/${periodId}`);
 }
 
-export async function approveEsgPeriod(
+export async function transitionEsgPeriod(
   _previousState: FormActionState,
   data: FormData
 ): Promise<FormActionState> {
   await requirePermission(PermissionKey.MANAGE_ESG);
   const { organizationId, user } = await getCurrentUserTenant();
   const id = required(data, "id");
+  const status = required(data, "status") as EsgDisclosureStatus;
   try {
-    const [period, requiredCount, recordedCount] = await Promise.all([
-      prisma.esgDisclosurePeriod.findFirst({ where: { id, organizationId } }),
-      prisma.esgMetricDefinition.count({
-        where: { organizationId, isActive: true },
-      }),
-      prisma.esgDataPoint.count({
-        where: { periodId: id, period: { organizationId } },
-      }),
-    ]);
-
-    if (!period) {
-      throw new Error("Disclosure period not found.");
+    if (!Object.values(EsgDisclosureStatus).includes(status)) {
+      throw new Error("Select a valid ESG disclosure status.");
     }
-
-    if (requiredCount === 0 || recordedCount < requiredCount) {
-      throw new Error(
-        `${requiredCount - recordedCount} required ESG metrics remain incomplete.`
-      );
-    }
-
-    await prisma.esgDisclosurePeriod.update({
-      where: { id },
-      data: {
-        status: EsgDisclosureStatus.APPROVED,
-        approvedById: user.id,
-        approvedAt: new Date(),
-      },
+    await transitionEsgDisclosureService({
+      organizationId,
+      userId: user.id,
+      periodId: id,
+      status,
     });
   } catch (error) {
     return {
@@ -271,7 +238,7 @@ export async function approveEsgPeriod(
       message:
         error instanceof Error
           ? error.message
-          : "The ESG disclosure period could not be approved.",
+          : "The ESG disclosure lifecycle could not be updated.",
     };
   }
 
@@ -279,6 +246,8 @@ export async function approveEsgPeriod(
   revalidatePath(`/esg/${id}`);
   return {
     status: "SUCCESS",
-    message: "ESG disclosure period approved.",
+    message: `ESG disclosure moved to ${status
+      .replaceAll("_", " ")
+      .toLowerCase()}.`,
   };
 }

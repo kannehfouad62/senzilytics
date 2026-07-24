@@ -158,7 +158,10 @@ export default async function EsgDisclosureDetailPage({
             </p>
           </div>
           {canManage && !exportable && (
-            <EsgPeriodApprovalForm periodId={period.id} />
+            <EsgPeriodApprovalForm
+              periodId={period.id}
+              status={period.status}
+            />
           )}
         </div>
 
