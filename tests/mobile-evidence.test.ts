@@ -40,11 +40,29 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
     targetType: "CORRECTIVE_ACTION",
     entityId: "action-1",
   });
+  const assetInspection = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "ASSET_INSPECTION",
+    parentSubmissionId: "f52be7a4-f13b-4e4b-ab88-8f838cdf082d",
+  });
+  const assetDefect = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "ASSET_DEFECT",
+    parentSubmissionId: "fc4b0c3a-fe09-43a4-9099-fc3c5fedafbd",
+  });
+  const assetMaintenance = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "ASSET_MAINTENANCE",
+    parentSubmissionId: "94ee294c-5711-4947-baba-0e0d850988fb",
+  });
 
   assert.equal(observation.success, true);
   assert.equal(inspection.success, true);
   assert.equal(audit.success, true);
   assert.equal(capa.success, true);
+  assert.equal(assetInspection.success, true);
+  assert.equal(assetDefect.success, true);
+  assert.equal(assetMaintenance.success, true);
   assert.equal(mobileEvidencePayloadSchema.safeParse({
     ...base,
     targetType: "INCIDENT",
@@ -53,6 +71,11 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
     ...base,
     targetType: "AUDIT_QUESTION",
     entityId: "audit-1",
+  }).success, false);
+  assert.equal(mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "ASSET_DEFECT",
+    entityId: "asset-1",
   }).success, false);
 });
 
@@ -83,4 +106,7 @@ test("each mobile evidence target retains its governing permission", () => {
   assert.equal(requiredMobileEvidencePermission("INSPECTION"), PermissionKey.MANAGE_INSPECTIONS);
   assert.equal(requiredMobileEvidencePermission("AUDIT_QUESTION"), PermissionKey.MANAGE_AUDITS);
   assert.equal(requiredMobileEvidencePermission("CORRECTIVE_ACTION"), PermissionKey.UPDATE_CAPA);
+  assert.equal(requiredMobileEvidencePermission("ASSET_INSPECTION"), PermissionKey.MANAGE_ASSETS);
+  assert.equal(requiredMobileEvidencePermission("ASSET_DEFECT"), PermissionKey.MANAGE_ASSETS);
+  assert.equal(requiredMobileEvidencePermission("ASSET_MAINTENANCE"), PermissionKey.MANAGE_ASSETS);
 });

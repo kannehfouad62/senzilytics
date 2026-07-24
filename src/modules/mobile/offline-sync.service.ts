@@ -1,7 +1,12 @@
 import {
   ActivityAction,
+  AssetDefectStatus,
+  AssetInspectionResult,
+  AssetMaintenanceStatus,
+  AssetStatus,
   ComplianceCalendarOccurrenceStatus,
   ConfigurableFormModule,
+  ContractorStatus,
   EnterpriseAuditResponseResult,
   EnterpriseAuditStatus,
   IncidentType,
@@ -53,6 +58,15 @@ import {
   transitionPermitToWorkService,
   verifyPermitControlService,
 } from "@/modules/permits-to-work/permit-to-work.service";
+import {
+  changeAssetMaintenanceStatusService,
+  changeAssetStatusService,
+  completeAssetMaintenanceService,
+  createAssetDefectService,
+  recordAssetInspectionService,
+  updateAssetDefectService,
+} from "@/modules/assets/asset.service";
+import { updateContractorStatusService } from "@/modules/contractors/contractor.service";
 
 const customValue = z.union([
   z.string().max(5000),
@@ -358,6 +372,102 @@ const permitGasTestItemSchema = z.object({
   }),
 });
 
+const assetStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ASSET_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    assetId: z.string().min(1).max(200),
+    status: z.nativeEnum(AssetStatus),
+    reason: z.string().trim().min(2).max(5000),
+  }),
+});
+
+const assetInspectionItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ASSET_INSPECTION"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    assetId: z.string().min(1).max(200),
+    inspectedAt: z.string().datetime(),
+    result: z.enum([
+      AssetInspectionResult.SATISFACTORY,
+      AssetInspectionResult.DEFECT_FOUND,
+      AssetInspectionResult.OUT_OF_SERVICE,
+    ]),
+    conditionScore: z.number().int().min(1).max(5).optional(),
+    evidenceReference: z.string().trim().max(5000).optional(),
+    observations: z.string().trim().max(5000).optional(),
+    immediateAction: z.string().trim().max(5000).optional(),
+    customForms: z.array(capturedFormSchema).max(20).default([]),
+  }),
+});
+
+const assetDefectItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ASSET_DEFECT"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    assetId: z.string().min(1).max(200),
+    title: z.string().trim().min(2).max(200),
+    description: z.string().trim().min(2).max(5000),
+    severity: z.nativeEnum(RiskLevel),
+    ownerId: z.string().min(1).max(200).optional(),
+    dueDate: dateOnly.optional(),
+    immediateControls: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const assetDefectStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ASSET_DEFECT_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    defectId: z.string().min(1).max(200),
+    status: z.nativeEnum(AssetDefectStatus),
+    repairPlan: z.string().trim().max(5000).optional(),
+    verificationEvidence: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const assetMaintenanceStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ASSET_MAINTENANCE_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    recordId: z.string().min(1).max(200),
+    status: z.enum([
+      AssetMaintenanceStatus.IN_PROGRESS,
+      AssetMaintenanceStatus.CANCELLED,
+    ]),
+    reason: z.string().trim().min(2).max(5000),
+  }),
+});
+
+const assetMaintenanceCompletionItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ASSET_MAINTENANCE_COMPLETE"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    recordId: z.string().min(1).max(200),
+    completedAt: z.string().datetime(),
+    workSummary: z.string().trim().min(2).max(5000),
+    evidenceReference: z.string().trim().min(1).max(5000),
+    downtimeHours: z.number().finite().min(0).max(100000).optional(),
+  }),
+});
+
+const contractorStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("CONTRACTOR_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    contractorId: z.string().min(1).max(200),
+    status: z.nativeEnum(ContractorStatus),
+    reason: z.string().trim().max(5000).optional(),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
@@ -378,6 +488,13 @@ const offlineItemSchema = z.discriminatedUnion("type", [
   permitStatusItemSchema,
   permitControlItemSchema,
   permitGasTestItemSchema,
+  assetStatusItemSchema,
+  assetInspectionItemSchema,
+  assetDefectItemSchema,
+  assetDefectStatusItemSchema,
+  assetMaintenanceStatusItemSchema,
+  assetMaintenanceCompletionItemSchema,
+  contractorStatusItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -420,6 +537,19 @@ export function requiredOfflinePermission(
     type === "PERMIT_GAS_TEST"
   ) {
     return PermissionKey.MANAGE_PERMITS_TO_WORK;
+  }
+  if (
+    type === "ASSET_STATUS" ||
+    type === "ASSET_INSPECTION" ||
+    type === "ASSET_DEFECT" ||
+    type === "ASSET_DEFECT_STATUS" ||
+    type === "ASSET_MAINTENANCE_STATUS" ||
+    type === "ASSET_MAINTENANCE_COMPLETE"
+  ) {
+    return PermissionKey.MANAGE_ASSETS;
+  }
+  if (type === "CONTRACTOR_STATUS") {
+    return PermissionKey.MANAGE_CONTRACTORS;
   }
   if (type === "CAPA_STATUS") {
     return status === Status.COMPLETED || status === Status.CLOSED
@@ -545,8 +675,22 @@ export async function syncOfflineSubmissionsService(input: {
         results.push(await syncPermitStatus(input, item, payloadHash));
       } else if (item.type === "PERMIT_CONTROL") {
         results.push(await syncPermitControl(input, item, payloadHash));
-      } else {
+      } else if (item.type === "PERMIT_GAS_TEST") {
         results.push(await syncPermitGasTest(input, item, payloadHash));
+      } else if (item.type === "ASSET_STATUS") {
+        results.push(await syncAssetStatus(input, item, payloadHash));
+      } else if (item.type === "ASSET_INSPECTION") {
+        results.push(await syncAssetInspection(input, item, payloadHash));
+      } else if (item.type === "ASSET_DEFECT") {
+        results.push(await syncAssetDefect(input, item, payloadHash));
+      } else if (item.type === "ASSET_DEFECT_STATUS") {
+        results.push(await syncAssetDefectStatus(input, item, payloadHash));
+      } else if (item.type === "ASSET_MAINTENANCE_STATUS") {
+        results.push(await syncAssetMaintenanceStatus(input, item, payloadHash));
+      } else if (item.type === "ASSET_MAINTENANCE_COMPLETE") {
+        results.push(await syncAssetMaintenanceCompletion(input, item, payloadHash));
+      } else {
+        results.push(await syncContractorStatus(input, item, payloadHash));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -1380,6 +1524,170 @@ async function syncPermitGasTest(
   return { id: item.id, status: "synced", recordId: gasTest.id };
 }
 
+async function syncAssetStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof assetStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const asset = await changeAssetStatusService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    assetId: item.payload.assetId,
+    status: item.payload.status,
+    reason: item.payload.reason,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: asset.id };
+}
+
+async function syncAssetInspection(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof assetInspectionItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const submissions = await prepareCapturedFormSubmissions({
+    organizationId: actor.organizationId,
+    module: ConfigurableFormModule.ASSET_SAFETY,
+    capturedAt,
+    forms: item.payload.customForms,
+  });
+  const result = await recordAssetInspectionService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    assetId: item.payload.assetId,
+    inspectedAt: new Date(item.payload.inspectedAt),
+    result: item.payload.result,
+    conditionScore: item.payload.conditionScore ?? null,
+    evidenceReference: item.payload.evidenceReference?.trim() || null,
+    observations: item.payload.observations?.trim() || null,
+    immediateAction: item.payload.immediateAction?.trim() || null,
+    customSubmissions: submissions,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt,
+      payloadHash,
+    },
+  });
+  return {
+    id: item.id,
+    status: "synced",
+    recordId: result.inspection.id,
+  };
+}
+
+async function syncAssetDefect(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof assetDefectItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const defect = await createAssetDefectService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    assetId: item.payload.assetId,
+    title: item.payload.title,
+    description: item.payload.description,
+    severity: item.payload.severity,
+    ownerId: item.payload.ownerId || null,
+    dueDate: parseDateOnly(item.payload.dueDate),
+    immediateControls: item.payload.immediateControls?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: defect.id };
+}
+
+async function syncAssetDefectStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof assetDefectStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const defect = await updateAssetDefectService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    defectId: item.payload.defectId,
+    status: item.payload.status,
+    repairPlan: item.payload.repairPlan?.trim() || null,
+    verificationEvidence:
+      item.payload.verificationEvidence?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: defect.id };
+}
+
+async function syncAssetMaintenanceStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof assetMaintenanceStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const record = await changeAssetMaintenanceStatusService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    recordId: item.payload.recordId,
+    status: item.payload.status,
+    reason: item.payload.reason,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: record.id };
+}
+
+async function syncAssetMaintenanceCompletion(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof assetMaintenanceCompletionItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const record = await completeAssetMaintenanceService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    recordId: item.payload.recordId,
+    completedAt: new Date(item.payload.completedAt),
+    workSummary: item.payload.workSummary,
+    evidenceReference: item.payload.evidenceReference,
+    downtimeHours: item.payload.downtimeHours ?? null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: record.id };
+}
+
+async function syncContractorStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof contractorStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const contractor = await updateContractorStatusService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    contractorId: item.payload.contractorId,
+    status: item.payload.status,
+    reason: item.payload.reason?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: contractor.id };
+}
+
 function parseDateOnly(value?: string) {
   return value ? new Date(`${value}T12:00:00.000Z`) : null;
 }
@@ -1394,7 +1702,7 @@ function parseFutureReviewDate(value: string | undefined, capturedAt: Date) {
 
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

@@ -35,6 +35,9 @@ const targetTypeSchema = z.enum([
   "INSPECTION",
   "AUDIT_QUESTION",
   "CORRECTIVE_ACTION",
+  "ASSET_INSPECTION",
+  "ASSET_DEFECT",
+  "ASSET_MAINTENANCE",
 ]);
 
 export const mobileEvidencePayloadSchema = z.object({
@@ -54,7 +57,13 @@ export const mobileEvidencePayloadSchema = z.object({
   capturedAt: z.string().datetime(),
 }).superRefine((value, context) => {
   if (
-    (value.targetType === "SAFETY_OBSERVATION" || value.targetType === "INCIDENT") &&
+    (
+      value.targetType === "SAFETY_OBSERVATION" ||
+      value.targetType === "INCIDENT" ||
+      value.targetType === "ASSET_INSPECTION" ||
+      value.targetType === "ASSET_DEFECT" ||
+      value.targetType === "ASSET_MAINTENANCE"
+    ) &&
     !value.parentSubmissionId
   ) {
     context.addIssue({
@@ -113,6 +122,13 @@ export function requiredMobileEvidencePermission(
   if (targetType === "INCIDENT") return PermissionKey.CREATE_INCIDENT;
   if (targetType === "INSPECTION") return PermissionKey.MANAGE_INSPECTIONS;
   if (targetType === "CORRECTIVE_ACTION") return PermissionKey.UPDATE_CAPA;
+  if (
+    targetType === "ASSET_INSPECTION" ||
+    targetType === "ASSET_DEFECT" ||
+    targetType === "ASSET_MAINTENANCE"
+  ) {
+    return PermissionKey.MANAGE_ASSETS;
+  }
   return PermissionKey.MANAGE_AUDITS;
 }
 
@@ -153,18 +169,59 @@ export async function resolveMobileEvidenceTarget(input: {
   let resolvedEntityId = input.payload.entityId || "";
   if (
     input.payload.targetType === "SAFETY_OBSERVATION" ||
-    input.payload.targetType === "INCIDENT"
+    input.payload.targetType === "INCIDENT" ||
+    input.payload.targetType === "ASSET_INSPECTION" ||
+    input.payload.targetType === "ASSET_DEFECT" ||
+    input.payload.targetType === "ASSET_MAINTENANCE"
   ) {
+    const parentRecordType =
+      input.payload.targetType === "ASSET_MAINTENANCE"
+        ? "ASSET_MAINTENANCE_COMPLETE"
+        : input.payload.targetType;
     const parent = await prisma.offlineSubmission.findFirst({
       where: {
         id: input.payload.parentSubmissionId,
         organizationId: input.organizationId,
         userId: input.userId,
-        recordType: input.payload.targetType,
+        recordType: parentRecordType,
       },
       select: { recordId: true },
     });
     if (!parent) throw new Error("Synchronize the parent record before uploading its evidence.");
+    if (input.payload.targetType === "ASSET_INSPECTION") {
+      const inspection = await prisma.assetInspection.findFirst({
+        where: {
+          id: parent.recordId,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!inspection) {
+        throw new Error("The synchronized asset inspection is unavailable.");
+      }
+    } else if (input.payload.targetType === "ASSET_DEFECT") {
+      const defect = await prisma.assetDefect.findFirst({
+        where: {
+          id: parent.recordId,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!defect) {
+        throw new Error("The synchronized asset defect is unavailable.");
+      }
+    } else if (input.payload.targetType === "ASSET_MAINTENANCE") {
+      const maintenance = await prisma.assetMaintenanceRecord.findFirst({
+        where: {
+          id: parent.recordId,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!maintenance) {
+        throw new Error("The synchronized maintenance record is unavailable.");
+      }
+    }
     resolvedEntityId = parent.recordId;
   } else if (input.payload.targetType === "INSPECTION") {
     const inspection = await prisma.inspection.findFirst({
@@ -422,6 +479,13 @@ function documentTarget(
   }
   if (type === "CORRECTIVE_ACTION") {
     return { entityType: DocumentEntityType.CORRECTIVE_ACTION };
+  }
+  if (
+    type === "ASSET_INSPECTION" ||
+    type === "ASSET_DEFECT" ||
+    type === "ASSET_MAINTENANCE"
+  ) {
+    return { entityType: DocumentEntityType.ASSET_SAFETY };
   }
   return { entityType: DocumentEntityType.INSPECTION };
 }

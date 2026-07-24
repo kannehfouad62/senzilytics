@@ -11,7 +11,37 @@ import {
   ConfigurableSubmissionStatus,
   ContractorStatus,
   ContractorWorkerStatus,
+  Prisma,
 } from "@prisma/client";
+
+type OfflineSubmissionInput = {
+  id: string;
+  capturedAt: Date;
+  payloadHash: string;
+};
+
+async function recordContractorOfflineSubmission(
+  tx: Prisma.TransactionClient,
+  input: {
+    organizationId: string;
+    userId: string;
+    offlineSubmission?: OfflineSubmissionInput;
+  },
+  recordId: string
+) {
+  if (!input.offlineSubmission) return;
+  await tx.offlineSubmission.create({
+    data: {
+      id: input.offlineSubmission.id,
+      organizationId: input.organizationId,
+      userId: input.userId,
+      recordType: "CONTRACTOR_STATUS",
+      recordId,
+      capturedAt: input.offlineSubmission.capturedAt,
+      payloadHash: input.offlineSubmission.payloadHash,
+    },
+  });
+}
 
 export async function createContractorService(input: {
   organizationId: string;
@@ -121,6 +151,7 @@ export async function updateContractorStatusService(input: {
   contractorId: string;
   status: ContractorStatus;
   reason?: string | null;
+  offlineSubmission?: OfflineSubmissionInput;
 }) {
   const contractor = await prisma.contractor.findFirst({
     where: { id: input.contractorId, organizationId: input.organizationId },
@@ -180,6 +211,11 @@ export async function updateContractorStatusService(input: {
   }
 
   if (contractor.status === input.status) {
+    if (input.offlineSubmission) {
+      await prisma.$transaction((tx) =>
+        recordContractorOfflineSubmission(tx, input, contractor.id)
+      );
+    }
     return contractor;
   }
 
@@ -219,6 +255,8 @@ export async function updateContractorStatusService(input: {
         },
       },
     });
+
+    await recordContractorOfflineSubmission(tx, input, updated.id);
 
     return updated;
   });

@@ -17,7 +17,7 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD";
   nativePermission?: PermissionKey;
 };
 
@@ -33,8 +33,8 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "risks", label: "Risk Register", description: "Enterprise hazards, controls, reviews, and residual risk.", href: "/risks", category: "SAFETY", permission: PermissionKey.VIEW_RISKS, nativeCapability: "RISK_FIELD" },
   { key: "jsa", label: "JSA / JHA", description: "Job steps, hazards, controls, approvals, and acknowledgements.", href: "/risks/jsa", category: "SAFETY", permission: PermissionKey.VIEW_RISKS, nativeCapability: "JSA_FIELD" },
   { key: "moc", label: "Management of Change", description: "Change requests, risk reviews, approvals, and implementation tasks.", href: "/moc", category: "SAFETY", permission: PermissionKey.VIEW_MOC, nativeCapability: "MOC_EXECUTION" },
-  { key: "assets", label: "Assets & Equipment", description: "Asset lifecycle, condition, inspections, and maintenance exposure.", href: "/assets", category: "SAFETY", permission: PermissionKey.VIEW_ASSETS },
-  { key: "contractors", label: "Contractors", description: "Contractor qualification, access, performance, and compliance.", href: "/contractors", category: "SAFETY", permission: PermissionKey.VIEW_CONTRACTORS },
+  { key: "assets", label: "Assets & Equipment", description: "Asset lifecycle, condition, inspections, and maintenance exposure.", href: "/assets", category: "SAFETY", permission: PermissionKey.VIEW_ASSETS, nativeCapability: "ASSET_FIELD" },
+  { key: "contractors", label: "Contractors", description: "Contractor qualification, access, performance, and compliance.", href: "/contractors", category: "SAFETY", permission: PermissionKey.VIEW_CONTRACTORS, nativeCapability: "CONTRACTOR_FIELD" },
   { key: "permits", label: "Permit to Work", description: "Controlled work permits, hazards, controls, and authorizations.", href: "/permits-to-work", category: "SAFETY", permission: PermissionKey.VIEW_PERMITS_TO_WORK, nativeCapability: "PERMIT_TO_WORK_EXECUTION" },
   { key: "industrial-hygiene", label: "Industrial Hygiene", description: "Exposure assessments, samples, limits, and surveillance.", href: "/industrial-hygiene", category: "SAFETY", permission: PermissionKey.VIEW_INDUSTRIAL_HYGIENE },
   { key: "occupational-health", label: "Occupational Health", description: "Health surveillance programs and fitness controls.", href: "/occupational-health", category: "SAFETY", permission: PermissionKey.VIEW_OCCUPATIONAL_HEALTH },

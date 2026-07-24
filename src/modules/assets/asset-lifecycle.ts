@@ -16,6 +16,14 @@ const maintenanceTransitions: Record<AssetMaintenanceStatus, AssetMaintenanceSta
   CANCELLED: [],
 };
 
+export const getAssetNextStatuses = (status: AssetStatus) => [
+  ...assetTransitions[status],
+];
+
+export const getMaintenanceNextStatuses = (
+  status: AssetMaintenanceStatus
+) => [...maintenanceTransitions[status]];
+
 export const canTransitionAssetStatus = (from: AssetStatus, to: AssetStatus) => from === to || assetTransitions[from].includes(to);
 export const canTransitionMaintenanceStatus = (from: AssetMaintenanceStatus, to: AssetMaintenanceStatus) => from === to || maintenanceTransitions[from].includes(to);
 export const nextAssetDueDate = (from: Date, intervalDays: number) => {

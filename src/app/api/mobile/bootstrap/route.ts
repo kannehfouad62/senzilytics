@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { authenticateMobileRequest, MobileAuthError } from "@/modules/mobile/mobile-auth.service";
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.service";
+import { getMobileAssetContractorWorkspace } from "@/modules/mobile/mobile-asset-contractor.service";
 import { getMobileComplianceTraining } from "@/modules/mobile/mobile-compliance-training.service";
 import { getMobileMocPermitWorkspace } from "@/modules/mobile/mobile-moc-permit.service";
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -65,6 +66,11 @@ export async function GET(request: Request) {
         permissions: assigned,
       }),
       getMobileMocPermitWorkspace({
+        organizationId: organization.id,
+        userId: user.id,
+        permissions: assigned,
+      }),
+      getMobileAssetContractorWorkspace({
         organizationId: organization.id,
         userId: user.id,
         permissions: assigned,
@@ -323,6 +329,12 @@ export async function GET(request: Request) {
       managementOfChanges: mocPermits.mocs,
       permitsToWork: mocPermits.permits,
       mocPermitCapabilities: mocPermits.capabilities,
+      assets: assetContractors.assets,
+      contractors: assetContractors.contractors,
+      assetContractorCapabilities: assetContractors.capabilities,
+      assetInspectionForms: serializeRuntimeForms(
+        assetContractors.assetInspectionForms
+      ),
       notifications,
       tasks: actionCenter.tasks,
       correctiveActions: actionCenter.correctiveActions,

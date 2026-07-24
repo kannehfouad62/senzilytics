@@ -11,11 +11,18 @@ import {
 } from "./offline-envelope";
 import { isMobileWorkspaceCacheFresh } from "./session-lifecycle";
 import type {
+  AssetDefectPayload,
+  AssetDefectStatusPayload,
+  AssetInspectionPayload,
+  AssetMaintenanceCompletionPayload,
+  AssetMaintenanceStatusPayload,
+  AssetStatusPayload,
   AuditResponsePayload,
   AuditStartPayload,
   CapaStatusPayload,
   ComplianceOccurrenceCompletionPayload,
   ComplianceOccurrenceReviewPayload,
+  ContractorStatusPayload,
   IncidentPayload,
   InspectionResponsePayload,
   JsaAcknowledgmentPayload,
@@ -39,7 +46,10 @@ type EvidenceTargetType =
   | "INCIDENT"
   | "INSPECTION"
   | "AUDIT_QUESTION"
-  | "CORRECTIVE_ACTION";
+  | "CORRECTIVE_ACTION"
+  | "ASSET_INSPECTION"
+  | "ASSET_DEFECT"
+  | "ASSET_MAINTENANCE";
 type EvidenceRow = {
   id: string;
   parent_submission_id: string | null;
@@ -148,7 +158,10 @@ async function queueOfflineItem(
         parentSubmissionId:
           type === "SAFETY_OBSERVATION" ||
           type === "INCIDENT" ||
-          type === "CAPA_STATUS"
+          type === "CAPA_STATUS" ||
+          type === "ASSET_INSPECTION" ||
+          type === "ASSET_DEFECT" ||
+          type === "ASSET_MAINTENANCE_COMPLETE"
             ? id
             : undefined,
       });
@@ -322,6 +335,75 @@ export async function queuePermitGasTest(
   return queueOfflineItem(ownerKey, "PERMIT_GAS_TEST", payload);
 }
 
+export async function queueAssetStatus(
+  ownerKey: string,
+  payload: AssetStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "ASSET_STATUS", payload);
+}
+
+export async function queueAssetInspection(
+  ownerKey: string,
+  payload: AssetInspectionPayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "ASSET_INSPECTION", payload, {
+    files: evidence,
+    targetType: "ASSET_INSPECTION",
+    entityId: payload.assetId,
+    title: "Asset inspection evidence",
+    description: payload.observations || payload.evidenceReference,
+  });
+}
+
+export async function queueAssetDefect(
+  ownerKey: string,
+  payload: AssetDefectPayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "ASSET_DEFECT", payload, {
+    files: evidence,
+    targetType: "ASSET_DEFECT",
+    entityId: payload.assetId,
+    title: `Asset defect evidence: ${payload.title}`,
+    description: payload.description,
+  });
+}
+
+export async function queueAssetDefectStatus(
+  ownerKey: string,
+  payload: AssetDefectStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "ASSET_DEFECT_STATUS", payload);
+}
+
+export async function queueAssetMaintenanceStatus(
+  ownerKey: string,
+  payload: AssetMaintenanceStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "ASSET_MAINTENANCE_STATUS", payload);
+}
+
+export async function queueAssetMaintenanceCompletion(
+  ownerKey: string,
+  payload: AssetMaintenanceCompletionPayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "ASSET_MAINTENANCE_COMPLETE", payload, {
+    files: evidence,
+    targetType: "ASSET_MAINTENANCE",
+    title: "Asset maintenance completion evidence",
+    description: payload.workSummary,
+  });
+}
+
+export async function queueContractorStatus(
+  ownerKey: string,
+  payload: ContractorStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "CONTRACTOR_STATUS", payload);
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([
@@ -348,7 +430,10 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "SAFETY_OBSERVATION" ||
     envelope.type === "INCIDENT" ||
     envelope.type === "AUDIT_START" ||
-    envelope.type === "RISK_CAPTURE"
+    envelope.type === "RISK_CAPTURE" ||
+    envelope.type === "ASSET_INSPECTION" ||
+    envelope.type === "ASSET_DEFECT" ||
+    envelope.type === "ASSET_MAINTENANCE_COMPLETE"
   );
   const responses = decoded.filter(({ envelope }) =>
     envelope.type === "INSPECTION_RESPONSE" ||
@@ -365,7 +450,11 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "MOC_TASK_STATUS" ||
     envelope.type === "PERMIT_STATUS" ||
     envelope.type === "PERMIT_CONTROL" ||
-    envelope.type === "PERMIT_GAS_TEST"
+    envelope.type === "PERMIT_GAS_TEST" ||
+    envelope.type === "ASSET_STATUS" ||
+    envelope.type === "ASSET_DEFECT_STATUS" ||
+    envelope.type === "ASSET_MAINTENANCE_STATUS" ||
+    envelope.type === "CONTRACTOR_STATUS"
   );
   const first = await synchronizeRows(database, parents);
   const files = await synchronizeEvidence(database, ownerKey);

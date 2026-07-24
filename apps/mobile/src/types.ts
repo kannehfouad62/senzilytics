@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD";
 };
 
 export type MobileDepartment = {
@@ -461,6 +461,178 @@ export type MobileMocPermitCapabilities = {
   canManagePermits: boolean;
 };
 
+export type MobileAssetStatus =
+  | "ACTIVE"
+  | "OUT_OF_SERVICE"
+  | "UNDER_MAINTENANCE"
+  | "QUARANTINED"
+  | "RETIRED";
+
+export type MobileAssetDefectStatus =
+  | "OPEN"
+  | "UNDER_REVIEW"
+  | "REPAIR_PLANNED"
+  | "REPAIRED"
+  | "VERIFIED"
+  | "CLOSED"
+  | "DEFERRED";
+
+export type MobileAssetMaintenanceStatus =
+  | "SCHEDULED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "OVERDUE";
+
+export type MobileAsset = {
+  id: string;
+  reference: string;
+  name: string;
+  description: string | null;
+  type: string;
+  status: MobileAssetStatus;
+  criticality: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  isSafetyCritical: boolean;
+  manufacturer: string | null;
+  modelNumber: string | null;
+  serialNumber: string | null;
+  location: string | null;
+  commissionedAt: string | null;
+  inspectionIntervalDays: number;
+  lastInspectionAt: string | null;
+  nextInspectionDueAt: string;
+  maintenanceIntervalDays: number;
+  lastMaintenanceAt: string | null;
+  nextMaintenanceDueAt: string;
+  permitRequired: boolean;
+  site: { id: string; name: string };
+  department: { id: string; name: string } | null;
+  owner: { id: string; name: string } | null;
+  nextStatuses: MobileAssetStatus[];
+  isOwner: boolean;
+  inspections: Array<{
+    id: string;
+    inspectedAt: string;
+    result: "SATISFACTORY" | "DEFECT_FOUND" | "OUT_OF_SERVICE" | "NOT_INSPECTED";
+    conditionScore: number | null;
+    evidenceReference: string | null;
+    observations: string | null;
+    immediateAction: string | null;
+    nextInspectionDueAt: string;
+    inspectedBy: { id: string; name: string };
+  }>;
+  defects: Array<{
+    id: string;
+    reference: string;
+    title: string;
+    description: string;
+    severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+    status: MobileAssetDefectStatus;
+    dueDate: string | null;
+    immediateControls: string | null;
+    repairPlan: string | null;
+    verificationEvidence: string | null;
+    verifiedAt: string | null;
+    correctiveActionId: string | null;
+    reportedBy: { id: string; name: string };
+    owner: { id: string; name: string } | null;
+    verifiedBy: { id: string; name: string } | null;
+    nextStatuses: MobileAssetDefectStatus[];
+    isAssignedToCurrentUser: boolean;
+  }>;
+  maintenanceRecords: Array<{
+    id: string;
+    type: string;
+    status: MobileAssetMaintenanceStatus;
+    title: string;
+    scheduledAt: string;
+    dueAt: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    serviceProvider: string | null;
+    workOrderReference: string | null;
+    workSummary: string | null;
+    evidenceReference: string | null;
+    downtimeHours: number | null;
+    nextMaintenanceDueAt: string | null;
+    technician: { id: string; name: string } | null;
+    defect: { id: string; reference: string; title: string } | null;
+    nextStatuses: MobileAssetMaintenanceStatus[];
+    isAssignedToCurrentUser: boolean;
+  }>;
+};
+
+export type MobileContractorStatus =
+  | "PENDING_APPROVAL"
+  | "APPROVED"
+  | "SUSPENDED"
+  | "EXPIRED"
+  | "INACTIVE";
+
+export type MobileContractor = {
+  id: string;
+  name: string;
+  legalName: string | null;
+  registrationNumber: string | null;
+  primaryContactName: string | null;
+  primaryContactEmail: string | null;
+  primaryContactPhone: string | null;
+  services: string | null;
+  safetyProgramSummary: string | null;
+  insuranceProvider: string | null;
+  insurancePolicyNumber: string | null;
+  insuranceExpiresAt: string | null;
+  status: MobileContractorStatus;
+  safetyRating: number | null;
+  approvedAt: string | null;
+  suspensionReason: string | null;
+  notes: string | null;
+  approvedBy: { id: string; name: string } | null;
+  nextStatuses: MobileContractorStatus[];
+  requiredFormCount: number;
+  submittedFormCount: number;
+  sites: Array<{
+    id: string;
+    approvedAt: string;
+    expiresAt: string | null;
+    notes: string | null;
+    site: { id: string; name: string };
+  }>;
+  workers: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeNumber: string | null;
+    email: string | null;
+    phone: string | null;
+    jobTitle: string | null;
+    status: "PENDING" | "ACTIVE" | "SUSPENDED" | "INACTIVE";
+    inductionCompletedAt: string | null;
+    inductionExpiresAt: string | null;
+    medicalExpiresAt: string | null;
+    competencySummary: string | null;
+    notes: string | null;
+    inductionCurrent: boolean;
+    medicalCurrent: boolean;
+  }>;
+  permitsToWork: Array<{
+    id: string;
+    reference: string;
+    title: string;
+    status: MobilePermitToWorkStatus;
+    plannedStartAt: string;
+    plannedEndAt: string;
+    site: { id: string; name: string };
+  }>;
+};
+
+export type MobileAssetContractorCapabilities = {
+  canViewAssets: boolean;
+  canManageAssets: boolean;
+  canViewContractors: boolean;
+  canManageContractors: boolean;
+};
+
 export type MobileInspectionResponse = {
   result: "NOT_ASSESSED" | "COMPLIANT" | "NON_COMPLIANT" | "NOT_APPLICABLE";
   responseText: string | null;
@@ -604,6 +776,10 @@ export type MobileBootstrap = {
   managementOfChanges: MobileManagementOfChange[];
   permitsToWork: MobilePermitToWork[];
   mocPermitCapabilities: MobileMocPermitCapabilities;
+  assets: MobileAsset[];
+  contractors: MobileContractor[];
+  assetContractorCapabilities: MobileAssetContractorCapabilities;
+  assetInspectionForms: RuntimeForm[];
   correctiveActions: MobileCorrectiveAction[];
   capaCapabilities: MobileCapaCapabilities;
   notifications: MobileNotification[];
@@ -792,4 +968,58 @@ export type PermitGasTestPayload = {
   coPpm?: number;
   result: "PASS" | "FAIL";
   notes?: string;
+};
+
+export type AssetStatusPayload = {
+  assetId: string;
+  status: MobileAssetStatus;
+  reason: string;
+};
+
+export type AssetInspectionPayload = {
+  assetId: string;
+  inspectedAt: string;
+  result: "SATISFACTORY" | "DEFECT_FOUND" | "OUT_OF_SERVICE";
+  conditionScore?: number;
+  evidenceReference?: string;
+  observations?: string;
+  immediateAction?: string;
+  customForms: CapturedForm[];
+};
+
+export type AssetDefectPayload = {
+  assetId: string;
+  title: string;
+  description: string;
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  ownerId?: string;
+  dueDate?: string;
+  immediateControls?: string;
+};
+
+export type AssetDefectStatusPayload = {
+  defectId: string;
+  status: MobileAssetDefectStatus;
+  repairPlan?: string;
+  verificationEvidence?: string;
+};
+
+export type AssetMaintenanceStatusPayload = {
+  recordId: string;
+  status: "IN_PROGRESS" | "CANCELLED";
+  reason: string;
+};
+
+export type AssetMaintenanceCompletionPayload = {
+  recordId: string;
+  completedAt: string;
+  workSummary: string;
+  evidenceReference: string;
+  downtimeHours?: number;
+};
+
+export type ContractorStatusPayload = {
+  contractorId: string;
+  status: MobileContractorStatus;
+  reason?: string;
 };

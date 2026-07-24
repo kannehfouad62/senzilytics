@@ -1,9 +1,16 @@
 import type {
+  AssetDefectPayload,
+  AssetDefectStatusPayload,
+  AssetInspectionPayload,
+  AssetMaintenanceCompletionPayload,
+  AssetMaintenanceStatusPayload,
+  AssetStatusPayload,
   AuditResponsePayload,
   AuditStartPayload,
   CapaStatusPayload,
   ComplianceOccurrenceCompletionPayload,
   ComplianceOccurrenceReviewPayload,
+  ContractorStatusPayload,
   IncidentPayload,
   InspectionResponsePayload,
   JsaAcknowledgmentPayload,
@@ -39,7 +46,14 @@ export type OfflineRecordType =
   | "MOC_TASK_STATUS"
   | "PERMIT_STATUS"
   | "PERMIT_CONTROL"
-  | "PERMIT_GAS_TEST";
+  | "PERMIT_GAS_TEST"
+  | "ASSET_STATUS"
+  | "ASSET_INSPECTION"
+  | "ASSET_DEFECT"
+  | "ASSET_DEFECT_STATUS"
+  | "ASSET_MAINTENANCE_STATUS"
+  | "ASSET_MAINTENANCE_COMPLETE"
+  | "CONTRACTOR_STATUS";
 
 export type OfflineRecordPayload =
   | ObservationPayload
@@ -60,7 +74,14 @@ export type OfflineRecordPayload =
   | MocTaskStatusPayload
   | PermitStatusPayload
   | PermitControlPayload
-  | PermitGasTestPayload;
+  | PermitGasTestPayload
+  | AssetStatusPayload
+  | AssetInspectionPayload
+  | AssetDefectPayload
+  | AssetDefectStatusPayload
+  | AssetMaintenanceStatusPayload
+  | AssetMaintenanceCompletionPayload
+  | ContractorStatusPayload;
 
 export type OfflineEnvelope = {
   type: OfflineRecordType;
@@ -87,6 +108,13 @@ const recordTypes = new Set<OfflineRecordType>([
   "PERMIT_STATUS",
   "PERMIT_CONTROL",
   "PERMIT_GAS_TEST",
+  "ASSET_STATUS",
+  "ASSET_INSPECTION",
+  "ASSET_DEFECT",
+  "ASSET_DEFECT_STATUS",
+  "ASSET_MAINTENANCE_STATUS",
+  "ASSET_MAINTENANCE_COMPLETE",
+  "CONTRACTOR_STATUS",
 ]);
 
 export function decodeOfflineEnvelope(value: unknown): OfflineEnvelope {

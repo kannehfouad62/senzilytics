@@ -80,6 +80,10 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.MANAGE_MOC,
       PermissionKey.VIEW_PERMITS_TO_WORK,
       PermissionKey.MANAGE_PERMITS_TO_WORK,
+      PermissionKey.VIEW_ASSETS,
+      PermissionKey.MANAGE_ASSETS,
+      PermissionKey.VIEW_CONTRACTORS,
+      PermissionKey.MANAGE_CONTRACTORS,
       PermissionKey.UPDATE_CAPA,
     ],
     user: {
@@ -99,6 +103,8 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(modules.find((module) => module.key === "jsa")?.nativeCapability, "JSA_FIELD");
   assert.equal(modules.find((module) => module.key === "moc")?.nativeCapability, "MOC_EXECUTION");
   assert.equal(modules.find((module) => module.key === "permits")?.nativeCapability, "PERMIT_TO_WORK_EXECUTION");
+  assert.equal(modules.find((module) => module.key === "assets")?.nativeCapability, "ASSET_FIELD");
+  assert.equal(modules.find((module) => module.key === "contractors")?.nativeCapability, "CONTRACTOR_FIELD");
 
   const governance = getMobileModuleCatalog({
     permissions: [
@@ -123,7 +129,13 @@ test("native field capabilities require their write permissions", () => {
   );
 
   const readOnly = getMobileModuleCatalog({
-    permissions: [PermissionKey.VIEW_INCIDENT, PermissionKey.VIEW_INSPECTIONS, PermissionKey.VIEW_AUDITS],
+    permissions: [
+      PermissionKey.VIEW_INCIDENT,
+      PermissionKey.VIEW_INSPECTIONS,
+      PermissionKey.VIEW_AUDITS,
+      PermissionKey.VIEW_ASSETS,
+      PermissionKey.VIEW_CONTRACTORS,
+    ],
     user: {
       email: "viewer@example.com",
       role: UserRole.AUDITOR,
@@ -135,4 +147,6 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(readOnly.find((module) => module.key === "incidents")?.nativeCapability, undefined);
   assert.equal(readOnly.find((module) => module.key === "inspections")?.nativeCapability, undefined);
   assert.equal(readOnly.find((module) => module.key === "audits")?.nativeCapability, undefined);
+  assert.equal(readOnly.find((module) => module.key === "assets")?.nativeCapability, "ASSET_FIELD");
+  assert.equal(readOnly.find((module) => module.key === "contractors")?.nativeCapability, "CONTRACTOR_FIELD");
 });

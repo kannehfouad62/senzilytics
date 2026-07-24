@@ -414,6 +414,127 @@ test("mobile permit gas-test contracts reject impossible readings", () => {
   }
 });
 
+test("mobile synchronization accepts governed asset and contractor field updates", () => {
+  const parsed = offlineSyncRequestSchema.safeParse({
+    items: [
+      {
+        id: "9e06e500-c84f-4d88-9df1-34d5278347ac",
+        type: "ASSET_STATUS",
+        capturedAt,
+        payload: {
+          assetId: "asset-1",
+          status: "OUT_OF_SERVICE",
+          reason: "Guard interlock failed during the pre-use check.",
+        },
+      },
+      {
+        id: "0e3873d6-ef4f-499b-b527-1221165df98f",
+        type: "ASSET_INSPECTION",
+        capturedAt,
+        payload: {
+          assetId: "asset-1",
+          inspectedAt: capturedAt,
+          result: "DEFECT_FOUND",
+          conditionScore: 2,
+          observations: "The fixed guard is loose at two anchor points.",
+          immediateAction: "Equipment isolated pending repair.",
+          customForms: [],
+        },
+      },
+      {
+        id: "543bf5df-864c-44d8-867b-05cd36941843",
+        type: "ASSET_DEFECT",
+        capturedAt,
+        payload: {
+          assetId: "asset-1",
+          title: "Loose fixed guard",
+          description: "Two guard anchor bolts do not retain torque.",
+          severity: "HIGH",
+          ownerId: "user-1",
+          dueDate: "2026-08-15",
+          immediateControls: "Asset locked out and tagged.",
+        },
+      },
+      {
+        id: "73c38123-8de7-4f22-ae7b-a4baa3b42da7",
+        type: "ASSET_DEFECT_STATUS",
+        capturedAt,
+        payload: {
+          defectId: "defect-1",
+          status: "REPAIR_PLANNED",
+          repairPlan: "Replace fasteners and complete functional verification.",
+        },
+      },
+      {
+        id: "36c002a7-6bdd-45f1-8523-f779cd6a88eb",
+        type: "ASSET_MAINTENANCE_STATUS",
+        capturedAt,
+        payload: {
+          recordId: "maintenance-1",
+          status: "IN_PROGRESS",
+          reason: "Technician accepted the work order and isolated the equipment.",
+        },
+      },
+      {
+        id: "4d0da25d-3c79-4a57-b73d-cba25c92b583",
+        type: "ASSET_MAINTENANCE_COMPLETE",
+        capturedAt,
+        payload: {
+          recordId: "maintenance-2",
+          completedAt: capturedAt,
+          workSummary: "Guard anchors replaced and interlock function tested.",
+          evidenceReference: "WO-2048",
+          downtimeHours: 3.5,
+        },
+      },
+      {
+        id: "a2fe06e7-d54e-4fc4-948b-e2e07f61bc36",
+        type: "CONTRACTOR_STATUS",
+        capturedAt,
+        payload: {
+          contractorId: "contractor-1",
+          status: "SUSPENDED",
+          reason: "Insurance certificate expired.",
+        },
+      },
+    ],
+  });
+  assert.equal(parsed.success, true);
+});
+
+test("mobile asset contracts reject unsafe inspection and maintenance values", () => {
+  const invalidInspection = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id,
+      type: "ASSET_INSPECTION",
+      capturedAt,
+      payload: {
+        assetId: "asset-1",
+        inspectedAt: capturedAt,
+        result: "NOT_INSPECTED",
+        conditionScore: 6,
+        customForms: [],
+      },
+    }],
+  });
+  const invalidDowntime = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id,
+      type: "ASSET_MAINTENANCE_COMPLETE",
+      capturedAt,
+      payload: {
+        recordId: "maintenance-1",
+        completedAt: capturedAt,
+        workSummary: "Completed",
+        evidenceReference: "WO-1",
+        downtimeHours: -1,
+      },
+    }],
+  });
+  assert.equal(invalidInspection.success, false);
+  assert.equal(invalidDowntime.success, false);
+});
+
 test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("SAFETY_OBSERVATION"), PermissionKey.CREATE_OBSERVATION);
   assert.equal(requiredOfflinePermission("INCIDENT"), PermissionKey.CREATE_INCIDENT);
@@ -436,6 +557,13 @@ test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("PERMIT_STATUS"), PermissionKey.MANAGE_PERMITS_TO_WORK);
   assert.equal(requiredOfflinePermission("PERMIT_CONTROL"), PermissionKey.MANAGE_PERMITS_TO_WORK);
   assert.equal(requiredOfflinePermission("PERMIT_GAS_TEST"), PermissionKey.MANAGE_PERMITS_TO_WORK);
+  assert.equal(requiredOfflinePermission("ASSET_STATUS"), PermissionKey.MANAGE_ASSETS);
+  assert.equal(requiredOfflinePermission("ASSET_INSPECTION"), PermissionKey.MANAGE_ASSETS);
+  assert.equal(requiredOfflinePermission("ASSET_DEFECT"), PermissionKey.MANAGE_ASSETS);
+  assert.equal(requiredOfflinePermission("ASSET_DEFECT_STATUS"), PermissionKey.MANAGE_ASSETS);
+  assert.equal(requiredOfflinePermission("ASSET_MAINTENANCE_STATUS"), PermissionKey.MANAGE_ASSETS);
+  assert.equal(requiredOfflinePermission("ASSET_MAINTENANCE_COMPLETE"), PermissionKey.MANAGE_ASSETS);
+  assert.equal(requiredOfflinePermission("CONTRACTOR_STATUS"), PermissionKey.MANAGE_CONTRACTORS);
 });
 
 test("mobile outbox decoder preserves legacy observation rows", () => {
@@ -479,5 +607,13 @@ test("mobile outbox decoder preserves legacy observation rows", () => {
   assert.deepEqual(decodeOfflineEnvelope({ type: "PERMIT_GAS_TEST", payload: { permitId: "permit-1" } }), {
     type: "PERMIT_GAS_TEST",
     payload: { permitId: "permit-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "ASSET_INSPECTION", payload: { assetId: "asset-1" } }), {
+    type: "ASSET_INSPECTION",
+    payload: { assetId: "asset-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "CONTRACTOR_STATUS", payload: { contractorId: "contractor-1" } }), {
+    type: "CONTRACTOR_STATUS",
+    payload: { contractorId: "contractor-1" },
   });
 });
