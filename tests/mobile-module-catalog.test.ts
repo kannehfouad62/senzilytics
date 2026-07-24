@@ -94,6 +94,28 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(modules.find((module) => module.key === "risks")?.nativeCapability, "RISK_FIELD");
   assert.equal(modules.find((module) => module.key === "jsa")?.nativeCapability, "JSA_FIELD");
 
+  const governance = getMobileModuleCatalog({
+    permissions: [
+      PermissionKey.VIEW_COMPLIANCE,
+      PermissionKey.VIEW_TRAINING,
+    ],
+    user: {
+      email: "employee@example.com",
+      role: UserRole.EMPLOYEE,
+      isActive: true,
+      isPlatformAdmin: false,
+    },
+  });
+  assert.equal(
+    governance.find((module) => module.key === "compliance-calendar")
+      ?.nativeCapability,
+    "COMPLIANCE_CALENDAR"
+  );
+  assert.equal(
+    governance.find((module) => module.key === "training")?.nativeCapability,
+    "TRAINING_ASSIGNMENTS"
+  );
+
   const readOnly = getMobileModuleCatalog({
     permissions: [PermissionKey.VIEW_INCIDENT, PermissionKey.VIEW_INSPECTIONS, PermissionKey.VIEW_AUDITS],
     user: {

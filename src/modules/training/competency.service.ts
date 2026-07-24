@@ -107,7 +107,20 @@ export async function getCompetencyMatrixService(organizationId: string, now = n
   return { rows, total: rows.length, satisfied: rows.filter(row => row.status === "SATISFIED").length, expiring: rows.filter(row => row.status === "EXPIRING").length, gaps: rows.filter(row => row.status === "GAP" || row.status === "EXPIRED").length, overdueGaps: rows.filter(row => row.isOverdue).length, criticalGaps: rows.filter(row => row.requirement.competency.isCritical && (row.status === "GAP" || row.status === "EXPIRED")).length };
 }
 
-export async function completeTrainingWithCompetenciesService(input: { organizationId: string; userId: string; recordId: string; completedAt: Date; certificateNumber?: string | null; score?: number | null; notes?: string | null }) {
+export async function completeTrainingWithCompetenciesService(input: {
+  organizationId: string;
+  userId: string;
+  recordId: string;
+  completedAt: Date;
+  certificateNumber?: string | null;
+  score?: number | null;
+  notes?: string | null;
+  offlineSubmission?: {
+    id: string;
+    capturedAt: Date;
+    payloadHash: string;
+  };
+}) {
   const [record, actor] = await Promise.all([
     prisma.trainingRecord.findFirst({ where: { id: input.recordId, user: { organizationId: input.organizationId } }, include: { course: { include: { competencyLinks: { include: { competency: true } } } }, user: true } }),
     prisma.user.findFirst({ where: { id: input.userId, organizationId: input.organizationId, isActive: true } }),
@@ -125,6 +138,19 @@ export async function completeTrainingWithCompetenciesService(input: { organizat
       const competencyExpiresAt = link.competency.validityMonths ? addCompetencyMonths(input.completedAt, link.competency.validityMonths) : expiresAt;
       await tx.competencyAssessment.upsert({ where: { sourceTrainingRecordId_competencyId: { sourceTrainingRecordId: record.id, competencyId: link.competencyId } }, update: { status: CompetencyAssessmentStatus.VERIFIED, assessedLevel: link.achievedLevel, assessedAt: input.completedAt, expiresAt: competencyExpiresAt, evidenceReference: input.certificateNumber, verifiedById: actor.id, verifiedAt: new Date(), rejectionReason: null }, create: { organizationId: input.organizationId, competencyId: link.competencyId, userId: record.userId, assessorId: actor.id, status: CompetencyAssessmentStatus.VERIFIED, assessedLevel: link.achievedLevel, assessedAt: input.completedAt, expiresAt: competencyExpiresAt, evidenceType: CompetencyEvidenceType.TRAINING, evidenceReference: input.certificateNumber, sourceTrainingRecordId: record.id, verifiedById: actor.id, verifiedAt: new Date() } });
       competenciesVerified++;
+    }
+    if (input.offlineSubmission) {
+      await tx.offlineSubmission.create({
+        data: {
+          id: input.offlineSubmission.id,
+          organizationId: input.organizationId,
+          userId: input.userId,
+          recordType: "TRAINING_COMPLETION",
+          recordId: record.id,
+          capturedAt: input.offlineSubmission.capturedAt,
+          payloadHash: input.offlineSubmission.payloadHash,
+        },
+      });
     }
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: actor.id, action: ActivityAction.UPDATE, entityType: "TrainingRecord", entityId: record.id, title: "Training completion recorded", description: record.courseName, metadata: { learnerId: record.userId, completedAt: input.completedAt, competenciesVerified } } });
     return { record: updated, competenciesVerified };

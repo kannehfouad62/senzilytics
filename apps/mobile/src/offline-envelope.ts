@@ -2,12 +2,16 @@ import type {
   AuditResponsePayload,
   AuditStartPayload,
   CapaStatusPayload,
+  ComplianceOccurrenceCompletionPayload,
+  ComplianceOccurrenceReviewPayload,
   IncidentPayload,
   InspectionResponsePayload,
   JsaAcknowledgmentPayload,
   ObservationPayload,
   RiskCapturePayload,
   RiskReviewPayload,
+  TrainingCompletionPayload,
+  TrainingProgressPayload,
 } from "./types";
 
 export type OfflineRecordType =
@@ -19,7 +23,11 @@ export type OfflineRecordType =
   | "CAPA_STATUS"
   | "RISK_CAPTURE"
   | "RISK_REVIEW"
-  | "JSA_ACKNOWLEDGMENT";
+  | "JSA_ACKNOWLEDGMENT"
+  | "COMPLIANCE_COMPLETION"
+  | "COMPLIANCE_REVIEW"
+  | "TRAINING_PROGRESS"
+  | "TRAINING_COMPLETION";
 
 export type OfflineRecordPayload =
   | ObservationPayload
@@ -30,7 +38,11 @@ export type OfflineRecordPayload =
   | CapaStatusPayload
   | RiskCapturePayload
   | RiskReviewPayload
-  | JsaAcknowledgmentPayload;
+  | JsaAcknowledgmentPayload
+  | ComplianceOccurrenceCompletionPayload
+  | ComplianceOccurrenceReviewPayload
+  | TrainingProgressPayload
+  | TrainingCompletionPayload;
 
 export type OfflineEnvelope = {
   type: OfflineRecordType;
@@ -47,6 +59,10 @@ const recordTypes = new Set<OfflineRecordType>([
   "RISK_CAPTURE",
   "RISK_REVIEW",
   "JSA_ACKNOWLEDGMENT",
+  "COMPLIANCE_COMPLETION",
+  "COMPLIANCE_REVIEW",
+  "TRAINING_PROGRESS",
+  "TRAINING_COMPLETION",
 ]);
 
 export function decodeOfflineEnvelope(value: unknown): OfflineEnvelope {

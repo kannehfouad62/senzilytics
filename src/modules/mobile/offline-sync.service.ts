@@ -1,5 +1,6 @@
 import {
   ActivityAction,
+  ComplianceCalendarOccurrenceStatus,
   ConfigurableFormModule,
   EnterpriseAuditResponseResult,
   EnterpriseAuditStatus,
@@ -36,6 +37,7 @@ import {
   createRiskReviewService,
   createRiskService,
 } from "@/modules/risk/risk.service";
+import { completeTrainingWithCompetenciesService } from "@/modules/training/competency.service";
 
 const customValue = z.union([
   z.string().max(5000),
@@ -162,7 +164,11 @@ const capaStatusItemSchema = z.object({
 const dateOnly = z.string().regex(
   /^\d{4}-\d{2}-\d{2}$/,
   "Use a YYYY-MM-DD date."
-);
+).refine((value) => {
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value;
+}, "Enter a valid calendar date.");
 
 const riskCaptureItemSchema = z.object({
   id: z.string().uuid(),
@@ -210,6 +216,57 @@ const jsaAcknowledgmentItemSchema = z.object({
   }),
 });
 
+const httpsUrl = z.string().url().max(2000)
+  .refine(
+    (value) => URL.canParse(value) && new URL(value).protocol === "https:",
+    "Evidence URL must use HTTPS."
+  );
+
+const complianceCompletionItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("COMPLIANCE_COMPLETION"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    occurrenceId: z.string().min(1).max(200),
+    completionNotes: z.string().trim().max(5000).optional(),
+    evidenceUrl: httpsUrl.optional(),
+  }),
+});
+
+const complianceReviewItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("COMPLIANCE_REVIEW"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    occurrenceId: z.string().min(1).max(200),
+    decision: z.enum(["APPROVE", "REJECT"]),
+    reviewNotes: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const trainingProgressItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("TRAINING_PROGRESS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    trainingRecordId: z.string().min(1).max(200),
+    notes: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const trainingCompletionItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("TRAINING_COMPLETION"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    trainingRecordId: z.string().min(1).max(200),
+    completedAt: dateOnly,
+    certificateNumber: z.string().trim().max(300).optional(),
+    score: z.number().finite().min(0).max(100).optional(),
+    notes: z.string().trim().max(5000).optional(),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
@@ -220,6 +277,10 @@ const offlineItemSchema = z.discriminatedUnion("type", [
   riskCaptureItemSchema,
   riskReviewItemSchema,
   jsaAcknowledgmentItemSchema,
+  complianceCompletionItemSchema,
+  complianceReviewItemSchema,
+  trainingProgressItemSchema,
+  trainingCompletionItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -245,6 +306,10 @@ export function requiredOfflinePermission(
     return PermissionKey.MANAGE_RISKS;
   }
   if (type === "JSA_ACKNOWLEDGMENT") return PermissionKey.VIEW_RISKS;
+  if (type === "COMPLIANCE_COMPLETION") return PermissionKey.VIEW_COMPLIANCE;
+  if (type === "COMPLIANCE_REVIEW") return PermissionKey.MANAGE_COMPLIANCE;
+  if (type === "TRAINING_PROGRESS") return PermissionKey.VIEW_TRAINING;
+  if (type === "TRAINING_COMPLETION") return PermissionKey.MANAGE_TRAINING;
   if (type === "CAPA_STATUS") {
     return status === Status.COMPLETED || status === Status.CLOSED
       ? PermissionKey.CLOSE_CAPA
@@ -333,8 +398,32 @@ export async function syncOfflineSubmissionsService(input: {
         results.push(await syncRiskCapture(input, item, payloadHash));
       } else if (item.type === "RISK_REVIEW") {
         results.push(await syncRiskReview(input, item, payloadHash));
-      } else {
+      } else if (item.type === "JSA_ACKNOWLEDGMENT") {
         results.push(await syncJsaAcknowledgment(input, item, payloadHash));
+      } else if (item.type === "COMPLIANCE_COMPLETION") {
+        results.push(await syncComplianceCompletion(
+          {
+            organizationId: input.organizationId,
+            userId: input.userId,
+            canManageCompliance: granted.has(PermissionKey.MANAGE_COMPLIANCE),
+          },
+          item,
+          payloadHash
+        ));
+      } else if (item.type === "COMPLIANCE_REVIEW") {
+        results.push(await syncComplianceReview(input, item, payloadHash));
+      } else if (item.type === "TRAINING_PROGRESS") {
+        results.push(await syncTrainingProgress(
+          {
+            organizationId: input.organizationId,
+            userId: input.userId,
+            canManageTraining: granted.has(PermissionKey.MANAGE_TRAINING),
+          },
+          item,
+          payloadHash
+        ));
+      } else {
+        results.push(await syncTrainingCompletion(input, item, payloadHash));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -744,6 +833,303 @@ async function syncJsaAcknowledgment(
   };
 }
 
+const completableComplianceStatuses =
+  new Set<ComplianceCalendarOccurrenceStatus>([
+    ComplianceCalendarOccurrenceStatus.UPCOMING,
+    ComplianceCalendarOccurrenceStatus.DUE,
+    ComplianceCalendarOccurrenceStatus.IN_PROGRESS,
+    ComplianceCalendarOccurrenceStatus.REJECTED,
+    ComplianceCalendarOccurrenceStatus.OVERDUE,
+  ]);
+
+async function syncComplianceCompletion(
+  actor: {
+    organizationId: string;
+    userId: string;
+    canManageCompliance: boolean;
+  },
+  item: z.infer<typeof complianceCompletionItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const occurrence = await prisma.complianceCalendarOccurrence.findFirst({
+    where: {
+      id: item.payload.occurrenceId,
+      organizationId: actor.organizationId,
+    },
+    include: {
+      task: {
+        select: {
+          title: true,
+          evidenceRequired: true,
+          approvalRequired: true,
+        },
+      },
+    },
+  });
+  if (!occurrence) {
+    return {
+      id: item.id,
+      status: "failed",
+      error: "Compliance calendar task not found in this organization.",
+    };
+  }
+  if (
+    occurrence.assignedToId !== actor.userId &&
+    !actor.canManageCompliance
+  ) {
+    return {
+      id: item.id,
+      status: "failed",
+      error: "Only the assignee or a compliance manager can complete this task.",
+    };
+  }
+  if (!completableComplianceStatuses.has(occurrence.status)) {
+    return {
+      id: item.id,
+      status: "failed",
+      error: "This compliance task is no longer available for completion.",
+    };
+  }
+  const completionNotes = item.payload.completionNotes?.trim() || null;
+  const evidenceUrl = item.payload.evidenceUrl || null;
+  if (occurrence.task.evidenceRequired && !completionNotes && !evidenceUrl) {
+    return {
+      id: item.id,
+      status: "failed",
+      error: "Completion evidence or notes are required.",
+    };
+  }
+
+  const capturedAt = new Date(item.capturedAt);
+  const updated = await prisma.$transaction(async (transaction) => {
+    const record = await transaction.complianceCalendarOccurrence.update({
+      where: { id: occurrence.id },
+      data: {
+        completionNotes,
+        evidenceUrl,
+        completedAt: capturedAt,
+        completedById: actor.userId,
+        status: occurrence.task.approvalRequired
+          ? ComplianceCalendarOccurrenceStatus.SUBMITTED
+          : ComplianceCalendarOccurrenceStatus.COMPLETED,
+      },
+    });
+    await transaction.offlineSubmission.create({
+      data: {
+        id: item.id,
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        recordType: item.type,
+        recordId: record.id,
+        capturedAt,
+        payloadHash,
+      },
+    });
+    await transaction.activityLog.create({
+      data: {
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        action: ActivityAction.UPDATE,
+        entityType: "ComplianceCalendarOccurrence",
+        entityId: record.id,
+        title: "Compliance calendar work submitted from mobile",
+        description: occurrence.task.title,
+        metadata: {
+          offlineSubmissionId: item.id,
+          approvalRequired: occurrence.task.approvalRequired,
+          evidenceUrlProvided: Boolean(evidenceUrl),
+        },
+      },
+    });
+    return record;
+  });
+  return { id: item.id, status: "synced", recordId: updated.id };
+}
+
+async function syncComplianceReview(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof complianceReviewItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const occurrence = await prisma.complianceCalendarOccurrence.findFirst({
+    where: {
+      id: item.payload.occurrenceId,
+      organizationId: actor.organizationId,
+      status: ComplianceCalendarOccurrenceStatus.SUBMITTED,
+    },
+    include: {
+      task: { select: { title: true } },
+    },
+  });
+  if (!occurrence) {
+    return {
+      id: item.id,
+      status: "failed",
+      error: "A submitted compliance task could not be found for review.",
+    };
+  }
+
+  const capturedAt = new Date(item.capturedAt);
+  const status = item.payload.decision === "APPROVE"
+    ? ComplianceCalendarOccurrenceStatus.COMPLETED
+    : ComplianceCalendarOccurrenceStatus.REJECTED;
+  const updated = await prisma.$transaction(async (transaction) => {
+    const record = await transaction.complianceCalendarOccurrence.update({
+      where: { id: occurrence.id },
+      data: {
+        status,
+        reviewedAt: capturedAt,
+        reviewedById: actor.userId,
+        reviewNotes: item.payload.reviewNotes?.trim() || null,
+      },
+    });
+    await transaction.offlineSubmission.create({
+      data: {
+        id: item.id,
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        recordType: item.type,
+        recordId: record.id,
+        capturedAt,
+        payloadHash,
+      },
+    });
+    await transaction.activityLog.create({
+      data: {
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        action: ActivityAction.UPDATE,
+        entityType: "ComplianceCalendarOccurrence",
+        entityId: record.id,
+        title: `Compliance calendar submission ${
+          item.payload.decision === "APPROVE" ? "approved" : "rejected"
+        }`,
+        description: occurrence.task.title,
+        metadata: {
+          offlineSubmissionId: item.id,
+          decision: item.payload.decision,
+        },
+      },
+    });
+    return record;
+  });
+  return { id: item.id, status: "synced", recordId: updated.id };
+}
+
+async function syncTrainingProgress(
+  actor: {
+    organizationId: string;
+    userId: string;
+    canManageTraining: boolean;
+  },
+  item: z.infer<typeof trainingProgressItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const assignment = await prisma.trainingRecord.findFirst({
+    where: {
+      id: item.payload.trainingRecordId,
+      user: { organizationId: actor.organizationId },
+    },
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      courseName: true,
+    },
+  });
+  if (!assignment) {
+    return {
+      id: item.id,
+      status: "failed",
+      error: "Training assignment not found in this organization.",
+    };
+  }
+  if (
+    assignment.userId !== actor.userId &&
+    !actor.canManageTraining
+  ) {
+    return {
+      id: item.id,
+      status: "failed",
+      error: "Only the learner or a training manager can start this assignment.",
+    };
+  }
+  if (
+    assignment.status === Status.COMPLETED ||
+    assignment.status === Status.CLOSED
+  ) {
+    return {
+      id: item.id,
+      status: "failed",
+      error: "This training assignment is already completed.",
+    };
+  }
+
+  const capturedAt = new Date(item.capturedAt);
+  const updated = await prisma.$transaction(async (transaction) => {
+    const record = await transaction.trainingRecord.update({
+      where: { id: assignment.id },
+      data: {
+        status: Status.IN_PROGRESS,
+        ...(item.payload.notes?.trim()
+          ? { notes: item.payload.notes.trim() }
+          : {}),
+      },
+    });
+    await transaction.offlineSubmission.create({
+      data: {
+        id: item.id,
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        recordType: item.type,
+        recordId: record.id,
+        capturedAt,
+        payloadHash,
+      },
+    });
+    await transaction.activityLog.create({
+      data: {
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        action: ActivityAction.UPDATE,
+        entityType: "TrainingRecord",
+        entityId: record.id,
+        title: "Training started from mobile",
+        description: assignment.courseName,
+        metadata: { offlineSubmissionId: item.id },
+      },
+    });
+    return record;
+  });
+  return { id: item.id, status: "synced", recordId: updated.id };
+}
+
+async function syncTrainingCompletion(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof trainingCompletionItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const result = await completeTrainingWithCompetenciesService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    recordId: item.payload.trainingRecordId,
+    completedAt: new Date(`${item.payload.completedAt}T00:00:00.000Z`),
+    certificateNumber: item.payload.certificateNumber?.trim() || null,
+    score: item.payload.score ?? null,
+    notes: item.payload.notes?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return {
+    id: item.id,
+    status: "synced",
+    recordId: result.record.id,
+  };
+}
+
 function parseDateOnly(value?: string) {
   return value ? new Date(`${value}T12:00:00.000Z`) : null;
 }
@@ -758,7 +1144,7 @@ function parseFutureReviewDate(value: string | undefined, capturedAt: Date) {
 
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

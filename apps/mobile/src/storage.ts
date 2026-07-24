@@ -14,6 +14,8 @@ import type {
   AuditResponsePayload,
   AuditStartPayload,
   CapaStatusPayload,
+  ComplianceOccurrenceCompletionPayload,
+  ComplianceOccurrenceReviewPayload,
   IncidentPayload,
   InspectionResponsePayload,
   JsaAcknowledgmentPayload,
@@ -21,6 +23,8 @@ import type {
   ObservationPayload,
   RiskCapturePayload,
   RiskReviewPayload,
+  TrainingCompletionPayload,
+  TrainingProgressPayload,
 } from "./types";
 
 type QueueRow = { id: string; payload: string; captured_at: string };
@@ -242,6 +246,34 @@ export async function queueJsaAcknowledgment(
   return queueOfflineItem(ownerKey, "JSA_ACKNOWLEDGMENT", payload);
 }
 
+export async function queueComplianceCompletion(
+  ownerKey: string,
+  payload: ComplianceOccurrenceCompletionPayload
+) {
+  return queueOfflineItem(ownerKey, "COMPLIANCE_COMPLETION", payload);
+}
+
+export async function queueComplianceReview(
+  ownerKey: string,
+  payload: ComplianceOccurrenceReviewPayload
+) {
+  return queueOfflineItem(ownerKey, "COMPLIANCE_REVIEW", payload);
+}
+
+export async function queueTrainingProgress(
+  ownerKey: string,
+  payload: TrainingProgressPayload
+) {
+  return queueOfflineItem(ownerKey, "TRAINING_PROGRESS", payload);
+}
+
+export async function queueTrainingCompletion(
+  ownerKey: string,
+  payload: TrainingCompletionPayload
+) {
+  return queueOfflineItem(ownerKey, "TRAINING_COMPLETION", payload);
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([
@@ -275,7 +307,11 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "AUDIT_RESPONSE" ||
     envelope.type === "CAPA_STATUS" ||
     envelope.type === "RISK_REVIEW" ||
-    envelope.type === "JSA_ACKNOWLEDGMENT"
+    envelope.type === "JSA_ACKNOWLEDGMENT" ||
+    envelope.type === "COMPLIANCE_COMPLETION" ||
+    envelope.type === "COMPLIANCE_REVIEW" ||
+    envelope.type === "TRAINING_PROGRESS" ||
+    envelope.type === "TRAINING_COMPLETION"
   );
   const first = await synchronizeRows(database, parents);
   const files = await synchronizeEvidence(database, ownerKey);

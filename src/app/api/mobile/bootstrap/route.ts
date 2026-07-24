@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { authenticateMobileRequest, MobileAuthError } from "@/modules/mobile/mobile-auth.service";
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.service";
+import { getMobileComplianceTraining } from "@/modules/mobile/mobile-compliance-training.service";
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
 import { getMobileRiskField } from "@/modules/mobile/mobile-risk-field.service";
 
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -53,6 +54,11 @@ export async function GET(request: Request) {
         permissions: assigned,
       }),
       getMobileRiskField({
+        organizationId: organization.id,
+        userId: user.id,
+        permissions: assigned,
+      }),
+      getMobileComplianceTraining({
         organizationId: organization.id,
         userId: user.id,
         permissions: assigned,
@@ -305,6 +311,9 @@ export async function GET(request: Request) {
       risks: riskField.risks,
       jsas: riskField.jsas,
       riskCapabilities: riskField.capabilities,
+      complianceOccurrences: complianceTraining.complianceOccurrences,
+      trainingAssignments: complianceTraining.trainingAssignments,
+      complianceTrainingCapabilities: complianceTraining.capabilities,
       notifications,
       tasks: actionCenter.tasks,
       correctiveActions: actionCenter.correctiveActions,

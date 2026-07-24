@@ -238,6 +238,83 @@ test("mobile field risk contracts reject malformed dates and incomplete acknowle
   assert.equal(invalidAcknowledgment.success, false);
 });
 
+test("mobile synchronization accepts governed compliance and training updates", () => {
+  const parsed = offlineSyncRequestSchema.safeParse({
+    items: [
+      {
+        id: "39ff0c56-3d94-4b82-981c-6445dd876777",
+        type: "COMPLIANCE_COMPLETION",
+        capturedAt,
+        payload: {
+          occurrenceId: "occurrence-1",
+          completionNotes: "Monthly inspection and statutory log review completed.",
+          evidenceUrl: "https://www.senzilytics.cloud/documents/evidence-1",
+        },
+      },
+      {
+        id: "46145a87-c554-4241-b75e-b25e75305408",
+        type: "COMPLIANCE_REVIEW",
+        capturedAt,
+        payload: {
+          occurrenceId: "occurrence-2",
+          decision: "REJECT",
+          reviewNotes: "Attach the signed regulator submission receipt.",
+        },
+      },
+      {
+        id: "1782167a-64d6-494f-9428-45d924b09cdd",
+        type: "TRAINING_PROGRESS",
+        capturedAt,
+        payload: {
+          trainingRecordId: "training-1",
+          notes: "Classroom module started.",
+        },
+      },
+      {
+        id: "99544235-227a-4922-a384-566c4ec1ade6",
+        type: "TRAINING_COMPLETION",
+        capturedAt,
+        payload: {
+          trainingRecordId: "training-2",
+          completedAt: "2026-07-22",
+          certificateNumber: "CERT-2048",
+          score: 94,
+          notes: "Practical assessment passed.",
+        },
+      },
+    ],
+  });
+  assert.equal(parsed.success, true);
+});
+
+test("mobile compliance and training contracts reject unsafe evidence and invalid scores", () => {
+  const insecureEvidence = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id,
+      type: "COMPLIANCE_COMPLETION",
+      capturedAt,
+      payload: {
+        occurrenceId: "occurrence-1",
+        evidenceUrl: "http://example.com/evidence",
+      },
+    }],
+  });
+  const invalidScore = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id,
+      type: "TRAINING_COMPLETION",
+      capturedAt,
+      payload: {
+        trainingRecordId: "training-1",
+        completedAt: "2026-07-22",
+        score: 101,
+      },
+    }],
+  });
+  assert.equal(insecureEvidence.success, false);
+  assert.equal(invalidScore.success, false);
+});
+
 test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("SAFETY_OBSERVATION"), PermissionKey.CREATE_OBSERVATION);
   assert.equal(requiredOfflinePermission("INCIDENT"), PermissionKey.CREATE_INCIDENT);
@@ -250,6 +327,10 @@ test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("RISK_CAPTURE"), PermissionKey.MANAGE_RISKS);
   assert.equal(requiredOfflinePermission("RISK_REVIEW"), PermissionKey.MANAGE_RISKS);
   assert.equal(requiredOfflinePermission("JSA_ACKNOWLEDGMENT"), PermissionKey.VIEW_RISKS);
+  assert.equal(requiredOfflinePermission("COMPLIANCE_COMPLETION"), PermissionKey.VIEW_COMPLIANCE);
+  assert.equal(requiredOfflinePermission("COMPLIANCE_REVIEW"), PermissionKey.MANAGE_COMPLIANCE);
+  assert.equal(requiredOfflinePermission("TRAINING_PROGRESS"), PermissionKey.VIEW_TRAINING);
+  assert.equal(requiredOfflinePermission("TRAINING_COMPLETION"), PermissionKey.MANAGE_TRAINING);
 });
 
 test("mobile outbox decoder preserves legacy observation rows", () => {
@@ -277,5 +358,13 @@ test("mobile outbox decoder preserves legacy observation rows", () => {
   assert.deepEqual(decodeOfflineEnvelope({ type: "JSA_ACKNOWLEDGMENT", payload: { jsaId: "jsa-1" } }), {
     type: "JSA_ACKNOWLEDGMENT",
     payload: { jsaId: "jsa-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "COMPLIANCE_COMPLETION", payload: { occurrenceId: "occurrence-1" } }), {
+    type: "COMPLIANCE_COMPLETION",
+    payload: { occurrenceId: "occurrence-1" },
+  });
+  assert.deepEqual(decodeOfflineEnvelope({ type: "TRAINING_COMPLETION", payload: { trainingRecordId: "training-1" } }), {
+    type: "TRAINING_COMPLETION",
+    payload: { trainingRecordId: "training-1" },
   });
 });

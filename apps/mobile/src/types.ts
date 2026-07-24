@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS";
 };
 
 export type MobileDepartment = {
@@ -190,6 +190,79 @@ export type MobileJsa = {
 export type MobileRiskCapabilities = {
   canView: boolean;
   canManage: boolean;
+};
+
+export type MobileComplianceOccurrenceStatus =
+  | "UPCOMING"
+  | "DUE"
+  | "IN_PROGRESS"
+  | "SUBMITTED"
+  | "COMPLETED"
+  | "REJECTED"
+  | "OVERDUE"
+  | "CANCELLED";
+
+export type MobileComplianceOccurrence = {
+  id: string;
+  dueAt: string;
+  status: MobileComplianceOccurrenceStatus;
+  completionNotes: string | null;
+  evidenceUrl: string | null;
+  completedAt: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  assignedTo: { id: string; name: string };
+  site: { id: string; name: string };
+  department: { id: string; name: string } | null;
+  task: {
+    id: string;
+    title: string;
+    description: string | null;
+    instructions: string | null;
+    category: string;
+    regulatoryReference: string | null;
+    evidenceRequired: boolean;
+    approvalRequired: boolean;
+    recurrence: string;
+  };
+  isAssignedToCurrentUser: boolean;
+};
+
+export type MobileTrainingAssignment = {
+  id: string;
+  courseName: string;
+  status: MobileCorrectiveActionStatus;
+  dueDate: string | null;
+  completedAt: string | null;
+  assignedAt: string;
+  expiresAt: string | null;
+  provider: string | null;
+  certificateNumber: string | null;
+  score: number | null;
+  notes: string | null;
+  user: { id: string; name: string };
+  assignedBy: { id: string; name: string } | null;
+  course: {
+    id: string;
+    code: string;
+    name: string;
+    description: string | null;
+    provider: string | null;
+    validityMonths: number | null;
+  } | null;
+  requirement: {
+    id: string;
+    dueWithinDays: number;
+    renewalLeadDays: number;
+  } | null;
+  isAssignedToCurrentUser: boolean;
+};
+
+export type MobileComplianceTrainingCapabilities = {
+  canViewCompliance: boolean;
+  canManageCompliance: boolean;
+  canViewTraining: boolean;
+  canManageTraining: boolean;
 };
 
 export type MobileInspectionResponse = {
@@ -329,6 +402,9 @@ export type MobileBootstrap = {
   risks: MobileRisk[];
   jsas: MobileJsa[];
   riskCapabilities: MobileRiskCapabilities;
+  complianceOccurrences: MobileComplianceOccurrence[];
+  trainingAssignments: MobileTrainingAssignment[];
+  complianceTrainingCapabilities: MobileComplianceTrainingCapabilities;
   correctiveActions: MobileCorrectiveAction[];
   capaCapabilities: MobileCapaCapabilities;
   notifications: MobileNotification[];
@@ -449,4 +525,29 @@ export type RiskReviewPayload = {
 export type JsaAcknowledgmentPayload = {
   jsaId: string;
   statement: string;
+};
+
+export type ComplianceOccurrenceCompletionPayload = {
+  occurrenceId: string;
+  completionNotes?: string;
+  evidenceUrl?: string;
+};
+
+export type ComplianceOccurrenceReviewPayload = {
+  occurrenceId: string;
+  decision: "APPROVE" | "REJECT";
+  reviewNotes?: string;
+};
+
+export type TrainingProgressPayload = {
+  trainingRecordId: string;
+  notes?: string;
+};
+
+export type TrainingCompletionPayload = {
+  trainingRecordId: string;
+  completedAt: string;
+  certificateNumber?: string;
+  score?: number;
+  notes?: string;
 };
