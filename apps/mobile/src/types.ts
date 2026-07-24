@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD";
 };
 
 export type MobileDepartment = {
@@ -898,6 +898,104 @@ export type MobileAudit = {
   }>;
 };
 
+export type MobileChemicalApprovalStatus =
+  | "DRAFT"
+  | "UNDER_REVIEW"
+  | "APPROVED"
+  | "RESTRICTED"
+  | "PROHIBITED"
+  | "ARCHIVED";
+
+export type MobileChemical = {
+  id: string;
+  productName: string;
+  productCode: string | null;
+  manufacturer: string | null;
+  supplier: string | null;
+  casNumber: string | null;
+  description: string | null;
+  status: MobileChemicalApprovalStatus;
+  signalWord: "DANGER" | "WARNING" | "NONE";
+  hazardClassifications: string | null;
+  pictograms: string | null;
+  exposureLimits: string | null;
+  requiredPpe: string | null;
+  firstAidMeasures: string | null;
+  spillResponse: string | null;
+  storageRequirements: string | null;
+  incompatibilities: string | null;
+  sdsRevisionDate: string | null;
+  sdsReviewDueDate: string | null;
+  regulatoryLists: string | null;
+  regulatoryNotes: string | null;
+  reviewedAt: string | null;
+  reviewedBy: { id: string; name: string } | null;
+  nextStatuses: MobileChemicalApprovalStatus[];
+  sdsReviewOverdue: boolean;
+  missingFormDefinitionIds: string[];
+  inventories: Array<{
+    id: string;
+    storageLocation: string;
+    quantity: number;
+    unit: string;
+    maximumAllowed: number | null;
+    containerType: string | null;
+    storageNotes: string | null;
+    inventoriedAt: string;
+    site: { id: string; name: string };
+    limitExceeded: boolean;
+  }>;
+};
+
+export type MobileEnvironmentalDataPoint = {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  value: number;
+  normalizedValue: number;
+  quality: "MEASURED" | "CALCULATED" | "ESTIMATED" | "SUPPLIER_PROVIDED";
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  evidenceSummary: string | null;
+  notes: string | null;
+  approvedAt: string | null;
+  site: { id: string; name: string };
+  enteredBy: { id: string; name: string };
+  approvedBy: { id: string; name: string } | null;
+  missingFormDefinitionIds: string[];
+};
+
+export type MobileEnvironmentalMetric = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  type: string;
+  sourceUnit: string;
+  reportingUnit: string;
+  conversionFactor: number;
+  methodology: string | null;
+  reportingFrequency: string;
+  dataPoints: MobileEnvironmentalDataPoint[];
+};
+
+export type MobileEnvironmentalTarget = {
+  id: string;
+  metricId: string;
+  name: string;
+  baselineYear: number;
+  baselineValue: number;
+  targetYear: number;
+  targetValue: number;
+  description: string | null;
+};
+
+export type MobileChemicalEnvironmentalCapabilities = {
+  canViewChemicals: boolean;
+  canManageChemicals: boolean;
+  canViewEnvironmental: boolean;
+  canManageEnvironmental: boolean;
+};
+
 export type MobileBootstrap = {
   user: MobileUser;
   organization: { id: string; name: string; subscriptionPlan: string };
@@ -926,6 +1024,13 @@ export type MobileBootstrap = {
   hygieneHealthPeople: Array<{ id: string; name: string }>;
   hygieneHealthCapabilities: MobileHygieneHealthCapabilities;
   industrialHygieneForms: RuntimeForm[];
+  chemicals: MobileChemical[];
+  environmentalMetrics: MobileEnvironmentalMetric[];
+  environmentalTargets: MobileEnvironmentalTarget[];
+  chemicalEnvironmentalCapabilities:
+    MobileChemicalEnvironmentalCapabilities;
+  chemicalForms: RuntimeForm[];
+  environmentalForms: RuntimeForm[];
   correctiveActions: MobileCorrectiveAction[];
   capaCapabilities: MobileCapaCapabilities;
   notifications: MobileNotification[];
@@ -1231,4 +1336,51 @@ export type SurveillanceCompletionPayload = {
 export type SurveillanceRemovalPayload = {
   enrollmentId: string;
   reason: string;
+};
+
+export type ChemicalInventoryPayload = {
+  chemicalId: string;
+  siteId: string;
+  storageLocation: string;
+  quantity: number;
+  unit: string;
+  maximumAllowed?: number;
+  containerType?: string;
+  storageNotes?: string;
+};
+
+export type ChemicalStatusPayload = {
+  chemicalId: string;
+  status: MobileChemicalApprovalStatus;
+};
+
+export type ChemicalFormsPayload = {
+  chemicalId: string;
+  customForms: CapturedForm[];
+};
+
+export type EnvironmentalDataPayload = {
+  metricId: string;
+  siteId: string;
+  value: number;
+  quality:
+    | "MEASURED"
+    | "CALCULATED"
+    | "ESTIMATED"
+    | "SUPPLIER_PROVIDED";
+  periodStart: string;
+  periodEnd: string;
+  evidenceSummary?: string;
+  notes?: string;
+  customForms: CapturedForm[];
+};
+
+export type EnvironmentalReviewPayload = {
+  dataPointId: string;
+  status: "APPROVED" | "REJECTED";
+};
+
+export type EnvironmentalFormsPayload = {
+  dataPointId: string;
+  customForms: CapturedForm[];
 };

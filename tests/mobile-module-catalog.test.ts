@@ -88,6 +88,10 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.MANAGE_INDUSTRIAL_HYGIENE,
       PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
       PermissionKey.MANAGE_OCCUPATIONAL_HEALTH,
+      PermissionKey.VIEW_CHEMICALS,
+      PermissionKey.MANAGE_CHEMICALS,
+      PermissionKey.VIEW_ENVIRONMENTAL,
+      PermissionKey.MANAGE_ENVIRONMENTAL,
       PermissionKey.UPDATE_CAPA,
     ],
     user: {
@@ -111,6 +115,8 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(modules.find((module) => module.key === "contractors")?.nativeCapability, "CONTRACTOR_FIELD");
   assert.equal(modules.find((module) => module.key === "industrial-hygiene")?.nativeCapability, "INDUSTRIAL_HYGIENE_FIELD");
   assert.equal(modules.find((module) => module.key === "occupational-health")?.nativeCapability, "OCCUPATIONAL_HEALTH_FIELD");
+  assert.equal(modules.find((module) => module.key === "chemicals")?.nativeCapability, "CHEMICAL_FIELD");
+  assert.equal(modules.find((module) => module.key === "environmental")?.nativeCapability, "ENVIRONMENTAL_FIELD");
 
   const governance = getMobileModuleCatalog({
     permissions: [
@@ -143,6 +149,8 @@ test("native field capabilities require their write permissions", () => {
       PermissionKey.VIEW_CONTRACTORS,
       PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
       PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
+      PermissionKey.VIEW_CHEMICALS,
+      PermissionKey.VIEW_ENVIRONMENTAL,
     ],
     user: {
       email: "viewer@example.com",
@@ -159,4 +167,6 @@ test("native field capabilities require their write permissions", () => {
   assert.equal(readOnly.find((module) => module.key === "contractors")?.nativeCapability, "CONTRACTOR_FIELD");
   assert.equal(readOnly.find((module) => module.key === "industrial-hygiene")?.nativeCapability, "INDUSTRIAL_HYGIENE_FIELD");
   assert.equal(readOnly.find((module) => module.key === "occupational-health")?.nativeCapability, "OCCUPATIONAL_HEALTH_FIELD");
+  assert.equal(readOnly.find((module) => module.key === "chemicals")?.nativeCapability, "CHEMICAL_FIELD");
+  assert.equal(readOnly.find((module) => module.key === "environmental")?.nativeCapability, "ENVIRONMENTAL_FIELD");
 });

@@ -39,6 +39,8 @@ const targetTypeSchema = z.enum([
   "ASSET_DEFECT",
   "ASSET_MAINTENANCE",
   "INDUSTRIAL_HYGIENE",
+  "CHEMICAL",
+  "ENVIRONMENTAL",
 ]);
 
 export const mobileEvidencePayloadSchema = z.object({
@@ -78,7 +80,8 @@ export const mobileEvidencePayloadSchema = z.object({
     (
       value.targetType === "INSPECTION" ||
       value.targetType === "AUDIT_QUESTION" ||
-      value.targetType === "CORRECTIVE_ACTION"
+      value.targetType === "CORRECTIVE_ACTION" ||
+      value.targetType === "CHEMICAL"
     ) &&
     !value.entityId
   ) {
@@ -93,6 +96,17 @@ export const mobileEvidencePayloadSchema = z.object({
       code: "custom",
       path: ["questionId"],
       message: "The Audit question is required.",
+    });
+  }
+  if (
+    value.targetType === "ENVIRONMENTAL" &&
+    !value.entityId &&
+    !value.parentSubmissionId
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["entityId"],
+      message: "The environmental evidence target is required.",
     });
   }
 });
@@ -134,6 +148,12 @@ export function requiredMobileEvidencePermission(
   if (targetType === "INDUSTRIAL_HYGIENE") {
     return PermissionKey.MANAGE_INDUSTRIAL_HYGIENE;
   }
+  if (targetType === "CHEMICAL") {
+    return PermissionKey.MANAGE_CHEMICALS;
+  }
+  if (targetType === "ENVIRONMENTAL") {
+    return PermissionKey.MANAGE_ENVIRONMENTAL;
+  }
   return PermissionKey.MANAGE_AUDITS;
 }
 
@@ -172,7 +192,52 @@ export async function resolveMobileEvidenceTarget(input: {
   }
 
   let resolvedEntityId = input.payload.entityId || "";
-  if (
+  if (input.payload.targetType === "CHEMICAL") {
+    const chemical = await prisma.chemical.findFirst({
+      where: {
+        id: input.payload.entityId,
+        organizationId: input.organizationId,
+      },
+      select: { id: true },
+    });
+    if (!chemical) {
+      throw new Error(
+        "This chemical is not available for mobile evidence capture."
+      );
+    }
+    resolvedEntityId = chemical.id;
+  } else if (input.payload.targetType === "ENVIRONMENTAL") {
+    if (input.payload.parentSubmissionId) {
+      const parent = await prisma.offlineSubmission.findFirst({
+        where: {
+          id: input.payload.parentSubmissionId,
+          organizationId: input.organizationId,
+          userId: input.userId,
+          recordType: "ENVIRONMENTAL_DATA",
+        },
+        select: { recordId: true },
+      });
+      if (!parent) {
+        throw new Error(
+          "Synchronize the environmental record before uploading its evidence."
+        );
+      }
+      resolvedEntityId = parent.recordId;
+    }
+    const point = await prisma.environmentalDataPoint.findFirst({
+      where: {
+        id: resolvedEntityId,
+        metric: { organizationId: input.organizationId },
+      },
+      select: { id: true },
+    });
+    if (!point) {
+      throw new Error(
+        "This environmental record is not available for mobile evidence capture."
+      );
+    }
+    resolvedEntityId = point.id;
+  } else if (
     input.payload.targetType === "SAFETY_OBSERVATION" ||
     input.payload.targetType === "INCIDENT" ||
     input.payload.targetType === "ASSET_INSPECTION" ||
@@ -508,6 +573,12 @@ function documentTarget(
   }
   if (type === "INDUSTRIAL_HYGIENE") {
     return { entityType: DocumentEntityType.INDUSTRIAL_HYGIENE };
+  }
+  if (type === "CHEMICAL") {
+    return { entityType: DocumentEntityType.CHEMICAL };
+  }
+  if (type === "ENVIRONMENTAL") {
+    return { entityType: DocumentEntityType.ENVIRONMENTAL };
   }
   return { entityType: DocumentEntityType.INSPECTION };
 }

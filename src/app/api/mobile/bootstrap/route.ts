@@ -12,6 +12,7 @@ import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.service";
 import { getMobileAssetContractorWorkspace } from "@/modules/mobile/mobile-asset-contractor.service";
 import { getMobileComplianceTraining } from "@/modules/mobile/mobile-compliance-training.service";
+import { getMobileChemicalEnvironmentalWorkspace } from "@/modules/mobile/mobile-chemical-environmental.service";
 import { getMobileHygieneHealthWorkspace } from "@/modules/mobile/mobile-hygiene-health.service";
 import { getMobileMocPermitWorkspace } from "@/modules/mobile/mobile-moc-permit.service";
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, hygieneHealth, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, hygieneHealth, chemicalEnvironmental, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -79,6 +80,10 @@ export async function GET(request: Request) {
       getMobileHygieneHealthWorkspace({
         organizationId: organization.id,
         userId: user.id,
+        permissions: assigned,
+      }),
+      getMobileChemicalEnvironmentalWorkspace({
+        organizationId: organization.id,
         permissions: assigned,
       }),
       canExecuteInspections
@@ -346,6 +351,17 @@ export async function GET(request: Request) {
       hygieneHealthPeople: hygieneHealth.people,
       hygieneHealthCapabilities: hygieneHealth.capabilities,
       industrialHygieneForms: serializeRuntimeForms(hygieneHealth.forms),
+      chemicals: chemicalEnvironmental.chemicals,
+      environmentalMetrics: chemicalEnvironmental.metrics,
+      environmentalTargets: chemicalEnvironmental.targets,
+      chemicalEnvironmentalCapabilities:
+        chemicalEnvironmental.capabilities,
+      chemicalForms: serializeRuntimeForms(
+        chemicalEnvironmental.chemicalForms
+      ),
+      environmentalForms: serializeRuntimeForms(
+        chemicalEnvironmental.environmentalForms
+      ),
       notifications,
       tasks: actionCenter.tasks,
       correctiveActions: actionCenter.correctiveActions,

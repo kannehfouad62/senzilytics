@@ -13,8 +13,8 @@ import { prisma } from "@/lib/prisma";
 import { hasSubscriptionFeature } from "@/lib/subscription";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
+import { getChemicalNextStatuses } from "@/modules/chemicals/chemical-lifecycle";
 import {
-  ChemicalApprovalStatus,
   ConfigurableFormModule,
   DocumentEntityType,
   PermissionKey,
@@ -76,6 +76,10 @@ export default async function ChemicalDetailPage({
     capturedForms.map((submission) => submission.definitionId)
   );
   const missingForms = forms.filter((form) => !capturedIds.has(form.id));
+  const availableStatuses = [
+    item.status,
+    ...getChemicalNextStatuses(item.status),
+  ];
 
   return (
     <div>
@@ -166,7 +170,7 @@ export default async function ChemicalDetailPage({
                   defaultValue={item.status}
                   className={inputClassName}
                 >
-                  {Object.values(ChemicalApprovalStatus).map((status) => (
+                  {availableStatuses.map((status) => (
                     <option key={status} value={status}>
                       {status.replaceAll("_", " ")}
                     </option>

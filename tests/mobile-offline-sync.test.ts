@@ -706,6 +706,81 @@ test("each offline record type requires its governing permission", () => {
   assert.equal(requiredOfflinePermission("OH_ENROLLMENT"), PermissionKey.MANAGE_OCCUPATIONAL_HEALTH);
   assert.equal(requiredOfflinePermission("OH_ENROLLMENT_COMPLETE"), PermissionKey.MANAGE_OCCUPATIONAL_HEALTH);
   assert.equal(requiredOfflinePermission("OH_ENROLLMENT_REMOVE"), PermissionKey.MANAGE_OCCUPATIONAL_HEALTH);
+  assert.equal(requiredOfflinePermission("CHEMICAL_INVENTORY"), PermissionKey.MANAGE_CHEMICALS);
+  assert.equal(requiredOfflinePermission("CHEMICAL_STATUS"), PermissionKey.MANAGE_CHEMICALS);
+  assert.equal(requiredOfflinePermission("CHEMICAL_FORMS"), PermissionKey.MANAGE_CHEMICALS);
+  assert.equal(requiredOfflinePermission("ENVIRONMENTAL_DATA"), PermissionKey.MANAGE_ENVIRONMENTAL);
+  assert.equal(requiredOfflinePermission("ENVIRONMENTAL_REVIEW"), PermissionKey.MANAGE_ENVIRONMENTAL);
+  assert.equal(requiredOfflinePermission("ENVIRONMENTAL_FORMS"), PermissionKey.MANAGE_ENVIRONMENTAL);
+});
+
+test("chemical inventory and environmental data offline contracts reject unsafe field values", () => {
+  const capturedAt = "2026-07-24T12:00:00.000Z";
+  const validChemical = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id: "96f5b642-584e-4fa8-8d02-a7c041132f32",
+      type: "CHEMICAL_INVENTORY",
+      capturedAt,
+      payload: {
+        chemicalId: "chemical-1",
+        siteId: "site-1",
+        storageLocation: "Flammable cabinet A",
+        quantity: 5,
+        unit: "L",
+        maximumAllowed: 10,
+      },
+    }],
+  });
+  const negativeChemical = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id: "a3467127-c3a9-494b-9685-686cc93e1e15",
+      type: "CHEMICAL_INVENTORY",
+      capturedAt,
+      payload: {
+        chemicalId: "chemical-1",
+        siteId: "site-1",
+        storageLocation: "Cabinet",
+        quantity: -1,
+        unit: "L",
+      },
+    }],
+  });
+  const validEnvironmental = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id: "75230862-a215-49da-a78e-03897066d032",
+      type: "ENVIRONMENTAL_DATA",
+      capturedAt,
+      payload: {
+        metricId: "metric-1",
+        siteId: "site-1",
+        value: 125.5,
+        quality: "MEASURED",
+        periodStart: "2026-07-01",
+        periodEnd: "2026-07-31",
+        customForms: [],
+      },
+    }],
+  });
+  const reversedPeriod = offlineSyncRequestSchema.safeParse({
+    items: [{
+      id: "6fd0d1b7-b522-4e98-a98d-6628796de5ca",
+      type: "ENVIRONMENTAL_DATA",
+      capturedAt,
+      payload: {
+        metricId: "metric-1",
+        siteId: "site-1",
+        value: 125.5,
+        quality: "MEASURED",
+        periodStart: "2026-07-31",
+        periodEnd: "2026-07-01",
+        customForms: [],
+      },
+    }],
+  });
+  assert.equal(validChemical.success, true);
+  assert.equal(negativeChemical.success, false);
+  assert.equal(validEnvironmental.success, true);
+  assert.equal(reversedPeriod.success, false);
 });
 
 test("mobile outbox decoder preserves legacy observation rows", () => {

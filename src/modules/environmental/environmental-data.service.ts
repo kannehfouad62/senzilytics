@@ -9,7 +9,38 @@ import {
   ConfigurableFormModule,
   EnvironmentalDataQuality,
   EnvironmentalDataStatus,
+  Prisma,
 } from "@prisma/client";
+
+type OfflineSubmissionInput = {
+  id: string;
+  capturedAt: Date;
+  payloadHash: string;
+};
+
+async function recordEnvironmentalOfflineSubmission(
+  tx: Prisma.TransactionClient,
+  input: {
+    organizationId: string;
+    userId: string;
+    offlineSubmission?: OfflineSubmissionInput;
+  },
+  recordType: string,
+  recordId: string
+) {
+  if (!input.offlineSubmission) return;
+  await tx.offlineSubmission.create({
+    data: {
+      id: input.offlineSubmission.id,
+      organizationId: input.organizationId,
+      userId: input.userId,
+      recordType,
+      recordId,
+      capturedAt: input.offlineSubmission.capturedAt,
+      payloadHash: input.offlineSubmission.payloadHash,
+    },
+  });
+}
 
 export async function recordEnvironmentalDataService(input: {
   organizationId: string;
@@ -23,6 +54,7 @@ export async function recordEnvironmentalDataService(input: {
   evidenceSummary?: string | null;
   notes?: string | null;
   customSubmissions?: PreparedSubmission[];
+  offlineSubmission?: OfflineSubmissionInput;
 }) {
   const [metric, site, creator] = await Promise.all([
     prisma.environmentalMetricDefinition.findFirst({
@@ -139,6 +171,12 @@ export async function recordEnvironmentalDataService(input: {
         },
       },
     });
+    await recordEnvironmentalOfflineSubmission(
+      tx,
+      input,
+      "ENVIRONMENTAL_DATA",
+      point.id
+    );
 
     return point;
   });
@@ -149,6 +187,7 @@ export async function completeEnvironmentalFormsService(input: {
   userId: string;
   dataPointId: string;
   submissions: PreparedSubmission[];
+  offlineSubmission?: OfflineSubmissionInput;
 }) {
   const point = await prisma.environmentalDataPoint.findFirst({
     where: {
@@ -171,5 +210,81 @@ export async function completeEnvironmentalFormsService(input: {
     activityTitle: "Environmental forms captured",
     formLabel: "environmental",
     submissions: input.submissions,
+    offlineSubmission: input.offlineSubmission,
+    offlineRecordType: input.offlineSubmission
+      ? "ENVIRONMENTAL_FORMS"
+      : undefined,
+  });
+}
+
+export async function reviewEnvironmentalDataService(input: {
+  organizationId: string;
+  userId: string;
+  dataPointId: string;
+  status:
+    | typeof EnvironmentalDataStatus.APPROVED
+    | typeof EnvironmentalDataStatus.REJECTED;
+  offlineSubmission?: OfflineSubmissionInput;
+}) {
+  const point = await prisma.environmentalDataPoint.findFirst({
+    where: {
+      id: input.dataPointId,
+      metric: { organizationId: input.organizationId },
+    },
+    include: {
+      metric: { select: { name: true } },
+      site: { select: { name: true } },
+    },
+  });
+  if (!point) {
+    throw new Error("Environmental record not found in this organization.");
+  }
+  if (point.status === input.status) {
+    if (input.offlineSubmission) {
+      await prisma.$transaction((tx) =>
+        recordEnvironmentalOfflineSubmission(
+          tx,
+          input,
+          "ENVIRONMENTAL_REVIEW",
+          point.id
+        )
+      );
+    }
+    return point;
+  }
+  if (point.status !== EnvironmentalDataStatus.DRAFT) {
+    throw new Error("Only draft environmental data can be approved or rejected.");
+  }
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.environmentalDataPoint.update({
+      where: { id: point.id },
+      data: {
+        status: input.status,
+        approvedById: input.userId,
+        approvedAt: new Date(),
+      },
+    });
+    await tx.activityLog.create({
+      data: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        action: ActivityAction.STATUS_CHANGE,
+        entityType: "EnvironmentalDataPoint",
+        entityId: point.id,
+        title: "Environmental data review completed",
+        description: `${point.metric.name} · ${point.site.name} · ${input.status}`,
+        metadata: {
+          previousStatus: point.status,
+          newStatus: input.status,
+        },
+      },
+    });
+    await recordEnvironmentalOfflineSubmission(
+      tx,
+      input,
+      "ENVIRONMENTAL_REVIEW",
+      updated.id
+    );
+    return updated;
   });
 }

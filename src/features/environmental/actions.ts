@@ -7,6 +7,7 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import {
   completeEnvironmentalFormsService,
   recordEnvironmentalDataService,
+  reviewEnvironmentalDataService,
 } from "@/modules/environmental/environmental-data.service";
 import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
 import {
@@ -166,14 +167,12 @@ export async function reviewEnvironmentalData(data: FormData) {
     throw new Error("Select an approval decision.");
   }
 
-  const result = await prisma.environmentalDataPoint.updateMany({
-    where: { id, metric: { organizationId } },
-    data: { status, approvedById: user.id, approvedAt: new Date() },
+  await reviewEnvironmentalDataService({
+    organizationId,
+    userId: user.id,
+    dataPointId: id,
+    status,
   });
-
-  if (!result.count) {
-    throw new Error("Environmental record not found.");
-  }
 
   revalidatePath("/environmental");
   revalidatePath(`/environmental/${id}`);

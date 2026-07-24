@@ -5,10 +5,13 @@ import {
   AssetMaintenanceStatus,
   AssetStatus,
   ComplianceCalendarOccurrenceStatus,
+  ChemicalApprovalStatus,
   ConfigurableFormModule,
   ContractorStatus,
   EnterpriseAuditResponseResult,
   EnterpriseAuditStatus,
+  EnvironmentalDataQuality,
+  EnvironmentalDataStatus,
   ExposureAssessmentStatus,
   ExposureSampleType,
   FitnessOutcome,
@@ -82,6 +85,16 @@ import {
   removeSurveillanceEnrollmentService,
   updateSurveillanceProgramStatusService,
 } from "@/modules/occupational-health/occupational-health.service";
+import {
+  completeChemicalFormsService,
+  updateChemicalApprovalStatusService,
+  upsertChemicalInventoryService,
+} from "@/modules/chemicals/chemical-governance.service";
+import {
+  completeEnvironmentalFormsService,
+  recordEnvironmentalDataService,
+  reviewEnvironmentalDataService,
+} from "@/modules/environmental/environmental-data.service";
 
 const customValue = z.union([
   z.string().max(5000),
@@ -596,6 +609,90 @@ const surveillanceRemovalItemSchema = z.object({
   }),
 });
 
+const chemicalInventoryItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("CHEMICAL_INVENTORY"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    chemicalId: z.string().min(1).max(200),
+    siteId: z.string().min(1).max(200),
+    storageLocation: z.string().trim().min(1).max(300),
+    quantity: z.number().finite().nonnegative(),
+    unit: z.string().trim().min(1).max(100),
+    maximumAllowed: z.number().finite().nonnegative().optional(),
+    containerType: z.string().trim().max(200).optional(),
+    storageNotes: z.string().trim().max(5000).optional(),
+  }),
+});
+
+const chemicalStatusItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("CHEMICAL_STATUS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    chemicalId: z.string().min(1).max(200),
+    status: z.nativeEnum(ChemicalApprovalStatus),
+  }),
+});
+
+const chemicalFormsItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("CHEMICAL_FORMS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    chemicalId: z.string().min(1).max(200),
+    customForms: z.array(capturedFormSchema).min(1).max(20),
+  }),
+});
+
+const environmentalDataItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ENVIRONMENTAL_DATA"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    metricId: z.string().min(1).max(200),
+    siteId: z.string().min(1).max(200),
+    value: z.number().finite(),
+    quality: z.nativeEnum(EnvironmentalDataQuality),
+    periodStart: dateOnly,
+    periodEnd: dateOnly,
+    evidenceSummary: z.string().trim().max(5000).optional(),
+    notes: z.string().trim().max(5000).optional(),
+    customForms: z.array(capturedFormSchema).max(20).default([]),
+  }).superRefine((value, context) => {
+    if (value.periodEnd < value.periodStart) {
+      context.addIssue({
+        code: "custom",
+        path: ["periodEnd"],
+        message: "Reporting period end cannot precede its start.",
+      });
+    }
+  }),
+});
+
+const environmentalReviewItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ENVIRONMENTAL_REVIEW"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    dataPointId: z.string().min(1).max(200),
+    status: z.enum([
+      EnvironmentalDataStatus.APPROVED,
+      EnvironmentalDataStatus.REJECTED,
+    ]),
+  }),
+});
+
+const environmentalFormsItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("ENVIRONMENTAL_FORMS"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    dataPointId: z.string().min(1).max(200),
+    customForms: z.array(capturedFormSchema).min(1).max(20),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
@@ -630,6 +727,12 @@ const offlineItemSchema = z.discriminatedUnion("type", [
   surveillanceEnrollmentItemSchema,
   surveillanceCompletionItemSchema,
   surveillanceRemovalItemSchema,
+  chemicalInventoryItemSchema,
+  chemicalStatusItemSchema,
+  chemicalFormsItemSchema,
+  environmentalDataItemSchema,
+  environmentalReviewItemSchema,
+  environmentalFormsItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -700,6 +803,20 @@ export function requiredOfflinePermission(
     type === "OH_ENROLLMENT_REMOVE"
   ) {
     return PermissionKey.MANAGE_OCCUPATIONAL_HEALTH;
+  }
+  if (
+    type === "CHEMICAL_INVENTORY" ||
+    type === "CHEMICAL_STATUS" ||
+    type === "CHEMICAL_FORMS"
+  ) {
+    return PermissionKey.MANAGE_CHEMICALS;
+  }
+  if (
+    type === "ENVIRONMENTAL_DATA" ||
+    type === "ENVIRONMENTAL_REVIEW" ||
+    type === "ENVIRONMENTAL_FORMS"
+  ) {
+    return PermissionKey.MANAGE_ENVIRONMENTAL;
   }
   if (type === "CAPA_STATUS") {
     return status === Status.COMPLETED || status === Status.CLOSED
@@ -853,8 +970,20 @@ export async function syncOfflineSubmissionsService(input: {
         results.push(await syncSurveillanceEnrollment(input, item, payloadHash));
       } else if (item.type === "OH_ENROLLMENT_COMPLETE") {
         results.push(await syncSurveillanceCompletion(input, item, payloadHash));
-      } else {
+      } else if (item.type === "OH_ENROLLMENT_REMOVE") {
         results.push(await syncSurveillanceRemoval(input, item, payloadHash));
+      } else if (item.type === "CHEMICAL_INVENTORY") {
+        results.push(await syncChemicalInventory(input, item, payloadHash));
+      } else if (item.type === "CHEMICAL_STATUS") {
+        results.push(await syncChemicalStatus(input, item, payloadHash));
+      } else if (item.type === "CHEMICAL_FORMS") {
+        results.push(await syncChemicalForms(input, item, payloadHash));
+      } else if (item.type === "ENVIRONMENTAL_DATA") {
+        results.push(await syncEnvironmentalData(input, item, payloadHash));
+      } else if (item.type === "ENVIRONMENTAL_REVIEW") {
+        results.push(await syncEnvironmentalReview(input, item, payloadHash));
+      } else {
+        results.push(await syncEnvironmentalForms(input, item, payloadHash));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -2022,6 +2151,150 @@ async function syncSurveillanceRemoval(
   return { id: item.id, status: "synced", recordId: enrollment.id };
 }
 
+async function syncChemicalInventory(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof chemicalInventoryItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const inventory = await upsertChemicalInventoryService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    chemicalId: item.payload.chemicalId,
+    siteId: item.payload.siteId,
+    storageLocation: item.payload.storageLocation,
+    quantity: item.payload.quantity,
+    unit: item.payload.unit,
+    maximumAllowed: item.payload.maximumAllowed ?? null,
+    containerType: item.payload.containerType?.trim() || null,
+    storageNotes: item.payload.storageNotes?.trim() || null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: inventory.id };
+}
+
+async function syncChemicalStatus(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof chemicalStatusItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const chemical = await updateChemicalApprovalStatusService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    chemicalId: item.payload.chemicalId,
+    status: item.payload.status,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: chemical.id };
+}
+
+async function syncChemicalForms(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof chemicalFormsItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const submissions = await prepareCapturedFormSubmissions({
+    organizationId: actor.organizationId,
+    module: ConfigurableFormModule.CHEMICAL,
+    capturedAt,
+    forms: item.payload.customForms,
+  });
+  await completeChemicalFormsService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    chemicalId: item.payload.chemicalId,
+    submissions,
+    offlineSubmission: { id: item.id, capturedAt, payloadHash },
+  });
+  return {
+    id: item.id,
+    status: "synced",
+    recordId: item.payload.chemicalId,
+  };
+}
+
+async function syncEnvironmentalData(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof environmentalDataItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const submissions = await prepareCapturedFormSubmissions({
+    organizationId: actor.organizationId,
+    module: ConfigurableFormModule.ENVIRONMENTAL,
+    capturedAt,
+    forms: item.payload.customForms,
+  });
+  const point = await recordEnvironmentalDataService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    metricId: item.payload.metricId,
+    siteId: item.payload.siteId,
+    value: item.payload.value,
+    quality: item.payload.quality,
+    periodStart: parseDateOnly(item.payload.periodStart)!,
+    periodEnd: parseDateOnly(item.payload.periodEnd)!,
+    evidenceSummary: item.payload.evidenceSummary?.trim() || null,
+    notes: item.payload.notes?.trim() || null,
+    customSubmissions: submissions,
+    offlineSubmission: { id: item.id, capturedAt, payloadHash },
+  });
+  return { id: item.id, status: "synced", recordId: point.id };
+}
+
+async function syncEnvironmentalReview(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof environmentalReviewItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const point = await reviewEnvironmentalDataService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    dataPointId: item.payload.dataPointId,
+    status: item.payload.status,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: point.id };
+}
+
+async function syncEnvironmentalForms(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof environmentalFormsItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const submissions = await prepareCapturedFormSubmissions({
+    organizationId: actor.organizationId,
+    module: ConfigurableFormModule.ENVIRONMENTAL,
+    capturedAt,
+    forms: item.payload.customForms,
+  });
+  await completeEnvironmentalFormsService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    dataPointId: item.payload.dataPointId,
+    submissions,
+    offlineSubmission: { id: item.id, capturedAt, payloadHash },
+  });
+  return {
+    id: item.id,
+    status: "synced",
+    recordId: item.payload.dataPointId,
+  };
+}
+
 function parseDateOnly(value?: string) {
   return value ? new Date(`${value}T12:00:00.000Z`) : null;
 }
@@ -2036,7 +2309,7 @@ function parseFutureReviewDate(value: string | undefined, capturedAt: Date) {
 
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction|exposure|hygiene|sample|surveillance|fitness|restriction|certificate|provider/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction|exposure|hygiene|sample|surveillance|fitness|restriction|certificate|provider|chemical|inventory|sds|environmental|metric|reporting period|emission|waste|water|energy/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

@@ -20,9 +20,15 @@ import type {
   AuditResponsePayload,
   AuditStartPayload,
   CapaStatusPayload,
+  ChemicalFormsPayload,
+  ChemicalInventoryPayload,
+  ChemicalStatusPayload,
   ComplianceOccurrenceCompletionPayload,
   ComplianceOccurrenceReviewPayload,
   ContractorStatusPayload,
+  EnvironmentalDataPayload,
+  EnvironmentalFormsPayload,
+  EnvironmentalReviewPayload,
   HygieneAssessmentStatusPayload,
   HygieneFormsPayload,
   HygieneSamplePayload,
@@ -57,7 +63,9 @@ type EvidenceTargetType =
   | "ASSET_INSPECTION"
   | "ASSET_DEFECT"
   | "ASSET_MAINTENANCE"
-  | "INDUSTRIAL_HYGIENE";
+  | "INDUSTRIAL_HYGIENE"
+  | "CHEMICAL"
+  | "ENVIRONMENTAL";
 type EvidenceRow = {
   id: string;
   parent_submission_id: string | null;
@@ -170,7 +178,8 @@ async function queueOfflineItem(
           type === "ASSET_INSPECTION" ||
           type === "ASSET_DEFECT" ||
           type === "ASSET_MAINTENANCE_COMPLETE" ||
-          type === "IH_SAMPLE"
+          type === "IH_SAMPLE" ||
+          type === "ENVIRONMENTAL_DATA"
             ? id
             : undefined,
       });
@@ -469,6 +478,92 @@ export async function queueSurveillanceRemoval(
   return queueOfflineItem(ownerKey, "OH_ENROLLMENT_REMOVE", payload);
 }
 
+export async function queueChemicalInventory(
+  ownerKey: string,
+  payload: ChemicalInventoryPayload
+) {
+  return queueOfflineItem(ownerKey, "CHEMICAL_INVENTORY", payload);
+}
+
+export async function queueChemicalStatus(
+  ownerKey: string,
+  payload: ChemicalStatusPayload
+) {
+  return queueOfflineItem(ownerKey, "CHEMICAL_STATUS", payload);
+}
+
+export async function queueChemicalForms(
+  ownerKey: string,
+  payload: ChemicalFormsPayload
+) {
+  return queueOfflineItem(ownerKey, "CHEMICAL_FORMS", payload);
+}
+
+export async function queueEnvironmentalData(
+  ownerKey: string,
+  payload: EnvironmentalDataPayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "ENVIRONMENTAL_DATA", payload, {
+    files: evidence,
+    targetType: "ENVIRONMENTAL",
+    title: "Environmental data evidence",
+    description: payload.evidenceSummary || payload.notes,
+  });
+}
+
+export async function queueEnvironmentalReview(
+  ownerKey: string,
+  payload: EnvironmentalReviewPayload
+) {
+  return queueOfflineItem(ownerKey, "ENVIRONMENTAL_REVIEW", payload);
+}
+
+export async function queueEnvironmentalForms(
+  ownerKey: string,
+  payload: EnvironmentalFormsPayload
+) {
+  return queueOfflineItem(ownerKey, "ENVIRONMENTAL_FORMS", payload);
+}
+
+export async function queueChemicalEvidence(
+  ownerKey: string,
+  chemicalId: string,
+  files: SelectedEvidence[],
+  title: string,
+  description?: string
+) {
+  const database = await db();
+  await database.withExclusiveTransactionAsync((transaction) =>
+    insertEvidence(transaction, ownerKey, {
+      files,
+      targetType: "CHEMICAL",
+      entityId: chemicalId,
+      title,
+      description,
+    })
+  );
+}
+
+export async function queueEnvironmentalEvidence(
+  ownerKey: string,
+  dataPointId: string,
+  files: SelectedEvidence[],
+  title: string,
+  description?: string
+) {
+  const database = await db();
+  await database.withExclusiveTransactionAsync((transaction) =>
+    insertEvidence(transaction, ownerKey, {
+      files,
+      targetType: "ENVIRONMENTAL",
+      entityId: dataPointId,
+      title,
+      description,
+    })
+  );
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([
@@ -499,7 +594,8 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "ASSET_INSPECTION" ||
     envelope.type === "ASSET_DEFECT" ||
     envelope.type === "ASSET_MAINTENANCE_COMPLETE" ||
-    envelope.type === "IH_SAMPLE"
+    envelope.type === "IH_SAMPLE" ||
+    envelope.type === "ENVIRONMENTAL_DATA"
   );
   const responses = decoded.filter(({ envelope }) =>
     envelope.type === "INSPECTION_RESPONSE" ||
@@ -526,7 +622,12 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "OH_PROGRAM_STATUS" ||
     envelope.type === "OH_ENROLLMENT" ||
     envelope.type === "OH_ENROLLMENT_COMPLETE" ||
-    envelope.type === "OH_ENROLLMENT_REMOVE"
+    envelope.type === "OH_ENROLLMENT_REMOVE" ||
+    envelope.type === "CHEMICAL_INVENTORY" ||
+    envelope.type === "CHEMICAL_STATUS" ||
+    envelope.type === "CHEMICAL_FORMS" ||
+    envelope.type === "ENVIRONMENTAL_REVIEW" ||
+    envelope.type === "ENVIRONMENTAL_FORMS"
   );
   const first = await synchronizeRows(database, parents);
   const files = await synchronizeEvidence(database, ownerKey);

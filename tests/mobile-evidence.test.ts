@@ -60,6 +60,21 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
     targetType: "INDUSTRIAL_HYGIENE",
     parentSubmissionId: "aaf85f1a-1257-4a93-9be9-ad2c779270c4",
   });
+  const chemical = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "CHEMICAL",
+    entityId: "chemical-1",
+  });
+  const environmentalExisting = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "ENVIRONMENTAL",
+    entityId: "data-point-1",
+  });
+  const environmentalOffline = mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "ENVIRONMENTAL",
+    parentSubmissionId: "e806a511-8667-4f77-b13d-b8d63d23f405",
+  });
 
   assert.equal(observation.success, true);
   assert.equal(inspection.success, true);
@@ -69,9 +84,20 @@ test("mobile evidence contracts require resolvable tenant record targets", () =>
   assert.equal(assetDefect.success, true);
   assert.equal(assetMaintenance.success, true);
   assert.equal(hygieneSample.success, true);
+  assert.equal(chemical.success, true);
+  assert.equal(environmentalExisting.success, true);
+  assert.equal(environmentalOffline.success, true);
   assert.equal(mobileEvidencePayloadSchema.safeParse({
     ...base,
     targetType: "INCIDENT",
+  }).success, false);
+  assert.equal(mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "CHEMICAL",
+  }).success, false);
+  assert.equal(mobileEvidencePayloadSchema.safeParse({
+    ...base,
+    targetType: "ENVIRONMENTAL",
   }).success, false);
   assert.equal(mobileEvidencePayloadSchema.safeParse({
     ...base,
@@ -121,4 +147,6 @@ test("each mobile evidence target retains its governing permission", () => {
   assert.equal(requiredMobileEvidencePermission("ASSET_DEFECT"), PermissionKey.MANAGE_ASSETS);
   assert.equal(requiredMobileEvidencePermission("ASSET_MAINTENANCE"), PermissionKey.MANAGE_ASSETS);
   assert.equal(requiredMobileEvidencePermission("INDUSTRIAL_HYGIENE"), PermissionKey.MANAGE_INDUSTRIAL_HYGIENE);
+  assert.equal(requiredMobileEvidencePermission("CHEMICAL"), PermissionKey.MANAGE_CHEMICALS);
+  assert.equal(requiredMobileEvidencePermission("ENVIRONMENTAL"), PermissionKey.MANAGE_ENVIRONMENTAL);
 });

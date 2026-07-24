@@ -2,11 +2,12 @@
 
 import type { FormActionState } from "@/core/actions/action-state";
 import { requirePermission } from "@/lib/permissions";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import {
   completeChemicalFormsService,
   createChemicalService,
+  updateChemicalApprovalStatusService,
+  upsertChemicalInventoryService,
 } from "@/modules/chemicals/chemical-governance.service";
 import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
 import {
@@ -143,56 +144,23 @@ export async function completeChemicalForms(
 
 export async function addChemicalInventory(data: FormData) {
   await requirePermission(PermissionKey.MANAGE_CHEMICALS);
-  const { organizationId } = await getCurrentUserTenant();
+  const { organizationId, user } = await getCurrentUserTenant();
   const chemicalId = required(data, "chemicalId");
   const siteId = required(data, "siteId");
-  const [chemical, site] = await Promise.all([
-    prisma.chemical.findFirst({ where: { id: chemicalId, organizationId } }),
-    prisma.site.findFirst({ where: { id: siteId, organizationId } }),
-  ]);
-
-  if (!chemical || !site) {
-    throw new Error("Select a valid chemical and site.");
-  }
-
   const quantity = Number(required(data, "quantity"));
   const rawMaximum = optional(data, "maximumAllowed");
   const maximumAllowed = rawMaximum ? Number(rawMaximum) : null;
-
-  if (
-    !Number.isFinite(quantity) ||
-    (maximumAllowed !== null && !Number.isFinite(maximumAllowed))
-  ) {
-    throw new Error("Enter valid inventory quantities.");
-  }
-
-  const storageLocation = required(data, "storageLocation");
-  await prisma.chemicalInventory.upsert({
-    where: {
-      chemicalId_siteId_storageLocation: {
-        chemicalId,
-        siteId,
-        storageLocation,
-      },
-    },
-    update: {
-      quantity,
-      unit: required(data, "unit"),
-      maximumAllowed,
-      containerType: optional(data, "containerType"),
-      storageNotes: optional(data, "storageNotes"),
-      inventoriedAt: new Date(),
-    },
-    create: {
-      chemicalId,
-      siteId,
-      storageLocation,
-      quantity,
-      unit: required(data, "unit"),
-      maximumAllowed,
-      containerType: optional(data, "containerType"),
-      storageNotes: optional(data, "storageNotes"),
-    },
+  await upsertChemicalInventoryService({
+    organizationId,
+    userId: user.id,
+    chemicalId,
+    siteId,
+    storageLocation: required(data, "storageLocation"),
+    quantity,
+    unit: required(data, "unit"),
+    maximumAllowed,
+    containerType: optional(data, "containerType"),
+    storageNotes: optional(data, "storageNotes"),
   });
 
   revalidatePath(`/chemicals/${chemicalId}`);
@@ -208,14 +176,12 @@ export async function reviewChemical(data: FormData) {
     throw new Error("Select a valid approval status.");
   }
 
-  const result = await prisma.chemical.updateMany({
-    where: { id, organizationId },
-    data: { status, reviewedById: user.id, reviewedAt: new Date() },
+  await updateChemicalApprovalStatusService({
+    organizationId,
+    userId: user.id,
+    chemicalId: id,
+    status,
   });
-
-  if (!result.count) {
-    throw new Error("Chemical not found.");
-  }
 
   revalidatePath(`/chemicals/${id}`);
 }

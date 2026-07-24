@@ -8,12 +8,18 @@ import type {
   AuditResponsePayload,
   AuditStartPayload,
   CapaStatusPayload,
+  ChemicalFormsPayload,
+  ChemicalInventoryPayload,
+  ChemicalStatusPayload,
   ComplianceOccurrenceCompletionPayload,
   ComplianceOccurrenceReviewPayload,
   ContractorStatusPayload,
   HygieneAssessmentStatusPayload,
   HygieneFormsPayload,
   HygieneSamplePayload,
+  EnvironmentalDataPayload,
+  EnvironmentalFormsPayload,
+  EnvironmentalReviewPayload,
   IncidentPayload,
   InspectionResponsePayload,
   JsaAcknowledgmentPayload,
@@ -67,7 +73,13 @@ export type OfflineRecordType =
   | "OH_PROGRAM_STATUS"
   | "OH_ENROLLMENT"
   | "OH_ENROLLMENT_COMPLETE"
-  | "OH_ENROLLMENT_REMOVE";
+  | "OH_ENROLLMENT_REMOVE"
+  | "CHEMICAL_INVENTORY"
+  | "CHEMICAL_STATUS"
+  | "CHEMICAL_FORMS"
+  | "ENVIRONMENTAL_DATA"
+  | "ENVIRONMENTAL_REVIEW"
+  | "ENVIRONMENTAL_FORMS";
 
 export type OfflineRecordPayload =
   | ObservationPayload
@@ -102,7 +114,13 @@ export type OfflineRecordPayload =
   | SurveillanceProgramStatusPayload
   | SurveillanceEnrollmentPayload
   | SurveillanceCompletionPayload
-  | SurveillanceRemovalPayload;
+  | SurveillanceRemovalPayload
+  | ChemicalInventoryPayload
+  | ChemicalStatusPayload
+  | ChemicalFormsPayload
+  | EnvironmentalDataPayload
+  | EnvironmentalReviewPayload
+  | EnvironmentalFormsPayload;
 
 export type OfflineEnvelope = {
   type: OfflineRecordType;
@@ -143,6 +161,12 @@ const recordTypes = new Set<OfflineRecordType>([
   "OH_ENROLLMENT",
   "OH_ENROLLMENT_COMPLETE",
   "OH_ENROLLMENT_REMOVE",
+  "CHEMICAL_INVENTORY",
+  "CHEMICAL_STATUS",
+  "CHEMICAL_FORMS",
+  "ENVIRONMENTAL_DATA",
+  "ENVIRONMENTAL_REVIEW",
+  "ENVIRONMENTAL_FORMS",
 ]);
 
 export function decodeOfflineEnvelope(value: unknown): OfflineEnvelope {
