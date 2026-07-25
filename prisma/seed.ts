@@ -178,6 +178,8 @@ async function main() {
       PermissionKey.VIEW_BUSINESS_CONTINUITY,
       PermissionKey.MANAGE_BUSINESS_CONTINUITY,
       PermissionKey.RECORD_CONTINUITY_EVENT,
+      PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE,
+      PermissionKey.MANAGE_PREDICTIVE_INTELLIGENCE,
     ],
 
     EHS_MANAGER: [
@@ -231,6 +233,8 @@ async function main() {
       PermissionKey.VIEW_BUSINESS_CONTINUITY,
       PermissionKey.MANAGE_BUSINESS_CONTINUITY,
       PermissionKey.RECORD_CONTINUITY_EVENT,
+      PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE,
+      PermissionKey.MANAGE_PREDICTIVE_INTELLIGENCE,
     ],
 
     SUPERVISOR: [
@@ -265,6 +269,7 @@ async function main() {
       PermissionKey.RECORD_EMERGENCY_RESPONSE,
       PermissionKey.VIEW_BUSINESS_CONTINUITY,
       PermissionKey.RECORD_CONTINUITY_EVENT,
+      PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE,
     ],
 
     EMPLOYEE: [
@@ -304,6 +309,7 @@ async function main() {
       PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
       PermissionKey.VIEW_EMERGENCY_PREPAREDNESS,
       PermissionKey.VIEW_BUSINESS_CONTINUITY,
+      PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE,
     ],
     DEMO_VIEWER: [
       PermissionKey.VIEW_DASHBOARD,
@@ -331,6 +337,7 @@ async function main() {
       PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
       PermissionKey.VIEW_EMERGENCY_PREPAREDNESS,
       PermissionKey.VIEW_BUSINESS_CONTINUITY,
+      PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE,
     ],
   };
 

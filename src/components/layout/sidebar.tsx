@@ -48,6 +48,7 @@ import {
   Target,
   Siren,
   RefreshCw,
+  TrendingUp,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -85,6 +86,12 @@ export const primaryNavItems: NavigationItem[] = [
     href: "/intelligence",
     icon: BrainCircuit,
     permission: PermissionKey.USE_AI,
+  },
+  {
+    label: "Predictive Intelligence",
+    href: "/intelligence/predictive",
+    icon: TrendingUp,
+    permission: PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE,
   },
   {
     label: "SIF Prevention",

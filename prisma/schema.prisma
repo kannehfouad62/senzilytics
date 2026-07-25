@@ -193,6 +193,8 @@ enum PermissionKey {
   VIEW_BUSINESS_CONTINUITY
   MANAGE_BUSINESS_CONTINUITY
   RECORD_CONTINUITY_EVENT
+  VIEW_PREDICTIVE_INTELLIGENCE
+  MANAGE_PREDICTIVE_INTELLIGENCE
 }
 
 enum EmergencyPlanType {
@@ -401,6 +403,42 @@ enum PerformanceMeasurementStatus {
   DRAFT
   APPROVED
   REJECTED
+}
+
+enum PredictiveSignalCategory {
+  INCIDENT_TREND
+  AT_RISK_OBSERVATION_TREND
+  OVERDUE_ACTION_EXPOSURE
+  CRITICAL_CONTROL_WEAKNESS
+  AUDIT_FINDING_PRESSURE
+  TRAINING_COMPLIANCE_GAP
+}
+
+enum PredictiveSignalStatus {
+  OPEN
+  ACKNOWLEDGED
+  MONITORING
+  RESOLVED
+  DISMISSED
+}
+
+enum PredictiveSignalDirection {
+  IMPROVING
+  STABLE
+  DETERIORATING
+}
+
+enum PredictiveIntelligenceRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum PredictiveSignalReviewDecision {
+  ACKNOWLEDGE
+  MONITOR
+  RESOLVE
+  DISMISS
 }
 
 enum IntegrationApiScope {
@@ -1785,6 +1823,10 @@ model Organization {
   continuityExercises            ContinuityExercise[]
   continuityActivations          ContinuityActivation[]
   continuityImprovements         ContinuityImprovement[]
+  predictiveIntelligencePolicy   PredictiveIntelligencePolicy?
+  predictiveIntelligenceRuns     PredictiveIntelligenceRun[]
+  predictiveSignals              PredictiveSignal[]
+  predictiveSignalReviews        PredictiveSignalReview[]
 }
 
 model PricingInquiry {
@@ -1851,6 +1893,7 @@ model Site {
   performanceMeasurements       PerformanceIndicatorMeasurement[]
   emergencyPlans                EmergencyPlan[]
   continuityPlans               BusinessContinuityPlan[]
+  predictiveSignals             PredictiveSignal[]
 }
 
 model Department {
@@ -1887,6 +1930,7 @@ model Department {
   performanceMeasurements  PerformanceIndicatorMeasurement[]
   emergencyPlans           EmergencyPlan[]
   continuityPlans          BusinessContinuityPlan[]
+  predictiveSignals        PredictiveSignal[]
 }
 
 model User {
@@ -2073,6 +2117,10 @@ model User {
   ownedContinuityImprovements         ContinuityImprovement[]         @relation("ContinuityImprovementOwner")
   createdContinuityImprovements       ContinuityImprovement[]         @relation("ContinuityImprovementCreatedBy")
   verifiedContinuityImprovements      ContinuityImprovement[]         @relation("ContinuityImprovementVerifiedBy")
+  requestedPredictiveRuns             PredictiveIntelligenceRun[]     @relation("PredictiveRunRequestedBy")
+  ownedPredictiveSignals              PredictiveSignal[]              @relation("PredictiveSignalOwner")
+  reviewedPredictiveSignals           PredictiveSignal[]              @relation("PredictiveSignalReviewer")
+  predictiveSignalReviews             PredictiveSignalReview[]        @relation("PredictiveSignalReviewUser")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -7115,4 +7163,128 @@ model PerformanceIndicatorMeasurement {
   @@index([indicatorId, scopeKey, periodEnd, status])
   @@index([siteId, periodEnd, status])
   @@index([departmentId, periodEnd, status])
+}
+
+// ============================================================
+// EXPLAINABLE PREDICTIVE RISK INTELLIGENCE
+// ============================================================
+
+model PredictiveIntelligencePolicy {
+  id                            String    @id @default(cuid())
+  organizationId                String    @unique
+  isActive                      Boolean   @default(true)
+  lookbackDays                  Int       @default(90)
+  minimumEventCount             Int       @default(3)
+  deteriorationThresholdPercent Float     @default(20)
+  overdueActionThreshold        Int       @default(3)
+  controlFailureThreshold       Int       @default(2)
+  reviewCadenceDays             Int       @default(14)
+  lastRunAt                     DateTime?
+  nextRunAt                     DateTime?
+  createdAt                     DateTime  @default(now())
+  updatedAt                     DateTime  @updatedAt
+
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  runs         PredictiveIntelligenceRun[]
+
+  @@index([isActive, nextRunAt])
+}
+
+model PredictiveIntelligenceRun {
+  id                String                          @id @default(cuid())
+  organizationId    String
+  policyId          String?
+  requestedById     String?
+  status            PredictiveIntelligenceRunStatus @default(RUNNING)
+  algorithmVersion  String                          @default("PRI-1.0")
+  windowStart       DateTime
+  windowEnd         DateTime
+  comparisonStart   DateTime
+  comparisonEnd     DateTime
+  dataQualityScore  Float                           @default(0)
+  sourceCounts      Json?
+  signalsDetected   Int                             @default(0)
+  signalsRefreshed  Int                             @default(0)
+  conditionsCleared Int                             @default(0)
+  failureReason     String?
+  startedAt         DateTime                        @default(now())
+  completedAt       DateTime?
+  createdAt         DateTime                        @default(now())
+
+  organization Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  policy       PredictiveIntelligencePolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  requestedBy  User?                         @relation("PredictiveRunRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  signals      PredictiveSignal[]
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+}
+
+model PredictiveSignal {
+  id                String                    @id @default(cuid())
+  organizationId    String
+  runId             String
+  siteId            String?
+  departmentId      String?
+  ownerId           String?
+  reviewerId        String?
+  fingerprint       String
+  category          PredictiveSignalCategory
+  severity          RiskLevel
+  direction         PredictiveSignalDirection
+  status            PredictiveSignalStatus    @default(OPEN)
+  conditionActive   Boolean                   @default(true)
+  title             String
+  summary           String
+  rationale         String
+  recommendedAction String
+  evidence          Json
+  currentValue      Float
+  baselineValue     Float
+  changePercent     Float?
+  thresholdValue    Float
+  attentionScore    Float
+  dataQualityScore  Float
+  firstDetectedAt   DateTime                  @default(now())
+  lastDetectedAt    DateTime                  @default(now())
+  reviewDueAt       DateTime
+  acknowledgedAt    DateTime?
+  resolvedAt        DateTime?
+  dismissedAt       DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  run          PredictiveIntelligenceRun @relation(fields: [runId], references: [id], onDelete: Restrict)
+  site         Site?                     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  department   Department?               @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  owner        User?                     @relation("PredictiveSignalOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  reviewer     User?                     @relation("PredictiveSignalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviews      PredictiveSignalReview[]
+
+  @@unique([organizationId, fingerprint])
+  @@index([organizationId, conditionActive, severity])
+  @@index([organizationId, status, reviewDueAt])
+  @@index([siteId, conditionActive])
+  @@index([ownerId, status])
+}
+
+model PredictiveSignalReview {
+  id             String                         @id @default(cuid())
+  organizationId String
+  signalId       String
+  reviewerId     String
+  decision       PredictiveSignalReviewDecision
+  rationale      String
+  statusBefore   PredictiveSignalStatus
+  statusAfter    PredictiveSignalStatus
+  createdAt      DateTime                       @default(now())
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  signal       PredictiveSignal @relation(fields: [signalId], references: [id], onDelete: Cascade)
+  reviewer     User             @relation("PredictiveSignalReviewUser", fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([signalId, createdAt])
+  @@index([reviewerId, createdAt])
 }

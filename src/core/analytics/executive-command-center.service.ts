@@ -250,6 +250,7 @@ export async function getExecutiveCommandCenter(input: {
     performance,
     workflow,
     latestAiBriefing,
+    predictiveSignals,
   ] = await Promise.all([
     getGlobalExecutivePortfolio(input.organizationId, input.permissions),
     getOperationalAssuranceOverview({
@@ -415,6 +416,23 @@ export async function getExecutiveCommandCenter(input: {
           orderBy: { createdAt: "desc" },
         })
       : null,
+    allowed.has(PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE)
+      ? prisma.predictiveSignal.findMany({
+          where: {
+            organizationId: input.organizationId,
+            conditionActive: true,
+            ...(scope.siteId ? { siteId: scope.siteId } : {}),
+            ...(scope.departmentId ? { departmentId: scope.departmentId } : {}),
+          },
+          select: {
+            id: true,
+            severity: true,
+            attentionScore: true,
+            updatedAt: true,
+          },
+          orderBy: { attentionScore: "desc" },
+        })
+      : [],
   ]);
 
   const openActions = actions.filter((action) => !completedStatuses.has(action.status));
@@ -526,6 +544,16 @@ export async function getExecutiveCommandCenter(input: {
           note: `${workflow.summary.overdueActiveSteps} active steps overdue`,
           href: "/workflows/analytics",
           tone: "performance" as const,
+        }
+      : null,
+    allowed.has(PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE)
+      ? {
+          key: "predictive",
+          label: "Predictive signals",
+          value: predictiveSignals.length,
+          note: `${predictiveSignals.filter((signal) => elevatedRiskLevels.includes(signal.severity)).length} high or critical`,
+          href: "/intelligence/predictive",
+          tone: "danger" as const,
         }
       : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
@@ -646,6 +674,15 @@ export async function getExecutiveCommandCenter(input: {
           recordCount: complianceItems.length,
           latestAt: latestDate(complianceItems.map((row) => row.updatedAt)),
           provenance: `${overdueCompliance.length} selected-scope obligations are overdue.`,
+        }
+      : null,
+    allowed.has(PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE)
+      ? {
+          domain: "Predictive intelligence",
+          recordCount: predictiveSignals.length,
+          latestAt: latestDate(predictiveSignals.map((row) => row.updatedAt)),
+          provenance:
+            "Active, explainable indicators derived from governed tenant source records.",
         }
       : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);

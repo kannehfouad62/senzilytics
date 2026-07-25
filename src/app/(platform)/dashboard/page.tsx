@@ -44,6 +44,7 @@ const metricIcons = {
   risk: AlertTriangle,
   scorecards: Target,
   workflow: Network,
+  predictive: BrainCircuit,
 } as const;
 
 const ratingTone: Record<string, string> = {
