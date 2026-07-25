@@ -17,14 +17,14 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE";
   nativePermission?: PermissionKey;
 };
 
 const modules: readonly MobileModuleDefinition[] = [
-  { key: "dashboard", label: "Executive Dashboard", description: "Enterprise EHS performance, risk signals, and leadership indicators.", href: "/dashboard", category: "COMMAND", permission: PermissionKey.VIEW_DASHBOARD },
-  { key: "assurance", label: "Operational Assurance", description: "Connected assurance performance and control effectiveness.", href: "/assurance", category: "COMMAND", permission: PermissionKey.VIEW_DASHBOARD },
-  { key: "intelligence", label: "AI Intelligence", description: "Governed EHS intelligence, analysis, and decision support.", href: "/intelligence", category: "COMMAND", permission: PermissionKey.USE_AI },
+  { key: "dashboard", label: "Executive Dashboard", description: "Enterprise EHS performance, risk signals, and leadership indicators.", href: "/dashboard", category: "COMMAND", permission: PermissionKey.VIEW_DASHBOARD, nativeCapability: "EXECUTIVE_DASHBOARD" },
+  { key: "assurance", label: "Operational Assurance", description: "Connected assurance performance and control effectiveness.", href: "/assurance", category: "COMMAND", permission: PermissionKey.VIEW_DASHBOARD, nativeCapability: "OPERATIONAL_ASSURANCE" },
+  { key: "intelligence", label: "AI Intelligence", description: "Governed EHS intelligence, analysis, and decision support.", href: "/intelligence", category: "COMMAND", permission: PermissionKey.USE_AI, anyPermissions: [PermissionKey.VIEW_DASHBOARD], nativeCapability: "AI_INTELLIGENCE" },
   { key: "tasks", label: "My Tasks", description: "Assigned workflow steps, due work, and required actions.", href: "/tasks", category: "COMMAND", nativeCapability: "ACTION_CENTER" },
   { key: "observations", label: "Safety Observations", description: "Capture, review, and manage safety observations.", href: "/observations", category: "SAFETY", anyPermissions: [PermissionKey.VIEW_OBSERVATIONS, PermissionKey.CREATE_OBSERVATION], nativeCapability: "OBSERVATION_CAPTURE", nativePermission: PermissionKey.CREATE_OBSERVATION },
   { key: "behavior-safety", label: "Behavior-Based Safety", description: "Behavior programs, coaching, trends, and interventions.", href: "/behavior-safety", category: "SAFETY", permission: PermissionKey.VIEW_BEHAVIOR_SAFETY, nativeCapability: "BEHAVIOR_SAFETY_FIELD" },
@@ -49,7 +49,7 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "environmental", label: "Environmental Metrics", description: "Environmental data, targets, controls, and disclosures.", href: "/environmental", category: "GOVERNANCE", permission: PermissionKey.VIEW_ENVIRONMENTAL, nativeCapability: "ENVIRONMENTAL_FIELD" },
   { key: "esg", label: "Sustainability & ESG", description: "Frameworks, disclosures, governance, and ESG performance.", href: "/esg", category: "GOVERNANCE", permission: PermissionKey.VIEW_ESG, nativeCapability: "ESG_FIELD" },
   { key: "chemicals", label: "Chemicals & SDS", description: "Chemical inventory, SDS records, approvals, and monitoring.", href: "/chemicals", category: "GOVERNANCE", permission: PermissionKey.VIEW_CHEMICALS, nativeCapability: "CHEMICAL_FIELD" },
-  { key: "reports", label: "Reports", description: "Operational and executive reporting across EHS modules.", href: "/reports", category: "GOVERNANCE", permission: PermissionKey.VIEW_REPORTS },
+  { key: "reports", label: "Reports", description: "Operational and executive reporting across EHS modules.", href: "/reports", category: "GOVERNANCE", permission: PermissionKey.VIEW_REPORTS, nativeCapability: "EXECUTIVE_REPORTING" },
   { key: "documents", label: "Documents", description: "Controlled documents, evidence, previews, and version history.", href: "/documents", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_DOCUMENTS },
   { key: "organization", label: "Organization Structure", description: "Sites, departments, and organizational structure.", href: "/organizations", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_ORGANIZATION },
   { key: "users", label: "Users", description: "Tenant users, roles, status, and access administration.", href: "/users", category: "ADMINISTRATION", permission: PermissionKey.VIEW_USERS },

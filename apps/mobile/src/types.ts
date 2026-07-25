@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE";
 };
 
 export type MobileDepartment = {
@@ -1430,6 +1430,256 @@ export type MobileRegulatoryChange = {
   canClose: boolean;
 };
 
+export type MobileExecutiveCapabilities = {
+  canViewDashboard: boolean;
+  canViewReports: boolean;
+  canUseAi: boolean;
+  canReviewAi: boolean;
+};
+
+export type MobileExecutiveDashboard = {
+  generatedAt: string;
+  kpis: {
+    totalIncidents: number;
+    openIncidents: number;
+    highRiskIncidents: number;
+    openInvestigations: number;
+    openCorrectiveActions: number;
+    overdueCorrectiveActions: number;
+    activeWorkflows: number;
+    overdueWorkflowSteps: number;
+    activeDocuments: number;
+    archivedDocuments: number;
+    incidentsThisMonth: number;
+    documentsThisMonth: number;
+    completedCorrectiveActions: number;
+    totalCorrectiveActions: number;
+    correctiveActionCompletionRate: number;
+  };
+  charts: {
+    monthlyTrend: Array<{
+      month: string;
+      incidents: number;
+      documents: number;
+    }>;
+    riskDistribution: Array<{ riskLevel: string; count: number }>;
+    sitePerformance: Array<{
+      siteId: string;
+      siteName: string;
+      incidents: number;
+      openIncidents: number;
+      highRiskIncidents: number;
+    }>;
+    actionAging: Array<{ bucket: string; count: number }>;
+    incidentTypeDistribution: Array<{
+      incidentType: string;
+      count: number;
+    }>;
+    actionStatusDistribution: Array<{ status: string; count: number }>;
+  };
+  recentIncidents: Array<{
+    id: string;
+    title: string;
+    status: string;
+    riskLevel: string;
+    occurredAt: string;
+    site: { name: string };
+    reportedBy: { name: string };
+  }>;
+  overdueActions: Array<{
+    id: string;
+    title: string;
+    status: string;
+    riskLevel: string;
+    dueDate: string;
+    assignedTo: { name: string };
+    incident: { id: string; title: string } | null;
+  }>;
+};
+
+export type MobileExecutivePortfolio = {
+  attentionCount: number;
+  modules: Array<{
+    label: string;
+    value: number;
+    note: string;
+    href: string;
+    tone: "danger" | "warning" | "good" | "neutral";
+  }>;
+};
+
+export type MobileOperationalAssurance = {
+  generatedAt: string;
+  signalCount: number;
+  criticalCount: number;
+  connectionCount: number;
+  signals: Array<{
+    id: string;
+    title: string;
+    detail: string;
+    source: string;
+    href: string;
+    severity: "CRITICAL" | "HIGH" | "MEDIUM";
+    site: string | null;
+  }>;
+  connections: Array<{
+    label: string;
+    count: number;
+    detail: string;
+    href: string;
+  }>;
+};
+
+export type MobileExecutiveReport = {
+  generatedAt: string;
+  filters: {
+    from: string;
+    to: string;
+    siteId: string | null;
+    siteName: string | null;
+  };
+  summary: {
+    totalIncidents: number;
+    openIncidents: number;
+    highRiskIncidents: number;
+    totalInvestigations: number;
+    openInvestigations: number;
+    overdueInvestigations: number;
+    totalCorrectiveActions: number;
+    openCorrectiveActions: number;
+    overdueCorrectiveActions: number;
+    highRiskCorrectiveActions: number;
+    correctiveActionClosureRate: number;
+    totalAudits: number;
+    completedAudits: number;
+    overdueAudits: number;
+    auditCompletionRate: number;
+    openAuditFindings: number;
+    totalInspections: number;
+    completedInspections: number;
+    overdueInspections: number;
+    inspectionCompletionRate: number;
+    openInspectionFindings: number;
+    activeWorkflows: number;
+    overdueWorkflowSteps: number;
+    totalComplianceItems: number;
+    overdueComplianceItems: number;
+    totalTrainingRecords: number;
+    completedTrainingRecords: number;
+    trainingCompletionRate: number;
+    totalOverdueExposure: number;
+  };
+  monthlyTrend: Array<{
+    month: string;
+    incidents: number;
+    audits: number;
+    inspections: number;
+    correctiveActions: number;
+  }>;
+  sitePerformance: Array<{
+    siteId: string;
+    siteName: string;
+    incidents: number;
+    openIncidents: number;
+    highRiskIncidents: number;
+    audits: number;
+    inspections: number;
+    openCorrectiveActions: number;
+    overdueCorrectiveActions: number;
+    exposureScore: number;
+  }>;
+  managementAttention: Array<{
+    id: string;
+    type: string;
+    title: string;
+    description: string;
+    riskLevel: string | null;
+    status: string;
+    dueDate: string | null;
+    siteName: string | null;
+    ownerName: string | null;
+    link: string;
+  }>;
+};
+
+export type MobileExecutiveAiAnalysis = {
+  id: string;
+  title: string;
+  useCase:
+    | "DAILY_BRIEFING"
+    | "EXECUTIVE_RISK"
+    | "AUDIT_FOCUS"
+    | "REGULATORY_IMPACT"
+    | "CONTROL_EFFECTIVENESS"
+    | "CUSTOM_QUERY";
+  question: string | null;
+  status: "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+  executiveSummary: string;
+  confidence: "LOW" | "MEDIUM" | "HIGH";
+  confidenceRationale: string;
+  limitations: string;
+  reviewNotes: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  requestedBy: { id: string; name: string };
+  reviewedBy: { id: string; name: string } | null;
+  sourceCount: number;
+  feedbackCount: number;
+  sources: Array<{
+    sourceKey: string;
+    module: string;
+    title: string;
+    summary: string;
+    href: string;
+  }>;
+  detail: {
+    keyRisks: Array<{
+      title: string;
+      analysis: string;
+      severity: string;
+      sourceKeys: string[];
+    }>;
+    trends: Array<{
+      title: string;
+      direction: string;
+      analysis: string;
+      sourceKeys: string[];
+    }>;
+    priorities: Array<{
+      title: string;
+      rationale: string;
+      urgency: string;
+      sourceKeys: string[];
+    }>;
+    managementQuestions: Array<{
+      question: string;
+      rationale: string;
+      sourceKeys: string[];
+    }>;
+  };
+};
+
+export type MobileExecutiveActionResponse = {
+  success: true;
+  analysisId: string;
+  message: string;
+};
+
+export type MobileExecutiveWorkspace = {
+  executiveGeneratedAt: string;
+  executiveCapabilities: MobileExecutiveCapabilities;
+  executiveDashboard: MobileExecutiveDashboard | null;
+  executivePortfolio: MobileExecutivePortfolio | null;
+  operationalAssurance: MobileOperationalAssurance | null;
+  executiveReport: MobileExecutiveReport | null;
+  executiveAiAnalyses: MobileExecutiveAiAnalysis[];
+  executiveAiMetrics: {
+    pending: number;
+    approved: number;
+    rejected: number;
+  } | null;
+};
+
 export type MobileBootstrap = {
   user: MobileUser;
   organization: { id: string; name: string; subscriptionPlan: string };
@@ -1498,7 +1748,7 @@ export type MobileBootstrap = {
   notifications: MobileNotification[];
   tasks: MobileTask[];
   modules: MobileModule[];
-};
+} & MobileExecutiveWorkspace;
 
 export type CapturedAnswer = { fieldId: string; value: string | number | boolean | string[] };
 export type CapturedForm = { definitionId: string; versionId: string; answers: CapturedAnswer[] };

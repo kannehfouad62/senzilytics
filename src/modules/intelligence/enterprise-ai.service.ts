@@ -347,6 +347,32 @@ export function listEnterpriseAiAnalysesService(organizationId: string, limit = 
   });
 }
 
+export function listEnterpriseAiAnalysesWithSourcesService(
+  organizationId: string,
+  limit = 20
+) {
+  return prisma.aiIntelligenceAnalysis.findMany({
+    where: { organizationId },
+    include: {
+      requestedBy: { select: { id: true, name: true } },
+      reviewedBy: { select: { id: true, name: true } },
+      sources: {
+        select: {
+          sourceKey: true,
+          module: true,
+          title: true,
+          summary: true,
+          href: true,
+        },
+        orderBy: { sourceKey: "asc" },
+      },
+      _count: { select: { sources: true, feedback: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: Math.min(Math.max(limit, 1), 50),
+  });
+}
+
 export function getEnterpriseAiAnalysisService(organizationId: string, analysisId: string) {
   return prisma.aiIntelligenceAnalysis.findFirst({
     where: { id: analysisId, organizationId },

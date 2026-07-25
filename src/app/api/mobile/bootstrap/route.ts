@@ -20,18 +20,17 @@ import { getMobileMocPermitWorkspace } from "@/modules/mobile/mobile-moc-permit.
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
 import { getMobileRegulatoryIntelligenceWorkspace } from "@/modules/mobile/mobile-regulatory-intelligence.service";
 import { getMobileRiskField } from "@/modules/mobile/mobile-risk-field.service";
+import {
+  getMobileAssignedPermissions,
+  mobileExecutiveCapabilities,
+} from "@/modules/mobile/mobile-executive.service";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
     const { user, organization } = await authenticateMobileRequest(request);
-    const assigned = user.role === UserRole.SUPER_ADMIN
-      ? Object.values(PermissionKey)
-      : await prisma.rolePermission.findMany({
-          where: { role: user.role },
-          select: { permission: true },
-        }).then((rows) => rows.map((row) => row.permission));
+    const assigned = await getMobileAssignedPermissions(user.role);
     const canExecuteInspections = assigned.includes(PermissionKey.MANAGE_INSPECTIONS);
     const canExecuteAudits = assigned.includes(PermissionKey.MANAGE_AUDITS);
     const auditManagementRole = new Set<UserRole>([
@@ -400,6 +399,14 @@ export async function GET(request: Request) {
       regulatorySources: regulatoryIntelligence.sources,
       regulatoryChanges: regulatoryIntelligence.changes,
       regulatoryCapabilities: regulatoryIntelligence.capabilities,
+      executiveGeneratedAt: new Date().toISOString(),
+      executiveCapabilities: mobileExecutiveCapabilities(assigned),
+      executiveDashboard: null,
+      executivePortfolio: null,
+      operationalAssurance: null,
+      executiveReport: null,
+      executiveAiAnalyses: [],
+      executiveAiMetrics: null,
       notifications,
       tasks: actionCenter.tasks,
       correctiveActions: actionCenter.correctiveActions,

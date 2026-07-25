@@ -33,6 +33,10 @@ import {
 } from "./src/chemical-environmental";
 import { EsgScreen, type EsgView } from "./src/esg";
 import {
+  ExecutiveCommandScreen,
+  type ExecutiveCommandView,
+} from "./src/executive-command";
+import {
   HygieneHealthScreen,
   type HygieneHealthView,
 } from "./src/hygiene-health";
@@ -71,6 +75,7 @@ import type {
   MobileBootstrap,
   MobileAudit,
   MobileAuditQuestion,
+  MobileExecutiveWorkspace,
   MobileInspection,
   MobileInspectionItem,
   MobileModule,
@@ -79,7 +84,7 @@ import type {
   RuntimeForm,
 } from "./src/types";
 
-type Tab = "home" | "workspace" | "capture" | "inspections" | "audits" | "risks" | "governance" | "controlledWork" | "assetContractors" | "hygieneHealth" | "chemicalEnvironmental" | "esg" | "behaviorAssurance" | "regulatory" | "actions" | "settings";
+type Tab = "home" | "workspace" | "capture" | "inspections" | "audits" | "risks" | "governance" | "controlledWork" | "assetContractors" | "hygieneHealth" | "chemicalEnvironmental" | "esg" | "behaviorAssurance" | "regulatory" | "executive" | "actions" | "settings";
 type CaptureMode = "observation" | "incident";
 type FieldValue = string | boolean | string[];
 const observationTypes = ["UNSAFE_ACT", "UNSAFE_CONDITION", "POSITIVE_PRACTICE", "ENVIRONMENTAL", "QUALITY", "OTHER"] as const;
@@ -104,12 +109,19 @@ export default function App() {
   const [esgView, setEsgView] = useState<EsgView>("disclosures");
   const [behaviorAssuranceView, setBehaviorAssuranceView] =
     useState<BehaviorAssuranceView>("behavior");
+  const [executiveCommandView, setExecutiveCommandView] =
+    useState<ExecutiveCommandView>("overview");
   const [captureMode, setCaptureMode] = useState<CaptureMode>("observation");
   const [pending, setPending] = useState(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [verifiedAt, setVerifiedAt] = useState<number | null>(null);
   const syncInFlight = useRef(false);
+  const workspaceRef = useRef<MobileBootstrap | null>(null);
+
+  useEffect(() => {
+    workspaceRef.current = workspace;
+  }, [workspace]);
 
   const ownerKey = workspace ? `${workspace.organization.id}:${workspace.user.id}` : "";
   const online = network.isConnected !== false && network.isInternetReachable !== false;
@@ -127,14 +139,32 @@ export default function App() {
 
   const refreshWorkspace = useCallback(async () => {
     const next = await loadMobileWorkspace();
+    const merged = preserveExecutiveSnapshot(next, workspaceRef.current);
     const nextOwner = `${next.organization.id}:${next.user.id}`;
     const verified = new Date().toISOString();
-    setWorkspace(next);
+    setWorkspace(merged);
     setVerifiedAt(Date.parse(verified));
-    await cacheWorkspace(nextOwner, next, verified);
+    await cacheWorkspace(nextOwner, merged, verified);
     setPending(await pendingOfflineCount(nextOwner));
-    return next;
+    return merged;
   }, []);
+
+  const refreshExecutiveWorkspace = async () => {
+    if (!workspace) {
+      throw new Error("The mobile workspace is not available.");
+    }
+    const executive = await mobileApi<MobileExecutiveWorkspace>(
+      "/api/mobile/executive"
+    );
+    const current = workspaceRef.current ?? workspace;
+    const merged = { ...current, ...executive };
+    const executiveOwner = `${merged.organization.id}:${merged.user.id}`;
+    const verified = new Date().toISOString();
+    setWorkspace(merged);
+    setVerifiedAt(Date.parse(verified));
+    await cacheWorkspace(executiveOwner, merged, verified);
+    return merged;
+  };
 
   useEffect(() => {
     let active = true;
@@ -234,7 +264,7 @@ export default function App() {
       </View>
       {notice ? <Pressable onPress={() => setNotice("")} style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
       {tab === "home" && <HomeScreen workspace={workspace} pending={pending} busy={busy} onRefresh={async () => { try { return await refreshWorkspace(); } catch (error) { setNotice(`Refresh paused: ${messageOf(error)}`); return workspace; } }} onSync={sync} onNavigate={setTab} onOpenActions={(view) => { setActionCenterView(view); setTab("actions"); }} />}
-      {tab === "workspace" && <WorkspaceScreen modules={workspace.modules ?? []} online={online} onCapture={(mode) => { setCaptureMode(mode); setTab("capture"); }} onInspect={() => setTab("inspections")} onAudit={() => setTab("audits")} onRisk={(view) => { setRiskFieldView(view); setTab("risks"); }} onGovernance={(view) => { setComplianceTrainingView(view); setTab("governance"); }} onControlledWork={(view) => { setMocPermitView(view); setTab("controlledWork"); }} onAssetContractor={(view) => { setAssetContractorView(view); setTab("assetContractors"); }} onHygieneHealth={(view) => { setHygieneHealthView(view); setTab("hygieneHealth"); }} onChemicalEnvironmental={(view) => { setChemicalEnvironmentalView(view); setTab("chemicalEnvironmental"); }} onEsg={(view) => { setEsgView(view); setTab("esg"); }} onBehaviorAssurance={(view) => { setBehaviorAssuranceView(view); setTab("behaviorAssurance"); }} onRegulatory={() => setTab("regulatory")} onActions={(view) => { setActionCenterView(view); setTab("actions"); }} onOpen={async (module) => openWorkspacePath(module.href)} />}
+      {tab === "workspace" && <WorkspaceScreen modules={workspace.modules ?? []} online={online} onCapture={(mode) => { setCaptureMode(mode); setTab("capture"); }} onInspect={() => setTab("inspections")} onAudit={() => setTab("audits")} onRisk={(view) => { setRiskFieldView(view); setTab("risks"); }} onGovernance={(view) => { setComplianceTrainingView(view); setTab("governance"); }} onControlledWork={(view) => { setMocPermitView(view); setTab("controlledWork"); }} onAssetContractor={(view) => { setAssetContractorView(view); setTab("assetContractors"); }} onHygieneHealth={(view) => { setHygieneHealthView(view); setTab("hygieneHealth"); }} onChemicalEnvironmental={(view) => { setChemicalEnvironmentalView(view); setTab("chemicalEnvironmental"); }} onEsg={(view) => { setEsgView(view); setTab("esg"); }} onBehaviorAssurance={(view) => { setBehaviorAssuranceView(view); setTab("behaviorAssurance"); }} onRegulatory={() => setTab("regulatory")} onExecutive={(view) => { setExecutiveCommandView(view); setTab("executive"); if (online) void refreshExecutiveWorkspace().catch((error) => setNotice(`Executive refresh paused: ${messageOf(error)}`)); }} onActions={(view) => { setActionCenterView(view); setTab("actions"); }} onOpen={async (module) => openWorkspacePath(module.href)} />}
       {tab === "capture" && <CaptureScreen mode={captureMode} onModeChange={setCaptureMode} workspace={workspace} ownerKey={ownerKey} online={online} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "inspections" && <InspectionsScreen inspections={workspace.inspections ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "audits" && <AuditsScreen audits={workspace.audits ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
@@ -247,12 +277,13 @@ export default function App() {
       {tab === "esg" && <EsgScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={esgView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "behaviorAssurance" && <BehaviorAssuranceScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={behaviorAssuranceView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "regulatory" && <RegulatoryIntelligenceScreen workspace={workspace} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "executive" && <ExecutiveCommandScreen workspace={workspace} online={online} initialView={executiveCommandView} onBack={() => setTab("workspace")} onRefresh={refreshExecutiveWorkspace} onNotice={setNotice} onOpenPath={openWorkspacePath} />}
       {tab === "actions" && <ActionCenterScreen workspace={workspace} ownerKey={ownerKey} online={online} view={actionCenterView} onViewChange={setActionCenterView} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} onOpenPath={openWorkspacePath} onReadNotification={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
       {tab === "settings" && <SettingsScreen workspace={workspace} pending={pending} onEnablePush={async () => { setBusy(true); try { setNotice(await registerForMobilePush()); } catch (error) { setNotice(messageOf(error)); } finally { setBusy(false); } }} onLogout={async () => { setBusy(true); try { await logoutMobileSession(); await clearWorkspaceCache(ownerKey); setWorkspace(null); setVerifiedAt(null); setAuthState("signed-out"); setTab("home"); } finally { setBusy(false); } }} />}
       <View style={styles.tabs}>
         <TabButton active={tab === "home"} label="Home" onPress={() => setTab("home")} />
         <TabButton active={tab === "workspace"} label="Workspace" onPress={() => setTab("workspace")} />
-        <TabButton active={tab === "capture" || tab === "inspections" || tab === "audits" || tab === "risks" || tab === "governance" || tab === "controlledWork" || tab === "assetContractors" || tab === "hygieneHealth" || tab === "chemicalEnvironmental" || tab === "esg" || tab === "behaviorAssurance" || tab === "regulatory"} label="Field" badge={pending || undefined} onPress={() => setTab("capture")} />
+        <TabButton active={tab === "capture" || tab === "inspections" || tab === "audits" || tab === "risks" || tab === "governance" || tab === "controlledWork" || tab === "assetContractors" || tab === "hygieneHealth" || tab === "chemicalEnvironmental" || tab === "esg" || tab === "behaviorAssurance" || tab === "regulatory" || tab === "executive"} label="Field" badge={pending || undefined} onPress={() => setTab("capture")} />
         <TabButton active={tab === "actions"} label="Actions" badge={unread + workspace.tasks.length || undefined} onPress={() => setTab("actions")} />
         <TabButton active={tab === "settings"} label="Settings" onPress={() => setTab("settings")} />
       </View>
@@ -273,7 +304,7 @@ function HomeScreen({ workspace, pending, busy, onRefresh, onSync, onNavigate, o
   return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} refreshControl={<RefreshControl tintColor="#67e8f9" refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await onRefresh(); } finally { setRefreshing(false); } }} />}><Text style={styles.eyebrow}>MOBILE COMMAND CENTER</Text><Text style={styles.pageTitle}>Welcome, {workspace.user.name.split(" ")[0]}</Text><Text style={styles.muted}>{workspace.organization.subscriptionPlan} workspace · {humanize(workspace.user.role)}</Text><View style={styles.metricGrid}><Metric label="Workflow tasks" value={workspace.tasks.length} /><Metric label="My open CAPAs" value={assignedCapas} /><Metric label="Unread alerts" value={unread} /><Metric label="Offline queue" value={pending} /></View><Card accent><Text style={styles.cardTitle}>Your authorized workspace</Text><Text style={styles.muted}>Open every Senzilytics function assigned to your role. Modules and native actions you cannot access are automatically hidden.</Text><SecondaryButton label="Explore my workspace" onPress={() => onNavigate("workspace")} /></Card><Card accent><Text style={styles.cardTitle}>Native Action Center</Text><Text style={styles.muted}>Review assigned workflow steps, update corrective actions with evidence, and respond to notifications from one operational inbox.</Text><SecondaryButton label="Open my actions" onPress={() => onOpenActions("tasks")} /></Card><Card><Text style={styles.cardTitle}>Fast field actions</Text><Text style={styles.muted}>Capture authorized field records and complete assigned inspections and Audits even when connectivity is unreliable. Every queued record remains tenant- and user-scoped.</Text><View style={styles.row}><SecondaryButton label="Open field workspace" onPress={() => onNavigate("workspace")} /><SecondaryButton label={busy ? "Syncing…" : "Sync now"} onPress={onSync} disabled={busy} /></View></Card><Text style={styles.sectionTitle}>Assigned workflow</Text>{workspace.tasks.length ? workspace.tasks.slice(0, 8).map((task) => <Pressable key={task.id} onPress={() => onOpenActions("tasks")}><Card><Text style={styles.cardTitle}>{task.name}</Text><Text style={styles.muted}>{task.instance.template.name} · {humanize(task.instance.entityType)}</Text><Text style={styles.due}>{task.dueAt ? `Due ${formatDate(task.dueAt)}` : "No due date"}</Text></Card></Pressable>) : <EmptyState text="No active workflow steps are assigned to you." />}</ScrollView>;
 }
 
-function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onRisk, onGovernance, onControlledWork, onAssetContractor, onHygieneHealth, onChemicalEnvironmental, onEsg, onBehaviorAssurance, onRegulatory, onActions, onOpen }: { modules: MobileModule[]; online: boolean; onCapture: (mode: CaptureMode) => void; onInspect: () => void; onAudit: () => void; onRisk: (view: RiskFieldView) => void; onGovernance: (view: ComplianceTrainingView) => void; onControlledWork: (view: MocPermitView) => void; onAssetContractor: (view: AssetContractorView) => void; onHygieneHealth: (view: HygieneHealthView) => void; onChemicalEnvironmental: (view: ChemicalEnvironmentalView) => void; onEsg: (view: EsgView) => void; onBehaviorAssurance: (view: BehaviorAssuranceView) => void; onRegulatory: () => void; onActions: (view: ActionCenterView) => void; onOpen: (module: MobileModule) => Promise<void> }) {
+function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onRisk, onGovernance, onControlledWork, onAssetContractor, onHygieneHealth, onChemicalEnvironmental, onEsg, onBehaviorAssurance, onRegulatory, onExecutive, onActions, onOpen }: { modules: MobileModule[]; online: boolean; onCapture: (mode: CaptureMode) => void; onInspect: () => void; onAudit: () => void; onRisk: (view: RiskFieldView) => void; onGovernance: (view: ComplianceTrainingView) => void; onControlledWork: (view: MocPermitView) => void; onAssetContractor: (view: AssetContractorView) => void; onHygieneHealth: (view: HygieneHealthView) => void; onChemicalEnvironmental: (view: ChemicalEnvironmentalView) => void; onEsg: (view: EsgView) => void; onBehaviorAssurance: (view: BehaviorAssuranceView) => void; onRegulatory: () => void; onExecutive: (view: ExecutiveCommandView) => void; onActions: (view: ActionCenterView) => void; onOpen: (module: MobileModule) => Promise<void> }) {
   const [query, setQuery] = useState("");
   const normalized = query.trim().toLowerCase();
   const visible = modules.filter((module) => !normalized || `${module.label} ${module.description} ${humanize(module.category)}`.toLowerCase().includes(normalized));
@@ -308,6 +339,8 @@ function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onRis
             behavior coaching, SIF critical-control verification, and
             certification readiness reviews,
             regulatory source reviews and impact assessments,
+            executive dashboards, reports, assurance signals, and prior
+            intelligence analyses,
             compliance and training assignments, inspections, Audits, and
             corrective-action progress remain available.
           </Text>
@@ -356,6 +389,10 @@ function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onRis
                   {module.nativeCapability === "SIF_ASSURANCE_FIELD" ? <SecondaryButton label="Open native SIF assurance" onPress={() => onBehaviorAssurance("sif")} /> : null}
                   {module.nativeCapability === "CERTIFICATION_ASSURANCE" ? <SecondaryButton label="Open native certification readiness" onPress={() => onBehaviorAssurance("certification")} /> : null}
                   {module.nativeCapability === "REGULATORY_INTELLIGENCE" ? <SecondaryButton label="Open native regulatory intelligence" onPress={onRegulatory} /> : null}
+                  {module.nativeCapability === "EXECUTIVE_DASHBOARD" ? <SecondaryButton label="Open native executive dashboard" onPress={() => onExecutive("overview")} /> : null}
+                  {module.nativeCapability === "OPERATIONAL_ASSURANCE" ? <SecondaryButton label="Open native assurance" onPress={() => onExecutive("assurance")} /> : null}
+                  {module.nativeCapability === "EXECUTIVE_REPORTING" ? <SecondaryButton label="Open native reports" onPress={() => onExecutive("reports")} /> : null}
+                  {module.nativeCapability === "AI_INTELLIGENCE" ? <SecondaryButton label="Open native AI Intelligence" onPress={() => onExecutive("ai")} /> : null}
                   <SecondaryButton
                     label={online ? "Open workspace" : "Connection required"}
                     disabled={!online}
@@ -712,6 +749,48 @@ function formatDate(value: string) { return new Intl.DateTimeFormat(undefined, {
 function formatFileSize(value: number) { return value >= 1024 * 1024 ? `${(value / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(value / 1024))} KB`; }
 function placeholderFor(type: RuntimeField["fieldType"]) { if (type === "DATE") return "YYYY-MM-DD"; if (type === "DATETIME") return "YYYY-MM-DDTHH:mm:ssZ"; if (type === "SIGNATURE") return "Type your full name"; return "Enter a response"; }
 function messageOf(error: unknown) { return error instanceof MobileApiError || error instanceof Error ? error.message : "Something went wrong."; }
+
+function preserveExecutiveSnapshot(
+  next: MobileBootstrap,
+  previous: MobileBootstrap | null
+) {
+  const sameOwner =
+    previous?.organization.id === next.organization.id &&
+    previous.user.id === next.user.id;
+  const hasSnapshot = Boolean(
+    previous?.executiveDashboard ||
+      previous?.executivePortfolio ||
+      previous?.operationalAssurance ||
+      previous?.executiveReport ||
+      previous?.executiveAiMetrics ||
+      previous?.executiveAiAnalyses?.length
+  );
+
+  if (!sameOwner || !previous || !hasSnapshot) return next;
+
+  return {
+    ...next,
+    executiveGeneratedAt: previous.executiveGeneratedAt,
+    executiveDashboard: next.executiveCapabilities.canViewDashboard
+      ? previous.executiveDashboard
+      : null,
+    executivePortfolio: next.executiveCapabilities.canViewDashboard
+      ? previous.executivePortfolio
+      : null,
+    operationalAssurance: next.executiveCapabilities.canViewDashboard
+      ? previous.operationalAssurance
+      : null,
+    executiveReport: next.executiveCapabilities.canViewReports
+      ? previous.executiveReport
+      : null,
+    executiveAiAnalyses: next.executiveCapabilities.canUseAi
+      ? previous.executiveAiAnalyses
+      : [],
+    executiveAiMetrics: next.executiveCapabilities.canUseAi
+      ? previous.executiveAiMetrics
+      : null,
+  };
+}
 
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: "#07111f", paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0 },

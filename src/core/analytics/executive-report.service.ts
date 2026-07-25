@@ -15,6 +15,7 @@ export type ExecutiveReportFilters = {
   from: Date;
   to: Date;
   siteId?: string | null;
+  recordActivity?: boolean;
 };
 
 export type ExecutiveReportDistributionItem = {
@@ -2006,50 +2007,52 @@ export async function getExecutiveReportData(
         ),
     };
 
-  await logActivity({
-    organizationId:
-      input.organizationId,
-    userId: input.userId,
-    action:
-      ActivityAction.SYSTEM,
-    entityType:
-      "ExecutiveReport",
-    entityId: null,
-    title:
-      "Executive report generated",
-    description:
-      "An executive EHS performance report was generated.",
-    metadata: {
-      from:
-        input.from.toISOString(),
-      to:
-        input.to.toISOString(),
-      siteId:
-        selectedSite?.id ??
-        null,
-      siteName:
-        selectedSite?.name ??
-        null,
-      incidentCount:
-        report.summary
-          .totalIncidents,
-      correctiveActionCount:
-        report.summary
-          .totalCorrectiveActions,
-      auditCount:
-        report.summary
-          .totalAudits,
-      inspectionCount:
-        report.summary
-          .totalInspections,
-      managementAttentionCount:
-        report
-          .managementAttention
-          .length,
-      generatedAt:
-        report.generatedAt.toISOString(),
-    },
-  });
+  if (input.recordActivity !== false) {
+    await logActivity({
+      organizationId:
+        input.organizationId,
+      userId: input.userId,
+      action:
+        ActivityAction.SYSTEM,
+      entityType:
+        "ExecutiveReport",
+      entityId: null,
+      title:
+        "Executive report generated",
+      description:
+        "An executive EHS performance report was generated.",
+      metadata: {
+        from:
+          input.from.toISOString(),
+        to:
+          input.to.toISOString(),
+        siteId:
+          selectedSite?.id ??
+          null,
+        siteName:
+          selectedSite?.name ??
+          null,
+        incidentCount:
+          report.summary
+            .totalIncidents,
+        correctiveActionCount:
+          report.summary
+            .totalCorrectiveActions,
+        auditCount:
+          report.summary
+            .totalAudits,
+        inspectionCount:
+          report.summary
+            .totalInspections,
+        managementAttentionCount:
+          report
+            .managementAttention
+            .length,
+        generatedAt:
+          report.generatedAt.toISOString(),
+      },
+    });
+  }
 
   return report;
 }
