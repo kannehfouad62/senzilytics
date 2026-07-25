@@ -4,7 +4,7 @@ import { requirePermission } from "@/lib/permissions";
 import { toggleWorkflowTemplateStatus } from "@/core/workflow/workflow.admin.actions";
 import { PermissionKey } from "@prisma/client";
 import { readWorkflowTriggerConditions } from "@/core/workflow/workflow-automation-rules";
-import { CalendarClock, GitBranch, Plus } from "lucide-react";
+import { BarChart3, CalendarClock, GitBranch, Plus } from "lucide-react";
 import Link from "next/link";
 
 
@@ -61,6 +61,13 @@ export default async function WorkflowsPage() {
   <CalendarClock size={18} />
   SLA Monitoring
 </Link>
+        <Link
+          href="/workflows/analytics"
+          className="flex items-center gap-2 rounded-2xl border border-violet-400/20 bg-violet-400/10 px-5 py-3 text-sm font-semibold text-violet-200 transition hover:bg-violet-400/20"
+        >
+          <BarChart3 size={18} />
+          Process Intelligence
+        </Link>
 </div>
       </div>
 

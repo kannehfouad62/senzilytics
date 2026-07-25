@@ -15,6 +15,7 @@ import {
 } from "@prisma/client";
 import {
   AlertTriangle,
+  BarChart3,
   CalendarClock,
   CheckCircle2,
   Clock3,
@@ -297,15 +298,24 @@ export default async function WorkflowSlaPage() {
           </p>
         </div>
 
-        <form action={runWorkflowSlaProcessor}>
-          <button
-            type="submit"
-            className="flex items-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/workflows/analytics"
+            className="flex items-center gap-2 rounded-2xl border border-violet-400/20 bg-violet-400/10 px-5 py-3 text-sm font-semibold text-violet-200 hover:bg-violet-400/20"
           >
-            <Play size={17} />
-            Process Automation &amp; SLA
-          </button>
-        </form>
+            <BarChart3 size={17} />
+            Process Intelligence
+          </Link>
+          <form action={runWorkflowSlaProcessor}>
+            <button
+              type="submit"
+              className="flex items-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+            >
+              <Play size={17} />
+              Process Automation &amp; SLA
+            </button>
+          </form>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
