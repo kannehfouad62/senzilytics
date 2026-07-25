@@ -1,4 +1,4 @@
-# Google Play listing — Senzilytics 1.0.0
+# Google Play listing — Senzilytics 1.1.0
 
 ## Store presence
 

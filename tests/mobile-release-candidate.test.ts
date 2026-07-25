@@ -66,3 +66,56 @@ test("Expo configuration and runtime headers share one release version source", 
   assert.match(config, /release-metadata\.json/);
   assert.match(runtime, /release-metadata\.json/);
 });
+
+test("store submission metadata matches the native release candidate", async () => {
+  const [
+    releaseMetadataText,
+    storeConfigText,
+    mobilePackageText,
+    appleWorksheet,
+    googleWorksheet,
+    playListing,
+  ] = await Promise.all([
+      readFile(
+        new URL("../apps/mobile/release-metadata.json", import.meta.url),
+        "utf8"
+      ),
+      readFile(
+        new URL("../apps/mobile/store.config.json", import.meta.url),
+        "utf8"
+      ),
+      readFile(
+        new URL("../apps/mobile/package.json", import.meta.url),
+        "utf8"
+      ),
+      readFile(
+        new URL("../apps/mobile/APPLE_STORE_SUBMISSION.md", import.meta.url),
+        "utf8"
+      ),
+      readFile(
+        new URL("../apps/mobile/GOOGLE_PLAY_SUBMISSION.md", import.meta.url),
+        "utf8"
+      ),
+      readFile(
+        new URL("../apps/mobile/PLAY_STORE_LISTING.md", import.meta.url),
+        "utf8"
+      ),
+  ]);
+  const releaseMetadata = JSON.parse(releaseMetadataText) as {
+    appVersion: string;
+  };
+  const storeConfig = JSON.parse(storeConfigText) as {
+    apple: { version: string };
+  };
+  const mobilePackage = JSON.parse(mobilePackageText) as {
+    scripts: { check: string };
+  };
+  const escapedVersion = releaseMetadata.appVersion.replaceAll(".", "\\.");
+  const versionPattern = new RegExp(`Senzilytics ${escapedVersion}`);
+
+  assert.equal(storeConfig.apple.version, releaseMetadata.appVersion);
+  assert.match(mobilePackage.scripts.check, /expo-doctor --verbose/);
+  assert.match(appleWorksheet, versionPattern);
+  assert.match(googleWorksheet, versionPattern);
+  assert.match(playListing, versionPattern);
+});

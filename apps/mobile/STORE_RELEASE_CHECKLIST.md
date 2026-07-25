@@ -2,6 +2,16 @@
 
 Use this checklist for version 1.1.0. Store rules and questionnaire wording change; verify each answer in App Store Connect and Google Play Console at submission time.
 
+## Candidate identity and evidence
+
+- [ ] Record the exact Git commit SHA in the governed release candidate.
+- [ ] Confirm the Git working tree is clean before both production builds are queued.
+- [ ] Record the EAS Android build ID, URL and auto-incremented version code.
+- [ ] Record the EAS iOS build ID, URL and auto-incremented build number.
+- [ ] Confirm both binaries were produced from the same commit and version `1.1.0`.
+- [ ] Attach the release-candidate validation report and build links to the governed `MOBILE_COMPATIBILITY` check.
+- [ ] Attach migration, authenticated smoke, tenant-isolation, cron-heartbeat, backup and rollback evidence to the matching governed checks.
+
 ## Product and account preparation
 
 - [ ] Confirm `com.senzilytics.mobile` is available and registered in both developer accounts.

@@ -1,4 +1,4 @@
-# Google Play submission worksheet — Senzilytics 1.0.0
+# Google Play submission worksheet — Senzilytics 1.1.0
 
 This is an engineering working sheet, not legal advice. Confirm every response against the final Android App Bundle, production vendors, tenant configuration and current Play Console form before submitting.
 
@@ -66,7 +66,7 @@ Google defines collection as transmitting data off device. Locally encrypted dat
 | Photos and videos — Photos / Videos | Evidence captured or selected for authorized tenant records | Collected; linked | Optional unless a tenant Audit or inspection question requires it | App functionality |
 | Files and docs — Files and docs | Evidence documents selected for authorized tenant records | Collected; linked | Optional | App functionality |
 
-Do not declare audio, precise/coarse location, contacts, health, financial data, purchases or advertising identifiers for version 1.0.0 unless the final binary or tenant-configured forms actually collect them. Camera, photo/video and document evidence are present and must be represented in the final Data safety answers.
+Do not declare audio, precise/coarse location, contacts, health, financial data, purchases or advertising identifiers for version 1.1.0 unless the final binary or tenant-configured forms actually collect them. Camera, photo/video and document evidence are present and must be represented in the final Data safety answers.
 
 Before final submission, inspect every included SDK and production vendor. Update this worksheet if crash reporting, analytics, camera evidence, file upload, location capture or other collection is added.
 

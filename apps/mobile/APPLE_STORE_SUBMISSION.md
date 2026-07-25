@@ -1,4 +1,4 @@
-# Apple App Store submission worksheet — Senzilytics 1.0.0
+# Apple App Store submission worksheet — Senzilytics 1.1.0
 
 This is an engineering working sheet, not legal advice. Confirm every answer against the final signed binary, production infrastructure, vendor contracts and current App Store Connect wording before submission.
 
@@ -14,7 +14,7 @@ Official references:
 | --- | --- |
 | App name | Senzilytics |
 | Bundle ID | `com.senzilytics.mobile` |
-| Version | `1.0.0` |
+| Version | `1.1.0` |
 | Primary category | Business |
 | Secondary category | Productivity |
 | Privacy Policy URL | `https://www.senzilytics.cloud/privacy` |
