@@ -171,6 +171,18 @@ export async function initializeOfflineStore() {
     );
     CREATE INDEX IF NOT EXISTS mobile_evidence_owner_captured
       ON mobile_evidence(owner_key, captured_at);
+    CREATE TABLE IF NOT EXISTS mobile_document_cache (
+      cache_key TEXT PRIMARY KEY NOT NULL,
+      owner_key TEXT NOT NULL,
+      document_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      checksum TEXT,
+      downloaded_at TEXT NOT NULL,
+      bytes BLOB NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS mobile_document_cache_owner
+      ON mobile_document_cache(owner_key, downloaded_at);
   `);
 }
 
@@ -1035,5 +1047,96 @@ export async function readCachedWorkspace(ownerKey: string) {
 
 export async function clearWorkspaceCache(ownerKey: string) {
   const database = await db();
-  await database.runAsync("DELETE FROM mobile_cache WHERE cache_key = ?", `bootstrap:${ownerKey}`);
+  await database.withExclusiveTransactionAsync(async (transaction) => {
+    await transaction.runAsync(
+      "DELETE FROM mobile_cache WHERE cache_key = ?",
+      `bootstrap:${ownerKey}`
+    );
+    await transaction.runAsync(
+      "DELETE FROM mobile_document_cache WHERE owner_key = ?",
+      ownerKey
+    );
+  });
+}
+
+export async function cacheControlledDocument(
+  ownerKey: string,
+  input: {
+    documentId: string;
+    fileName: string;
+    mimeType: string;
+    checksum?: string | null;
+    bytes: Uint8Array;
+  }
+) {
+  const database = await db();
+  await database.runAsync(
+    `INSERT INTO mobile_document_cache (
+      cache_key, owner_key, document_id, file_name, mime_type,
+      checksum, downloaded_at, bytes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(cache_key) DO UPDATE SET
+      file_name = excluded.file_name,
+      mime_type = excluded.mime_type,
+      checksum = excluded.checksum,
+      downloaded_at = excluded.downloaded_at,
+      bytes = excluded.bytes`,
+    `document:${ownerKey}:${input.documentId}`,
+    ownerKey,
+    input.documentId,
+    input.fileName,
+    input.mimeType,
+    input.checksum ?? null,
+    new Date().toISOString(),
+    input.bytes
+  );
+}
+
+export async function readCachedControlledDocument(
+  ownerKey: string,
+  documentId: string
+) {
+  const database = await db();
+  return database.getFirstAsync<{
+    file_name: string;
+    mime_type: string;
+    checksum: string | null;
+    downloaded_at: string;
+    bytes: Uint8Array | ArrayBuffer;
+  }>(
+    `SELECT file_name, mime_type, checksum, downloaded_at, bytes
+     FROM mobile_document_cache
+     WHERE cache_key = ? AND owner_key = ?`,
+    `document:${ownerKey}:${documentId}`,
+    ownerKey
+  );
+}
+
+export async function cachedControlledDocumentIds(ownerKey: string) {
+  const database = await db();
+  const rows = await database.getAllAsync<{ document_id: string }>(
+    "SELECT document_id FROM mobile_document_cache WHERE owner_key = ?",
+    ownerKey
+  );
+  return rows.map((row) => row.document_id);
+}
+
+export async function removeCachedControlledDocument(
+  ownerKey: string,
+  documentId: string
+) {
+  const database = await db();
+  await database.runAsync(
+    "DELETE FROM mobile_document_cache WHERE cache_key = ? AND owner_key = ?",
+    `document:${ownerKey}:${documentId}`,
+    ownerKey
+  );
+}
+
+export async function clearCachedControlledDocuments(ownerKey: string) {
+  const database = await db();
+  await database.runAsync(
+    "DELETE FROM mobile_document_cache WHERE owner_key = ?",
+    ownerKey
+  );
 }

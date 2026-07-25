@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE";
 };
 
 export type MobileDepartment = {
@@ -263,6 +263,119 @@ export type MobileComplianceTrainingCapabilities = {
   canManageCompliance: boolean;
   canViewTraining: boolean;
   canManageTraining: boolean;
+};
+
+export type MobileComplianceObligation = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  dueDate: string;
+  reference: string | null;
+  obligationType: string;
+  authority: string | null;
+  jurisdiction: string | null;
+  legalReference: string | null;
+  applicability: string | null;
+  recurrence: string;
+  intervalValue: number;
+  evidenceRequired: string | null;
+  completedAt: string | null;
+  lastEvaluatedAt: string | null;
+  evaluationNotes: string | null;
+  site: { id: string; name: string };
+  owner: { id: string; name: string } | null;
+  regulatorySource: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
+  evaluations: Array<{
+    id: string;
+    evaluatedAt: string;
+    isCompliant: boolean;
+    findings: string | null;
+    evidenceSummary: string | null;
+    nextDueDate: string | null;
+    evaluatedBy: { id: string; name: string };
+  }>;
+  isOwner: boolean;
+  isOverdue: boolean;
+};
+
+export type MobileCompliancePermit = {
+  id: string;
+  number: string;
+  name: string;
+  description: string | null;
+  authority: string | null;
+  permitType: string | null;
+  status: string;
+  effectiveDate: string | null;
+  expirationDate: string | null;
+  renewalDueDate: string | null;
+  conditions: string | null;
+  limits: string | null;
+  reportingRequirements: string | null;
+  notes: string | null;
+  site: { id: string; name: string };
+  owner: { id: string; name: string } | null;
+  isOwner: boolean;
+  expiresWithin60Days: boolean;
+  isExpired: boolean;
+};
+
+export type MobileControlledDocument = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  category: string;
+  status: "ACTIVE" | "ARCHIVED";
+  name: string;
+  originalName: string;
+  description: string | null;
+  mimeType: string;
+  sizeBytes: number;
+  version: number;
+  versionGroupId: string;
+  checksum: string | null;
+  createdAt: string;
+  archivedAt: string | null;
+  uploadedBy: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  versions: Array<{
+    id: string;
+    versionGroupId: string;
+    version: number;
+    name: string;
+    originalName: string;
+    mimeType: string;
+    sizeBytes: number;
+    status: string;
+    isLatest: boolean;
+    createdAt: string;
+    uploadedBy: { id: string; name: string } | null;
+  }>;
+};
+
+export type MobileComplianceDocumentCapabilities = {
+  canViewCompliance: boolean;
+  canManageCompliance: boolean;
+  canManageDocuments: boolean;
+  canUploadDocuments: boolean;
+};
+
+export type MobileComplianceDocumentMetrics = {
+  obligations: number;
+  overdueObligations: number;
+  noncompliantObligations: number;
+  permitsExpiringWithin60Days: number;
+  activeDocuments: number;
+  archivedDocuments: number;
+  documentStorageBytes: number;
 };
 
 export type MobileMocStatus =
@@ -1696,6 +1809,12 @@ export type MobileBootstrap = {
   complianceOccurrences: MobileComplianceOccurrence[];
   trainingAssignments: MobileTrainingAssignment[];
   complianceTrainingCapabilities: MobileComplianceTrainingCapabilities;
+  complianceDocumentGeneratedAt: string;
+  complianceDocumentMetrics: MobileComplianceDocumentMetrics;
+  complianceObligations: MobileComplianceObligation[];
+  compliancePermits: MobileCompliancePermit[];
+  controlledDocuments: MobileControlledDocument[];
+  complianceDocumentCapabilities: MobileComplianceDocumentCapabilities;
   managementOfChanges: MobileManagementOfChange[];
   permitsToWork: MobilePermitToWork[];
   mocPermitCapabilities: MobileMocPermitCapabilities;

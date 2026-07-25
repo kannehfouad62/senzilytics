@@ -16,8 +16,38 @@ export async function uploadPrivateMobileEvidence(input: {
   contentType: string;
   clientPayload: string;
 }) {
-  const tokenResponse = await mobileApi<{ clientToken: string }>(
+  return uploadPrivateMobileFile(
     "/api/mobile/evidence/upload",
+    input,
+    "Private evidence upload failed."
+  );
+}
+
+export async function uploadPrivateMobileDocument(input: {
+  pathname: string;
+  body: ArrayBuffer;
+  contentType: string;
+  clientPayload: string;
+}) {
+  return uploadPrivateMobileFile(
+    "/api/mobile/documents/upload",
+    input,
+    "Controlled-document upload failed."
+  );
+}
+
+async function uploadPrivateMobileFile(
+  route: string,
+  input: {
+    pathname: string;
+    body: ArrayBuffer;
+    contentType: string;
+    clientPayload: string;
+  },
+  fallbackMessage: string
+) {
+  const tokenResponse = await mobileApi<{ clientToken: string }>(
+    route,
     {
       method: "POST",
       body: JSON.stringify({
@@ -51,7 +81,7 @@ export async function uploadPrivateMobileEvidence(input: {
     const body = await response.json().catch(() => null) as {
       error?: { message?: string };
     } | null;
-    throw new Error(body?.error?.message || "Private evidence upload failed.");
+    throw new Error(body?.error?.message || fallbackMessage);
   }
   return await response.json() as UploadResult;
 }
@@ -63,6 +93,6 @@ function clientTokenStoreId(token: string) {
     parts[2] === "client"
     ? parts[3]
     : "";
-  if (!storeId) throw new Error("The private evidence upload token is invalid.");
+  if (!storeId) throw new Error("The private file upload token is invalid.");
   return storeId;
 }

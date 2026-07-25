@@ -13,6 +13,7 @@ import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.ser
 import { getMobileAssetContractorWorkspace } from "@/modules/mobile/mobile-asset-contractor.service";
 import { getMobileBehaviorAssuranceWorkspace } from "@/modules/mobile/mobile-behavior-assurance.service";
 import { getMobileComplianceTraining } from "@/modules/mobile/mobile-compliance-training.service";
+import { getMobileComplianceDocumentWorkspace } from "@/modules/mobile/mobile-compliance-documents.service";
 import { getMobileChemicalEnvironmentalWorkspace } from "@/modules/mobile/mobile-chemical-environmental.service";
 import { getMobileEsgWorkspace } from "@/modules/mobile/mobile-esg.service";
 import { getMobileHygieneHealthWorkspace } from "@/modules/mobile/mobile-hygiene-health.service";
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, hygieneHealth, chemicalEnvironmental, esg, behaviorAssurance, regulatoryIntelligence, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, complianceDocuments, mocPermits, assetContractors, hygieneHealth, chemicalEnvironmental, esg, behaviorAssurance, regulatoryIntelligence, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -68,6 +69,12 @@ export async function GET(request: Request) {
         organizationId: organization.id,
         userId: user.id,
         permissions: assigned,
+      }),
+      getMobileComplianceDocumentWorkspace({
+        organizationId: organization.id,
+        userId: user.id,
+        permissions: assigned,
+        subscriptionPlan: organization.subscriptionPlan,
       }),
       getMobileMocPermitWorkspace({
         organizationId: organization.id,
@@ -353,6 +360,12 @@ export async function GET(request: Request) {
       complianceOccurrences: complianceTraining.complianceOccurrences,
       trainingAssignments: complianceTraining.trainingAssignments,
       complianceTrainingCapabilities: complianceTraining.capabilities,
+      complianceDocumentGeneratedAt: complianceDocuments.generatedAt,
+      complianceDocumentMetrics: complianceDocuments.metrics,
+      complianceObligations: complianceDocuments.obligations,
+      compliancePermits: complianceDocuments.permits,
+      controlledDocuments: complianceDocuments.documents,
+      complianceDocumentCapabilities: complianceDocuments.capabilities,
       managementOfChanges: mocPermits.mocs,
       permitsToWork: mocPermits.permits,
       mocPermitCapabilities: mocPermits.capabilities,

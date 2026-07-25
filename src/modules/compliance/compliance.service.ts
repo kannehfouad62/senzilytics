@@ -8,7 +8,9 @@ import {
   ComplianceObligationType,
   ComplianceRecurrence,
   ConfigurableFormModule,
+  Status,
 } from "@prisma/client";
+import { nextComplianceDueDate } from "./compliance-recurrence";
 
 export async function createComplianceObligationService(input: {
   organizationId: string;
@@ -201,5 +203,103 @@ export async function completeComplianceFormsService(input: {
         },
       },
     });
+  });
+}
+
+export async function evaluateComplianceObligationService(input: {
+  organizationId: string;
+  userId: string;
+  complianceItemId: string;
+  isCompliant: boolean;
+  findings?: string | null;
+  evidenceSummary?: string | null;
+}) {
+  const [item, evaluator] = await Promise.all([
+    prisma.complianceItem.findFirst({
+      where: {
+        id: input.complianceItemId,
+        site: { organizationId: input.organizationId },
+      },
+    }),
+    prisma.user.findFirst({
+      where: {
+        id: input.userId,
+        organizationId: input.organizationId,
+        isActive: true,
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!item) {
+    throw new Error("Compliance obligation not found in this organization.");
+  }
+
+  if (!evaluator) {
+    throw new Error("The compliance evaluator is not an active tenant user.");
+  }
+
+  const findings = input.findings?.trim() || null;
+  const evidenceSummary = input.evidenceSummary?.trim() || null;
+  const nextDueDate = input.isCompliant
+    ? nextComplianceDueDate(
+        item.dueDate,
+        item.recurrence,
+        item.intervalValue
+      )
+    : null;
+  const evaluatedAt = new Date();
+
+  return prisma.$transaction(async (tx) => {
+    const evaluation = await tx.complianceEvaluation.create({
+      data: {
+        complianceItemId: item.id,
+        evaluatedById: evaluator.id,
+        evaluatedAt,
+        isCompliant: input.isCompliant,
+        findings,
+        evidenceSummary,
+        nextDueDate,
+      },
+    });
+
+    await tx.complianceItem.update({
+      where: { id: item.id },
+      data: {
+        status: input.isCompliant
+          ? nextDueDate
+            ? Status.OPEN
+            : Status.COMPLETED
+          : Status.IN_PROGRESS,
+        completedAt:
+          input.isCompliant && !nextDueDate ? evaluatedAt : null,
+        lastEvaluatedAt: evaluatedAt,
+        evaluationNotes: findings,
+        dueDate: nextDueDate ?? item.dueDate,
+        reminderSentAt: nextDueDate ? null : item.reminderSentAt,
+        overdueNotifiedAt: nextDueDate ? null : item.overdueNotifiedAt,
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        action: ActivityAction.UPDATE,
+        entityType: "ComplianceItem",
+        entityId: item.id,
+        title: "Compliance obligation evaluated",
+        description: input.isCompliant
+          ? "Recorded as compliant."
+          : "Recorded as noncompliant.",
+        metadata: {
+          isCompliant: input.isCompliant,
+          nextDueDate: nextDueDate?.toISOString() ?? null,
+          evidenceSummaryRecorded: Boolean(evidenceSummary),
+        },
+      },
+    });
+
+    return evaluation;
   });
 }

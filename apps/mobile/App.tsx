@@ -28,6 +28,10 @@ import {
 } from "./src/behavior-assurance";
 import { ComplianceTrainingScreen, type ComplianceTrainingView } from "./src/compliance-training";
 import {
+  ComplianceDocumentsScreen,
+  type ComplianceDocumentView,
+} from "./src/compliance-documents";
+import {
   ChemicalEnvironmentalScreen,
   type ChemicalEnvironmentalView,
 } from "./src/chemical-environmental";
@@ -54,6 +58,7 @@ import { registerForMobilePush, subscribeToMobileNotificationResponses } from ".
 import { MOBILE_WORKSPACE_MAX_OFFLINE_AGE_MS } from "./src/session-lifecycle";
 import {
   cacheWorkspace,
+  clearCachedControlledDocuments,
   clearWorkspaceCache,
   initializeOfflineStore,
   pendingOfflineCount,
@@ -84,7 +89,7 @@ import type {
   RuntimeForm,
 } from "./src/types";
 
-type Tab = "home" | "workspace" | "capture" | "inspections" | "audits" | "risks" | "governance" | "controlledWork" | "assetContractors" | "hygieneHealth" | "chemicalEnvironmental" | "esg" | "behaviorAssurance" | "regulatory" | "executive" | "actions" | "settings";
+type Tab = "home" | "workspace" | "capture" | "inspections" | "audits" | "risks" | "governance" | "complianceDocuments" | "controlledWork" | "assetContractors" | "hygieneHealth" | "chemicalEnvironmental" | "esg" | "behaviorAssurance" | "regulatory" | "executive" | "actions" | "settings";
 type CaptureMode = "observation" | "incident";
 type FieldValue = string | boolean | string[];
 const observationTypes = ["UNSAFE_ACT", "UNSAFE_CONDITION", "POSITIVE_PRACTICE", "ENVIRONMENTAL", "QUALITY", "OTHER"] as const;
@@ -99,6 +104,8 @@ export default function App() {
   const [actionCenterView, setActionCenterView] = useState<ActionCenterView>("tasks");
   const [riskFieldView, setRiskFieldView] = useState<RiskFieldView>("risks");
   const [complianceTrainingView, setComplianceTrainingView] = useState<ComplianceTrainingView>("calendar");
+  const [complianceDocumentView, setComplianceDocumentView] =
+    useState<ComplianceDocumentView>("compliance");
   const [mocPermitView, setMocPermitView] = useState<MocPermitView>("moc");
   const [assetContractorView, setAssetContractorView] =
     useState<AssetContractorView>("assets");
@@ -142,6 +149,9 @@ export default function App() {
     const merged = preserveExecutiveSnapshot(next, workspaceRef.current);
     const nextOwner = `${next.organization.id}:${next.user.id}`;
     const verified = new Date().toISOString();
+    if (!next.complianceDocumentCapabilities.canManageDocuments) {
+      await clearCachedControlledDocuments(nextOwner);
+    }
     setWorkspace(merged);
     setVerifiedAt(Date.parse(verified));
     await cacheWorkspace(nextOwner, merged, verified);
@@ -264,12 +274,13 @@ export default function App() {
       </View>
       {notice ? <Pressable onPress={() => setNotice("")} style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
       {tab === "home" && <HomeScreen workspace={workspace} pending={pending} busy={busy} onRefresh={async () => { try { return await refreshWorkspace(); } catch (error) { setNotice(`Refresh paused: ${messageOf(error)}`); return workspace; } }} onSync={sync} onNavigate={setTab} onOpenActions={(view) => { setActionCenterView(view); setTab("actions"); }} />}
-      {tab === "workspace" && <WorkspaceScreen modules={workspace.modules ?? []} online={online} onCapture={(mode) => { setCaptureMode(mode); setTab("capture"); }} onInspect={() => setTab("inspections")} onAudit={() => setTab("audits")} onRisk={(view) => { setRiskFieldView(view); setTab("risks"); }} onGovernance={(view) => { setComplianceTrainingView(view); setTab("governance"); }} onControlledWork={(view) => { setMocPermitView(view); setTab("controlledWork"); }} onAssetContractor={(view) => { setAssetContractorView(view); setTab("assetContractors"); }} onHygieneHealth={(view) => { setHygieneHealthView(view); setTab("hygieneHealth"); }} onChemicalEnvironmental={(view) => { setChemicalEnvironmentalView(view); setTab("chemicalEnvironmental"); }} onEsg={(view) => { setEsgView(view); setTab("esg"); }} onBehaviorAssurance={(view) => { setBehaviorAssuranceView(view); setTab("behaviorAssurance"); }} onRegulatory={() => setTab("regulatory")} onExecutive={(view) => { setExecutiveCommandView(view); setTab("executive"); if (online) void refreshExecutiveWorkspace().catch((error) => setNotice(`Executive refresh paused: ${messageOf(error)}`)); }} onActions={(view) => { setActionCenterView(view); setTab("actions"); }} onOpen={async (module) => openWorkspacePath(module.href)} />}
+      {tab === "workspace" && <WorkspaceScreen modules={workspace.modules ?? []} online={online} onCapture={(mode) => { setCaptureMode(mode); setTab("capture"); }} onInspect={() => setTab("inspections")} onAudit={() => setTab("audits")} onRisk={(view) => { setRiskFieldView(view); setTab("risks"); }} onGovernance={(view) => { setComplianceTrainingView(view); setTab("governance"); }} onComplianceDocuments={(view) => { setComplianceDocumentView(view); setTab("complianceDocuments"); }} onControlledWork={(view) => { setMocPermitView(view); setTab("controlledWork"); }} onAssetContractor={(view) => { setAssetContractorView(view); setTab("assetContractors"); }} onHygieneHealth={(view) => { setHygieneHealthView(view); setTab("hygieneHealth"); }} onChemicalEnvironmental={(view) => { setChemicalEnvironmentalView(view); setTab("chemicalEnvironmental"); }} onEsg={(view) => { setEsgView(view); setTab("esg"); }} onBehaviorAssurance={(view) => { setBehaviorAssuranceView(view); setTab("behaviorAssurance"); }} onRegulatory={() => setTab("regulatory")} onExecutive={(view) => { setExecutiveCommandView(view); setTab("executive"); if (online) void refreshExecutiveWorkspace().catch((error) => setNotice(`Executive refresh paused: ${messageOf(error)}`)); }} onActions={(view) => { setActionCenterView(view); setTab("actions"); }} onOpen={async (module) => openWorkspacePath(module.href)} />}
       {tab === "capture" && <CaptureScreen mode={captureMode} onModeChange={setCaptureMode} workspace={workspace} ownerKey={ownerKey} online={online} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "inspections" && <InspectionsScreen inspections={workspace.inspections ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "audits" && <AuditsScreen audits={workspace.audits ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "risks" && <RiskFieldScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={riskFieldView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "governance" && <ComplianceTrainingScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={complianceTrainingView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "complianceDocuments" && <ComplianceDocumentsScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={complianceDocumentView} onBack={() => setTab("workspace")} onRefresh={refreshWorkspace} onNotice={setNotice} />}
       {tab === "controlledWork" && <MocPermitScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={mocPermitView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "assetContractors" && <AssetContractorScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={assetContractorView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "hygieneHealth" && <HygieneHealthScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={hygieneHealthView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
@@ -283,7 +294,7 @@ export default function App() {
       <View style={styles.tabs}>
         <TabButton active={tab === "home"} label="Home" onPress={() => setTab("home")} />
         <TabButton active={tab === "workspace"} label="Workspace" onPress={() => setTab("workspace")} />
-        <TabButton active={tab === "capture" || tab === "inspections" || tab === "audits" || tab === "risks" || tab === "governance" || tab === "controlledWork" || tab === "assetContractors" || tab === "hygieneHealth" || tab === "chemicalEnvironmental" || tab === "esg" || tab === "behaviorAssurance" || tab === "regulatory" || tab === "executive"} label="Field" badge={pending || undefined} onPress={() => setTab("capture")} />
+        <TabButton active={tab === "capture" || tab === "inspections" || tab === "audits" || tab === "risks" || tab === "governance" || tab === "complianceDocuments" || tab === "controlledWork" || tab === "assetContractors" || tab === "hygieneHealth" || tab === "chemicalEnvironmental" || tab === "esg" || tab === "behaviorAssurance" || tab === "regulatory" || tab === "executive"} label="Field" badge={pending || undefined} onPress={() => setTab("capture")} />
         <TabButton active={tab === "actions"} label="Actions" badge={unread + workspace.tasks.length || undefined} onPress={() => setTab("actions")} />
         <TabButton active={tab === "settings"} label="Settings" onPress={() => setTab("settings")} />
       </View>
@@ -304,7 +315,7 @@ function HomeScreen({ workspace, pending, busy, onRefresh, onSync, onNavigate, o
   return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} refreshControl={<RefreshControl tintColor="#67e8f9" refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await onRefresh(); } finally { setRefreshing(false); } }} />}><Text style={styles.eyebrow}>MOBILE COMMAND CENTER</Text><Text style={styles.pageTitle}>Welcome, {workspace.user.name.split(" ")[0]}</Text><Text style={styles.muted}>{workspace.organization.subscriptionPlan} workspace · {humanize(workspace.user.role)}</Text><View style={styles.metricGrid}><Metric label="Workflow tasks" value={workspace.tasks.length} /><Metric label="My open CAPAs" value={assignedCapas} /><Metric label="Unread alerts" value={unread} /><Metric label="Offline queue" value={pending} /></View><Card accent><Text style={styles.cardTitle}>Your authorized workspace</Text><Text style={styles.muted}>Open every Senzilytics function assigned to your role. Modules and native actions you cannot access are automatically hidden.</Text><SecondaryButton label="Explore my workspace" onPress={() => onNavigate("workspace")} /></Card><Card accent><Text style={styles.cardTitle}>Native Action Center</Text><Text style={styles.muted}>Review assigned workflow steps, update corrective actions with evidence, and respond to notifications from one operational inbox.</Text><SecondaryButton label="Open my actions" onPress={() => onOpenActions("tasks")} /></Card><Card><Text style={styles.cardTitle}>Fast field actions</Text><Text style={styles.muted}>Capture authorized field records and complete assigned inspections and Audits even when connectivity is unreliable. Every queued record remains tenant- and user-scoped.</Text><View style={styles.row}><SecondaryButton label="Open field workspace" onPress={() => onNavigate("workspace")} /><SecondaryButton label={busy ? "Syncing…" : "Sync now"} onPress={onSync} disabled={busy} /></View></Card><Text style={styles.sectionTitle}>Assigned workflow</Text>{workspace.tasks.length ? workspace.tasks.slice(0, 8).map((task) => <Pressable key={task.id} onPress={() => onOpenActions("tasks")}><Card><Text style={styles.cardTitle}>{task.name}</Text><Text style={styles.muted}>{task.instance.template.name} · {humanize(task.instance.entityType)}</Text><Text style={styles.due}>{task.dueAt ? `Due ${formatDate(task.dueAt)}` : "No due date"}</Text></Card></Pressable>) : <EmptyState text="No active workflow steps are assigned to you." />}</ScrollView>;
 }
 
-function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onRisk, onGovernance, onControlledWork, onAssetContractor, onHygieneHealth, onChemicalEnvironmental, onEsg, onBehaviorAssurance, onRegulatory, onExecutive, onActions, onOpen }: { modules: MobileModule[]; online: boolean; onCapture: (mode: CaptureMode) => void; onInspect: () => void; onAudit: () => void; onRisk: (view: RiskFieldView) => void; onGovernance: (view: ComplianceTrainingView) => void; onControlledWork: (view: MocPermitView) => void; onAssetContractor: (view: AssetContractorView) => void; onHygieneHealth: (view: HygieneHealthView) => void; onChemicalEnvironmental: (view: ChemicalEnvironmentalView) => void; onEsg: (view: EsgView) => void; onBehaviorAssurance: (view: BehaviorAssuranceView) => void; onRegulatory: () => void; onExecutive: (view: ExecutiveCommandView) => void; onActions: (view: ActionCenterView) => void; onOpen: (module: MobileModule) => Promise<void> }) {
+function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onRisk, onGovernance, onComplianceDocuments, onControlledWork, onAssetContractor, onHygieneHealth, onChemicalEnvironmental, onEsg, onBehaviorAssurance, onRegulatory, onExecutive, onActions, onOpen }: { modules: MobileModule[]; online: boolean; onCapture: (mode: CaptureMode) => void; onInspect: () => void; onAudit: () => void; onRisk: (view: RiskFieldView) => void; onGovernance: (view: ComplianceTrainingView) => void; onComplianceDocuments: (view: ComplianceDocumentView) => void; onControlledWork: (view: MocPermitView) => void; onAssetContractor: (view: AssetContractorView) => void; onHygieneHealth: (view: HygieneHealthView) => void; onChemicalEnvironmental: (view: ChemicalEnvironmentalView) => void; onEsg: (view: EsgView) => void; onBehaviorAssurance: (view: BehaviorAssuranceView) => void; onRegulatory: () => void; onExecutive: (view: ExecutiveCommandView) => void; onActions: (view: ActionCenterView) => void; onOpen: (module: MobileModule) => Promise<void> }) {
   const [query, setQuery] = useState("");
   const normalized = query.trim().toLowerCase();
   const visible = modules.filter((module) => !normalized || `${module.label} ${module.description} ${humanize(module.category)}`.toLowerCase().includes(normalized));
@@ -341,6 +352,8 @@ function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onRis
             regulatory source reviews and impact assessments,
             executive dashboards, reports, assurance signals, and prior
             intelligence analyses,
+            compliance obligations, permit exposure, and encrypted controlled
+            document copies,
             compliance and training assignments, inspections, Audits, and
             corrective-action progress remain available.
           </Text>
@@ -374,6 +387,7 @@ function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onRis
                   {module.nativeCapability === "AUDIT_EXECUTION" ? <SecondaryButton label="Assigned Audits" onPress={onAudit} /> : null}
                   {module.nativeCapability === "RISK_FIELD" ? <SecondaryButton label="Open native Risk Register" onPress={() => onRisk("risks")} /> : null}
                   {module.nativeCapability === "JSA_FIELD" ? <SecondaryButton label="Open native JSA / JHA" onPress={() => onRisk("jsa")} /> : null}
+                  {module.nativeCapability === "COMPLIANCE_REGISTER" ? <SecondaryButton label="Open native compliance" onPress={() => onComplianceDocuments("compliance")} /> : null}
                   {module.nativeCapability === "COMPLIANCE_CALENDAR" ? <SecondaryButton label="Open native calendar" onPress={() => onGovernance("calendar")} /> : null}
                   {module.nativeCapability === "TRAINING_ASSIGNMENTS" ? <SecondaryButton label="Open native training" onPress={() => onGovernance("training")} /> : null}
                   {module.nativeCapability === "MOC_EXECUTION" ? <SecondaryButton label="Open native MOC" onPress={() => onControlledWork("moc")} /> : null}
@@ -389,6 +403,7 @@ function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onRis
                   {module.nativeCapability === "SIF_ASSURANCE_FIELD" ? <SecondaryButton label="Open native SIF assurance" onPress={() => onBehaviorAssurance("sif")} /> : null}
                   {module.nativeCapability === "CERTIFICATION_ASSURANCE" ? <SecondaryButton label="Open native certification readiness" onPress={() => onBehaviorAssurance("certification")} /> : null}
                   {module.nativeCapability === "REGULATORY_INTELLIGENCE" ? <SecondaryButton label="Open native regulatory intelligence" onPress={onRegulatory} /> : null}
+                  {module.nativeCapability === "CONTROLLED_DOCUMENTS" ? <SecondaryButton label="Open native documents" onPress={() => onComplianceDocuments("documents")} /> : null}
                   {module.nativeCapability === "EXECUTIVE_DASHBOARD" ? <SecondaryButton label="Open native executive dashboard" onPress={() => onExecutive("overview")} /> : null}
                   {module.nativeCapability === "OPERATIONAL_ASSURANCE" ? <SecondaryButton label="Open native assurance" onPress={() => onExecutive("assurance")} /> : null}
                   {module.nativeCapability === "EXECUTIVE_REPORTING" ? <SecondaryButton label="Open native reports" onPress={() => onExecutive("reports")} /> : null}

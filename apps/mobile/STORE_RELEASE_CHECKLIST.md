@@ -53,6 +53,10 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] Confirm users without editable Audit membership cannot download or synchronize Audit execution data.
 - [ ] Confirm the 72-hour offline authorization policy and session revocation behavior.
 - [ ] Confirm one tenant cannot view or synchronize another tenant's cache, outbox, tasks or notifications.
+- [ ] Verify `VIEW_COMPLIANCE` can review native obligations and permits while only `MANAGE_COMPLIANCE` can submit a formal online evaluation.
+- [ ] Upload, download, archive and restore a controlled document as `MANAGE_DOCUMENTS`; verify a user without that permission cannot list or transfer files.
+- [ ] Download a controlled document for offline use, open/share it offline, then verify sign-out and document-permission removal delete the encrypted copy.
+- [ ] Replace a document in the web workspace and verify the native version history and integrity-checked current download are accurate.
 - [ ] Register push on a physical device, deliver a test alert and tap it into the **Alerts** view inside **Actions**.
 - [ ] Test declined notification permission and confirm core app use remains available.
 - [ ] Sign out with and without connectivity and verify protected workspace access is removed.

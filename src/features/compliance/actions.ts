@@ -7,8 +7,8 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import {
   completeComplianceFormsService,
   createComplianceObligationService,
+  evaluateComplianceObligationService,
 } from "@/modules/compliance/compliance.service";
-import { nextComplianceDueDate } from "@/modules/compliance/compliance-recurrence";
 import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
 import {
   ComplianceObligationType,
@@ -16,7 +16,6 @@ import {
   ConfigurableFormModule,
   PermissionKey,
   PermitStatus,
-  Status,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -221,54 +220,16 @@ export async function evaluateComplianceObligation(data: FormData) {
   await requirePermission(PermissionKey.MANAGE_COMPLIANCE);
   const { organizationId, user } = await getCurrentUserTenant();
   const id = required(data, "id");
-  const item = await prisma.complianceItem.findFirst({
-    where: {
-      id,
-      site: { organizationId },
-    },
-  });
-
-  if (!item) {
-    throw new Error("Compliance obligation not found.");
-  }
-
   const isCompliant = required(data, "result") === "COMPLIANT";
-  const nextDueDate = isCompliant
-    ? nextComplianceDueDate(
-        item.dueDate,
-        item.recurrence,
-        item.intervalValue
-      )
-    : null;
 
-  await prisma.$transaction([
-    prisma.complianceEvaluation.create({
-      data: {
-        complianceItemId: id,
-        evaluatedById: user.id,
-        isCompliant,
-        findings: optional(data, "findings"),
-        evidenceSummary: optional(data, "evidenceSummary"),
-        nextDueDate,
-      },
-    }),
-    prisma.complianceItem.update({
-      where: { id },
-      data: {
-        status: isCompliant
-          ? nextDueDate
-            ? Status.OPEN
-            : Status.COMPLETED
-          : Status.IN_PROGRESS,
-        completedAt: isCompliant && !nextDueDate ? new Date() : null,
-        lastEvaluatedAt: new Date(),
-        evaluationNotes: optional(data, "findings"),
-        dueDate: nextDueDate ?? item.dueDate,
-        reminderSentAt: nextDueDate ? null : item.reminderSentAt,
-        overdueNotifiedAt: nextDueDate ? null : item.overdueNotifiedAt,
-      },
-    }),
-  ]);
+  await evaluateComplianceObligationService({
+    organizationId,
+    userId: user.id,
+    complianceItemId: id,
+    isCompliant,
+    findings: optional(data, "findings"),
+    evidenceSummary: optional(data, "evidenceSummary"),
+  });
 
   revalidatePath(`/compliance/${id}`);
   revalidatePath("/compliance");

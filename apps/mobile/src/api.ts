@@ -125,6 +125,32 @@ export async function clearMobileSession() {
 }
 
 export async function mobileApi<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
+  return parseJson<T>(await authorizedMobileFetch(path, init, retry));
+}
+
+export async function mobileBinary(
+  path: string,
+  init: RequestInit = {},
+  retry = true
+) {
+  const response = await authorizedMobileFetch(path, init, retry);
+  if (!response.ok) {
+    await parseJson(response);
+  }
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    contentType:
+      response.headers.get("content-type") || "application/octet-stream",
+    contentLength: Number(response.headers.get("content-length") || 0),
+    etag: response.headers.get("etag"),
+  };
+}
+
+async function authorizedMobileFetch(
+  path: string,
+  init: RequestInit = {},
+  retry = true
+) {
   if (!accessToken) await refreshMobileSession();
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -132,9 +158,9 @@ export async function mobileApi<T>(path: string, init: RequestInit = {}, retry =
   });
   if (response.status === 401 && retry) {
     await refreshMobileSession();
-    return mobileApi<T>(path, init, false);
+    return authorizedMobileFetch(path, init, false);
   }
-  return parseJson<T>(response);
+  return response;
 }
 
 export function loadMobileWorkspace() { return mobileApi<MobileBootstrap>("/api/mobile/bootstrap"); }
