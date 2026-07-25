@@ -1,5 +1,6 @@
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { processAuditSchedules } from "@/modules/audit/audit-schedule-processor.service";
+import { runTrackedScheduledJob } from "@/modules/platform/scheduled-job-monitor.service";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -21,7 +22,10 @@ export async function GET(request: NextRequest) {
   const processedAt = new Date().toISOString();
 
   try {
-    const result = await processAuditSchedules();
+    const result = await runTrackedScheduledJob(
+      "audit-schedules",
+      processAuditSchedules,
+    );
 
     return NextResponse.json({
       success: true,

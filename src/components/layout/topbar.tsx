@@ -1,6 +1,6 @@
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Bell, Building2, ClipboardList, LogOut, Search, Sparkles } from "lucide-react";
+import { Bell, Building2, ClipboardList, LogOut, Search, ServerCog, Sparkles } from "lucide-react";
 import Link from "next/link";
 import {
   auditNavItems,
@@ -96,6 +96,11 @@ export async function Topbar() {
             label: "Tenant Provisioning",
             href: "/platform/tenants",
             icon: Building2,
+          },
+          {
+            label: "Platform Operations",
+            href: "/platform/operations",
+            icon: ServerCog,
           },
         ]
       : currentUser?.role === UserRole.DEMO_VIEWER

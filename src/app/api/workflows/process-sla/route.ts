@@ -8,6 +8,7 @@ import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { cleanupExpiredDemoUsers } from "@/features/demo/cleanup.service";
 import { processIntegrationWebhookDeliveries } from "@/modules/integrations/webhook-delivery.service";
 import { processMobilePushDeliveries } from "@/modules/mobile/mobile-push.service";
+import { runTrackedScheduledJob } from "@/modules/platform/scheduled-job-monitor.service";
 import {
   NextRequest,
   NextResponse,
@@ -43,7 +44,8 @@ export async function GET(
   }
 
   try {
-    const [
+    return await runTrackedScheduledJob("workflow-sla", async () => {
+      const [
       workflowResult,
       correctiveActionResult,
       incidentEscalationResult,
@@ -72,7 +74,7 @@ export async function GET(
       processMobilePushDeliveries(),
     ]);
 
-    return NextResponse.json({
+      return NextResponse.json({
       success: true,
 
       processedAt:
@@ -176,7 +178,8 @@ export async function GET(
           auditResult.skipped +
           inspectionResult.skipped,
       },
-    });
+      });
+    }, (response) => ({ httpStatus: response.status }));
   } catch (error) {
     console.error(
       "Scheduled SLA processing failed:",

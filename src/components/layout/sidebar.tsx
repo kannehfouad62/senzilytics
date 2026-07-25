@@ -42,6 +42,8 @@ import {
   Wrench,
   BrainCircuit,
   PlugZap,
+  Rocket,
+  ServerCog,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -125,6 +127,12 @@ export const primaryNavItems: NavigationItem[] = [
     label: "Organizations",
     href: "/organizations",
     icon: Building2,
+    permission: PermissionKey.MANAGE_ORGANIZATION,
+  },
+  {
+    label: "Implementation",
+    href: "/implementation",
+    icon: Rocket,
     permission: PermissionKey.MANAGE_ORGANIZATION,
   },
   {
@@ -338,6 +346,11 @@ export async function Sidebar() {
           label: "Tenant Provisioning",
           href: "/platform/tenants",
           icon: Building2,
+        },
+        {
+          label: "Platform Operations",
+          href: "/platform/operations",
+          icon: ServerCog,
         },
       ]
     : isDemo

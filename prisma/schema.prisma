@@ -39,6 +39,40 @@ enum TenantInvitationStatus {
   EXPIRED
 }
 
+enum TenantOnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  READY_FOR_REVIEW
+  LIVE
+}
+
+enum TenantOnboardingStepKey {
+  DOMAIN_AND_AUTH
+  ORGANIZATION_STRUCTURE
+  SSO_CONFIGURATION
+  USER_ACCESS
+  GOVERNANCE_FOUNDATION
+  DATA_FOUNDATION
+  WORKFLOW_VALIDATION
+  MOBILE_READINESS
+  GO_LIVE_APPROVAL
+}
+
+enum TenantOnboardingStepStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  WAIVED
+}
+
+enum ScheduledJobRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
 enum RiskLevel {
   LOW
   MEDIUM
@@ -1437,6 +1471,7 @@ model Organization {
   mobileSessions                 MobileSession[]
   mobilePushTokens               MobilePushToken[]
   mobilePushDeliveries           MobilePushDelivery[]
+  onboardingPlan                 TenantOnboardingPlan?
 }
 
 model PricingInquiry {
@@ -1668,6 +1703,11 @@ model User {
   mobileSessions                   MobileSession[]
   mobilePushTokens                 MobilePushToken[]
   mobilePushDeliveries             MobilePushDelivery[]
+  ownedTenantOnboardingPlans       TenantOnboardingPlan[]          @relation("TenantOnboardingCustomerOwner")
+  approvedTenantOnboardingPlans    TenantOnboardingPlan[]          @relation("TenantOnboardingApprovedBy")
+  ownedTenantOnboardingSteps       TenantOnboardingStep[]          @relation("TenantOnboardingStepOwner")
+  completedTenantOnboardingSteps   TenantOnboardingStep[]          @relation("TenantOnboardingStepCompletedBy")
+  updatedTenantOnboardingSteps     TenantOnboardingStep[]          @relation("TenantOnboardingStepUpdatedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -1725,6 +1765,72 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model TenantOnboardingPlan {
+  id                 String                 @id @default(cuid())
+  organizationId     String                 @unique
+  status             TenantOnboardingStatus @default(NOT_STARTED)
+  targetGoLiveAt     DateTime?
+  customerOwnerId    String?
+  platformOwnerName  String?
+  platformOwnerEmail String?
+  tenantVisibleNotes String?
+  internalNotes      String?
+  startedAt          DateTime?
+  readyForReviewAt   DateTime?
+  goLiveApprovedAt   DateTime?
+  goLiveApprovedById String?
+  liveAt             DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  organization     Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customerOwner    User?                  @relation("TenantOnboardingCustomerOwner", fields: [customerOwnerId], references: [id], onDelete: SetNull)
+  goLiveApprovedBy User?                  @relation("TenantOnboardingApprovedBy", fields: [goLiveApprovedById], references: [id], onDelete: SetNull)
+  steps            TenantOnboardingStep[]
+
+  @@index([status, targetGoLiveAt])
+}
+
+model TenantOnboardingStep {
+  id            String                     @id @default(cuid())
+  planId        String
+  key           TenantOnboardingStepKey
+  status        TenantOnboardingStepStatus @default(NOT_STARTED)
+  ownerId       String?
+  dueAt         DateTime?
+  tenantNotes   String?
+  blocker       String?
+  completedAt   DateTime?
+  completedById String?
+  updatedById   String
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  plan        TenantOnboardingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  owner       User?                @relation("TenantOnboardingStepOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  completedBy User?                @relation("TenantOnboardingStepCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  updatedBy   User                 @relation("TenantOnboardingStepUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@unique([planId, key])
+  @@index([status, dueAt])
+  @@index([ownerId, status])
+}
+
+model ScheduledJobRun {
+  id           String                @id @default(cuid())
+  jobKey       String
+  status       ScheduledJobRunStatus @default(RUNNING)
+  startedAt    DateTime              @default(now())
+  completedAt  DateTime?
+  durationMs   Int?
+  summary      Json?
+  errorMessage String?
+  createdAt    DateTime              @default(now())
+
+  @@index([jobKey, startedAt])
+  @@index([status, startedAt])
 }
 
 model DemoLead {
