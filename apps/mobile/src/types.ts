@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE";
 };
 
 export type MobileDepartment = {
@@ -1340,6 +1340,96 @@ export type MobileBehaviorAssuranceCapabilities = {
   canManageCertification: boolean;
 };
 
+export type MobileRegulatoryCapabilities = {
+  canView: boolean;
+  canManage: boolean;
+};
+
+export type MobileRegulatorySource = {
+  id: string;
+  code: string;
+  name: string;
+  authority: string;
+  type: string;
+  jurisdiction: string;
+  sourceUrl: string;
+  description: string | null;
+  status: "ACTIVE" | "PAUSED" | "RETIRED";
+  reviewCadenceDays: number;
+  lastReviewedAt: string | null;
+  nextReviewAt: string;
+  owner: { id: string; name: string };
+  changeCount: number;
+  obligationCount: number;
+  isReviewOverdue: boolean;
+  canReview: boolean;
+};
+
+export type MobileRegulatoryAssessment = {
+  id: string;
+  status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  decision: "APPLICABLE" | "NOT_APPLICABLE" | "UNDETERMINED";
+  applicabilityRationale: string;
+  impactSummary: string | null;
+  gapSummary: string | null;
+  requiredActions: string | null;
+  implementationDueAt: string | null;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+};
+
+export type MobileRegulatoryChange = {
+  id: string;
+  reference: string;
+  title: string;
+  summary: string;
+  type: string;
+  status:
+    | "DETECTED"
+    | "UNDER_REVIEW"
+    | "IMPACT_ASSESSMENT"
+    | "ACTION_REQUIRED"
+    | "IMPLEMENTED"
+    | "NOT_APPLICABLE"
+    | "CLOSED";
+  significance: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  sourceUrl: string;
+  citation: string | null;
+  publishedAt: string | null;
+  effectiveAt: string | null;
+  detectedAt: string;
+  assessmentDueAt: string;
+  implementationSummary: string | null;
+  implementedAt: string | null;
+  closeRationale: string | null;
+  closedAt: string | null;
+  owner: { id: string; name: string };
+  isOwner: boolean;
+  source: {
+    id: string;
+    code: string;
+    name: string;
+    authority: string;
+    jurisdiction: string;
+  };
+  latestAssessment: MobileRegulatoryAssessment | null;
+  obligationCount: number;
+  actions: Array<{
+    id: string;
+    title: string;
+    status: string;
+    riskLevel: string;
+    dueDate: string | null;
+  }>;
+  isAssessmentOverdue: boolean;
+  canStartReview: boolean;
+  canSubmitAssessment: boolean;
+  canReviewAssessment: boolean;
+  canImplement: boolean;
+  canClose: boolean;
+};
+
 export type MobileBootstrap = {
   user: MobileUser;
   organization: { id: string; name: string; subscriptionPlan: string };
@@ -1389,6 +1479,20 @@ export type MobileBootstrap = {
   sifForms: RuntimeForm[];
   certificationPrograms: MobileCertificationProgram[];
   certificationForms: RuntimeForm[];
+  regulatoryGeneratedAt: string;
+  regulatoryMetrics: {
+    activeSources: number;
+    sourceReviewsOverdue: number;
+    openChanges: number;
+    assessmentsOverdue: number;
+    effectiveWithin30Days: number;
+    criticalExposure: number;
+    governedObligations: number;
+    implementationActionsOpen: number;
+  } | null;
+  regulatorySources: MobileRegulatorySource[];
+  regulatoryChanges: MobileRegulatoryChange[];
+  regulatoryCapabilities: MobileRegulatoryCapabilities;
   correctiveActions: MobileCorrectiveAction[];
   capaCapabilities: MobileCapaCapabilities;
   notifications: MobileNotification[];
@@ -1853,4 +1957,40 @@ export type CertificationReviewCompletePayload = {
 
 export type CertificationReviewApprovePayload = {
   reviewId: string;
+};
+
+export type RegulatorySourceReviewPayload = {
+  sourceId: string;
+  notes: string;
+};
+
+export type RegulatoryChangeReviewPayload = {
+  changeId: string;
+  note: string;
+};
+
+export type RegulatoryImpactAssessmentPayload = {
+  changeId: string;
+  decision: "APPLICABLE" | "NOT_APPLICABLE";
+  applicabilityRationale: string;
+  impactSummary?: string;
+  gapSummary?: string;
+  requiredActions?: string;
+  implementationDueAt?: string;
+};
+
+export type RegulatoryAssessmentReviewPayload = {
+  assessmentId: string;
+  approved: boolean;
+  reviewNotes: string;
+};
+
+export type RegulatoryImplementationPayload = {
+  changeId: string;
+  implementationSummary: string;
+};
+
+export type RegulatoryChangeClosePayload = {
+  changeId: string;
+  rationale: string;
 };

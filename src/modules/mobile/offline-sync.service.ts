@@ -32,6 +32,7 @@ import {
   PermissionKey,
   PermitGasTestResult,
   PermitToWorkStatus,
+  RegulatoryImpactDecision,
   RiskCategory,
   RiskControlEffectiveness,
   RiskImpact,
@@ -126,6 +127,14 @@ import {
   approveCertificationManagementReviewService,
   completeCertificationManagementReviewService,
 } from "@/modules/assurance/certification-readiness.service";
+import {
+  closeRegulatoryChangeService,
+  markRegulatoryChangeImplementedService,
+  recordRegulatorySourceReviewService,
+  reviewRegulatoryImpactAssessmentService,
+  startRegulatoryChangeReviewService,
+  submitRegulatoryImpactAssessmentService,
+} from "@/modules/compliance/regulatory-intelligence.service";
 
 const customValue = z.union([
   z.string().max(5000),
@@ -928,6 +937,95 @@ const certificationReviewApproveItemSchema = z.object({
   }),
 });
 
+const regulatorySourceReviewItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("REGULATORY_SOURCE_REVIEW"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    sourceId: z.string().min(1).max(200),
+    notes: z.string().trim().min(2).max(10_000),
+  }),
+});
+
+const regulatoryChangeReviewItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("REGULATORY_CHANGE_REVIEW"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    changeId: z.string().min(1).max(200),
+    note: z.string().trim().min(2).max(10_000),
+  }),
+});
+
+const regulatoryImpactAssessmentItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("REGULATORY_IMPACT_ASSESSMENT"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    changeId: z.string().min(1).max(200),
+    decision: z.nativeEnum(RegulatoryImpactDecision),
+    applicabilityRationale: z.string().trim().min(2).max(10_000),
+    impactSummary: z.string().trim().max(10_000).optional(),
+    gapSummary: z.string().trim().max(10_000).optional(),
+    requiredActions: z.string().trim().max(10_000).optional(),
+    implementationDueAt: z.string().datetime().optional(),
+  }).superRefine((value, context) => {
+    if (value.decision !== RegulatoryImpactDecision.APPLICABLE) return;
+    if (!value.impactSummary) {
+      context.addIssue({
+        code: "custom",
+        path: ["impactSummary"],
+        message: "Applicable changes require an impact summary.",
+      });
+    }
+    if (!value.requiredActions) {
+      context.addIssue({
+        code: "custom",
+        path: ["requiredActions"],
+        message: "Applicable changes require implementation actions.",
+      });
+    }
+    if (!value.implementationDueAt) {
+      context.addIssue({
+        code: "custom",
+        path: ["implementationDueAt"],
+        message: "Applicable changes require an implementation due date.",
+      });
+    }
+  }),
+});
+
+const regulatoryAssessmentReviewItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("REGULATORY_ASSESSMENT_REVIEW"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    assessmentId: z.string().min(1).max(200),
+    approved: z.boolean(),
+    reviewNotes: z.string().trim().min(2).max(10_000),
+  }),
+});
+
+const regulatoryImplementationItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("REGULATORY_IMPLEMENTATION"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    changeId: z.string().min(1).max(200),
+    implementationSummary: z.string().trim().min(2).max(10_000),
+  }),
+});
+
+const regulatoryChangeCloseItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("REGULATORY_CHANGE_CLOSE"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    changeId: z.string().min(1).max(200),
+    rationale: z.string().trim().min(2).max(10_000),
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
@@ -980,6 +1078,12 @@ const offlineItemSchema = z.discriminatedUnion("type", [
   sifSignalReviewItemSchema,
   certificationReviewCompleteItemSchema,
   certificationReviewApproveItemSchema,
+  regulatorySourceReviewItemSchema,
+  regulatoryChangeReviewItemSchema,
+  regulatoryImpactAssessmentItemSchema,
+  regulatoryAssessmentReviewItemSchema,
+  regulatoryImplementationItemSchema,
+  regulatoryChangeCloseItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -1091,6 +1195,16 @@ export function requiredOfflinePermission(
     type === "CERTIFICATION_REVIEW_APPROVE"
   ) {
     return PermissionKey.MANAGE_CERTIFICATION_READINESS;
+  }
+  if (
+    type === "REGULATORY_SOURCE_REVIEW" ||
+    type === "REGULATORY_CHANGE_REVIEW" ||
+    type === "REGULATORY_IMPACT_ASSESSMENT" ||
+    type === "REGULATORY_ASSESSMENT_REVIEW" ||
+    type === "REGULATORY_IMPLEMENTATION" ||
+    type === "REGULATORY_CHANGE_CLOSE"
+  ) {
+    return PermissionKey.MANAGE_COMPLIANCE;
   }
   if (type === "CAPA_STATUS") {
     return status === Status.COMPLETED || status === Status.CLOSED
@@ -1329,12 +1443,24 @@ export async function syncOfflineSubmissionsService(input: {
           item,
           payloadHash
         ));
-      } else {
+      } else if (item.type === "CERTIFICATION_REVIEW_APPROVE") {
         results.push(await syncCertificationReviewApprove(
           input,
           item,
           payloadHash
         ));
+      } else if (item.type === "REGULATORY_SOURCE_REVIEW") {
+        results.push(await syncRegulatorySourceReview(input, item, payloadHash));
+      } else if (item.type === "REGULATORY_CHANGE_REVIEW") {
+        results.push(await syncRegulatoryChangeReview(input, item, payloadHash));
+      } else if (item.type === "REGULATORY_IMPACT_ASSESSMENT") {
+        results.push(await syncRegulatoryImpactAssessment(input, item, payloadHash));
+      } else if (item.type === "REGULATORY_ASSESSMENT_REVIEW") {
+        results.push(await syncRegulatoryAssessmentReview(input, item, payloadHash));
+      } else if (item.type === "REGULATORY_IMPLEMENTATION") {
+        results.push(await syncRegulatoryImplementation(input, item, payloadHash));
+      } else {
+        results.push(await syncRegulatoryChangeClose(input, item, payloadHash));
       }
     } catch (error) {
       results.push({ id: item.id, status: "failed", error: safeOfflineError(error) });
@@ -2941,6 +3067,128 @@ async function syncCertificationReviewApprove(
   return { id: item.id, status: "synced", recordId: review.id };
 }
 
+async function syncRegulatorySourceReview(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof regulatorySourceReviewItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const source = await recordRegulatorySourceReviewService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    sourceId: item.payload.sourceId,
+    notes: item.payload.notes,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: source.id };
+}
+
+async function syncRegulatoryChangeReview(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof regulatoryChangeReviewItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const change = await startRegulatoryChangeReviewService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    changeId: item.payload.changeId,
+    note: item.payload.note,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: change.id };
+}
+
+async function syncRegulatoryImpactAssessment(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof regulatoryImpactAssessmentItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const assessment = await submitRegulatoryImpactAssessmentService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    changeId: item.payload.changeId,
+    decision: item.payload.decision,
+    applicabilityRationale: item.payload.applicabilityRationale,
+    impactSummary: item.payload.impactSummary?.trim() || null,
+    gapSummary: item.payload.gapSummary?.trim() || null,
+    requiredActions: item.payload.requiredActions?.trim() || null,
+    implementationDueAt: item.payload.implementationDueAt
+      ? new Date(item.payload.implementationDueAt)
+      : null,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: assessment.id };
+}
+
+async function syncRegulatoryAssessmentReview(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof regulatoryAssessmentReviewItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const assessment = await reviewRegulatoryImpactAssessmentService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    assessmentId: item.payload.assessmentId,
+    approved: item.payload.approved,
+    reviewNotes: item.payload.reviewNotes,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: assessment.id };
+}
+
+async function syncRegulatoryImplementation(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof regulatoryImplementationItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const change = await markRegulatoryChangeImplementedService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    changeId: item.payload.changeId,
+    implementationSummary: item.payload.implementationSummary,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: change.id };
+}
+
+async function syncRegulatoryChangeClose(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof regulatoryChangeCloseItemSchema>,
+  payloadHash: string
+): Promise<SyncResult> {
+  const change = await closeRegulatoryChangeService({
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    changeId: item.payload.changeId,
+    rationale: item.payload.rationale,
+    offlineSubmission: {
+      id: item.id,
+      capturedAt: new Date(item.capturedAt),
+      payloadHash,
+    },
+  });
+  return { id: item.id, status: "synced", recordId: change.id };
+}
+
 function parseDateOnly(value?: string) {
   return value ? new Date(`${value}T12:00:00.000Z`) : null;
 }
@@ -2955,7 +3203,7 @@ function parseFutureReviewDate(value: string | undefined, capturedAt: Date) {
 
 const safeOfflineError = (error: unknown) => {
   const value = error instanceof Error ? error.message : "";
-  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction|exposure|hygiene|sample|surveillance|fitness|restriction|certificate|provider|chemical|inventory|sds|environmental|metric|reporting period|emission|waste|water|energy|esg|disclosure|initiative|pillar|behavior|coaching|follow-up|recognition|sif|critical control|signal|certification|management review|readiness/i.test(value)
+  return /captured|custom form|form version|answer|is required|must be|valid option|inspection|audit|capa|corrective action|risk|hazard|jsa|acknowledg|assigned|assignee|authorized|planned|scheduled|started|completed|closed|site|department|organization|evidence|photo|comment|not applicable|compliance|training|course|learner|review|management of change|moc|permit|control|gas test|atmospheric|oxygen|contractor|worker|approval|implementation|verification|asset|equipment|defect|repair|maintenance|downtime|insurance|qualification|induction|exposure|hygiene|sample|surveillance|fitness|restriction|certificate|provider|chemical|inventory|sds|environmental|metric|reporting period|emission|waste|water|energy|esg|disclosure|initiative|pillar|behavior|coaching|follow-up|recognition|sif|critical control|signal|certification|management review|readiness|regulatory|legal register|applicab|impact assessment|source/i.test(value)
     ? value
     : "The record could not be synchronized.";
 };

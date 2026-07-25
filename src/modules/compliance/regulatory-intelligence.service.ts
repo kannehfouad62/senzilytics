@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { canTransitionRegulatoryChange, canTransitionRegulatorySource } from "@/modules/compliance/regulatory-intelligence-lifecycle";
 import { createPreparedSubmissions, type PreparedSubmission } from "@/modules/forms/runtime-form.service";
 import {
+  recordMobileOfflineSubmission,
+  type MobileOfflineSubmission,
+} from "@/modules/mobile/mobile-offline-record";
+import {
   ActivityAction,
   ConfigurableFormModule,
   NotificationType,
@@ -63,7 +67,7 @@ export async function changeRegulatorySourceStatusService(input: { organizationI
   });
 }
 
-export async function recordRegulatorySourceReviewService(input: { organizationId: string; userId: string; sourceId: string; notes: string }) {
+export async function recordRegulatorySourceReviewService(input: { organizationId: string; userId: string; sourceId: string; notes: string; offlineSubmission?: MobileOfflineSubmission }) {
   const [source, reviewer] = await Promise.all([prisma.regulatorySource.findFirst({ where: { id: input.sourceId, organizationId: input.organizationId } }), tenantUser(input.organizationId, input.userId)]);
   if (!source || !reviewer) throw new Error("Regulatory source not found in this organization.");
   if (source.status === RegulatorySourceStatus.RETIRED) throw new Error("Retired sources cannot receive monitoring reviews.");
@@ -73,6 +77,7 @@ export async function recordRegulatorySourceReviewService(input: { organizationI
   return prisma.$transaction(async tx => {
     const updated = await tx.regulatorySource.update({ where: { id: source.id }, data: { lastReviewedAt: reviewedAt, lastReviewedById: reviewer.id, nextReviewAt, reviewReminderAt: null } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: reviewer.id, action: ActivityAction.UPDATE, entityType: "RegulatorySource", entityId: source.id, title: "Regulatory source reviewed", description: input.notes, metadata: { previousReviewDueAt: source.nextReviewAt, nextReviewAt } } });
+    await recordMobileOfflineSubmission(tx, input, "REGULATORY_SOURCE_REVIEW", updated.id);
     return updated;
   });
 }
@@ -99,7 +104,7 @@ export async function createRegulatoryChangeService(input: {
   });
 }
 
-export async function startRegulatoryChangeReviewService(input: { organizationId: string; userId: string; changeId: string; note: string }) {
+export async function startRegulatoryChangeReviewService(input: { organizationId: string; userId: string; changeId: string; note: string; offlineSubmission?: MobileOfflineSubmission }) {
   const [change, user] = await Promise.all([prisma.regulatoryChange.findFirst({ where: { id: input.changeId, organizationId: input.organizationId } }), tenantUser(input.organizationId, input.userId)]);
   if (!change || !user) throw new Error("Regulatory change not found in this organization.");
   if (!canTransitionRegulatoryChange(change.status, RegulatoryChangeStatus.UNDER_REVIEW)) throw new Error("This regulatory change cannot enter review from its current status.");
@@ -107,6 +112,7 @@ export async function startRegulatoryChangeReviewService(input: { organizationId
   return prisma.$transaction(async tx => {
     const updated = await tx.regulatoryChange.update({ where: { id: change.id }, data: { status: RegulatoryChangeStatus.UNDER_REVIEW } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: user.id, action: ActivityAction.STATUS_CHANGE, entityType: "RegulatoryChange", entityId: change.id, title: "Regulatory change review started", description: input.note, metadata: { previousStatus: change.status, status: updated.status } } });
+    await recordMobileOfflineSubmission(tx, input, "REGULATORY_CHANGE_REVIEW", updated.id);
     return updated;
   });
 }
@@ -114,6 +120,7 @@ export async function startRegulatoryChangeReviewService(input: { organizationId
 export async function submitRegulatoryImpactAssessmentService(input: {
   organizationId: string; userId: string; changeId: string; decision: RegulatoryImpactDecision; applicabilityRationale: string;
   impactSummary?: string | null; gapSummary?: string | null; requiredActions?: string | null; implementationDueAt?: Date | null;
+  offlineSubmission?: MobileOfflineSubmission;
 }) {
   const [change, assessor] = await Promise.all([prisma.regulatoryChange.findFirst({ where: { id: input.changeId, organizationId: input.organizationId }, include: { assessments: { where: { status: RegulatoryAssessmentStatus.SUBMITTED }, select: { id: true } } } }), tenantUser(input.organizationId, input.userId)]);
   if (!change || !assessor) throw new Error("Regulatory change not found in this organization.");
@@ -128,11 +135,12 @@ export async function submitRegulatoryImpactAssessmentService(input: {
     const assessment = await tx.regulatoryImpactAssessment.create({ data: { organizationId: input.organizationId, changeId: change.id, assessorId: assessor.id, decision: input.decision, applicabilityRationale: input.applicabilityRationale, impactSummary: input.impactSummary, gapSummary: input.gapSummary, requiredActions: input.requiredActions, implementationDueAt: input.decision === RegulatoryImpactDecision.APPLICABLE ? input.implementationDueAt : null } });
     await tx.regulatoryChange.update({ where: { id: change.id }, data: { status: RegulatoryChangeStatus.IMPACT_ASSESSMENT, assessmentReminderAt: null } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: assessor.id, action: ActivityAction.CREATE, entityType: "RegulatoryImpactAssessment", entityId: assessment.id, title: "Regulatory impact assessment submitted", description: `${change.reference}: ${assessment.decision.replaceAll("_", " ")}`, metadata: { changeId: change.id, decision: assessment.decision, implementationDueAt: assessment.implementationDueAt } } });
+    await recordMobileOfflineSubmission(tx, input, "REGULATORY_IMPACT_ASSESSMENT", assessment.id);
     return assessment;
   });
 }
 
-export async function reviewRegulatoryImpactAssessmentService(input: { organizationId: string; userId: string; assessmentId: string; approved: boolean; reviewNotes: string }) {
+export async function reviewRegulatoryImpactAssessmentService(input: { organizationId: string; userId: string; assessmentId: string; approved: boolean; reviewNotes: string; offlineSubmission?: MobileOfflineSubmission }) {
   const [assessment, approver] = await Promise.all([prisma.regulatoryImpactAssessment.findFirst({ where: { id: input.assessmentId, organizationId: input.organizationId }, include: { change: true } }), tenantUser(input.organizationId, input.userId)]);
   if (!assessment || !approver) throw new Error("Regulatory impact assessment not found in this organization.");
   if (assessment.status !== RegulatoryAssessmentStatus.SUBMITTED || assessment.change.status !== RegulatoryChangeStatus.IMPACT_ASSESSMENT) throw new Error("This assessment is not awaiting review.");
@@ -143,6 +151,7 @@ export async function reviewRegulatoryImpactAssessmentService(input: { organizat
     const reviewed = await tx.regulatoryImpactAssessment.update({ where: { id: assessment.id }, data: { status: input.approved ? RegulatoryAssessmentStatus.APPROVED : RegulatoryAssessmentStatus.REJECTED, reviewedById: approver.id, reviewedAt: new Date(), reviewNotes: input.reviewNotes } });
     await tx.regulatoryChange.update({ where: { id: assessment.changeId }, data: { status: nextStatus } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: approver.id, action: ActivityAction.STATUS_CHANGE, entityType: "RegulatoryImpactAssessment", entityId: assessment.id, title: input.approved ? "Regulatory impact assessment approved" : "Regulatory impact assessment rejected", description: input.reviewNotes, metadata: { changeId: assessment.changeId, decision: assessment.decision, assessmentStatus: reviewed.status, changeStatus: nextStatus } } });
+    await recordMobileOfflineSubmission(tx, input, "REGULATORY_ASSESSMENT_REVIEW", reviewed.id);
     return reviewed;
   });
 }
@@ -178,7 +187,7 @@ export async function createCapaFromRegulatoryChangeService(input: { organizatio
   return action;
 }
 
-export async function markRegulatoryChangeImplementedService(input: { organizationId: string; userId: string; changeId: string; implementationSummary: string }) {
+export async function markRegulatoryChangeImplementedService(input: { organizationId: string; userId: string; changeId: string; implementationSummary: string; offlineSubmission?: MobileOfflineSubmission }) {
   const [change, user] = await Promise.all([prisma.regulatoryChange.findFirst({ where: { id: input.changeId, organizationId: input.organizationId }, include: { assessments: { where: { status: RegulatoryAssessmentStatus.APPROVED, decision: RegulatoryImpactDecision.APPLICABLE } }, obligationLinks: true, actionLinks: { include: { correctiveAction: true } } } }), tenantUser(input.organizationId, input.userId)]);
   if (!change || !user) throw new Error("Regulatory change not found in this organization.");
   if (!canTransitionRegulatoryChange(change.status, RegulatoryChangeStatus.IMPLEMENTED)) throw new Error("This regulatory change is not ready for implementation closure.");
@@ -190,11 +199,12 @@ export async function markRegulatoryChangeImplementedService(input: { organizati
   return prisma.$transaction(async tx => {
     const updated = await tx.regulatoryChange.update({ where: { id: change.id }, data: { status: RegulatoryChangeStatus.IMPLEMENTED, implementedAt: new Date(), implementedById: user.id, implementationSummary: input.implementationSummary } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: user.id, action: ActivityAction.STATUS_CHANGE, entityType: "RegulatoryChange", entityId: change.id, title: "Regulatory change implemented", description: input.implementationSummary, metadata: { previousStatus: change.status, status: updated.status, obligationCount: change.obligationLinks.length, actionCount: change.actionLinks.length } } });
+    await recordMobileOfflineSubmission(tx, input, "REGULATORY_IMPLEMENTATION", updated.id);
     return updated;
   });
 }
 
-export async function closeRegulatoryChangeService(input: { organizationId: string; userId: string; changeId: string; rationale: string }) {
+export async function closeRegulatoryChangeService(input: { organizationId: string; userId: string; changeId: string; rationale: string; offlineSubmission?: MobileOfflineSubmission }) {
   const [change, user] = await Promise.all([prisma.regulatoryChange.findFirst({ where: { id: input.changeId, organizationId: input.organizationId } }), tenantUser(input.organizationId, input.userId)]);
   if (!change || !user) throw new Error("Regulatory change not found in this organization.");
   if (!canTransitionRegulatoryChange(change.status, RegulatoryChangeStatus.CLOSED)) throw new Error("Only implemented or approved not-applicable changes can be closed.");
@@ -202,6 +212,7 @@ export async function closeRegulatoryChangeService(input: { organizationId: stri
   return prisma.$transaction(async tx => {
     const updated = await tx.regulatoryChange.update({ where: { id: change.id }, data: { status: RegulatoryChangeStatus.CLOSED, closedAt: new Date(), closeRationale: input.rationale } });
     await tx.activityLog.create({ data: { organizationId: input.organizationId, userId: user.id, action: ActivityAction.STATUS_CHANGE, entityType: "RegulatoryChange", entityId: change.id, title: "Regulatory change closed", description: input.rationale, metadata: { previousStatus: change.status, status: updated.status } } });
+    await recordMobileOfflineSubmission(tx, input, "REGULATORY_CHANGE_CLOSE", updated.id);
     return updated;
   });
 }

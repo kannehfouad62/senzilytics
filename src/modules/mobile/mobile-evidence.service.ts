@@ -45,6 +45,7 @@ const targetTypeSchema = z.enum([
   "BEHAVIOR_SAFETY",
   "SIF_ASSURANCE",
   "CERTIFICATION_READINESS",
+  "REGULATORY_CHANGE",
 ]);
 
 export const mobileEvidencePayloadSchema = z.object({
@@ -73,7 +74,8 @@ export const mobileEvidencePayloadSchema = z.object({
       value.targetType === "INDUSTRIAL_HYGIENE" ||
       value.targetType === "BEHAVIOR_SAFETY" ||
       value.targetType === "SIF_ASSURANCE" ||
-      value.targetType === "CERTIFICATION_READINESS"
+      value.targetType === "CERTIFICATION_READINESS" ||
+      value.targetType === "REGULATORY_CHANGE"
     ) &&
     !value.parentSubmissionId
   ) {
@@ -183,6 +185,9 @@ export function requiredMobileEvidencePermission(
   }
   if (targetType === "CERTIFICATION_READINESS") {
     return PermissionKey.MANAGE_CERTIFICATION_READINESS;
+  }
+  if (targetType === "REGULATORY_CHANGE") {
+    return PermissionKey.MANAGE_COMPLIANCE;
   }
   return PermissionKey.MANAGE_AUDITS;
 }
@@ -310,6 +315,51 @@ export async function resolveMobileEvidenceTarget(input: {
       );
     }
     resolvedEntityId = period.id;
+  } else if (input.payload.targetType === "REGULATORY_CHANGE") {
+    const parent = await prisma.offlineSubmission.findFirst({
+      where: {
+        id: input.payload.parentSubmissionId,
+        organizationId: input.organizationId,
+        userId: input.userId,
+        recordType: {
+          in: [
+            "REGULATORY_IMPACT_ASSESSMENT",
+            "REGULATORY_IMPLEMENTATION",
+          ],
+        },
+      },
+      select: { recordId: true, recordType: true },
+    });
+    if (!parent) {
+      throw new Error(
+        "Synchronize the regulatory record before uploading its evidence."
+      );
+    }
+    if (parent.recordType === "REGULATORY_IMPACT_ASSESSMENT") {
+      const assessment = await prisma.regulatoryImpactAssessment.findFirst({
+        where: {
+          id: parent.recordId,
+          organizationId: input.organizationId,
+        },
+        select: { changeId: true },
+      });
+      if (!assessment) {
+        throw new Error("The synchronized impact assessment is unavailable.");
+      }
+      resolvedEntityId = assessment.changeId;
+    } else {
+      const change = await prisma.regulatoryChange.findFirst({
+        where: {
+          id: parent.recordId,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!change) {
+        throw new Error("The synchronized regulatory change is unavailable.");
+      }
+      resolvedEntityId = change.id;
+    }
   } else if (
     input.payload.targetType === "SAFETY_OBSERVATION" ||
     input.payload.targetType === "INCIDENT" ||
@@ -707,6 +757,9 @@ function documentTarget(
   }
   if (type === "CERTIFICATION_READINESS") {
     return { entityType: DocumentEntityType.CERTIFICATION_READINESS };
+  }
+  if (type === "REGULATORY_CHANGE") {
+    return { entityType: DocumentEntityType.REGULATORY_CHANGE };
   }
   return { entityType: DocumentEntityType.INSPECTION };
 }

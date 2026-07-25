@@ -53,6 +53,12 @@ import type {
   PermitControlPayload,
   PermitGasTestPayload,
   PermitStatusPayload,
+  RegulatoryAssessmentReviewPayload,
+  RegulatoryChangeClosePayload,
+  RegulatoryChangeReviewPayload,
+  RegulatoryImpactAssessmentPayload,
+  RegulatoryImplementationPayload,
+  RegulatorySourceReviewPayload,
   RiskCapturePayload,
   RiskReviewPayload,
   SifSignalReviewPayload,
@@ -81,7 +87,8 @@ type EvidenceTargetType =
   | "ESG"
   | "BEHAVIOR_SAFETY"
   | "SIF_ASSURANCE"
-  | "CERTIFICATION_READINESS";
+  | "CERTIFICATION_READINESS"
+  | "REGULATORY_CHANGE";
 type EvidenceRow = {
   id: string;
   parent_submission_id: string | null;
@@ -711,6 +718,60 @@ export async function queueCertificationReviewApprove(
   return queueOfflineItem(ownerKey, "CERTIFICATION_REVIEW_APPROVE", payload);
 }
 
+export async function queueRegulatorySourceReview(
+  ownerKey: string,
+  payload: RegulatorySourceReviewPayload
+) {
+  return queueOfflineItem(ownerKey, "REGULATORY_SOURCE_REVIEW", payload);
+}
+
+export async function queueRegulatoryChangeReview(
+  ownerKey: string,
+  payload: RegulatoryChangeReviewPayload
+) {
+  return queueOfflineItem(ownerKey, "REGULATORY_CHANGE_REVIEW", payload);
+}
+
+export async function queueRegulatoryImpactAssessment(
+  ownerKey: string,
+  payload: RegulatoryImpactAssessmentPayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "REGULATORY_IMPACT_ASSESSMENT", payload, {
+    files: evidence,
+    targetType: "REGULATORY_CHANGE",
+    title: "Regulatory impact assessment evidence",
+    description: payload.impactSummary || payload.applicabilityRationale,
+  });
+}
+
+export async function queueRegulatoryAssessmentReview(
+  ownerKey: string,
+  payload: RegulatoryAssessmentReviewPayload
+) {
+  return queueOfflineItem(ownerKey, "REGULATORY_ASSESSMENT_REVIEW", payload);
+}
+
+export async function queueRegulatoryImplementation(
+  ownerKey: string,
+  payload: RegulatoryImplementationPayload,
+  evidence: SelectedEvidence[] = []
+) {
+  return queueOfflineItem(ownerKey, "REGULATORY_IMPLEMENTATION", payload, {
+    files: evidence,
+    targetType: "REGULATORY_CHANGE",
+    title: "Regulatory implementation evidence",
+    description: payload.implementationSummary,
+  });
+}
+
+export async function queueRegulatoryChangeClose(
+  ownerKey: string,
+  payload: RegulatoryChangeClosePayload
+) {
+  return queueOfflineItem(ownerKey, "REGULATORY_CHANGE_CLOSE", payload);
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([
@@ -746,7 +807,9 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "ESG_DATA" ||
     envelope.type === "BEHAVIOR_SESSION" ||
     envelope.type === "SIF_VERIFICATION" ||
-    envelope.type === "CERTIFICATION_REVIEW_COMPLETE"
+    envelope.type === "CERTIFICATION_REVIEW_COMPLETE" ||
+    envelope.type === "REGULATORY_IMPACT_ASSESSMENT" ||
+    envelope.type === "REGULATORY_IMPLEMENTATION"
   );
   const responses = decoded.filter(({ envelope }) =>
     envelope.type === "INSPECTION_RESPONSE" ||
@@ -786,7 +849,11 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "BEHAVIOR_RECOGNITION" ||
     envelope.type === "BEHAVIOR_PROGRAM_REVIEW" ||
     envelope.type === "SIF_SIGNAL_REVIEW" ||
-    envelope.type === "CERTIFICATION_REVIEW_APPROVE"
+    envelope.type === "CERTIFICATION_REVIEW_APPROVE" ||
+    envelope.type === "REGULATORY_SOURCE_REVIEW" ||
+    envelope.type === "REGULATORY_CHANGE_REVIEW" ||
+    envelope.type === "REGULATORY_ASSESSMENT_REVIEW" ||
+    envelope.type === "REGULATORY_CHANGE_CLOSE"
   );
   const first = await synchronizeRows(database, parents);
   const files = await synchronizeEvidence(database, ownerKey);

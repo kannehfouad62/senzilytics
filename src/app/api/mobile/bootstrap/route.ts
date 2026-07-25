@@ -18,6 +18,7 @@ import { getMobileEsgWorkspace } from "@/modules/mobile/mobile-esg.service";
 import { getMobileHygieneHealthWorkspace } from "@/modules/mobile/mobile-hygiene-health.service";
 import { getMobileMocPermitWorkspace } from "@/modules/mobile/mobile-moc-permit.service";
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
+import { getMobileRegulatoryIntelligenceWorkspace } from "@/modules/mobile/mobile-regulatory-intelligence.service";
 import { getMobileRiskField } from "@/modules/mobile/mobile-risk-field.service";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, hygieneHealth, chemicalEnvironmental, esg, behaviorAssurance, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, mocPermits, assetContractors, hygieneHealth, chemicalEnvironmental, esg, behaviorAssurance, regulatoryIntelligence, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -93,6 +94,11 @@ export async function GET(request: Request) {
         permissions: assigned,
       }),
       getMobileBehaviorAssuranceWorkspace({
+        organizationId: organization.id,
+        userId: user.id,
+        permissions: assigned,
+      }),
+      getMobileRegulatoryIntelligenceWorkspace({
         organizationId: organization.id,
         userId: user.id,
         permissions: assigned,
@@ -389,6 +395,11 @@ export async function GET(request: Request) {
       certificationForms: serializeRuntimeForms(
         behaviorAssurance.certificationForms
       ),
+      regulatoryGeneratedAt: regulatoryIntelligence.generatedAt,
+      regulatoryMetrics: regulatoryIntelligence.metrics,
+      regulatorySources: regulatoryIntelligence.sources,
+      regulatoryChanges: regulatoryIntelligence.changes,
+      regulatoryCapabilities: regulatoryIntelligence.capabilities,
       notifications,
       tasks: actionCenter.tasks,
       correctiveActions: actionCenter.correctiveActions,

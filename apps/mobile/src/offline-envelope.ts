@@ -40,6 +40,12 @@ import type {
   PermitControlPayload,
   PermitGasTestPayload,
   PermitStatusPayload,
+  RegulatoryAssessmentReviewPayload,
+  RegulatoryChangeClosePayload,
+  RegulatoryChangeReviewPayload,
+  RegulatoryImpactAssessmentPayload,
+  RegulatoryImplementationPayload,
+  RegulatorySourceReviewPayload,
   RiskCapturePayload,
   RiskReviewPayload,
   SifSignalReviewPayload,
@@ -103,7 +109,13 @@ export type OfflineRecordType =
   | "SIF_VERIFICATION"
   | "SIF_SIGNAL_REVIEW"
   | "CERTIFICATION_REVIEW_COMPLETE"
-  | "CERTIFICATION_REVIEW_APPROVE";
+  | "CERTIFICATION_REVIEW_APPROVE"
+  | "REGULATORY_SOURCE_REVIEW"
+  | "REGULATORY_CHANGE_REVIEW"
+  | "REGULATORY_IMPACT_ASSESSMENT"
+  | "REGULATORY_ASSESSMENT_REVIEW"
+  | "REGULATORY_IMPLEMENTATION"
+  | "REGULATORY_CHANGE_CLOSE";
 
 export type OfflineRecordPayload =
   | ObservationPayload
@@ -156,7 +168,13 @@ export type OfflineRecordPayload =
   | SifVerificationPayload
   | SifSignalReviewPayload
   | CertificationReviewCompletePayload
-  | CertificationReviewApprovePayload;
+  | CertificationReviewApprovePayload
+  | RegulatorySourceReviewPayload
+  | RegulatoryChangeReviewPayload
+  | RegulatoryImpactAssessmentPayload
+  | RegulatoryAssessmentReviewPayload
+  | RegulatoryImplementationPayload
+  | RegulatoryChangeClosePayload;
 
 export type OfflineEnvelope = {
   type: OfflineRecordType;
@@ -215,6 +233,12 @@ const recordTypes = new Set<OfflineRecordType>([
   "SIF_SIGNAL_REVIEW",
   "CERTIFICATION_REVIEW_COMPLETE",
   "CERTIFICATION_REVIEW_APPROVE",
+  "REGULATORY_SOURCE_REVIEW",
+  "REGULATORY_CHANGE_REVIEW",
+  "REGULATORY_IMPACT_ASSESSMENT",
+  "REGULATORY_ASSESSMENT_REVIEW",
+  "REGULATORY_IMPLEMENTATION",
+  "REGULATORY_CHANGE_CLOSE",
 ]);
 
 export function decodeOfflineEnvelope(value: unknown): OfflineEnvelope {

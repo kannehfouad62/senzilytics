@@ -17,7 +17,7 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE";
   nativePermission?: PermissionKey;
 };
 
@@ -44,7 +44,7 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "audits", label: "Audit Workspace", description: "Programs, protocols, schedules, execution, findings, and reports.", href: "/audits", category: "ASSURANCE", permission: PermissionKey.VIEW_AUDITS, nativeCapability: "AUDIT_EXECUTION", nativePermission: PermissionKey.MANAGE_AUDITS },
   { key: "compliance", label: "Compliance", description: "Legal obligations, evaluations, permits, and compliance status.", href: "/compliance", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE },
   { key: "compliance-calendar", label: "Compliance Calendar", description: "Daily through annual assigned obligations and completion tracking.", href: "/compliance/calendar", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE, nativeCapability: "COMPLIANCE_CALENDAR" },
-  { key: "regulatory", label: "Regulatory Intelligence", description: "Regulatory changes, applicability, impact, and response governance.", href: "/compliance/regulatory", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE },
+  { key: "regulatory", label: "Regulatory Intelligence", description: "Regulatory changes, applicability, impact, and response governance.", href: "/compliance/regulatory", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE, nativeCapability: "REGULATORY_INTELLIGENCE" },
   { key: "training", label: "Training", description: "Courses, requirements, assignments, competence, and compliance.", href: "/training", category: "GOVERNANCE", permission: PermissionKey.VIEW_TRAINING, nativeCapability: "TRAINING_ASSIGNMENTS" },
   { key: "environmental", label: "Environmental Metrics", description: "Environmental data, targets, controls, and disclosures.", href: "/environmental", category: "GOVERNANCE", permission: PermissionKey.VIEW_ENVIRONMENTAL, nativeCapability: "ENVIRONMENTAL_FIELD" },
   { key: "esg", label: "Sustainability & ESG", description: "Frameworks, disclosures, governance, and ESG performance.", href: "/esg", category: "GOVERNANCE", permission: PermissionKey.VIEW_ESG, nativeCapability: "ESG_FIELD" },
