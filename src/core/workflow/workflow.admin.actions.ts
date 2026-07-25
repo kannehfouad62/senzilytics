@@ -438,6 +438,36 @@ export async function deleteWorkflowTemplateStep(formData: FormData) {
     throw new Error("A workflow must have at least one step.");
   }
 
+  const targetStep = await prisma.workflowTemplateStep.findFirst({
+    where: {
+      id: stepId,
+      templateId: workflowId,
+    },
+    include: {
+      outcomes: {
+        include: {
+          _count: {
+            select: {
+              executions: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!targetStep) {
+    throw new Error("Workflow step not found.");
+  }
+  if (
+    targetStep.outcomes.some(
+      (outcome) => outcome._count.executions > 0,
+    )
+  ) {
+    throw new Error(
+      "This step has automated-outcome history and cannot be deleted. Deactivate its outcomes instead.",
+    );
+  }
+
   await prisma.workflowTemplateStep.deleteMany({
     where: {
       id: stepId,

@@ -5,6 +5,7 @@ import { processInspectionSlaNotifications } from "@/core/notifications/inspecti
 import { processInvestigationSlaNotifications } from "@/core/notifications/investigation-sla.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
 import { processWorkflowAutomationEvents } from "@/core/workflow/workflow-automation-event.service";
+import { processWorkflowOutcomeExecutions } from "@/core/workflow/workflow-outcome.service";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { cleanupExpiredDemoUsers } from "@/features/demo/cleanup.service";
 import { processIntegrationWebhookDeliveries } from "@/modules/integrations/webhook-delivery.service";
@@ -46,8 +47,9 @@ export async function GET(
 
   try {
     return await runTrackedScheduledJob("workflow-sla", async () => {
+      const workflowAutomationResult =
+        await processWorkflowAutomationEvents();
       const [
-      workflowAutomationResult,
       workflowResult,
       correctiveActionResult,
       incidentEscalationResult,
@@ -56,8 +58,6 @@ export async function GET(
       inspectionResult,
       demoResult,
     ] = await Promise.all([
-      processWorkflowAutomationEvents(),
-
       processWorkflowSlaNotifications(),
 
       processCorrectiveActionSlaNotifications(),
@@ -73,6 +73,8 @@ export async function GET(
       cleanupExpiredDemoUsers(),
 
     ]);
+    const workflowOutcomeResult =
+      await processWorkflowOutcomeExecutions();
     const [integrationResult, mobilePushResult] = await Promise.all([
       processIntegrationWebhookDeliveries(),
       processMobilePushDeliveries(),
@@ -89,6 +91,9 @@ export async function GET(
 
       workflowAutomation:
         workflowAutomationResult,
+
+      workflowOutcomes:
+        workflowOutcomeResult,
 
       correctiveActions:
         correctiveActionResult,
@@ -118,6 +123,7 @@ export async function GET(
         checked:
           workflowAutomationResult.checked +
           workflowResult.checked +
+          workflowOutcomeResult.checked +
           correctiveActionResult.checked +
           incidentEscalationResult.checked +
           investigationResult.checked +
@@ -181,6 +187,7 @@ export async function GET(
         skipped:
           workflowAutomationResult.skipped +
           workflowResult.skipped +
+          workflowOutcomeResult.skipped +
           correctiveActionResult.skipped +
           incidentEscalationResult.skipped +
           investigationResult.skipped +
@@ -195,6 +202,15 @@ export async function GET(
 
         automationEventsFailed:
           workflowAutomationResult.failed,
+
+        workflowOutcomesCompleted:
+          workflowOutcomeResult.completed,
+
+        workflowOutcomesFailed:
+          workflowOutcomeResult.failed,
+
+        workflowOutcomeApprovalRequests:
+          workflowOutcomeResult.approvalRequestsSent,
       },
       });
     }, (response) => ({ httpStatus: response.status }));

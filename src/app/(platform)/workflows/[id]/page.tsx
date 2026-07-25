@@ -8,6 +8,11 @@ import { addWorkflowTemplateStep,
   updateWorkflowTemplateStep,} from "@/core/workflow/workflow.admin.actions";
 import { WorkflowStepSorter } from "@/core/workflow/workflow-step-sorter";
 import { WorkflowTriggerSettingsFields } from "@/core/workflow/workflow-trigger-settings-fields";
+import { WorkflowOutcomeDefinitionForm } from "@/core/workflow/workflow-outcome-definition-form";
+import {
+  deleteWorkflowOutcomeDefinition,
+  toggleWorkflowOutcomeDefinition,
+} from "@/core/workflow/workflow-outcome.actions";
 import { PermissionKey, UserRole, WorkflowEntityType, WorkflowStepType, } from "@prisma/client";
 import { ArrowLeft, GitBranch } from "lucide-react";
 import Link from "next/link";
@@ -36,6 +41,18 @@ export default async function WorkflowDetailPage({
         include: {
           approveNextStep: true,
           rejectNextStep: true,
+          outcomes: {
+            orderBy: {
+              createdAt: "asc",
+            },
+            include: {
+              _count: {
+                select: {
+                  executions: true,
+                },
+              },
+            },
+          },
         },
       },
       instances: {
@@ -50,6 +67,51 @@ export default async function WorkflowDetailPage({
   if (!workflow) {
     notFound();
   }
+
+  const [users, sites] = await Promise.all([
+    prisma.user.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    }),
+    prisma.site.findMany({
+      where: {
+        organizationId,
+      },
+      select: {
+        id: true,
+        name: true,
+        departments: {
+          select: {
+            id: true,
+            name: true,
+          },
+          orderBy: {
+            name: "asc",
+          },
+        },
+      },
+      orderBy: {
+        name: "asc",
+      },
+    }),
+  ]);
+  const outcomes = workflow.steps.flatMap((step) =>
+    step.outcomes.map((outcome) => ({
+      ...outcome,
+      stepName: step.name,
+      stepSequence: step.sequence,
+    })),
+  );
 
   return (
     <div>
@@ -75,7 +137,7 @@ export default async function WorkflowDetailPage({
           {workflow.description || "No description provided."}
         </p>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-4">
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <InfoCard
             label="Entity Type"
             value={workflow.entityType.replaceAll("_", " ")}
@@ -88,6 +150,10 @@ export default async function WorkflowDetailPage({
           <InfoCard
             label="Instances"
             value={workflow.instances.length.toString()}
+          />
+          <InfoCard
+            label="Automated Outcomes"
+            value={outcomes.length.toString()}
           />
         </div>
       </div>
@@ -387,6 +453,134 @@ export default async function WorkflowDetailPage({
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl">
+        <div>
+          <h2 className="text-2xl font-semibold">Automated Outcomes</h2>
+          <p className="mt-2 max-w-4xl text-sm text-slate-400">
+            Configure governed actions that run after a step is approved,
+            rejected, escalated, or completes the workflow. Consequential
+            actions remain pending until a workflow administrator approves
+            them in SLA Monitoring.
+          </p>
+        </div>
+
+        <WorkflowOutcomeDefinitionForm
+          workflowId={workflow.id}
+          steps={workflow.steps.map((step) => ({
+            id: step.id,
+            name: step.name,
+            sequence: step.sequence,
+          }))}
+          users={users}
+          sites={sites}
+        />
+
+        <div className="mt-8 overflow-x-auto rounded-2xl border border-white/10">
+          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <thead className="border-b border-white/10 bg-white/5 text-slate-300">
+              <tr>
+                <th className="px-5 py-3 font-medium">Outcome</th>
+                <th className="px-5 py-3 font-medium">Step / event</th>
+                <th className="px-5 py-3 font-medium">Action</th>
+                <th className="px-5 py-3 font-medium">Governance</th>
+                <th className="px-5 py-3 font-medium">History</th>
+                <th className="px-5 py-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {outcomes.map((outcome) => (
+                <tr
+                  key={outcome.id}
+                  className="border-b border-white/5 align-top"
+                >
+                  <td className="px-5 py-4">
+                    <p className="font-medium text-white">{outcome.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {outcome.isActive ? "Active" : "Inactive"}
+                    </p>
+                  </td>
+                  <td className="px-5 py-4 text-slate-300">
+                    <p>
+                      {outcome.stepSequence}. {outcome.stepName}
+                    </p>
+                    <p className="mt-1 text-xs text-cyan-300">
+                      {outcome.event.replaceAll("_", " ")}
+                    </p>
+                  </td>
+                  <td className="px-5 py-4 text-slate-300">
+                    {outcome.outcomeType.replaceAll("_", " ")}
+                  </td>
+                  <td className="px-5 py-4">
+                    <span
+                      className={`rounded-full border px-3 py-1 text-xs ${
+                        outcome.requiresApproval
+                          ? "border-amber-400/20 bg-amber-400/10 text-amber-300"
+                          : "border-cyan-400/20 bg-cyan-400/10 text-cyan-300"
+                      }`}
+                    >
+                      {outcome.requiresApproval
+                        ? "APPROVAL REQUIRED"
+                        : "AUTOMATIC"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 text-slate-300">
+                    {outcome._count.executions} execution
+                    {outcome._count.executions === 1 ? "" : "s"}
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      <form action={toggleWorkflowOutcomeDefinition}>
+                        <input
+                          type="hidden"
+                          name="workflowId"
+                          value={workflow.id}
+                        />
+                        <input
+                          type="hidden"
+                          name="definitionId"
+                          value={outcome.id}
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-lg border border-cyan-400/20 px-3 py-2 text-xs text-cyan-300 hover:bg-cyan-400/10"
+                        >
+                          {outcome.isActive ? "Deactivate" : "Activate"}
+                        </button>
+                      </form>
+                      {outcome._count.executions === 0 && (
+                        <form action={deleteWorkflowOutcomeDefinition}>
+                          <input
+                            type="hidden"
+                            name="workflowId"
+                            value={workflow.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="definitionId"
+                            value={outcome.id}
+                          />
+                          <button
+                            type="submit"
+                            className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300 hover:bg-red-400/10"
+                          >
+                            Delete
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {outcomes.length === 0 && (
+            <p className="p-8 text-center text-sm text-slate-400">
+              No automated outcomes have been configured.
+            </p>
+          )}
         </div>
       </section>
 

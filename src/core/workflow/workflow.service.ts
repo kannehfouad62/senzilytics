@@ -6,7 +6,8 @@ import {
 } from "@/core/notifications/notification-email.service";
 import { createNotification } from "@/core/notifications/notifications.service";
 import { sanitizeWorkflowAutomationContext, workflowConditionsMatch, type WorkflowAutomationContext } from "@/core/workflow/workflow-automation-rules";
-import { ActivityAction, NotificationType, Prisma, WorkflowDecision, WorkflowEntityType, WorkflowStepStatus, WorkflowTriggerEvent,} from "@prisma/client";
+import { queueWorkflowOutcomesSafely } from "@/core/workflow/workflow-outcome.service";
+import { ActivityAction, NotificationType, Prisma, WorkflowDecision, WorkflowEntityType, WorkflowOutcomeEvent, WorkflowStepStatus, WorkflowTriggerEvent,} from "@prisma/client";
 import { completeWorkflowInstance, completeWorkflowStepWithDecision, createWorkflowInstance, createWorkflowInstanceSteps, findActiveWorkflowTemplates, findWorkflowInstanceByEntity, findWorkflowInstanceStep,
   findWorkflowTemplateStepById, setWorkflowCurrentStep, updateWorkflowStepStatus,} from "./workflow.repository";
 import { prisma } from "@/lib/prisma";
@@ -301,6 +302,29 @@ export async function advanceWorkflowForEntity(input: {
       },
     });
 
+    await queueWorkflowOutcomesSafely({
+      organizationId: input.organizationId,
+      workflowInstanceId: instance.id,
+      workflowInstanceStepId: currentStep.id,
+      templateStepId: currentStep.templateStepId,
+      event: WorkflowOutcomeEvent.STEP_APPROVED,
+      context: {
+        decision: WorkflowDecision.APPROVE,
+        completedById: input.userId,
+      },
+    });
+    await queueWorkflowOutcomesSafely({
+      organizationId: input.organizationId,
+      workflowInstanceId: instance.id,
+      workflowInstanceStepId: currentStep.id,
+      templateStepId: currentStep.templateStepId,
+      event: WorkflowOutcomeEvent.WORKFLOW_COMPLETED,
+      context: {
+        decision: WorkflowDecision.APPROVE,
+        completedById: input.userId,
+      },
+    });
+
     return {
       completed: true,
       instanceId: instance.id,
@@ -372,6 +396,18 @@ export async function advanceWorkflowForEntity(input: {
       nextStep: nextStep.name,
       nextStepDueAt:
         nextStepDueAt?.toISOString() ?? null,
+    },
+  });
+
+  await queueWorkflowOutcomesSafely({
+    organizationId: input.organizationId,
+    workflowInstanceId: instance.id,
+    workflowInstanceStepId: currentStep.id,
+    templateStepId: currentStep.templateStepId,
+    event: WorkflowOutcomeEvent.STEP_APPROVED,
+    context: {
+      decision: WorkflowDecision.APPROVE,
+      completedById: input.userId,
     },
   });
 
@@ -527,6 +563,18 @@ export async function decideWorkflowStep(input: {
         },
       });
 
+      await queueWorkflowOutcomesSafely({
+        organizationId: input.organizationId,
+        workflowInstanceId: instance.id,
+        workflowInstanceStepId: currentStep.id,
+        templateStepId: currentStep.templateStepId,
+        event: WorkflowOutcomeEvent.STEP_REJECTED,
+        context: {
+          decision: WorkflowDecision.REJECT,
+          completedById: input.userId,
+        },
+      });
+
       return {
         completed: false,
         rejected: true,
@@ -629,6 +677,18 @@ export async function decideWorkflowStep(input: {
       },
     });
 
+    await queueWorkflowOutcomesSafely({
+      organizationId: input.organizationId,
+      workflowInstanceId: instance.id,
+      workflowInstanceStepId: currentStep.id,
+      templateStepId: currentStep.templateStepId,
+      event: WorkflowOutcomeEvent.STEP_REJECTED,
+      context: {
+        decision: WorkflowDecision.REJECT,
+        completedById: input.userId,
+      },
+    });
+
     return {
       completed: false,
       rejected: true,
@@ -714,6 +774,31 @@ export async function decideWorkflowStep(input: {
         comments: input.comments,
         completedById: input.userId,
         completedByName: currentUser.name,
+      },
+    });
+
+    if (recordedDecision === WorkflowDecision.APPROVE) {
+      await queueWorkflowOutcomesSafely({
+        organizationId: input.organizationId,
+        workflowInstanceId: instance.id,
+        workflowInstanceStepId: currentStep.id,
+        templateStepId: currentStep.templateStepId,
+        event: WorkflowOutcomeEvent.STEP_APPROVED,
+        context: {
+          decision: recordedDecision,
+          completedById: input.userId,
+        },
+      });
+    }
+    await queueWorkflowOutcomesSafely({
+      organizationId: input.organizationId,
+      workflowInstanceId: instance.id,
+      workflowInstanceStepId: currentStep.id,
+      templateStepId: currentStep.templateStepId,
+      event: WorkflowOutcomeEvent.WORKFLOW_COMPLETED,
+      context: {
+        decision: recordedDecision,
+        completedById: input.userId,
       },
     });
 
@@ -821,6 +906,20 @@ export async function decideWorkflowStep(input: {
       completedByName: currentUser.name,
     },
   });
+
+  if (recordedDecision === WorkflowDecision.APPROVE) {
+    await queueWorkflowOutcomesSafely({
+      organizationId: input.organizationId,
+      workflowInstanceId: instance.id,
+      workflowInstanceStepId: currentStep.id,
+      templateStepId: currentStep.templateStepId,
+      event: WorkflowOutcomeEvent.STEP_APPROVED,
+      context: {
+        decision: recordedDecision,
+        completedById: input.userId,
+      },
+    });
+  }
 
   return {
     completed: false,

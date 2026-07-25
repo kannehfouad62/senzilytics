@@ -1,9 +1,11 @@
 import { sendWorkflowSlaEmail } from "@/core/notifications/notification-email.service";
 import { createNotification } from "@/core/notifications/notifications.service";
+import { queueWorkflowOutcomesSafely } from "@/core/workflow/workflow-outcome.service";
 import { prisma } from "@/lib/prisma";
 import {
   NotificationType,
   WorkflowInstanceStatus,
+  WorkflowOutcomeEvent,
   WorkflowStepStatus,
 } from "@prisma/client";
 
@@ -126,6 +128,20 @@ export async function processWorkflowSlaNotifications(input?: {
     }
 
     const isOverdue = step.dueAt < now;
+
+    if (isOverdue) {
+      await queueWorkflowOutcomesSafely({
+        organizationId: step.instance.organizationId,
+        workflowInstanceId: step.instance.id,
+        workflowInstanceStepId: step.id,
+        templateStepId: step.templateStepId,
+        event: WorkflowOutcomeEvent.STEP_ESCALATED,
+        context: {
+          dueAt: step.dueAt.toISOString(),
+          overdue: true,
+        },
+      });
+    }
 
     if (isOverdue && step.overdueNotifiedAt) {
       skipped += 1;

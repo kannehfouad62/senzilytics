@@ -3,9 +3,14 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { runWorkflowSlaProcessor } from "@/core/workflow/workflow-sla.actions";
 import {
+  retryWorkflowOutcomeExecution,
+  reviewWorkflowOutcomeExecution,
+} from "@/core/workflow/workflow-outcome.actions";
+import {
   PermissionKey,
   WorkflowAutomationEventStatus,
   WorkflowInstanceStatus,
+  WorkflowOutcomeExecutionStatus,
   WorkflowStepStatus,
 } from "@prisma/client";
 import {
@@ -38,6 +43,10 @@ export default async function WorkflowSlaPage() {
     failedAutomationCount,
     automationEvents,
     tasks,
+    awaitingOutcomeApprovalCount,
+    failedOutcomeCount,
+    pendingOutcomeCount,
+    outcomeExecutions,
   ] = await Promise.all([
     prisma.workflowInstanceStep.count({
       where: {
@@ -152,6 +161,64 @@ export default async function WorkflowSlaPage() {
         },
       },
     }),
+
+    prisma.workflowOutcomeExecution.count({
+      where: {
+        organizationId,
+        status: WorkflowOutcomeExecutionStatus.AWAITING_APPROVAL,
+      },
+    }),
+
+    prisma.workflowOutcomeExecution.count({
+      where: {
+        organizationId,
+        status: WorkflowOutcomeExecutionStatus.FAILED,
+      },
+    }),
+
+    prisma.workflowOutcomeExecution.count({
+      where: {
+        organizationId,
+        status: {
+          in: [
+            WorkflowOutcomeExecutionStatus.PENDING,
+            WorkflowOutcomeExecutionStatus.PROCESSING,
+          ],
+        },
+      },
+    }),
+
+    prisma.workflowOutcomeExecution.findMany({
+      where: {
+        organizationId,
+      },
+      include: {
+        definition: true,
+        workflowInstance: {
+          include: {
+            template: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        approvedBy: {
+          select: {
+            name: true,
+          },
+        },
+        rejectedBy: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 20,
+    }),
   ]);
 
   const stats = [
@@ -190,6 +257,24 @@ export default async function WorkflowSlaPage() {
       value: reminderSentCount,
       note: "Reminder or escalation sent",
       icon: CheckCircle2,
+    },
+    {
+      title: "Outcome Approvals",
+      value: awaitingOutcomeApprovalCount,
+      note: "Human decisions required",
+      icon: AlertTriangle,
+    },
+    {
+      title: "Outcome Queue",
+      value: pendingOutcomeCount,
+      note: "Pending or processing actions",
+      icon: Play,
+    },
+    {
+      title: "Outcome Failures",
+      value: failedOutcomeCount,
+      note: "Available for controlled retry",
+      icon: AlertTriangle,
     },
   ];
 
@@ -319,6 +404,164 @@ export default async function WorkflowSlaPage() {
         {automationEvents.length === 0 && (
           <div className="p-10 text-center text-slate-400">
             No workflow automation events have been received.
+          </div>
+        )}
+      </section>
+
+      <section className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
+        <div className="border-b border-white/10 p-6">
+          <h2 className="text-2xl font-semibold">
+            Outcome Approvals &amp; Execution
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm text-slate-400">
+            Review consequential cross-module actions before they run, inspect
+            completed results, and retry failed executions after correcting
+            their workflow configuration.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+            <thead className="border-b border-white/10 bg-white/5 text-slate-300">
+              <tr>
+                <th className="px-6 py-4 font-medium">Outcome</th>
+                <th className="px-6 py-4 font-medium">Source</th>
+                <th className="px-6 py-4 font-medium">Event</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+                <th className="px-6 py-4 font-medium">Attempts</th>
+                <th className="px-6 py-4 font-medium">Review / action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {outcomeExecutions.map((execution) => (
+                <tr
+                  key={execution.id}
+                  className="border-b border-white/5 align-top transition hover:bg-white/[0.03]"
+                >
+                  <td className="px-6 py-5">
+                    <p className="font-medium text-white">
+                      {execution.definition.name}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {execution.definition.outcomeType.replaceAll("_", " ")}
+                    </p>
+                  </td>
+                  <td className="px-6 py-5">
+                    <Link
+                      href={getEntityLink(
+                        execution.workflowInstance.entityType,
+                        execution.workflowInstance.entityId,
+                      )}
+                      className="text-cyan-300 hover:text-cyan-200"
+                    >
+                      {execution.workflowInstance.entityType.replaceAll(
+                        "_",
+                        " ",
+                      )}
+                    </Link>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {execution.workflowInstance.template.name}
+                    </p>
+                  </td>
+                  <td className="px-6 py-5 text-slate-300">
+                    {execution.event.replaceAll("_", " ")}
+                  </td>
+                  <td className="px-6 py-5">
+                    <OutcomeStatusBadge status={execution.status} />
+                    {execution.lastError && (
+                      <p className="mt-2 max-w-xs text-xs text-red-300">
+                        {execution.lastError}
+                      </p>
+                    )}
+                    {(execution.approvedBy || execution.rejectedBy) && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        Reviewed by{" "}
+                        {execution.approvedBy?.name ||
+                          execution.rejectedBy?.name}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-6 py-5 text-slate-300">
+                    {execution.attempts} / 3
+                  </td>
+                  <td className="px-6 py-5">
+                    {execution.status ===
+                      WorkflowOutcomeExecutionStatus.AWAITING_APPROVAL && (
+                      <form
+                        action={reviewWorkflowOutcomeExecution}
+                        className="grid min-w-[330px] gap-2"
+                      >
+                        <input
+                          type="hidden"
+                          name="executionId"
+                          value={execution.id}
+                        />
+                        <input
+                          name="reviewNotes"
+                          maxLength={1000}
+                          placeholder="Review notes (optional)"
+                          className="rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-xs text-white outline-none focus:border-cyan-400"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            name="decision"
+                            value="APPROVE"
+                            className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300"
+                          >
+                            Approve &amp; Run
+                          </button>
+                          <button
+                            type="submit"
+                            name="decision"
+                            value="REJECT"
+                            className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-300"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                    {execution.status ===
+                      WorkflowOutcomeExecutionStatus.FAILED && (
+                      <form action={retryWorkflowOutcomeExecution}>
+                        <input
+                          type="hidden"
+                          name="executionId"
+                          value={execution.id}
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-300"
+                        >
+                          Retry Execution
+                        </button>
+                      </form>
+                    )}
+                    {execution.status ===
+                      WorkflowOutcomeExecutionStatus.COMPLETED && (
+                      <p className="text-xs text-emerald-300">
+                        Completed{" "}
+                        {execution.processedAt?.toLocaleString() ?? ""}
+                      </p>
+                    )}
+                    {execution.status ===
+                      WorkflowOutcomeExecutionStatus.REJECTED && (
+                      <p className="max-w-xs text-xs text-slate-400">
+                        {execution.reviewNotes ||
+                          "Rejected without review notes."}
+                      </p>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {outcomeExecutions.length === 0 && (
+          <div className="p-10 text-center text-slate-400">
+            No automated outcomes have been queued.
           </div>
         )}
       </section>
@@ -456,6 +699,31 @@ function AutomationStatusBadge({
       className={`rounded-full border px-3 py-1 text-xs ${styles[status]}`}
     >
       {status}
+    </span>
+  );
+}
+
+function OutcomeStatusBadge({
+  status,
+}: {
+  status: WorkflowOutcomeExecutionStatus;
+}) {
+  const styles = {
+    AWAITING_APPROVAL:
+      "border-amber-400/20 bg-amber-400/10 text-amber-300",
+    PENDING: "border-sky-400/20 bg-sky-400/10 text-sky-300",
+    PROCESSING: "border-cyan-400/20 bg-cyan-400/10 text-cyan-300",
+    COMPLETED:
+      "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
+    FAILED: "border-red-400/20 bg-red-400/10 text-red-300",
+    REJECTED: "border-slate-400/20 bg-slate-400/10 text-slate-300",
+  } satisfies Record<WorkflowOutcomeExecutionStatus, string>;
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-xs ${styles[status]}`}
+    >
+      {status.replaceAll("_", " ")}
     </span>
   );
 }

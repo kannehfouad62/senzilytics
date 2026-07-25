@@ -946,6 +946,39 @@ enum WorkflowDecision {
   SKIP
 }
 
+enum WorkflowOutcomeEvent {
+  STEP_APPROVED
+  STEP_REJECTED
+  WORKFLOW_COMPLETED
+  STEP_ESCALATED
+}
+
+enum WorkflowOutcomeType {
+  CREATE_TASK
+  CREATE_CORRECTIVE_ACTION
+  CREATE_RISK_DRAFT
+  CREATE_COMPLIANCE_TASK
+  SEND_NOTIFICATION
+  UPDATE_SOURCE_STATUS
+  EMIT_WEBHOOK
+}
+
+enum WorkflowOutcomeExecutionStatus {
+  AWAITING_APPROVAL
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REJECTED
+}
+
+enum WorkflowGeneratedTaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 enum DocumentEntityType {
   SAFETY_OBSERVATION
   INCIDENT
@@ -1410,6 +1443,8 @@ model Organization {
   notifications                Notification[]
   workflowTemplates            WorkflowTemplate[]
   workflowAutomationEvents     WorkflowAutomationEvent[]
+  workflowOutcomeExecutions    WorkflowOutcomeExecution[]
+  workflowGeneratedTasks       WorkflowGeneratedTask[]
   configurableForms            ConfigurableFormDefinition[]
   configurableFormSubmissions  ConfigurableFormSubmission[]
   workflowInstances            WorkflowInstance[]
@@ -1657,6 +1692,10 @@ model User {
   initiatedWorkflowAutomationEvents WorkflowAutomationEvent[]    @relation("WorkflowAutomationEventInitiator")
   assignedWorkflowSteps             WorkflowInstanceStep[]       @relation("WorkflowAssignedUser")
   completedWorkflowSteps            WorkflowInstanceStep[]       @relation("WorkflowCompletedBy")
+  approvedWorkflowOutcomes          WorkflowOutcomeExecution[]   @relation("WorkflowOutcomeApprovedBy")
+  rejectedWorkflowOutcomes          WorkflowOutcomeExecution[]   @relation("WorkflowOutcomeRejectedBy")
+  assignedWorkflowGeneratedTasks    WorkflowGeneratedTask[]      @relation("WorkflowGeneratedTaskAssignee")
+  completedWorkflowGeneratedTasks   WorkflowGeneratedTask[]      @relation("WorkflowGeneratedTaskCompletedBy")
   configurableFormsCreated          ConfigurableFormDefinition[] @relation("ConfigurableFormCreatedBy")
   configurableFormVersionsCreated   ConfigurableFormVersion[]    @relation("ConfigurableFormVersionCreatedBy")
   configurableFormVersionsPublished ConfigurableFormVersion[]    @relation("ConfigurableFormVersionPublishedBy")
@@ -5877,8 +5916,9 @@ model WorkflowTemplateStep {
 
   rejectNextStep WorkflowTemplateStep? @relation("RejectNextStep", fields: [rejectNextStepId], references: [id])
 
-  approveParents WorkflowTemplateStep[] @relation("ApproveNextStep")
-  rejectParents  WorkflowTemplateStep[] @relation("RejectNextStep")
+  approveParents WorkflowTemplateStep[]      @relation("ApproveNextStep")
+  rejectParents  WorkflowTemplateStep[]      @relation("RejectNextStep")
+  outcomes       WorkflowOutcomeDefinition[]
 
   @@unique([templateId, sequence])
 }
@@ -5900,10 +5940,11 @@ model WorkflowInstance {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  template     WorkflowTemplate       @relation(fields: [templateId], references: [id])
-  startedBy    User?                  @relation(fields: [startedById], references: [id])
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  template     WorkflowTemplate           @relation(fields: [templateId], references: [id])
+  startedBy    User?                      @relation(fields: [startedById], references: [id])
   steps        WorkflowInstanceStep[]
+  outcomes     WorkflowOutcomeExecution[]
 
   @@index([templateId, entityType, entityId])
   @@index([organizationId, triggerEvent, createdAt])
@@ -5933,6 +5974,91 @@ model WorkflowAutomationEvent {
   @@index([status, createdAt])
   @@index([organizationId, status, createdAt])
   @@index([organizationId, entityType, entityId])
+}
+
+model WorkflowOutcomeDefinition {
+  id               String               @id @default(cuid())
+  templateStepId   String
+  name             String
+  event            WorkflowOutcomeEvent
+  outcomeType      WorkflowOutcomeType
+  configuration    Json
+  requiresApproval Boolean              @default(false)
+  isActive         Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  templateStep WorkflowTemplateStep       @relation(fields: [templateStepId], references: [id], onDelete: Cascade)
+  executions   WorkflowOutcomeExecution[]
+
+  @@index([templateStepId, event, isActive])
+}
+
+model WorkflowOutcomeExecution {
+  id                     String                         @id @default(cuid())
+  organizationId         String
+  definitionId           String
+  workflowInstanceId     String
+  workflowInstanceStepId String?
+  event                  WorkflowOutcomeEvent
+  status                 WorkflowOutcomeExecutionStatus
+  attempts               Int                            @default(0)
+  context                Json?
+  output                 Json?
+  lastError              String?
+  approvalRequestedAt    DateTime?
+  approvedById           String?
+  approvedAt             DateTime?
+  rejectedById           String?
+  rejectedAt             DateTime?
+  reviewNotes            String?
+  processedAt            DateTime?
+  idempotencyKey         String
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+
+  organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  definition       WorkflowOutcomeDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  workflowInstance WorkflowInstance          @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  workflowStep     WorkflowInstanceStep?     @relation(fields: [workflowInstanceStepId], references: [id], onDelete: SetNull)
+  approvedBy       User?                     @relation("WorkflowOutcomeApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectedBy       User?                     @relation("WorkflowOutcomeRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
+  generatedTask    WorkflowGeneratedTask?
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([status, createdAt])
+  @@index([organizationId, status, createdAt])
+  @@index([workflowInstanceId, event])
+  @@index([definitionId, createdAt])
+}
+
+model WorkflowGeneratedTask {
+  id                 String                      @id
+  organizationId     String
+  outcomeExecutionId String                      @unique
+  sourceEntityType   WorkflowEntityType
+  sourceEntityId     String
+  title              String
+  description        String?
+  assignedRole       UserRole?
+  assignedUserId     String?
+  status             WorkflowGeneratedTaskStatus @default(OPEN)
+  dueAt              DateTime?
+  completedById      String?
+  completedAt        DateTime?
+  completionNotes    String?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  outcomeExecution WorkflowOutcomeExecution @relation(fields: [outcomeExecutionId], references: [id], onDelete: Restrict)
+  assignedUser     User?                    @relation("WorkflowGeneratedTaskAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  completedBy      User?                    @relation("WorkflowGeneratedTaskCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, dueAt])
+  @@index([assignedUserId, status, dueAt])
+  @@index([assignedRole, status, dueAt])
+  @@index([organizationId, sourceEntityType, sourceEntityId])
 }
 
 model WorkflowInstanceStep {
@@ -5966,8 +6092,9 @@ model WorkflowInstanceStep {
 
   instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
 
-  assignedUser User? @relation("WorkflowAssignedUser", fields: [assignedUserId], references: [id])
-  completedBy  User? @relation("WorkflowCompletedBy", fields: [completedById], references: [id])
+  assignedUser User?                      @relation("WorkflowAssignedUser", fields: [assignedUserId], references: [id])
+  completedBy  User?                      @relation("WorkflowCompletedBy", fields: [completedById], references: [id])
+  outcomes     WorkflowOutcomeExecution[]
 
   @@index([status, dueAt])
 }
