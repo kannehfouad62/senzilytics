@@ -7,6 +7,7 @@ import { addWorkflowTemplateStep,
   updateWorkflowTemplate,
   updateWorkflowTemplateStep,} from "@/core/workflow/workflow.admin.actions";
 import { WorkflowStepSorter } from "@/core/workflow/workflow-step-sorter";
+import { WorkflowTriggerSettingsFields } from "@/core/workflow/workflow-trigger-settings-fields";
 import { PermissionKey, UserRole, WorkflowEntityType, WorkflowStepType, } from "@prisma/client";
 import { ArrowLeft, GitBranch } from "lucide-react";
 import Link from "next/link";
@@ -126,6 +127,11 @@ export default async function WorkflowDetailPage({
         </select>
       </div>
     </div>
+
+    <WorkflowTriggerSettingsFields
+      triggerEvent={workflow.triggerEvent}
+      triggerConditions={workflow.triggerConditions}
+    />
 
     <div>
       <label className="mb-2 block text-sm text-slate-300">

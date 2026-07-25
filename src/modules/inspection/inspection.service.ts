@@ -1,6 +1,9 @@
 import { logActivity } from "@/core/activity-log/activity-log.service";
 import { createNotification } from "@/core/notifications/notifications.service";
-import { startWorkflowForEntity } from "@/core/workflow/workflow.service";
+import {
+  signalWorkflowAutomation,
+  startWorkflowForEntity,
+} from "@/core/workflow/workflow.service";
 import { prisma } from "@/lib/prisma";
 import {
   ActivityAction,
@@ -11,6 +14,7 @@ import {
   Status,
   UserRole,
   WorkflowEntityType,
+  WorkflowTriggerEvent,
   ConfigurableFormModule,
 } from "@prisma/client";
 import {
@@ -435,6 +439,14 @@ export async function createInspectionService(input: {
         WorkflowEntityType.INSPECTION,
       entityId:
         inspection.id,
+      context: {
+        status: inspection.status,
+        type: inspection.type,
+        siteId: inspection.siteId,
+        area: inspection.area,
+        leadInspectorId:
+          inspection.leadInspectorId,
+      },
     });
   } catch (error) {
     console.error(
@@ -522,6 +534,34 @@ export async function updateInspectionStatusService(input: {
         null,
     },
   });
+
+  try {
+    await signalWorkflowAutomation({
+      organizationId:
+        input.organizationId,
+      userId: input.userId,
+      entityType:
+        WorkflowEntityType.INSPECTION,
+      entityId:
+        inspection.id,
+      triggerEvent:
+        WorkflowTriggerEvent.STATUS_CHANGED,
+      context: {
+        previousStatus,
+        status: input.status,
+        type: inspection.type,
+        siteId: inspection.siteId,
+        area: inspection.area,
+        leadInspectorId:
+          inspection.leadInspectorId,
+      },
+    });
+  } catch (error) {
+    console.error(
+      `Status-change workflow startup failed for inspection ${inspection.id}:`,
+      error,
+    );
+  }
 
   return updatedInspection;
 }

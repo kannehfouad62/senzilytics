@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { enqueueWorkflowAutomationEvent } from "@/core/workflow/workflow-automation-event.service";
+import { configurableFormWorkflowEntityType } from "@/core/workflow/workflow-automation-rules";
 import {
   ConfigurableFieldType,
   ConfigurableFormModule,
@@ -6,6 +8,7 @@ import {
   ConfigurableSubmissionStatus,
   DocumentEntityType,
   Prisma,
+  WorkflowTriggerEvent,
 } from "@prisma/client";
 
 type RuntimeRule={fieldKey:string;operator:"EQUALS";value:string};
@@ -112,7 +115,13 @@ export async function prepareCapturedFormSubmissions(input:{organizationId:strin
 }
 
 export async function createPreparedSubmissions(tx:Prisma.TransactionClient,input:{organizationId:string;userId:string;module:ConfigurableFormModule;entityId:string;submissions:PreparedSubmission[]}){
-  for(const submission of input.submissions)await tx.configurableFormSubmission.create({data:{organizationId:input.organizationId,definitionId:submission.definitionId,versionId:submission.versionId,entityType:input.module,entityId:input.entityId,submittedById:input.userId,status:submission.status,answers:{create:submission.answers}}});
+  const workflowEntityType=configurableFormWorkflowEntityType(input.module);
+  for(const submission of input.submissions){
+    const created=await tx.configurableFormSubmission.create({data:{organizationId:input.organizationId,definitionId:submission.definitionId,versionId:submission.versionId,entityType:input.module,entityId:input.entityId,submittedById:input.userId,status:submission.status,answers:{create:submission.answers}}});
+    if(workflowEntityType){
+      await enqueueWorkflowAutomationEvent(tx,{organizationId:input.organizationId,entityType:workflowEntityType,entityId:input.entityId,triggerEvent:WorkflowTriggerEvent.FORM_SUBMITTED,context:{formDefinitionId:submission.definitionId,formVersionId:submission.versionId,formSubmissionId:created.id,formStatus:submission.status,module:input.module},initiatedById:input.userId,dedupeKey:`form-submitted:${created.id}`});
+    }
+  }
 }
 
 export const configurableFieldInputName=fieldName;

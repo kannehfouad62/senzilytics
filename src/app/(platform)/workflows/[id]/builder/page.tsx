@@ -61,8 +61,8 @@ export default async function WorkflowBuilderPage({
         </h1>
 
         <p className="mt-3 max-w-3xl text-slate-400">
-          Drag steps to reorder this workflow. Later, this builder will support
-          branching, parallel approvals, escalations, and automated actions.
+          Reorder steps and review the configured decision branches, role
+          assignments, SLA targets, and automation routing.
         </p>
       </div>
 

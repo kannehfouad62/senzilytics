@@ -1,9 +1,20 @@
 "use server";
 
+import {
+  parseWorkflowTriggerConditions,
+  workflowConditionsJson,
+} from "@/core/workflow/workflow-automation-rules";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { requirePermission } from "@/lib/permissions";
-import { PermissionKey, UserRole, WorkflowEntityType, WorkflowStepType,
+import {
+  ActivityAction,
+  PermissionKey,
+  Prisma,
+  UserRole,
+  WorkflowEntityType,
+  WorkflowStepType,
+  WorkflowTriggerEvent,
 } from "@prisma/client";
 import { redirect } from "next/navigation";
 
@@ -55,47 +66,115 @@ function hasWorkflowCycle(steps: WorkflowBranchStep[]) {
   return steps.some((step) => visit(step.id));
 }
 
+function workflowTriggerSettings(formData: FormData) {
+  const triggerEvent = String(
+    formData.get("triggerEvent") || WorkflowTriggerEvent.RECORD_CREATED,
+  ) as WorkflowTriggerEvent;
+  if (!Object.values(WorkflowTriggerEvent).includes(triggerEvent)) {
+    throw new Error("Select a valid workflow trigger event.");
+  }
+  const conditions = parseWorkflowTriggerConditions({
+    fields: formData.getAll("conditionField").map(String),
+    operators: formData.getAll("conditionOperator").map(String),
+    values: formData.getAll("conditionValue").map(String),
+  });
+  return {
+    triggerEvent,
+    triggerConditions: conditions.length
+      ? workflowConditionsJson(conditions)
+      : Prisma.JsonNull,
+    conditionCount: conditions.length,
+  };
+}
+
 export async function createWorkflowTemplate(formData: FormData) {
   await requirePermission(PermissionKey.MANAGE_WORKFLOWS);
 
-  const { organizationId } = await getCurrentUserTenant();
+  const { organizationId, user } = await getCurrentUserTenant();
 
-  const name = String(formData.get("name"));
-  const description = String(formData.get("description"));
+  const name = String(formData.get("name")).trim();
+  const description = String(formData.get("description")).trim();
   const entityType = formData.get("entityType") as WorkflowEntityType;
-
-  const template = await prisma.workflowTemplate.create({
-    data: {
-      organizationId,
-      name,
-      description,
-      entityType,
-      isActive: true,
-    },
-  });
+  const trigger = workflowTriggerSettings(formData);
+  if (!name || name.length > 120) {
+    throw new Error("Workflow name is required and must be 120 characters or fewer.");
+  }
+  if (!Object.values(WorkflowEntityType).includes(entityType)) {
+    throw new Error("Select a valid workflow entity type.");
+  }
 
   const stepNames = formData.getAll("stepName").map(String);
   const stepTypes = formData.getAll("stepType").map(String);
   const requiredRoles = formData.getAll("requiredRole").map(String);
   const slaHours = formData.getAll("slaHours").map(String);
-
+  const steps: Prisma.WorkflowTemplateStepCreateWithoutTemplateInput[] = [];
   for (let index = 0; index < stepNames.length; index++) {
-    if (!stepNames[index]) continue;
-
-    await prisma.workflowTemplateStep.create({
-      data: {
-        templateId: template.id,
-        name: stepNames[index],
-        stepType: stepTypes[index] as WorkflowStepType,
-        sequence: index + 1,
-        requiredRole:
-          requiredRoles[index] === "NONE"
-            ? null
-            : (requiredRoles[index] as UserRole),
-        slaHours: slaHours[index] ? Number(slaHours[index]) : null,
-      },
+    const stepName = stepNames[index].trim();
+    if (!stepName) continue;
+    const stepType = stepTypes[index] as WorkflowStepType;
+    const requiredRole = requiredRoles[index];
+    const parsedSla = slaHours[index] ? Number(slaHours[index]) : null;
+    if (!Object.values(WorkflowStepType).includes(stepType)) {
+      throw new Error("Select a valid workflow step type.");
+    }
+    if (
+      requiredRole !== "NONE" &&
+      !Object.values(UserRole).includes(requiredRole as UserRole)
+    ) {
+      throw new Error("Select a valid workflow step role.");
+    }
+    if (
+      parsedSla !== null &&
+      (!Number.isInteger(parsedSla) || parsedSla < 0)
+    ) {
+      throw new Error("SLA hours must be a non-negative whole number.");
+    }
+    steps.push({
+      name: stepName,
+      stepType,
+      sequence: steps.length + 1,
+      requiredRole:
+        requiredRole === "NONE" ? null : (requiredRole as UserRole),
+      slaHours: parsedSla,
     });
   }
+  if (!steps.length) throw new Error("Add at least one workflow step.");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.workflowTemplate.updateMany({
+      where: { organizationId, entityType, isActive: true },
+      data: { isActive: false },
+    });
+    const template = await tx.workflowTemplate.create({
+      data: {
+        organizationId,
+        name,
+        description: description || null,
+        entityType,
+        triggerEvent: trigger.triggerEvent,
+        triggerConditions: trigger.triggerConditions,
+        isActive: true,
+        steps: { create: steps },
+      },
+    });
+    await tx.activityLog.create({
+      data: {
+        organizationId,
+        userId: user.id,
+        action: ActivityAction.CREATE,
+        entityType: "WorkflowTemplate",
+        entityId: template.id,
+        title: "Workflow automation created",
+        description: template.name,
+        metadata: {
+          entityType,
+          triggerEvent: trigger.triggerEvent,
+          conditionCount: trigger.conditionCount,
+          stepCount: steps.length,
+        },
+      },
+    });
+  });
 
   redirect("/workflows");
 }
@@ -428,23 +507,63 @@ export async function reorderWorkflowTemplateSteps(formData: FormData) {
 export async function updateWorkflowTemplate(formData: FormData) {
   await requirePermission(PermissionKey.MANAGE_WORKFLOWS);
 
-  const { organizationId } = await getCurrentUserTenant();
+  const { organizationId, user } = await getCurrentUserTenant();
 
   const workflowId = String(formData.get("workflowId"));
-  const name = String(formData.get("name"));
-  const description = String(formData.get("description"));
+  const name = String(formData.get("name")).trim();
+  const description = String(formData.get("description")).trim();
   const entityType = formData.get("entityType") as WorkflowEntityType;
+  const trigger = workflowTriggerSettings(formData);
+  if (!name || name.length > 120) {
+    throw new Error("Workflow name is required and must be 120 characters or fewer.");
+  }
+  if (!Object.values(WorkflowEntityType).includes(entityType)) {
+    throw new Error("Select a valid workflow entity type.");
+  }
+  const workflow = await prisma.workflowTemplate.findFirst({
+    where: { id: workflowId, organizationId },
+    select: { id: true, isActive: true },
+  });
+  if (!workflow) throw new Error("Workflow template not found.");
 
-  await prisma.workflowTemplate.updateMany({
-    where: {
-      id: workflowId,
-      organizationId,
-    },
-    data: {
-      name,
-      description,
-      entityType,
-    },
+  await prisma.$transaction(async (tx) => {
+    if (workflow.isActive) {
+      await tx.workflowTemplate.updateMany({
+        where: {
+          organizationId,
+          entityType,
+          id: { not: workflow.id },
+          isActive: true,
+        },
+        data: { isActive: false },
+      });
+    }
+    await tx.workflowTemplate.update({
+      where: { id: workflow.id },
+      data: {
+        name,
+        description: description || null,
+        entityType,
+        triggerEvent: trigger.triggerEvent,
+        triggerConditions: trigger.triggerConditions,
+      },
+    });
+    await tx.activityLog.create({
+      data: {
+        organizationId,
+        userId: user.id,
+        action: ActivityAction.UPDATE,
+        entityType: "WorkflowTemplate",
+        entityId: workflow.id,
+        title: "Workflow automation settings updated",
+        description: name,
+        metadata: {
+          entityType,
+          triggerEvent: trigger.triggerEvent,
+          conditionCount: trigger.conditionCount,
+        },
+      },
+    });
   });
 
   redirect(`/workflows/${workflowId}`);

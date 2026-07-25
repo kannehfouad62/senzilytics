@@ -902,6 +902,19 @@ enum WorkflowEntityType {
   RISK
 }
 
+enum WorkflowTriggerEvent {
+  RECORD_CREATED
+  STATUS_CHANGED
+  FORM_SUBMITTED
+}
+
+enum WorkflowAutomationEventStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
 enum WorkflowStepType {
   START
   REVIEW
@@ -1396,6 +1409,7 @@ model Organization {
   activityLogs                 ActivityLog[]
   notifications                Notification[]
   workflowTemplates            WorkflowTemplate[]
+  workflowAutomationEvents     WorkflowAutomationEvent[]
   configurableForms            ConfigurableFormDefinition[]
   configurableFormSubmissions  ConfigurableFormSubmission[]
   workflowInstances            WorkflowInstance[]
@@ -1640,6 +1654,7 @@ model User {
   completedRiskReviews RiskReview[]  @relation("RiskReviewCompletedBy")
 
   startedWorkflowInstances          WorkflowInstance[]
+  initiatedWorkflowAutomationEvents WorkflowAutomationEvent[]    @relation("WorkflowAutomationEventInitiator")
   assignedWorkflowSteps             WorkflowInstanceStep[]       @relation("WorkflowAssignedUser")
   completedWorkflowSteps            WorkflowInstanceStep[]       @relation("WorkflowCompletedBy")
   configurableFormsCreated          ConfigurableFormDefinition[] @relation("ConfigurableFormCreatedBy")
@@ -5821,12 +5836,14 @@ model ConfigurableFormFileAnswer {
 }
 
 model WorkflowTemplate {
-  id             String             @id @default(cuid())
-  organizationId String
-  name           String
-  description    String?
-  entityType     WorkflowEntityType
-  isActive       Boolean            @default(true)
+  id                String               @id @default(cuid())
+  organizationId    String
+  name              String
+  description       String?
+  entityType        WorkflowEntityType
+  triggerEvent      WorkflowTriggerEvent @default(RECORD_CREATED)
+  triggerConditions Json?
+  isActive          Boolean              @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5835,7 +5852,7 @@ model WorkflowTemplate {
   steps        WorkflowTemplateStep[]
   instances    WorkflowInstance[]
 
-  @@index([organizationId, entityType, isActive])
+  @@index([organizationId, entityType, triggerEvent, isActive])
 }
 
 model WorkflowTemplateStep {
@@ -5874,6 +5891,8 @@ model WorkflowInstance {
   entityId       String
   status         WorkflowInstanceStatus @default(ACTIVE)
   currentStepId  String?
+  triggerEvent   WorkflowTriggerEvent   @default(RECORD_CREATED)
+  triggerContext Json?
 
   startedById String?
   completedAt DateTime?
@@ -5885,6 +5904,35 @@ model WorkflowInstance {
   template     WorkflowTemplate       @relation(fields: [templateId], references: [id])
   startedBy    User?                  @relation(fields: [startedById], references: [id])
   steps        WorkflowInstanceStep[]
+
+  @@index([templateId, entityType, entityId])
+  @@index([organizationId, triggerEvent, createdAt])
+}
+
+model WorkflowAutomationEvent {
+  id                   String                        @id @default(cuid())
+  organizationId       String
+  entityType           WorkflowEntityType
+  entityId             String
+  triggerEvent         WorkflowTriggerEvent
+  context              Json?
+  initiatedById        String?
+  status               WorkflowAutomationEventStatus @default(PENDING)
+  attempts             Int                           @default(0)
+  startedWorkflowCount Int                           @default(0)
+  lastError            String?
+  processedAt          DateTime?
+  dedupeKey            String
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  initiatedBy  User?        @relation("WorkflowAutomationEventInitiator", fields: [initiatedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, dedupeKey])
+  @@index([status, createdAt])
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, entityType, entityId])
 }
 
 model WorkflowInstanceStep {

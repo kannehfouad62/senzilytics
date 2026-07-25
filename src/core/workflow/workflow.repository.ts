@@ -1,21 +1,25 @@
 import { prisma } from "@/lib/prisma";
 import {
+  Prisma,
   WorkflowDecision,
   WorkflowEntityType,
   WorkflowInstanceStatus,
   WorkflowStepType,
   WorkflowStepStatus,
+  WorkflowTriggerEvent,
   UserRole,
 } from "@prisma/client";
 
-export async function findActiveWorkflowTemplate(input: {
+export async function findActiveWorkflowTemplates(input: {
   organizationId: string;
   entityType: WorkflowEntityType;
+  triggerEvent: WorkflowTriggerEvent;
 }) {
-  return prisma.workflowTemplate.findFirst({
+  return prisma.workflowTemplate.findMany({
     where: {
       organizationId: input.organizationId,
       entityType: input.entityType,
+      triggerEvent: input.triggerEvent,
       isActive: true,
     },
     include: {
@@ -29,6 +33,7 @@ export async function findActiveWorkflowTemplate(input: {
         },
       },
     },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
 }
 
@@ -39,6 +44,8 @@ export async function createWorkflowInstance(input: {
   entityId: string;
   startedById?: string | null;
   currentStepId?: string | null;
+  triggerEvent: WorkflowTriggerEvent;
+  triggerContext: Prisma.InputJsonValue;
 }) {
   return prisma.workflowInstance.create({
     data: {
@@ -49,6 +56,8 @@ export async function createWorkflowInstance(input: {
       status: WorkflowInstanceStatus.ACTIVE,
       startedById: input.startedById,
       currentStepId: input.currentStepId,
+      triggerEvent: input.triggerEvent,
+      triggerContext: input.triggerContext,
     },
   });
 }

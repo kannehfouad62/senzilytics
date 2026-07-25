@@ -4,7 +4,10 @@ import {
   sendIncidentReporterConfirmationEmail,
 } from "@/core/notifications/notification-email.service";
 import { createNotification } from "@/core/notifications/notifications.service";
-import { startWorkflowForEntity } from "@/core/workflow/workflow.service";
+import {
+  signalWorkflowAutomation,
+  startWorkflowForEntity,
+} from "@/core/workflow/workflow.service";
 import { prisma } from "@/lib/prisma";
 import {
   ActivityAction,
@@ -15,6 +18,7 @@ import {
   Status,
   UserRole,
   WorkflowEntityType,
+  WorkflowTriggerEvent,
 } from "@prisma/client";
 import {
   createTenantCorrectiveAction,
@@ -442,6 +446,13 @@ export async function createIncidentService(input: {
       entityType:
         WorkflowEntityType.INCIDENT,
       entityId: incident.id,
+      context: {
+        status: incident.status,
+        type: incident.type,
+        riskLevel: incident.riskLevel,
+        siteId: incident.siteId,
+        location: incident.location,
+      },
     });
   } catch (error) {
     console.error(
@@ -472,6 +483,10 @@ export async function updateIncidentStatusService(input: {
 
   const previousStatus = incident.status;
 
+  if (previousStatus === input.status) {
+    return incident;
+  }
+
   const updatedIncident =
     await updateTenantIncidentStatus({
       incidentId: input.incidentId,
@@ -491,6 +506,29 @@ export async function updateIncidentStatusService(input: {
       newStatus: input.status,
     },
   });
+
+  try {
+    await signalWorkflowAutomation({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      entityType: WorkflowEntityType.INCIDENT,
+      entityId: incident.id,
+      triggerEvent: WorkflowTriggerEvent.STATUS_CHANGED,
+      context: {
+        previousStatus,
+        status: input.status,
+        type: incident.type,
+        riskLevel: incident.riskLevel,
+        siteId: incident.siteId,
+        location: incident.location,
+      },
+    });
+  } catch (error) {
+    console.error(
+      `Status-change workflow startup failed for incident ${incident.id}:`,
+      error,
+    );
+  }
 
   return updatedIncident;
 }

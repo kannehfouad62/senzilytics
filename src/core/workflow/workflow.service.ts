@@ -5,8 +5,9 @@ import {
   sendWorkflowDecisionEmail,
 } from "@/core/notifications/notification-email.service";
 import { createNotification } from "@/core/notifications/notifications.service";
-import { ActivityAction, NotificationType, WorkflowDecision, WorkflowEntityType, WorkflowStepStatus,} from "@prisma/client";
-import { completeWorkflowInstance, completeWorkflowStepWithDecision, createWorkflowInstance, createWorkflowInstanceSteps, findActiveWorkflowTemplate, findWorkflowInstanceByEntity, findWorkflowInstanceStep,
+import { sanitizeWorkflowAutomationContext, workflowConditionsMatch, type WorkflowAutomationContext } from "@/core/workflow/workflow-automation-rules";
+import { ActivityAction, NotificationType, Prisma, WorkflowDecision, WorkflowEntityType, WorkflowStepStatus, WorkflowTriggerEvent,} from "@prisma/client";
+import { completeWorkflowInstance, completeWorkflowStepWithDecision, createWorkflowInstance, createWorkflowInstanceSteps, findActiveWorkflowTemplates, findWorkflowInstanceByEntity, findWorkflowInstanceStep,
   findWorkflowTemplateStepById, setWorkflowCurrentStep, updateWorkflowStepStatus,} from "./workflow.repository";
 import { prisma } from "@/lib/prisma";
 
@@ -27,19 +28,37 @@ function getEntityLink(
       return `/incidents/${entityId}`;
 
     case WorkflowEntityType.CORRECTIVE_ACTION:
-      return "/actions";
+      return `/actions/${entityId}`;
 
     case WorkflowEntityType.AUDIT:
-      return "/workflows";
+      return `/audits/${entityId}`;
 
     case WorkflowEntityType.INSPECTION:
-      return "/inspections";
+      return `/inspections/${entityId}`;
 
     case WorkflowEntityType.COMPLIANCE:
-      return "/compliance";
+      return `/compliance/${entityId}`;
 
     case WorkflowEntityType.TRAINING:
-      return "/training";
+      return `/training/${entityId}`;
+
+    case WorkflowEntityType.PERMIT:
+      return `/permits-to-work/${entityId}`;
+
+    case WorkflowEntityType.CHEMICAL:
+      return `/chemicals/${entityId}`;
+
+    case WorkflowEntityType.ENVIRONMENTAL:
+      return `/environmental/${entityId}`;
+
+    case WorkflowEntityType.MOC:
+      return `/moc/${entityId}`;
+
+    case WorkflowEntityType.OBSERVATION:
+      return `/observations/${entityId}`;
+
+    case WorkflowEntityType.RISK:
+      return `/risks/${entityId}`;
 
     default:
       return "/tasks";
@@ -51,87 +70,149 @@ export async function startWorkflowForEntity(input: {
   userId: string;
   entityType: WorkflowEntityType;
   entityId: string;
+  context?: WorkflowAutomationContext;
 }) {
-  const template = await findActiveWorkflowTemplate({
-    organizationId: input.organizationId,
-    entityType: input.entityType,
-  });
-
-  if (!template || template.steps.length === 0) {
-    return null;
-  }
-
-  const firstStep = template.steps[0];
-
-  const instance = await createWorkflowInstance({
-    organizationId: input.organizationId,
-    templateId: template.id,
-    entityType: input.entityType,
-    entityId: input.entityId,
-    startedById: input.userId,
-  });
-
-  await createWorkflowInstanceSteps(
-    template.steps.map((step, index) => ({
-      instanceId: instance.id,
-      templateStepId: step.id,
-      name: step.name,
-      stepType: step.stepType,
-      sequence: step.sequence,
-      status:
-        index === 0
-          ? WorkflowStepStatus.IN_PROGRESS
-          : WorkflowStepStatus.PENDING,
-      assignedRole: step.requiredRole,
-      dueAt: index === 0 ? calculateStepDueAt(step.slaHours) : null,
-    }))
-  );
-
-  const firstInstanceStep = await findWorkflowInstanceStep({
-    instanceId: instance.id,
-    templateStepId: firstStep.id,
-  });
-
-  if (!firstInstanceStep) {
-    throw new Error("The first workflow instance step could not be created.");
-  }
-
-  const updatedInstance = await setWorkflowCurrentStep({
-    instanceId: instance.id,
-    currentStepId: firstInstanceStep.id,
-  });
-
-  await notifyWorkflowStepOwners({
-    organizationId: input.organizationId,
-    workflowName: template.name,
-    entityType: input.entityType,
-    entityId: input.entityId,
-    stepName: firstInstanceStep.name,
-    assignedRole: firstInstanceStep.assignedRole,
-    assignedUserId: firstInstanceStep.assignedUserId,
-    dueAt: firstInstanceStep.dueAt,
-    link: getEntityLink(input.entityType, input.entityId),
-  });
-
-  await logActivity({
+  const result = await signalWorkflowAutomation({
     organizationId: input.organizationId,
     userId: input.userId,
-    action: ActivityAction.SYSTEM,
-    entityType: "Workflow",
-    entityId: instance.id,
-    title: "Workflow started",
-    description: `${template.name} workflow started for ${input.entityType}.`,
-    metadata: {
-      workflowTemplateId: template.id,
-      workflowInstanceId: instance.id,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    triggerEvent: WorkflowTriggerEvent.RECORD_CREATED,
+    context: input.context ?? {},
+  });
+  return result.started[0]?.instance ?? null;
+}
+
+export async function signalWorkflowAutomation(input: {
+  organizationId: string;
+  userId?: string | null;
+  entityType: WorkflowEntityType;
+  entityId: string;
+  triggerEvent: WorkflowTriggerEvent;
+  context: WorkflowAutomationContext;
+}) {
+  const context = sanitizeWorkflowAutomationContext(input.context);
+  const templates = await findActiveWorkflowTemplates({
+    organizationId: input.organizationId,
+    entityType: input.entityType,
+    triggerEvent: input.triggerEvent,
+  });
+  const started: Array<{
+    templateId: string;
+    templateName: string;
+    instance: Awaited<ReturnType<typeof setWorkflowCurrentStep>>;
+  }> = [];
+  const skipped: Array<{
+    templateId: string;
+    reason: "NO_STEPS" | "CONDITIONS_NOT_MET" | "ALREADY_STARTED";
+  }> = [];
+
+  for (const template of templates) {
+    if (template.steps.length === 0) {
+      skipped.push({ templateId: template.id, reason: "NO_STEPS" });
+      continue;
+    }
+    if (!workflowConditionsMatch(template.triggerConditions, context)) {
+      skipped.push({ templateId: template.id, reason: "CONDITIONS_NOT_MET" });
+      continue;
+    }
+    const existing = await prisma.workflowInstance.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        templateId: template.id,
+        entityType: input.entityType,
+        entityId: input.entityId,
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      skipped.push({ templateId: template.id, reason: "ALREADY_STARTED" });
+      continue;
+    }
+
+    const firstStep = template.steps[0];
+
+    const instance = await createWorkflowInstance({
+      organizationId: input.organizationId,
+      templateId: template.id,
       entityType: input.entityType,
       entityId: input.entityId,
-      currentStepId: firstInstanceStep.id,
-      currentStepName: firstInstanceStep.name,
-    },
-  });
+      startedById: input.userId,
+      triggerEvent: input.triggerEvent,
+      triggerContext: context as Prisma.InputJsonValue,
+    });
 
-  return updatedInstance;
+    await createWorkflowInstanceSteps(
+      template.steps.map((step, index) => ({
+        instanceId: instance.id,
+        templateStepId: step.id,
+        name: step.name,
+        stepType: step.stepType,
+        sequence: step.sequence,
+        status:
+          index === 0
+            ? WorkflowStepStatus.IN_PROGRESS
+            : WorkflowStepStatus.PENDING,
+        assignedRole: step.requiredRole,
+        dueAt: index === 0 ? calculateStepDueAt(step.slaHours) : null,
+      }))
+    );
+
+    const firstInstanceStep = await findWorkflowInstanceStep({
+      instanceId: instance.id,
+      templateStepId: firstStep.id,
+    });
+
+    if (!firstInstanceStep) {
+      throw new Error("The first workflow instance step could not be created.");
+    }
+
+    const updatedInstance = await setWorkflowCurrentStep({
+      instanceId: instance.id,
+      currentStepId: firstInstanceStep.id,
+    });
+
+    await notifyWorkflowStepOwners({
+      organizationId: input.organizationId,
+      workflowName: template.name,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      stepName: firstInstanceStep.name,
+      assignedRole: firstInstanceStep.assignedRole,
+      assignedUserId: firstInstanceStep.assignedUserId,
+      dueAt: firstInstanceStep.dueAt,
+      link: getEntityLink(input.entityType, input.entityId),
+    });
+
+    await logActivity({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      action: ActivityAction.SYSTEM,
+      entityType: "Workflow",
+      entityId: instance.id,
+      title: "Workflow automation started",
+      description: `${template.name} started from ${input.triggerEvent.replaceAll("_", " ").toLowerCase()}.`,
+      metadata: {
+        workflowTemplateId: template.id,
+        workflowInstanceId: instance.id,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        triggerEvent: input.triggerEvent,
+        triggerContext: context,
+        currentStepId: firstInstanceStep.id,
+        currentStepName: firstInstanceStep.name,
+      },
+    });
+
+    started.push({
+      templateId: template.id,
+      templateName: template.name,
+      instance: updatedInstance,
+    });
+    break;
+  }
+
+  return { started, skipped };
 }
 
 export async function advanceWorkflowForEntity(input: {

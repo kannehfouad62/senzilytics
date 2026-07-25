@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import {
   NotificationType,
   WorkflowInstanceStatus,
-  UserRole,
   WorkflowStepStatus,
 } from "@prisma/client";
 
@@ -76,7 +75,9 @@ async function getStepRecipients(input: {
   });
 }
 
-export async function processWorkflowSlaNotifications() {
+export async function processWorkflowSlaNotifications(input?: {
+  organizationId?: string;
+}) {
   const now = new Date();
 
   const reminderWindowEnd = new Date(
@@ -93,6 +94,9 @@ export async function processWorkflowSlaNotifications() {
       },
       instance: {
         status: WorkflowInstanceStatus.ACTIVE,
+        ...(input?.organizationId
+          ? { organizationId: input.organizationId }
+          : {}),
       },
     },
     include: {

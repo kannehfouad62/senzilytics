@@ -3,6 +3,7 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { toggleWorkflowTemplateStatus } from "@/core/workflow/workflow.admin.actions";
 import { PermissionKey } from "@prisma/client";
+import { readWorkflowTriggerConditions } from "@/core/workflow/workflow-automation-rules";
 import { CalendarClock, GitBranch, Plus } from "lucide-react";
 import Link from "next/link";
 
@@ -74,6 +75,15 @@ export default async function WorkflowsPage() {
                 <p className="text-sm text-cyan-300">
                   {workflow.entityType.replaceAll("_", " ")}
                 </p>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-cyan-300">
+                    {workflow.triggerEvent.replaceAll("_", " ")}
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
+                    {readWorkflowTriggerConditions(workflow.triggerConditions).length}{" "}
+                    conditions
+                  </span>
+                </div>
                 <Link
   href={`/workflows/${workflow.id}`}
   className="mt-1 block text-2xl font-semibold hover:text-cyan-300"

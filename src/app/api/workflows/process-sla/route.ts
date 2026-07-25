@@ -4,6 +4,7 @@ import { processIncidentEscalations } from "@/core/notifications/incident-escala
 import { processInspectionSlaNotifications } from "@/core/notifications/inspection-sla.service";
 import { processInvestigationSlaNotifications } from "@/core/notifications/investigation-sla.service";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
+import { processWorkflowAutomationEvents } from "@/core/workflow/workflow-automation-event.service";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { cleanupExpiredDemoUsers } from "@/features/demo/cleanup.service";
 import { processIntegrationWebhookDeliveries } from "@/modules/integrations/webhook-delivery.service";
@@ -46,6 +47,7 @@ export async function GET(
   try {
     return await runTrackedScheduledJob("workflow-sla", async () => {
       const [
+      workflowAutomationResult,
       workflowResult,
       correctiveActionResult,
       incidentEscalationResult,
@@ -54,6 +56,8 @@ export async function GET(
       inspectionResult,
       demoResult,
     ] = await Promise.all([
+      processWorkflowAutomationEvents(),
+
       processWorkflowSlaNotifications(),
 
       processCorrectiveActionSlaNotifications(),
@@ -83,6 +87,9 @@ export async function GET(
       workflows:
         workflowResult,
 
+      workflowAutomation:
+        workflowAutomationResult,
+
       correctiveActions:
         correctiveActionResult,
 
@@ -109,6 +116,7 @@ export async function GET(
 
       totals: {
         checked:
+          workflowAutomationResult.checked +
           workflowResult.checked +
           correctiveActionResult.checked +
           incidentEscalationResult.checked +
@@ -171,12 +179,22 @@ export async function GET(
             .emailsSent,
 
         skipped:
+          workflowAutomationResult.skipped +
           workflowResult.skipped +
           correctiveActionResult.skipped +
           incidentEscalationResult.skipped +
           investigationResult.skipped +
           auditResult.skipped +
           inspectionResult.skipped,
+
+        automationEventsProcessed:
+          workflowAutomationResult.processed,
+
+        workflowsStarted:
+          workflowAutomationResult.workflowsStarted,
+
+        automationEventsFailed:
+          workflowAutomationResult.failed,
       },
       });
     }, (response) => ({ httpStatus: response.status }));

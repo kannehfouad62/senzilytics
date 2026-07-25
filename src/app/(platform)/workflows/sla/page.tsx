@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/permissions";
 import { runWorkflowSlaProcessor } from "@/core/workflow/workflow-sla.actions";
 import {
   PermissionKey,
+  WorkflowAutomationEventStatus,
   WorkflowInstanceStatus,
   WorkflowStepStatus,
 } from "@prisma/client";
@@ -33,6 +34,9 @@ export default async function WorkflowSlaPage() {
     overdueTaskCount,
     dueSoonTaskCount,
     reminderSentCount,
+    pendingAutomationCount,
+    failedAutomationCount,
+    automationEvents,
     tasks,
   ] = await Promise.all([
     prisma.workflowInstanceStep.count({
@@ -94,6 +98,35 @@ export default async function WorkflowSlaPage() {
       },
     }),
 
+    prisma.workflowAutomationEvent.count({
+      where: {
+        organizationId,
+        status: {
+          in: [
+            WorkflowAutomationEventStatus.PENDING,
+            WorkflowAutomationEventStatus.PROCESSING,
+          ],
+        },
+      },
+    }),
+
+    prisma.workflowAutomationEvent.count({
+      where: {
+        organizationId,
+        status: WorkflowAutomationEventStatus.FAILED,
+      },
+    }),
+
+    prisma.workflowAutomationEvent.findMany({
+      where: {
+        organizationId,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 12,
+    }),
+
     prisma.workflowInstanceStep.findMany({
       where: {
         status: WorkflowStepStatus.IN_PROGRESS,
@@ -129,6 +162,18 @@ export default async function WorkflowSlaPage() {
       icon: Clock3,
     },
     {
+      title: "Automation Queue",
+      value: pendingAutomationCount,
+      note: "Pending or processing events",
+      icon: Play,
+    },
+    {
+      title: "Automation Failures",
+      value: failedAutomationCount,
+      note: "Eligible for controlled retry",
+      icon: AlertTriangle,
+    },
+    {
       title: "Due Soon",
       value: dueSoonTaskCount,
       note: "Due within four hours",
@@ -162,8 +207,8 @@ export default async function WorkflowSlaPage() {
           </h1>
 
           <p className="mt-2 max-w-2xl text-slate-400">
-            Monitor due dates, reminders, escalations, and workflow task
-            performance across your organization.
+            Monitor automation triggers, due dates, reminders, escalations,
+            and workflow task performance across your organization.
           </p>
         </div>
 
@@ -173,12 +218,12 @@ export default async function WorkflowSlaPage() {
             className="flex items-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
           >
             <Play size={17} />
-            Process SLA Alerts
+            Process Automation &amp; SLA
           </button>
         </form>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {stats.map((stat) => {
           const Icon = stat.icon;
 
@@ -203,6 +248,80 @@ export default async function WorkflowSlaPage() {
           );
         })}
       </div>
+
+      <section className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
+        <div className="border-b border-white/10 p-6">
+          <h2 className="text-2xl font-semibold">
+            Recent Automation Events
+          </h2>
+          <p className="mt-2 text-sm text-slate-400">
+            Durable Form Studio trigger events. Record-created and
+            status-change triggers are audited on their workflow instances.
+            Failed queued events are retried up to three times.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <thead className="border-b border-white/10 bg-white/5 text-slate-300">
+              <tr>
+                <th className="px-6 py-4 font-medium">Record</th>
+                <th className="px-6 py-4 font-medium">Trigger</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+                <th className="px-6 py-4 font-medium">Attempts</th>
+                <th className="px-6 py-4 font-medium">Workflows Started</th>
+                <th className="px-6 py-4 font-medium">Received</th>
+              </tr>
+            </thead>
+            <tbody>
+              {automationEvents.map((event) => (
+                <tr
+                  key={event.id}
+                  className="border-b border-white/5 transition hover:bg-white/[0.03]"
+                >
+                  <td className="px-6 py-5">
+                    <Link
+                      href={getEntityLink(event.entityType, event.entityId)}
+                      className="font-medium text-white hover:text-cyan-300"
+                    >
+                      {event.entityType.replaceAll("_", " ")}
+                    </Link>
+                    <p className="mt-1 font-mono text-xs text-slate-500">
+                      {event.entityId}
+                    </p>
+                  </td>
+                  <td className="px-6 py-5 text-slate-300">
+                    {event.triggerEvent.replaceAll("_", " ")}
+                  </td>
+                  <td className="px-6 py-5">
+                    <AutomationStatusBadge status={event.status} />
+                    {event.lastError && (
+                      <p className="mt-2 max-w-sm text-xs text-red-300">
+                        {event.lastError}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-6 py-5 text-slate-300">
+                    {event.attempts} / 3
+                  </td>
+                  <td className="px-6 py-5 text-slate-300">
+                    {event.startedWorkflowCount}
+                  </td>
+                  <td className="px-6 py-5 text-slate-400">
+                    {event.createdAt.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {automationEvents.length === 0 && (
+          <div className="p-10 text-center text-slate-400">
+            No workflow automation events have been received.
+          </div>
+        )}
+      </section>
 
       <section className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
         <div className="border-b border-white/10 p-6">
@@ -320,6 +439,27 @@ export default async function WorkflowSlaPage() {
   );
 }
 
+function AutomationStatusBadge({
+  status,
+}: {
+  status: WorkflowAutomationEventStatus;
+}) {
+  const styles = {
+    PENDING: "border-amber-400/20 bg-amber-400/10 text-amber-300",
+    PROCESSING: "border-cyan-400/20 bg-cyan-400/10 text-cyan-300",
+    PROCESSED: "border-green-400/20 bg-green-400/10 text-green-300",
+    FAILED: "border-red-400/20 bg-red-400/10 text-red-300",
+  } satisfies Record<WorkflowAutomationEventStatus, string>;
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-xs ${styles[status]}`}
+    >
+      {status}
+    </span>
+  );
+}
+
 function SlaBadge({
   isOverdue,
   isDueSoon,
@@ -366,19 +506,37 @@ function getEntityLink(entityType: string, entityId: string) {
       return `/incidents/${entityId}`;
 
     case "CORRECTIVE_ACTION":
-      return "/actions";
+      return `/actions/${entityId}`;
 
     case "AUDIT":
-      return "/workflows";
+      return `/audits/${entityId}`;
 
     case "INSPECTION":
-      return "/inspections";
+      return `/inspections/${entityId}`;
 
     case "COMPLIANCE":
-      return "/compliance";
+      return `/compliance/${entityId}`;
 
     case "TRAINING":
       return "/training";
+
+    case "MOC":
+      return `/moc/${entityId}`;
+
+    case "OBSERVATION":
+      return `/observations/${entityId}`;
+
+    case "RISK":
+      return `/risks/${entityId}`;
+
+    case "CHEMICAL":
+      return `/chemicals/${entityId}`;
+
+    case "ENVIRONMENTAL":
+      return "/environmental";
+
+    case "PERMIT":
+      return `/permits-to-work/${entityId}`;
 
     default:
       return "/tasks";

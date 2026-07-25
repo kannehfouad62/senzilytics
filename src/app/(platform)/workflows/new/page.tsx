@@ -1,12 +1,17 @@
 import { createWorkflowTemplate } from "@/core/workflow/workflow.admin.actions";
+import { WorkflowTriggerSettingsFields } from "@/core/workflow/workflow-trigger-settings-fields";
+import { requirePermission } from "@/lib/permissions";
 import {
+  PermissionKey,
   UserRole,
   WorkflowEntityType,
   WorkflowStepType,
 } from "@prisma/client";
 import Link from "next/link";
 
-export default function NewWorkflowPage() {
+export default async function NewWorkflowPage() {
+  await requirePermission(PermissionKey.MANAGE_WORKFLOWS);
+
   const defaultSteps = [
     "Start",
     "Review",
@@ -74,6 +79,8 @@ export default function NewWorkflowPage() {
             className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-cyan-400"
           />
         </div>
+
+        <WorkflowTriggerSettingsFields />
 
         <div>
           <h2 className="mb-4 text-xl font-semibold">Workflow Steps</h2>

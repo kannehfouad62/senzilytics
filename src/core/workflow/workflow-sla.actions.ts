@@ -2,13 +2,17 @@
 
 import { requirePermission } from "@/lib/permissions";
 import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.service";
+import { processWorkflowAutomationEvents } from "@/core/workflow/workflow-automation-event.service";
+import { getCurrentUserTenant } from "@/lib/tenant";
 import { PermissionKey } from "@prisma/client";
 import { redirect } from "next/navigation";
 
 export async function runWorkflowSlaProcessor() {
   await requirePermission(PermissionKey.MANAGE_WORKFLOWS);
+  const { organizationId } = await getCurrentUserTenant();
 
-  await processWorkflowSlaNotifications();
+  await processWorkflowAutomationEvents({ organizationId });
+  await processWorkflowSlaNotifications({ organizationId });
 
   redirect("/workflows/sla");
 }
