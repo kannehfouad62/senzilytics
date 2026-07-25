@@ -6,6 +6,7 @@ import { getCurrentUserPermissions } from "@/lib/permissions";
 import { PermissionKey, UserRole } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
 import { filterNavigationItems } from "@/core/permissions/navigation-access";
+import { ActiveNavigationLink } from "@/components/layout/active-navigation-link";
 import {
   Activity,
   AlertTriangle,
@@ -412,14 +413,17 @@ export async function Sidebar() {
               const Icon = item.icon;
 
               return (
-                <Link
+                <ActiveNavigationLink
                   key={item.href}
                   href={item.href}
-                  className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-slate-300 transition hover:bg-cyan-400/10 hover:text-cyan-200"
+                  matchHrefs={visibleInspectionItems.map((candidate) => candidate.href)}
+                  className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition"
+                  activeClassName="bg-cyan-300/15 font-semibold text-cyan-100 ring-1 ring-cyan-300/20"
+                  inactiveClassName="text-slate-300 hover:bg-cyan-400/10 hover:text-cyan-200"
                 >
                   <Icon size={18} />
                   {item.label}
-                </Link>
+                </ActiveNavigationLink>
               );
             })}
           </div>
@@ -455,14 +459,17 @@ function NavigationSection({
           const Icon = item.icon;
 
           return (
-            <Link
+            <ActiveNavigationLink
               key={item.href}
               href={item.href}
-              className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-slate-300 transition hover:bg-cyan-400/10 hover:text-cyan-200"
+              matchHrefs={items.map((candidate) => candidate.href)}
+              className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition"
+              activeClassName="bg-cyan-300/15 font-semibold text-cyan-100 ring-1 ring-cyan-300/20"
+              inactiveClassName="text-slate-300 hover:bg-cyan-400/10 hover:text-cyan-200"
             >
               <Icon size={18} />
               {item.label}
-            </Link>
+            </ActiveNavigationLink>
           );
         })}
       </div>

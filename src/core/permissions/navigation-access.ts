@@ -33,3 +33,25 @@ export function filterNavigationItems<T extends NavigationAccessRequirement>(
     canViewNavigationItem(item, grantedPermissions),
   );
 }
+
+export function resolveActiveNavigationHref(
+  pathname: string,
+  hrefs: readonly string[],
+) {
+  const normalizedPathname = normalizePath(pathname);
+  return (
+    hrefs
+      .map(normalizePath)
+      .filter(
+        (href) =>
+          normalizedPathname === href ||
+          (href !== "/" && normalizedPathname.startsWith(`${href}/`)),
+      )
+      .sort((left, right) => right.length - left.length)[0] ?? null
+  );
+}
+
+function normalizePath(value: string) {
+  if (value === "/") return value;
+  return value.replace(/\/+$/, "") || "/";
+}

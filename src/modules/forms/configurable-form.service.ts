@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { ConfigurableFieldType, ConfigurableFormModule, ConfigurableFormVersionStatus, Prisma } from "@prisma/client";
+import { configurableFormDeletionBlocker } from "@/modules/forms/form-definition-lifecycle";
+import { ActivityAction, ConfigurableFieldType, ConfigurableFormModule, ConfigurableFormVersionStatus, Prisma } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
 
 export const slugifyFormName=(value:string)=>value.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,80);
@@ -42,4 +43,149 @@ export async function createDraftRevision(input:{organizationId:string;definitio
   if(!definition)throw new Error("Form not found.");const existingDraft=definition.versions.find(v=>v.status===ConfigurableFormVersionStatus.DRAFT);if(existingDraft)return existingDraft;
   const source=definition.versions[0];if(!source)throw new Error("No source version is available.");
   return prisma.configurableFormVersion.create({data:{definitionId:definition.id,version:source.version+1,createdById:input.userId,instructions:source.instructions,fields:{create:source.fields.map(field=>({key:field.key,label:field.label,description:field.description,placeholder:field.placeholder,fieldType:field.fieldType,sequence:field.sequence,isRequired:field.isRequired,options:field.options??Prisma.JsonNull,validation:field.validation??Prisma.JsonNull,visibilityRule:field.visibilityRule??Prisma.JsonNull}))}}});
+}
+
+export async function updateFormDefinitionSettings(input: {
+  organizationId: string;
+  definitionId: string;
+  userId: string;
+  name: string;
+  description: string | null;
+  module: ConfigurableFormModule;
+}) {
+  const definition = await prisma.configurableFormDefinition.findFirst({
+    where: { id: input.definitionId, organizationId: input.organizationId },
+    select: { id: true, name: true, module: true },
+  });
+  if (!definition) throw new Error("Form not found.");
+  const name = normalizedName(input.name);
+  const description = boundedDescription(input.description);
+  if (!Object.values(ConfigurableFormModule).includes(input.module)) {
+    throw new Error("Select a valid module assignment.");
+  }
+  const duplicate = await prisma.configurableFormDefinition.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      id: { not: definition.id },
+      name: { equals: name, mode: "insensitive" },
+    },
+    select: { id: true },
+  });
+  if (duplicate) throw new Error("A form with this name already exists.");
+
+  await prisma.$transaction([
+    prisma.configurableFormDefinition.update({
+      where: { id: definition.id },
+      data: { name, description, module: input.module },
+    }),
+    prisma.activityLog.create({
+      data: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        action: ActivityAction.UPDATE,
+        entityType: "ConfigurableFormDefinition",
+        entityId: definition.id,
+        title: "Configurable form settings updated",
+        description: name,
+        metadata: {
+          previousName: definition.name,
+          previousModule: definition.module,
+          module: input.module,
+        },
+      },
+    }),
+  ]);
+}
+
+export async function setFormDefinitionAssignment(input: {
+  organizationId: string;
+  definitionId: string;
+  userId: string;
+  assigned: boolean;
+}) {
+  const definition = await prisma.configurableFormDefinition.findFirst({
+    where: { id: input.definitionId, organizationId: input.organizationId },
+    select: { id: true, name: true, module: true, isActive: true },
+  });
+  if (!definition) throw new Error("Form not found.");
+  if (definition.isActive === input.assigned) return;
+
+  await prisma.$transaction([
+    prisma.configurableFormDefinition.update({
+      where: { id: definition.id },
+      data: { isActive: input.assigned },
+    }),
+    prisma.activityLog.create({
+      data: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        action: ActivityAction.STATUS_CHANGE,
+        entityType: "ConfigurableFormDefinition",
+        entityId: definition.id,
+        title: input.assigned
+          ? "Configurable form assigned"
+          : "Configurable form unassigned",
+        description: `${definition.name} — ${definition.module.replaceAll("_", " ")}`,
+        metadata: { module: definition.module, assigned: input.assigned },
+      },
+    }),
+  ]);
+}
+
+export async function deleteFormDefinition(input: {
+  organizationId: string;
+  definitionId: string;
+  userId: string;
+  confirmation: string;
+}) {
+  const definition = await prisma.configurableFormDefinition.findFirst({
+    where: { id: input.definitionId, organizationId: input.organizationId },
+    select: {
+      id: true,
+      name: true,
+      module: true,
+      _count: { select: { submissions: true } },
+    },
+  });
+  if (!definition) throw new Error("Form not found.");
+  if (input.confirmation.trim() !== definition.name) {
+    throw new Error("Enter the exact form name to confirm permanent deletion.");
+  }
+  const blocker = configurableFormDeletionBlocker(
+    definition._count.submissions,
+  );
+  if (blocker) throw new Error(blocker);
+
+  await prisma.$transaction([
+    prisma.activityLog.create({
+      data: {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        action: ActivityAction.DELETE,
+        entityType: "ConfigurableFormDefinition",
+        entityId: definition.id,
+        title: "Unused configurable form deleted",
+        description: definition.name,
+        metadata: { module: definition.module },
+      },
+    }),
+    prisma.configurableFormDefinition.delete({ where: { id: definition.id } }),
+  ]);
+}
+
+function normalizedName(value: string) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (!normalized) throw new Error("Form name is required.");
+  if (normalized.length > 120) {
+    throw new Error("Form name must be 120 characters or fewer.");
+  }
+  return normalized;
+}
+
+function boundedDescription(value: string | null) {
+  const normalized = value?.trim() || null;
+  if (normalized && normalized.length > 2_000) {
+    throw new Error("Description must be 2,000 characters or fewer.");
+  }
+  return normalized;
 }

@@ -16,6 +16,7 @@ import { PermissionKey, UserRole } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
 import { getCurrentUserPermissions } from "@/lib/permissions";
 import { filterNavigationItems } from "@/core/permissions/navigation-access";
+import { ActiveNavigationLink } from "@/components/layout/active-navigation-link";
 
 export const dynamic = "force-dynamic";
 
@@ -144,7 +145,7 @@ export async function Topbar() {
                 <div className="space-y-1">
                   {section.items.map((item) => {
                     const Icon = item.icon;
-                    return <MobileLink key={item.href} href={item.href} label={item.label} icon={<Icon size={17} />} />;
+                    return <MobileLink key={item.href} href={item.href} matchHrefs={section.items.map((candidate) => candidate.href)} label={item.label} icon={<Icon size={17} />} />;
                   })}
                 </div>
               </div>
@@ -214,6 +215,6 @@ export async function Topbar() {
   );
 }
 
-function MobileLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
-  return <Link href={href} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-300 transition hover:bg-cyan-400/10 hover:text-cyan-200">{icon}{label}</Link>;
+function MobileLink({ href, matchHrefs, label, icon }: { href: string; matchHrefs: readonly string[]; label: string; icon: React.ReactNode }) {
+  return <ActiveNavigationLink href={href} matchHrefs={matchHrefs} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition" activeClassName="bg-cyan-300/15 font-semibold text-cyan-100 ring-1 ring-cyan-300/20" inactiveClassName="text-slate-300 hover:bg-cyan-400/10 hover:text-cyan-200">{icon}{label}</ActiveNavigationLink>;
 }

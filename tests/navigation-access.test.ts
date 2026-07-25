@@ -4,6 +4,7 @@ import { PermissionKey } from "@prisma/client";
 import {
   canViewNavigationItem,
   filterNavigationItems,
+  resolveActiveNavigationHref,
 } from "../src/core/permissions/navigation-access";
 
 test("navigation hides an item when its required permission is not granted", () => {
@@ -43,5 +44,36 @@ test("navigation filtering preserves only accessible modules", () => {
       (item) => item.href,
     ),
     ["/audits", "/tasks"],
+  );
+});
+
+test("active navigation uses the most specific matching module route", () => {
+  const hrefs = [
+    "/assurance",
+    "/assurance/sif",
+    "/assurance/certification",
+  ];
+
+  assert.equal(
+    resolveActiveNavigationHref("/assurance/sif/controls/control-1", hrefs),
+    "/assurance/sif",
+  );
+  assert.equal(
+    resolveActiveNavigationHref(
+      "/assurance/certification/reviews/review-1",
+      hrefs,
+    ),
+    "/assurance/certification",
+  );
+});
+
+test("active navigation does not match unrelated route prefixes", () => {
+  assert.equal(
+    resolveActiveNavigationHref("/risk-assessments", ["/risks"]),
+    null,
+  );
+  assert.equal(
+    resolveActiveNavigationHref("/form-studio/new/", ["/form-studio"]),
+    "/form-studio",
   );
 });
