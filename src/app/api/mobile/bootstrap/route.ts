@@ -21,6 +21,7 @@ import { getMobileMocPermitWorkspace } from "@/modules/mobile/mobile-moc-permit.
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
 import { getMobileRegulatoryIntelligenceWorkspace } from "@/modules/mobile/mobile-regulatory-intelligence.service";
 import { getMobileRiskField } from "@/modules/mobile/mobile-risk-field.service";
+import { mobileTenantAdministrationCapabilities } from "@/modules/mobile/mobile-tenant-administration.service";
 import {
   getMobileAssignedPermissions,
   mobileExecutiveCapabilities,
@@ -412,6 +413,25 @@ export async function GET(request: Request) {
       regulatorySources: regulatoryIntelligence.sources,
       regulatoryChanges: regulatoryIntelligence.changes,
       regulatoryCapabilities: regulatoryIntelligence.capabilities,
+      tenantAdministrationGeneratedAt: new Date().toISOString(),
+      tenantAdministrationCapabilities:
+        mobileTenantAdministrationCapabilities(assigned),
+      tenantOrganization: null,
+      tenantDirectorySites: [],
+      tenantUsers: [],
+      tenantInvitations: [],
+      tenantMobileSessions: [],
+      tenantWorkflowTemplates: [],
+      tenantWorkflowInstances: [],
+      tenantActivityLogs: [],
+      tenantConfigurationHealth: {
+        activeForms: 0,
+        publishedVersions: 0,
+        draftVersions: 0,
+        activeApiCredentials: 0,
+        activeWebhooks: 0,
+        failedWebhookDeliveries: 0,
+      },
       executiveGeneratedAt: new Date().toISOString(),
       executiveCapabilities: mobileExecutiveCapabilities(assigned),
       executiveDashboard: null,

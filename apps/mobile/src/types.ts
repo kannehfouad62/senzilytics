@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE" | "ORGANIZATION_ADMIN" | "USER_ADMIN" | "WORKFLOW_ADMIN" | "ACTIVITY_AUDIT" | "CONFIGURATION_HEALTH";
 };
 
 export type MobileDepartment = {
@@ -1793,6 +1793,164 @@ export type MobileExecutiveWorkspace = {
   } | null;
 };
 
+export type MobileTenantAdministrationCapabilities = {
+  canManageOrganization: boolean;
+  canViewConfigurationHealth: boolean;
+  canViewIntegrationHealth: boolean;
+  canViewUsers: boolean;
+  canManageUsers: boolean;
+  canManageWorkflows: boolean;
+  canViewActivity: boolean;
+};
+
+export type MobileTenantOrganization = {
+  id: string;
+  name: string;
+  industry: string | null;
+  address: string | null;
+  status: string;
+  allowedEmailDomains: string[];
+  subscriptionPlan: string;
+  contractedUserMinimum: number | null;
+  sites: Array<{
+    id: string;
+    name: string;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    departments: Array<{
+      id: string;
+      name: string;
+      _count: { users: number };
+    }>;
+  }>;
+  identityProviders: Array<{
+    id: string;
+    type: string;
+    emailDomain: string | null;
+    isEnabled: boolean;
+    enforceSso: boolean;
+    updatedAt: string;
+  }>;
+  _count: { users: number };
+};
+
+export type MobileTenantUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  jobTitle: string | null;
+  isActive: boolean;
+  invitedAt: string | null;
+  activatedAt: string | null;
+  lastLoginAt: string | null;
+  department: {
+    id: string;
+    name: string;
+    site: { id: string; name: string };
+  } | null;
+  _count: { mobileSessions: number };
+};
+
+export type MobileTenantInvitation = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  departmentId: string | null;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  invitedBy: { id: string; name: string };
+};
+
+export type MobileTenantDevice = {
+  id: string;
+  deviceName: string;
+  platform: string;
+  status: string;
+  lastUsedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
+  user: { id: string; name: string; email: string };
+  _count: { pushTokens: number };
+};
+
+export type MobileTenantWorkflowTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  entityType: string;
+  isActive: boolean;
+  updatedAt: string;
+  steps: Array<{
+    id: string;
+    name: string;
+    stepType: string;
+    sequence: number;
+    requiredRole: string | null;
+    slaHours: number | null;
+  }>;
+  _count: { instances: number };
+};
+
+export type MobileTenantWorkflowInstance = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  template: { id: string; name: string };
+  steps: Array<{
+    id: string;
+    name: string;
+    status: string;
+    dueAt: string | null;
+    assignedRole: string | null;
+    assignedUser: { id: string; name: string } | null;
+  }>;
+};
+
+export type MobileTenantActivity = {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  title: string;
+  description: string | null;
+  createdAt: string;
+  user: { id: string; name: string; email: string } | null;
+};
+
+export type MobileTenantAdministrationWorkspace = {
+  tenantAdministrationGeneratedAt: string;
+  tenantAdministrationCapabilities: MobileTenantAdministrationCapabilities;
+  tenantOrganization: MobileTenantOrganization | null;
+  tenantDirectorySites: Array<{
+    id: string;
+    name: string;
+    departments: Array<{ id: string; name: string }>;
+  }>;
+  tenantUsers: MobileTenantUser[];
+  tenantInvitations: MobileTenantInvitation[];
+  tenantMobileSessions: MobileTenantDevice[];
+  tenantWorkflowTemplates: MobileTenantWorkflowTemplate[];
+  tenantWorkflowInstances: MobileTenantWorkflowInstance[];
+  tenantActivityLogs: MobileTenantActivity[];
+  tenantConfigurationHealth: {
+    activeForms: number;
+    publishedVersions: number;
+    draftVersions: number;
+    activeApiCredentials: number;
+    activeWebhooks: number;
+    failedWebhookDeliveries: number;
+  };
+};
+
 export type MobileBootstrap = {
   user: MobileUser;
   organization: { id: string; name: string; subscriptionPlan: string };
@@ -1867,7 +2025,8 @@ export type MobileBootstrap = {
   notifications: MobileNotification[];
   tasks: MobileTask[];
   modules: MobileModule[];
-} & MobileExecutiveWorkspace;
+} & MobileExecutiveWorkspace &
+  MobileTenantAdministrationWorkspace;
 
 export type CapturedAnswer = { fieldId: string; value: string | number | boolean | string[] };
 export type CapturedForm = { definitionId: string; versionId: string; answers: CapturedAnswer[] };

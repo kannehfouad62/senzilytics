@@ -60,6 +60,15 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] Register push on a physical device, deliver a test alert and tap it into the **Alerts** view inside **Actions**.
 - [ ] Test declined notification permission and confirm core app use remains available.
 - [ ] Sign out with and without connectivity and verify protected workspace access is removed.
+- [ ] Verify Native Tenant Administration is independently gated by organization, user, workflow, integration-health, and activity-log permissions.
+- [ ] Create and edit a site and department online; confirm offline mode remains read-only and the changes are tenant-scoped.
+- [ ] Invite a user and confirm the 72-hour activation link is delivered by email but never displayed or cached in the app.
+- [ ] Change a test user role/department, suspend and restore the account, and confirm role changes or suspension revoke existing native sessions.
+- [ ] Confirm an administrator cannot suspend themselves, revoke the current device from the device list, assign `SUPER_ADMIN`, or remove the final active organization administrator.
+- [ ] Revoke another test device and confirm its session and push token stop working immediately.
+- [ ] Activate and pause a workflow template; confirm only one active template remains for that entity type and the action appears in the tenant activity log.
+- [ ] Review form and integration health; confirm the app never receives SSO issuer/directory identifiers, invitation tokens, passwords, API tokens, webhook URLs, or secret material.
+- [ ] Remove each administration permission in turn and verify only the matching encrypted cached data slice is removed.
 
 ## Apple submission
 

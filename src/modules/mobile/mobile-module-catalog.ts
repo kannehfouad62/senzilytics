@@ -17,7 +17,7 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE" | "ORGANIZATION_ADMIN" | "USER_ADMIN" | "WORKFLOW_ADMIN" | "ACTIVITY_AUDIT" | "CONFIGURATION_HEALTH";
   nativePermission?: PermissionKey;
 };
 
@@ -51,12 +51,12 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "chemicals", label: "Chemicals & SDS", description: "Chemical inventory, SDS records, approvals, and monitoring.", href: "/chemicals", category: "GOVERNANCE", permission: PermissionKey.VIEW_CHEMICALS, nativeCapability: "CHEMICAL_FIELD" },
   { key: "reports", label: "Reports", description: "Operational and executive reporting across EHS modules.", href: "/reports", category: "GOVERNANCE", permission: PermissionKey.VIEW_REPORTS, nativeCapability: "EXECUTIVE_REPORTING" },
   { key: "documents", label: "Documents", description: "Controlled documents, evidence, previews, and version history.", href: "/documents", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_DOCUMENTS, nativeCapability: "CONTROLLED_DOCUMENTS" },
-  { key: "organization", label: "Organization Structure", description: "Sites, departments, and organizational structure.", href: "/organizations", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_ORGANIZATION },
-  { key: "users", label: "Users", description: "Tenant users, roles, status, and access administration.", href: "/users", category: "ADMINISTRATION", permission: PermissionKey.VIEW_USERS },
-  { key: "workflows", label: "Workflows", description: "Workflow templates, approvals, assignments, and SLA controls.", href: "/workflows", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_WORKFLOWS },
-  { key: "form-studio", label: "Form Studio", description: "Versioned configurable forms and field governance.", href: "/form-studio", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_ORGANIZATION },
-  { key: "integrations", label: "Integrations", description: "Enterprise API credentials, webhooks, and connected systems.", href: "/integrations", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_INTEGRATIONS },
-  { key: "activity", label: "Activity Log", description: "Tenant audit trail and accountable platform activity.", href: "/activity", category: "ADMINISTRATION", permission: PermissionKey.VIEW_ACTIVITY_LOG },
+  { key: "organization", label: "Organization Structure", description: "Sites, departments, and organizational structure.", href: "/organizations", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_ORGANIZATION, nativeCapability: "ORGANIZATION_ADMIN" },
+  { key: "users", label: "Users", description: "Tenant users, roles, status, and access administration.", href: "/users", category: "ADMINISTRATION", anyPermissions: [PermissionKey.VIEW_USERS, PermissionKey.MANAGE_USERS], nativeCapability: "USER_ADMIN" },
+  { key: "workflows", label: "Workflows", description: "Workflow templates, approvals, assignments, and SLA controls.", href: "/workflows", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_WORKFLOWS, nativeCapability: "WORKFLOW_ADMIN" },
+  { key: "form-studio", label: "Form Studio", description: "Versioned configurable forms and field governance.", href: "/form-studio", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_ORGANIZATION, nativeCapability: "CONFIGURATION_HEALTH" },
+  { key: "integrations", label: "Integrations", description: "Enterprise API credentials, webhooks, and connected systems.", href: "/integrations", category: "ADMINISTRATION", permission: PermissionKey.MANAGE_INTEGRATIONS, nativeCapability: "CONFIGURATION_HEALTH" },
+  { key: "activity", label: "Activity Log", description: "Tenant audit trail and accountable platform activity.", href: "/activity", category: "ADMINISTRATION", permission: PermissionKey.VIEW_ACTIVITY_LOG, nativeCapability: "ACTIVITY_AUDIT" },
   { key: "tenant-provisioning", label: "Tenant Provisioning", description: "Senzilytics tenant plans, identity, and lifecycle administration.", href: "/platform/tenants", category: "ADMINISTRATION", platformOnly: true },
 ];
 
