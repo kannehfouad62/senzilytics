@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +18,15 @@ import {
 import * as Network from "expo-network";
 import * as Linking from "expo-linking";
 import { beginMobileSignIn, clearMobileSession, getStoredMobileOwnerKey, loadMobileWorkspace, logoutMobileSession, mobileApi, MobileApiError, mobileWebUrl, restoreMobileSession } from "./src/api";
+import {
+  loadMobileReleaseStatus,
+  loadMobileSystemHealth,
+  MobileDiagnosticsPanel,
+  MobileErrorBoundary,
+  type MobileReleaseStatus,
+  type MobileSystemHealth,
+  MobileUpdateRequiredScreen,
+} from "./src/release-candidate";
 import { ActionCenterScreen, type ActionCenterView } from "./src/action-center";
 import {
   AssetContractorScreen,
@@ -101,7 +111,7 @@ const observationTypes = ["UNSAFE_ACT", "UNSAFE_CONDITION", "POSITIVE_PRACTICE",
 const incidentTypes = ["INJURY", "NEAR_MISS", "PROPERTY_DAMAGE", "ENVIRONMENTAL", "VEHICLE", "SECURITY", "OTHER"] as const;
 const riskLevels = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
 
-export default function App() {
+function SenzilyticsApp() {
   const network = Network.useNetworkState();
   const [authState, setAuthState] = useState<"loading" | "signed-out" | "signed-in">("loading");
   const [workspace, setWorkspace] = useState<MobileBootstrap | null>(null);
@@ -130,8 +140,13 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [verifiedAt, setVerifiedAt] = useState<number | null>(null);
+  const [releaseStatus, setReleaseStatus] =
+    useState<MobileReleaseStatus | null>(null);
+  const [systemHealth, setSystemHealth] =
+    useState<MobileSystemHealth | null>(null);
   const syncInFlight = useRef(false);
   const workspaceRef = useRef<MobileBootstrap | null>(null);
+  const lastInactiveAt = useRef<number | null>(null);
 
   useEffect(() => {
     workspaceRef.current = workspace;
@@ -139,6 +154,19 @@ export default function App() {
 
   const ownerKey = workspace ? `${workspace.organization.id}:${workspace.user.id}` : "";
   const online = network.isConnected !== false && network.isInternetReachable !== false;
+  const refreshReleasePolicy = useCallback(async () => {
+    const current = await loadMobileReleaseStatus();
+    setReleaseStatus(current);
+    return current;
+  }, []);
+  const refreshDiagnostics = useCallback(async () => {
+    const [release, health] = await Promise.all([
+      loadMobileReleaseStatus(),
+      loadMobileSystemHealth(),
+    ]);
+    setReleaseStatus(release);
+    setSystemHealth(health);
+  }, []);
   const openWorkspacePath = async (path: string) => {
     if (!online) {
       setNotice("Connect to the internet to open the complete operational workspace.");
@@ -210,6 +238,21 @@ export default function App() {
       try {
         await initializeOfflineStore();
         try {
+          const currentRelease = await refreshReleasePolicy();
+          if (currentRelease.updateRequired) {
+            if (active) setAuthState("signed-out");
+            return;
+          }
+          if (currentRelease.maintenance && active) {
+            setNotice(
+              currentRelease.message ||
+                "Mobile service is temporarily unavailable."
+            );
+          }
+        } catch {
+          // Network failure does not invalidate a bounded encrypted offline session.
+        }
+        try {
           const session = await restoreMobileSession();
           if (!session) { if (active) setAuthState("signed-out"); return; }
           await refreshWorkspace();
@@ -236,9 +279,15 @@ export default function App() {
       }
     })();
     return () => { active = false; };
-  }, [refreshWorkspace]);
+  }, [refreshReleasePolicy, refreshWorkspace]);
 
   const signIn = async () => {
+    if (releaseStatus?.maintenance) {
+      setNotice(
+        releaseStatus.message || "Mobile service is temporarily unavailable."
+      );
+      return;
+    }
     setBusy(true); setNotice("");
     try { await beginMobileSignIn(); await refreshWorkspace(); setAuthState("signed-in"); }
     catch (error) { setNotice(messageOf(error)); }
@@ -262,6 +311,40 @@ export default function App() {
   useEffect(() => {
     if (authState === "signed-in" && ownerKey && online) void sync(true);
   }, [authState, online, ownerKey, sync]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active") {
+        lastInactiveAt.current = Date.now();
+        return;
+      }
+      const inactiveAt = lastInactiveAt.current;
+      lastInactiveAt.current = null;
+      if (!inactiveAt || Date.now() - inactiveAt < 5 * 60_000) return;
+      void (async () => {
+        try {
+          const currentRelease = await refreshReleasePolicy();
+          if (
+            !currentRelease.updateRequired &&
+            authState === "signed-in" &&
+            online
+          ) {
+            await refreshWorkspace();
+          }
+        } catch {
+          // Existing encrypted offline access remains bounded by verifiedAt.
+        }
+      })();
+    });
+    return () => subscription.remove();
+  }, [authState, online, refreshReleasePolicy, refreshWorkspace]);
+
+  useEffect(() => {
+    if (tab !== "settings" || !online) return;
+    void refreshDiagnostics().catch((error) =>
+      setNotice(`Diagnostics refresh paused: ${messageOf(error)}`)
+    );
+  }, [online, refreshDiagnostics, tab]);
 
   useEffect(() => subscribeToMobileNotificationResponses(() => {
     setActionCenterView("alerts");
@@ -289,8 +372,20 @@ export default function App() {
     return () => { active = false; clearTimeout(timer); };
   }, [authState, refreshWorkspace, verifiedAt]);
 
+  if (releaseStatus?.updateRequired) {
+    return (
+      <MobileUpdateRequiredScreen
+        status={releaseStatus}
+        onRetry={() => {
+          void refreshReleasePolicy().catch((error) =>
+            setNotice(messageOf(error))
+          );
+        }}
+      />
+    );
+  }
   if (authState === "loading") return <LoadingScreen />;
-  if (authState === "signed-out" || !workspace) return <SignInScreen busy={busy} notice={notice} onSignIn={signIn} />;
+  if (authState === "signed-out" || !workspace) return <SignInScreen busy={busy} disabled={Boolean(releaseStatus?.maintenance)} notice={notice} onSignIn={signIn} />;
 
   const unread = workspace.notifications.filter((item) => !item.readAt).length;
   return (
@@ -319,7 +414,7 @@ export default function App() {
       {tab === "executive" && <ExecutiveCommandScreen workspace={workspace} online={online} initialView={executiveCommandView} onBack={() => setTab("workspace")} onRefresh={refreshExecutiveWorkspace} onNotice={setNotice} onOpenPath={openWorkspacePath} />}
       {tab === "administration" && <TenantAdministrationScreen workspace={workspace} online={online} initialView={tenantAdministrationView} onBack={() => setTab("workspace")} onRefresh={refreshTenantAdministrationWorkspace} onNotice={setNotice} />}
       {tab === "actions" && <ActionCenterScreen workspace={workspace} ownerKey={ownerKey} online={online} view={actionCenterView} onViewChange={setActionCenterView} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} onOpenPath={openWorkspacePath} onReadNotification={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
-      {tab === "settings" && <SettingsScreen workspace={workspace} pending={pending} onEnablePush={async () => { setBusy(true); try { setNotice(await registerForMobilePush()); } catch (error) { setNotice(messageOf(error)); } finally { setBusy(false); } }} onLogout={async () => { setBusy(true); try { await logoutMobileSession(); await clearWorkspaceCache(ownerKey); setWorkspace(null); setVerifiedAt(null); setAuthState("signed-out"); setTab("home"); } finally { setBusy(false); } }} />}
+      {tab === "settings" && <SettingsScreen workspace={workspace} pending={pending} releaseStatus={releaseStatus} systemHealth={systemHealth} verifiedAt={verifiedAt} onRefreshDiagnostics={() => { void refreshDiagnostics().catch((error) => setNotice(`Diagnostics refresh paused: ${messageOf(error)}`)); }} onEnablePush={async () => { setBusy(true); try { setNotice(await registerForMobilePush()); } catch (error) { setNotice(messageOf(error)); } finally { setBusy(false); } }} onLogout={async () => { setBusy(true); try { await logoutMobileSession(); await clearWorkspaceCache(ownerKey); setWorkspace(null); setVerifiedAt(null); setAuthState("signed-out"); setTab("home"); } finally { setBusy(false); } }} />}
       <View style={styles.tabs}>
         <TabButton active={tab === "home"} label="Home" onPress={() => setTab("home")} />
         <TabButton active={tab === "workspace"} label="Workspace" onPress={() => setTab("workspace")} />
@@ -331,10 +426,18 @@ export default function App() {
   );
 }
 
+export default function App() {
+  return (
+    <MobileErrorBoundary>
+      <SenzilyticsApp />
+    </MobileErrorBoundary>
+  );
+}
+
 function LoadingScreen() { return <SafeAreaView style={[styles.app, styles.center]}><ActivityIndicator color="#67e8f9" size="large" /><Text style={styles.loadingText}>Securing your mobile workspace…</Text></SafeAreaView>; }
 
-function SignInScreen({ busy, notice, onSignIn }: { busy: boolean; notice: string; onSignIn: () => void }) {
-  return <SafeAreaView style={[styles.app, styles.center]}><View style={styles.signInCard}><Image source={require("./assets/app-icon.png")} style={styles.logo} resizeMode="contain" /><Text style={styles.eyebrow}>SENZILYTICS · EHS INTELLIGENCE</Text><Text style={styles.signInTitle}>Your complete EHS workspace.</Text><Text style={styles.muted}>Use your Senzilytics, Microsoft, or Okta account. The authorization screen always identifies the active account and lets you choose a different user before access is issued.</Text>{notice ? <Text style={styles.error}>{notice}</Text> : null}<PrimaryButton label={busy ? "Opening account selection…" : "Choose account and sign in"} disabled={busy} onPress={onSignIn} /><Text style={styles.securityNote}>Device-bound session · Encrypted credential storage · Role-aware Premium access</Text></View></SafeAreaView>;
+function SignInScreen({ busy, disabled, notice, onSignIn }: { busy: boolean; disabled: boolean; notice: string; onSignIn: () => void }) {
+  return <SafeAreaView style={[styles.app, styles.center]}><View style={styles.signInCard}><Image source={require("./assets/app-icon.png")} style={styles.logo} resizeMode="contain" /><Text style={styles.eyebrow}>SENZILYTICS · EHS INTELLIGENCE</Text><Text style={styles.signInTitle}>Your complete EHS workspace.</Text><Text style={styles.muted}>Use your Senzilytics, Microsoft, or Okta account. The authorization screen always identifies the active account and lets you choose a different user before access is issued.</Text>{notice ? <Text style={styles.error}>{notice}</Text> : null}<PrimaryButton label={disabled ? "Mobile service temporarily unavailable" : busy ? "Opening account selection…" : "Choose account and sign in"} disabled={busy || disabled} onPress={onSignIn} /><Text style={styles.securityNote}>Device-bound session · Encrypted credential storage · Role-aware Premium access</Text></View></SafeAreaView>;
 }
 
 function HomeScreen({ workspace, pending, busy, onRefresh, onSync, onNavigate, onOpenActions }: { workspace: MobileBootstrap; pending: number; busy: boolean; onRefresh: () => Promise<MobileBootstrap>; onSync: () => void; onNavigate: (tab: Tab) => void; onOpenActions: (view: ActionCenterView) => void }) {
@@ -754,8 +857,8 @@ function DynamicField({ field, value, onChange }: { field: RuntimeField; value: 
   return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} />{field.description ? <Text style={styles.fieldHelp}>{field.description}</Text> : null}<Input value={typeof value === "string" ? value : ""} onChangeText={onChange} placeholder={field.placeholder || placeholderFor(field.fieldType)} multiline={field.fieldType === "LONG_TEXT"} keyboardType={field.fieldType === "NUMBER" ? "decimal-pad" : field.fieldType === "EMAIL" ? "email-address" : field.fieldType === "PHONE" ? "phone-pad" : "default"} /></View>;
 }
 
-function SettingsScreen({ workspace, pending, onEnablePush, onLogout }: { workspace: MobileBootstrap; pending: number; onEnablePush: () => void; onLogout: () => void }) {
-  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><Text style={styles.eyebrow}>ACCOUNT</Text><Text style={styles.pageTitle}>Mobile settings</Text><Card><Text style={styles.cardTitle}>{workspace.user.name}</Text><Text style={styles.muted}>{workspace.user.email}</Text><Text style={styles.due}>{humanize(workspace.user.role)} · {workspace.organization.name}</Text></Card><Card><Text style={styles.cardTitle}>Data protection</Text><Text style={styles.muted}>Credentials are stored in the device Keychain or Android Keystore. Offline records and evidence file bytes are encrypted and isolated by tenant and user. Private uploads revalidate your role, assignment, subscription, and record ownership.</Text></Card><Card><Text style={styles.cardTitle}>Account switching</Text><Text style={styles.muted}>Signing out revokes this device session. The next sign-in screen will show the active browser identity and provide a clear option to use another Senzilytics, Microsoft, or Okta account.</Text></Card><Card><Text style={styles.cardTitle}>Offline queue</Text><Text style={styles.muted}>{pending} queued field item{pending === 1 ? "" : "s"} waiting on this device.</Text></Card><PrimaryButton label="Enable push notifications" onPress={onEnablePush} /><SecondaryButton label="Privacy policy" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/privacy"); }} /><SecondaryButton label="Support center" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/support"); }} /><SecondaryButton label="Account and data deletion" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/account-deletion"); }} /><SecondaryButton label="Sign out and choose another account" onPress={onLogout} /></ScrollView>;
+function SettingsScreen({ workspace, pending, releaseStatus, systemHealth, verifiedAt, onRefreshDiagnostics, onEnablePush, onLogout }: { workspace: MobileBootstrap; pending: number; releaseStatus: MobileReleaseStatus | null; systemHealth: MobileSystemHealth | null; verifiedAt: number | null; onRefreshDiagnostics: () => void; onEnablePush: () => void; onLogout: () => void }) {
+  return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><Text style={styles.eyebrow}>ACCOUNT</Text><Text style={styles.pageTitle}>Mobile settings</Text><Card><Text style={styles.cardTitle}>{workspace.user.name}</Text><Text style={styles.muted}>{workspace.user.email}</Text><Text style={styles.due}>{humanize(workspace.user.role)} · {workspace.organization.name}</Text></Card><MobileDiagnosticsPanel release={releaseStatus} health={systemHealth} verifiedAt={verifiedAt} pending={pending} onRefresh={onRefreshDiagnostics} /><Card><Text style={styles.cardTitle}>Data protection</Text><Text style={styles.muted}>Credentials are stored in the device Keychain or Android Keystore. Offline records and evidence file bytes are encrypted and isolated by tenant and user. Private uploads revalidate your role, assignment, subscription, and record ownership.</Text></Card><Card><Text style={styles.cardTitle}>Account switching</Text><Text style={styles.muted}>Signing out revokes this device session. The next sign-in screen will show the active browser identity and provide a clear option to use another Senzilytics, Microsoft, or Okta account.</Text></Card><Card><Text style={styles.cardTitle}>Offline queue</Text><Text style={styles.muted}>{pending} queued field item{pending === 1 ? "" : "s"} waiting on this device.</Text></Card><PrimaryButton label="Enable push notifications" onPress={onEnablePush} /><SecondaryButton label="Privacy policy" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/privacy"); }} /><SecondaryButton label="Support center" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/support"); }} /><SecondaryButton label="Account and data deletion" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/account-deletion"); }} /><SecondaryButton label="Sign out and choose another account" onPress={onLogout} /></ScrollView>;
 }
 
 function buildCapturedForms(forms: RuntimeForm[], answers: Record<string, FieldValue>): CapturedForm[] {

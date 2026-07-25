@@ -1,4 +1,5 @@
 import type { ExpoConfig } from "expo/config";
+import releaseMetadata from "./release-metadata.json";
 
 const notificationMode: "development" | "production" = process.env.EAS_BUILD_PROFILE === "production" ? "production" : "development";
 
@@ -6,7 +7,7 @@ const config: ExpoConfig = {
   name: "Senzilytics",
   slug: "senzilytics-mobile",
   owner: "senzilytics-app",
-  version: "1.0.0",
+  version: releaseMetadata.appVersion,
   platforms: ["ios", "android"],
   description: "Secure EHS, ESG, risk, audit, and compliance field intelligence for Senzilytics Premium tenants.",
   orientation: "portrait",

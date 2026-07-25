@@ -4,6 +4,10 @@ import * as Device from "expo-device";
 import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
+import {
+  MOBILE_API_VERSION,
+  MOBILE_APP_VERSION,
+} from "./release-metadata";
 import { mobileOwnerKey, parseStoredMobileContext, shouldDiscardMobileSession } from "./session-lifecycle";
 import type { MobileBootstrap, MobileTokens } from "./types";
 
@@ -16,6 +20,15 @@ let refreshInFlight: Promise<MobileTokens> | null = null;
 
 export class MobileApiError extends Error {
   constructor(message: string, public readonly status: number, public readonly code?: string) { super(message); }
+}
+
+export function mobileClientHeaders() {
+  return {
+    "x-senzilytics-mobile-version": MOBILE_APP_VERSION,
+    "x-senzilytics-mobile-platform":
+      Platform.OS === "ios" ? "ios" : "android",
+    "x-senzilytics-mobile-api-version": MOBILE_API_VERSION,
+  };
 }
 
 function randomHex(bytes: number) {
@@ -44,7 +57,7 @@ export async function beginMobileSignIn() {
   const redirectUri = "senzilytics://auth";
   const challengeResponse = await fetch(`${API_URL}/api/mobile/auth/challenge`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...mobileClientHeaders() },
     body: JSON.stringify({ codeChallenge, state, redirectUri }),
   });
   const challenge = await parseJson<{ authorizeUrl: string }>(challengeResponse);
@@ -59,7 +72,7 @@ export async function beginMobileSignIn() {
   if (!code) throw new MobileApiError("The authorization code is missing.", 401, "invalid_grant");
   const tokenResponse = await fetch(`${API_URL}/api/mobile/auth/token`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...mobileClientHeaders() },
     body: JSON.stringify({
       grantType: "authorization_code",
       code,
@@ -85,7 +98,7 @@ async function refreshMobileSession(refreshToken?: string) {
     if (!stored) throw new MobileApiError("Sign in is required.", 401, "unauthorized");
     const response = await fetch(`${API_URL}/api/mobile/auth/token`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...mobileClientHeaders() },
       body: JSON.stringify({ grantType: "refresh_token", refreshToken: stored }),
     });
     return storeTokens(await parseJson<MobileTokens>(response));
@@ -128,6 +141,37 @@ export async function mobileApi<T>(path: string, init: RequestInit = {}, retry =
   return parseJson<T>(await authorizedMobileFetch(path, init, retry));
 }
 
+export async function mobilePublicApi<T>(
+  path: string,
+  init: RequestInit = {}
+): Promise<T> {
+  return parseJson<T>(
+    await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        ...mobileClientHeaders(),
+        ...init.headers,
+      },
+    })
+  );
+}
+
+export async function mobilePublicStatus<T>(
+  path: string,
+  init: RequestInit = {}
+): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      ...mobileClientHeaders(),
+      ...init.headers,
+    },
+  });
+  return (await response.json()) as T;
+}
+
 export async function mobileBinary(
   path: string,
   init: RequestInit = {},
@@ -154,7 +198,12 @@ async function authorizedMobileFetch(
   if (!accessToken) await refreshMobileSession();
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: { "content-type": "application/json", ...init.headers, authorization: `Bearer ${accessToken}` },
+    headers: {
+      "content-type": "application/json",
+      ...mobileClientHeaders(),
+      ...init.headers,
+      authorization: `Bearer ${accessToken}`,
+    },
   });
   if (response.status === 401 && retry) {
     await refreshMobileSession();

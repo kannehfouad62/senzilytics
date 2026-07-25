@@ -1,3 +1,8 @@
+import {
+  parseMobileVersion,
+  safeStoreUrl,
+} from "@/modules/mobile/mobile-release-policy";
+
 const requiredProductionVariables = ["DATABASE_URL", "AUTH_SECRET", "CRON_SECRET", "APP_URL", "MOBILE_TOKEN_SECRET"] as const;
 
 export function inspectProductionEnvironment(environment: Record<string, string | undefined> = process.env) {
@@ -13,6 +18,30 @@ export function inspectProductionEnvironment(environment: Record<string, string 
   else {
     const decodedLength = /^[a-f0-9]{64}$/i.test(integrationKey) ? 32 : Buffer.from(integrationKey, "base64").length;
     if (decodedLength !== 32) warnings.push("INTEGRATION_ENCRYPTION_KEY must be a 32-byte base64 or 64-character hex key.");
+  }
+  if (
+    environment.MOBILE_ENFORCE_MINIMUM_VERSION?.trim().toLowerCase() === "true"
+  ) {
+    if (!parseMobileVersion(environment.MOBILE_MINIMUM_IOS_VERSION)) {
+      warnings.push(
+        "MOBILE_MINIMUM_IOS_VERSION must use a major.minor.patch version before mobile enforcement is enabled."
+      );
+    }
+    if (!parseMobileVersion(environment.MOBILE_MINIMUM_ANDROID_VERSION)) {
+      warnings.push(
+        "MOBILE_MINIMUM_ANDROID_VERSION must use a major.minor.patch version before mobile enforcement is enabled."
+      );
+    }
+    if (!safeStoreUrl("ios", environment.MOBILE_IOS_STORE_URL)) {
+      warnings.push(
+        "MOBILE_IOS_STORE_URL must be an HTTPS apps.apple.com URL before mobile enforcement is enabled."
+      );
+    }
+    if (!safeStoreUrl("android", environment.MOBILE_ANDROID_STORE_URL)) {
+      warnings.push(
+        "MOBILE_ANDROID_STORE_URL must be an HTTPS play.google.com URL before mobile enforcement is enabled."
+      );
+    }
   }
   return { valid: missing.length === 0 && warnings.length === 0, missing, warnings };
 }

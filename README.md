@@ -11,7 +11,7 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-Required local variables are stored in `.env` and must never be committed. At minimum configure `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, `MOBILE_TOKEN_SECRET`, `APP_URL`, and `INTEGRATION_ENCRYPTION_KEY`. Generate independent mobile and integration keys with `openssl rand -base64 48` and `openssl rand -base64 32`; they must remain stable across deployments. Document uploads require `BLOB_READ_WRITE_TOKEN`; email delivery requires the configured provider credentials; AI features require `OPENAI_API_KEY`. `EXPO_ACCESS_TOKEN` is optional and only needed when enhanced Expo Push Service security is enabled.
+Required local variables are stored in `.env` and must never be committed. At minimum configure `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, `MOBILE_TOKEN_SECRET`, `APP_URL`, and `INTEGRATION_ENCRYPTION_KEY`. Generate independent mobile and integration keys with `openssl rand -base64 48` and `openssl rand -base64 32`; they must remain stable across deployments. Document uploads require `BLOB_READ_WRITE_TOKEN`; email delivery requires the configured provider credentials; AI features require `OPENAI_API_KEY`. `EXPO_ACCESS_TOKEN` is optional and only needed when enhanced Expo Push Service security is enabled. Native release enforcement additionally supports platform minimum/recommended versions and trusted App Store/Play Store URLs; keep enforcement disabled until the replacement binaries are publicly available.
 
 ## Production release
 

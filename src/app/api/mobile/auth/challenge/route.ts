@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createMobileChallengeService, MobileAuthError } from "@/modules/mobile/mobile-auth.service";
+import { assertMobileReleaseCompatibility, createMobileChallengeService, MobileAuthError } from "@/modules/mobile/mobile-auth.service";
 
 const schema = z.object({ codeChallenge: z.string(), state: z.string(), redirectUri: z.string() });
 
 export async function POST(request: Request) {
   try {
+    assertMobileReleaseCompatibility(request);
     const parsed = schema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) throw new MobileAuthError("Mobile authorization request is invalid.", 400, "invalid_request");
     const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";

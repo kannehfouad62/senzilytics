@@ -61,6 +61,8 @@ This Expo/React Native application is the Premium native field workspace for iOS
 - Expo push-token registration with tenant/user ownership enforcement
 - Production launcher, adaptive, themed, notification and splash assets
 - Store-facing privacy, support and account-request links
+- Server-governed minimum and recommended app versions with trusted App Store and Google Play destinations
+- Foreground release/session revalidation, privacy-safe service diagnostics, maintenance handling, and a native recovery boundary
 
 ## Local setup
 
@@ -112,6 +114,36 @@ Save the value as `MOBILE_TOKEN_SECRET`. Do not reuse `AUTH_SECRET`. If Expo Pus
 
 Native access is deliberately denied for demo, Essential, and Enterprise tenants. The organization must have the Premium `MOBILE_APPS` entitlement.
 
+### Release compatibility controls
+
+The backend publishes a no-store compatibility policy at `/api/mobile/release`.
+Every native authorization and API request sends the app version, platform, and
+mobile API contract version. Configure these optional server variables in
+Vercel:
+
+```text
+MOBILE_MINIMUM_IOS_VERSION=1.0.0
+MOBILE_MINIMUM_ANDROID_VERSION=1.0.0
+MOBILE_RECOMMENDED_IOS_VERSION=1.0.0
+MOBILE_RECOMMENDED_ANDROID_VERSION=1.0.0
+MOBILE_IOS_STORE_URL=https://apps.apple.com/...
+MOBILE_ANDROID_STORE_URL=https://play.google.com/store/apps/details?id=com.senzilytics.mobile
+MOBILE_ENFORCE_MINIMUM_VERSION=false
+MOBILE_MAINTENANCE_MODE=false
+MOBILE_MAINTENANCE_MESSAGE=
+```
+
+Versions must use `major.minor.patch`. Store URLs are accepted only from
+`apps.apple.com` and `play.google.com`. Mandatory enforcement activates only
+when `MOBILE_ENFORCE_MINIMUM_VERSION=true`, both minimum versions are valid,
+and both trusted store URLs are present. Maintenance blocks live authorization
+and synchronization but does not extend or erase an existing encrypted offline
+authorization window.
+
+The single release version source is `release-metadata.json`; update it before
+building a new binary. The Expo app configuration and runtime request headers
+both consume that file.
+
 ## Store builds
 
 The initial Apple listing copy is versioned in `store.config.json`. Review it in App Store Connect before submission. EAS Metadata is currently Apple-only, so use `PLAY_STORE_LISTING.md` when completing Google Play Console. Use `APPLE_STORE_SUBMISSION.md` and `GOOGLE_PLAY_SUBMISSION.md` as working disclosure sheets, prepare approved imagery using `store-assets/README.md`, and work through `STORE_RELEASE_CHECKLIST.md` before uploading a production binary.
@@ -125,6 +157,12 @@ npx eas-cli@latest build --profile production --platform all
 npx eas-cli@latest submit --profile production --platform ios
 npx eas-cli@latest submit --profile production --platform android
 ```
+
+Deploy backend compatibility support with enforcement disabled before uploading
+a new binary. Promote the binary through TestFlight and Play Internal testing,
+verify Settings diagnostics, publish the store release, then add the trusted
+store URLs and enable minimum-version enforcement only if older clients must be
+retired.
 
 `EXPO_PUBLIC_API_URL` is public configuration, not a secret. If you prefer to manage it in the Expo dashboard instead of `eas.json`, create the same value separately for the development, preview, and production environments and retain each profile's explicit `environment` selection. Confirm the active configuration before a release with `eas config --platform ios --profile production` and `eas config --platform android --profile production`.
 

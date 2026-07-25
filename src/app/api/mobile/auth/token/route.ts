@@ -1,7 +1,7 @@
 import { MobilePlatform } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { exchangeMobileAuthorizationCodeService, MobileAuthError, refreshMobileSessionService } from "@/modules/mobile/mobile-auth.service";
+import { assertMobileReleaseCompatibility, exchangeMobileAuthorizationCodeService, MobileAuthError, refreshMobileSessionService } from "@/modules/mobile/mobile-auth.service";
 
 const authorization = z.object({ grantType: z.literal("authorization_code"), code: z.string(), codeVerifier: z.string(), deviceId: z.string(), deviceName: z.string(), platform: z.nativeEnum(MobilePlatform) });
 const refresh = z.object({ grantType: z.literal("refresh_token"), refreshToken: z.string() });
@@ -9,6 +9,7 @@ const schema = z.discriminatedUnion("grantType", [authorization, refresh]);
 
 export async function POST(request: Request) {
   try {
+    assertMobileReleaseCompatibility(request);
     const parsed = schema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) throw new MobileAuthError("Mobile token request is invalid.", 400, "invalid_request");
     const result = parsed.data.grantType === "authorization_code" ? await exchangeMobileAuthorizationCodeService(parsed.data) : await refreshMobileSessionService(parsed.data.refreshToken);

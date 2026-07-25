@@ -1,6 +1,6 @@
 # Senzilytics mobile store release checklist
 
-Use this checklist for version 1.0.0. Store rules and questionnaire wording change; verify each answer in App Store Connect and Google Play Console at submission time.
+Use this checklist for version 1.1.0. Store rules and questionnaire wording change; verify each answer in App Store Connect and Google Play Console at submission time.
 
 ## Product and account preparation
 
@@ -18,6 +18,7 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] `https://www.senzilytics.cloud/support` is public and monitored.
 - [ ] `https://www.senzilytics.cloud/account-deletion` is public and the mailbox is monitored.
 - [ ] `https://www.senzilytics.cloud/api/health` returns a healthy production response.
+- [ ] `https://www.senzilytics.cloud/api/mobile/release` returns a no-store release policy.
 
 ## Native configuration
 
@@ -28,6 +29,9 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] FCM v1 credentials are configured through EAS for Android.
 - [ ] `MOBILE_TOKEN_SECRET`, `CRON_SECRET` and `EXPO_ACCESS_TOKEN` are configured in Vercel where applicable.
 - [ ] No server secret is stored in an `EXPO_PUBLIC_` variable or committed mobile config.
+- [ ] `release-metadata.json` matches the intended store version.
+- [ ] The iOS and Android store URLs use only `apps.apple.com` and `play.google.com`.
+- [ ] Minimum-version enforcement remains disabled until both approved binaries are available from their stores.
 
 ## Functional acceptance
 
@@ -69,6 +73,11 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] Activate and pause a workflow template; confirm only one active template remains for that entity type and the action appears in the tenant activity log.
 - [ ] Review form and integration health; confirm the app never receives SSO issuer/directory identifiers, invitation tokens, passwords, API tokens, webhook URLs, or secret material.
 - [ ] Remove each administration permission in turn and verify only the matching encrypted cached data slice is removed.
+- [ ] Open **Settings**, refresh diagnostics, and verify app version, API version, service state, database state, live-verification time, and offline queue.
+- [ ] Background the app for at least five minutes, return to it, and confirm release policy and live authorization are refreshed without duplicate synchronization.
+- [ ] Test a recommended update as non-blocking and a minimum-version update as blocking with the correct store destination.
+- [ ] Test maintenance mode with and without a valid encrypted offline snapshot; new sign-in and live synchronization must pause while bounded offline work remains available.
+- [ ] Trigger a controlled render failure in a non-production build and confirm the recovery screen does not display credentials, tenant content, or a stack trace.
 
 ## Apple submission
 
@@ -93,6 +102,16 @@ Use this checklist for version 1.0.0. Store rules and questionnaire wording chan
 - [ ] Test the Android App Bundle through Internal testing before closed or production rollout.
 
 ## Build and release
+
+Use this rollout order:
+
+1. Deploy the compatible backend with `MOBILE_ENFORCE_MINIMUM_VERSION=false`.
+2. Build and submit the new binaries to TestFlight and Play Internal testing.
+3. Complete functional, offline, account-switching, diagnostics, and update-flow acceptance.
+4. Publish the approved binaries and verify their public store URLs.
+5. Configure minimum/recommended versions and both trusted store URLs in Vercel.
+6. Set `MOBILE_ENFORCE_MINIMUM_VERSION=true` only when retiring older binaries is intentional.
+7. Re-run `npm run verify:production` and verify `/api/health` and `/api/mobile/release`.
 
 ```bash
 cd apps/mobile

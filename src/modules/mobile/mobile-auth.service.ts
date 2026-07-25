@@ -1,9 +1,36 @@
 import { ActivityAction, MobilePlatform, MobileSessionStatus, OrganizationStatus, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { planEntitlements } from "@/lib/subscription";
+import {
+  MOBILE_API_VERSION,
+  readMobileReleasePolicy,
+} from "@/modules/mobile/mobile-release-policy";
 import { createMobileOpaqueToken, hashMobileToken, isMobilePlatform, isMobileRedirectUri, isValidDeviceId, isValidMobileState, isValidPkceChallenge, MOBILE_SESSION_TTL_MS, pkceChallenge, secureHashMatch, signMobileAccessToken, verifyMobileAccessToken } from "@/modules/mobile/mobile-token";
 
 export class MobileAuthError extends Error { constructor(message: string, public readonly status: number, public readonly code: string) { super(message); } }
+
+export function assertMobileReleaseCompatibility(request: Request) {
+  const policy = readMobileReleasePolicy(request);
+  if (policy.maintenance) {
+    throw new MobileAuthError(
+      policy.message || "Mobile service is temporarily unavailable.",
+      503,
+      "maintenance"
+    );
+  }
+  if (
+    policy.updateRequired ||
+    (policy.enforcementEnabled &&
+      policy.apiVersion !== MOBILE_API_VERSION)
+  ) {
+    throw new MobileAuthError(
+      "This version of Senzilytics is no longer supported. Update the app to continue.",
+      426,
+      "upgrade_required"
+    );
+  }
+  return policy;
+}
 
 export type MobileAuthorizationEligibility =
   | {
@@ -157,6 +184,7 @@ export async function refreshMobileSessionService(refreshToken: string) {
 }
 
 export async function authenticateMobileRequest(request: Request) {
+  assertMobileReleaseCompatibility(request);
   const authorization = request.headers.get("authorization");
   const raw = authorization?.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
   const payload = raw ? verifyMobileAccessToken(raw) : null;
