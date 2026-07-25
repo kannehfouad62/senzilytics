@@ -25,9 +25,53 @@ import {
 
 const closedStatuses = [Status.COMPLETED, Status.CLOSED];
 
+const capaPermissions = [
+  PermissionKey.CREATE_CAPA,
+  PermissionKey.UPDATE_CAPA,
+  PermissionKey.CLOSE_CAPA,
+  PermissionKey.VIEW_REPORTS,
+] as const;
+
+const modulePermissions: Record<string, readonly PermissionKey[]> = {
+  Observations: [PermissionKey.VIEW_OBSERVATIONS],
+  CAPA: capaPermissions,
+  Risk: [PermissionKey.VIEW_RISKS],
+  MOC: [PermissionKey.VIEW_MOC],
+  Audits: [PermissionKey.VIEW_AUDITS],
+  "Audit Findings": [PermissionKey.VIEW_AUDITS],
+  Inspections: [PermissionKey.VIEW_INSPECTIONS],
+  "Training & Competency": [PermissionKey.VIEW_TRAINING],
+  Compliance: [PermissionKey.VIEW_COMPLIANCE],
+  "Regulatory Change": [PermissionKey.VIEW_COMPLIANCE],
+  Permits: [PermissionKey.VIEW_COMPLIANCE],
+  Chemicals: [PermissionKey.VIEW_CHEMICALS],
+  Environmental: [PermissionKey.VIEW_ENVIRONMENTAL],
+  ESG: [PermissionKey.VIEW_ESG],
+  "JSA / JHA": [PermissionKey.VIEW_RISKS],
+  Contractors: [PermissionKey.VIEW_CONTRACTORS],
+  "Permits to Work": [PermissionKey.VIEW_PERMITS_TO_WORK],
+  "Industrial Hygiene": [PermissionKey.VIEW_INDUSTRIAL_HYGIENE],
+  "Occupational Health": [PermissionKey.VIEW_OCCUPATIONAL_HEALTH],
+  "SIF Prevention": [PermissionKey.VIEW_SIF_INTELLIGENCE],
+  "Certification Readiness": [PermissionKey.VIEW_CERTIFICATION_READINESS],
+  "Assets & Equipment": [PermissionKey.VIEW_ASSETS],
+  "Behavior-Based Safety": [PermissionKey.VIEW_BEHAVIOR_SAFETY],
+};
+
+export function canViewExecutiveModule(
+  moduleLabel: string,
+  permissions: Iterable<PermissionKey>,
+) {
+  const required = modulePermissions[moduleLabel];
+  if (!required) return false;
+  const allowed = permissions instanceof Set ? permissions : new Set(permissions);
+  return required.some((permission) => allowed.has(permission));
+}
+
 export async function getGlobalExecutivePortfolio(organizationId: string, permissions: PermissionKey[]) {
   const now = new Date();
   const allowed = new Set(permissions);
+  const canViewCapa = capaPermissions.some((permission) => allowed.has(permission));
   const credentialHorizon = new Date(now.getTime() + 30 * 86400000);
   const auditClosed = [EnterpriseAuditStatus.COMPLETED, EnterpriseAuditStatus.CLOSED, EnterpriseAuditStatus.CANCELLED];
   const findingClosed = [EnterpriseAuditFindingStatus.VERIFIED, EnterpriseAuditFindingStatus.CLOSED, EnterpriseAuditFindingStatus.REJECTED, EnterpriseAuditFindingStatus.CANCELLED];
@@ -64,30 +108,30 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     behaviorSessionsThisMonth, criticalBehaviorAtRisk, overdueBehaviorFollowUps,
     openRegulatoryChanges, overdueRegulatoryAssessments, criticalRegulatoryExposure,
   ] = await Promise.all([
-    prisma.safetyObservation.count({ where: { organizationId, status: { notIn: [SafetyObservationStatus.RESOLVED, SafetyObservationStatus.CLOSED] } } }),
-    prisma.correctiveAction.count({ where: { ...actionTenantScope, status: { notIn: closedStatuses } } }),
-    prisma.correctiveAction.count({ where: { ...actionTenantScope, status: { notIn: closedStatuses }, dueDate: { lt: now } } }),
-    prisma.risk.count({ where: { organizationId, status: { notIn: [RiskStatus.CLOSED, RiskStatus.ARCHIVED] }, currentRiskLevel: { in: [RiskLevel.HIGH, RiskLevel.CRITICAL] } } }),
-    prisma.risk.count({ where: { organizationId, status: { notIn: [RiskStatus.CLOSED, RiskStatus.ARCHIVED] }, nextReviewDate: { lt: now } } }),
-    prisma.managementOfChange.count({ where: { organizationId, status: { notIn: mocClosed } } }),
-    prisma.managementOfChange.count({ where: { organizationId, status: { notIn: mocClosed }, plannedCompletionDate: { lt: now } } }),
-    prisma.enterpriseAudit.count({ where: { organizationId, status: { notIn: auditClosed } } }),
-    prisma.enterpriseAudit.count({ where: { organizationId, status: { notIn: auditClosed }, dueDate: { lt: now } } }),
-    prisma.enterpriseAuditFinding.count({ where: { organizationId, status: { notIn: findingClosed } } }),
-    prisma.inspection.count({ where: { site: { organizationId }, status: { notIn: closedStatuses }, dueDate: { lt: now } } }),
-    prisma.trainingRecord.count({ where: { user: { organizationId }, status: { notIn: closedStatuses }, dueDate: { lt: now } } }),
-    prisma.trainingRecord.count({ where: { user: { organizationId }, status: { in: closedStatuses }, expiresAt: { gte: now, lte: new Date(now.getTime() + 30 * 86400000) } } }),
-    prisma.complianceItem.count({ where: { site: { organizationId }, status: { notIn: closedStatuses }, dueDate: { lt: now } } }),
-    prisma.permit.count({ where: { organizationId, status: { in: [PermitStatus.EXPIRING, PermitStatus.EXPIRED] } } }),
-    prisma.chemicalInventory.count({ where: { chemical: { organizationId, status: { notIn: [ChemicalApprovalStatus.DRAFT, ChemicalApprovalStatus.ARCHIVED] } } } }),
-    prisma.environmentalDataPoint.count({ where: { metric: { organizationId }, status: { in: [EnvironmentalDataStatus.DRAFT, EnvironmentalDataStatus.SUBMITTED, EnvironmentalDataStatus.REJECTED] } } }),
-    prisma.esgDisclosurePeriod.count({ where: { organizationId, status: { in: [EsgDisclosureStatus.DRAFT, EsgDisclosureStatus.DATA_COLLECTION, EsgDisclosureStatus.UNDER_REVIEW] } } }),
-    prisma.jobSafetyAnalysis.count({ where: { organizationId, status: JsaStatus.ACTIVE } }),
-    prisma.jobSafetyAnalysis.count({ where: { organizationId, status: JsaStatus.ACTIVE, reviewDueDate: { lt: now } } }),
-    prisma.contractor.count({ where: { organizationId, status: ContractorStatus.APPROVED } }),
-    prisma.contractor.count({ where: { organizationId, status: ContractorStatus.APPROVED, insuranceExpiresAt: { lte: credentialHorizon } } }),
-    prisma.permitToWork.count({ where: { organizationId, status: { in: [PermitToWorkStatus.APPROVED, PermitToWorkStatus.ACTIVE, PermitToWorkStatus.SUSPENDED] } } }),
-    prisma.permitToWork.count({ where: { organizationId, status: { in: [PermitToWorkStatus.DRAFT, PermitToWorkStatus.PENDING_APPROVAL, PermitToWorkStatus.APPROVED, PermitToWorkStatus.ACTIVE, PermitToWorkStatus.SUSPENDED] }, plannedEndAt: { lt: now } } }),
+    allowed.has(PermissionKey.VIEW_OBSERVATIONS) ? prisma.safetyObservation.count({ where: { organizationId, status: { notIn: [SafetyObservationStatus.RESOLVED, SafetyObservationStatus.CLOSED] } } }) : 0,
+    canViewCapa ? prisma.correctiveAction.count({ where: { ...actionTenantScope, status: { notIn: closedStatuses } } }) : 0,
+    canViewCapa ? prisma.correctiveAction.count({ where: { ...actionTenantScope, status: { notIn: closedStatuses }, dueDate: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_RISKS) ? prisma.risk.count({ where: { organizationId, status: { notIn: [RiskStatus.CLOSED, RiskStatus.ARCHIVED] }, currentRiskLevel: { in: [RiskLevel.HIGH, RiskLevel.CRITICAL] } } }) : 0,
+    allowed.has(PermissionKey.VIEW_RISKS) ? prisma.risk.count({ where: { organizationId, status: { notIn: [RiskStatus.CLOSED, RiskStatus.ARCHIVED] }, nextReviewDate: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_MOC) ? prisma.managementOfChange.count({ where: { organizationId, status: { notIn: mocClosed } } }) : 0,
+    allowed.has(PermissionKey.VIEW_MOC) ? prisma.managementOfChange.count({ where: { organizationId, status: { notIn: mocClosed }, plannedCompletionDate: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_AUDITS) ? prisma.enterpriseAudit.count({ where: { organizationId, status: { notIn: auditClosed } } }) : 0,
+    allowed.has(PermissionKey.VIEW_AUDITS) ? prisma.enterpriseAudit.count({ where: { organizationId, status: { notIn: auditClosed }, dueDate: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_AUDITS) ? prisma.enterpriseAuditFinding.count({ where: { organizationId, status: { notIn: findingClosed } } }) : 0,
+    allowed.has(PermissionKey.VIEW_INSPECTIONS) ? prisma.inspection.count({ where: { site: { organizationId }, status: { notIn: closedStatuses }, dueDate: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_TRAINING) ? prisma.trainingRecord.count({ where: { user: { organizationId }, status: { notIn: closedStatuses }, dueDate: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_TRAINING) ? prisma.trainingRecord.count({ where: { user: { organizationId }, status: { in: closedStatuses }, expiresAt: { gte: now, lte: new Date(now.getTime() + 30 * 86400000) } } }) : 0,
+    allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.complianceItem.count({ where: { site: { organizationId }, status: { notIn: closedStatuses }, dueDate: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.permit.count({ where: { organizationId, status: { in: [PermitStatus.EXPIRING, PermitStatus.EXPIRED] } } }) : 0,
+    allowed.has(PermissionKey.VIEW_CHEMICALS) ? prisma.chemicalInventory.count({ where: { chemical: { organizationId, status: { notIn: [ChemicalApprovalStatus.DRAFT, ChemicalApprovalStatus.ARCHIVED] } } } }) : 0,
+    allowed.has(PermissionKey.VIEW_ENVIRONMENTAL) ? prisma.environmentalDataPoint.count({ where: { metric: { organizationId }, status: { in: [EnvironmentalDataStatus.DRAFT, EnvironmentalDataStatus.SUBMITTED, EnvironmentalDataStatus.REJECTED] } } }) : 0,
+    allowed.has(PermissionKey.VIEW_ESG) ? prisma.esgDisclosurePeriod.count({ where: { organizationId, status: { in: [EsgDisclosureStatus.DRAFT, EsgDisclosureStatus.DATA_COLLECTION, EsgDisclosureStatus.UNDER_REVIEW] } } }) : 0,
+    allowed.has(PermissionKey.VIEW_RISKS) ? prisma.jobSafetyAnalysis.count({ where: { organizationId, status: JsaStatus.ACTIVE } }) : 0,
+    allowed.has(PermissionKey.VIEW_RISKS) ? prisma.jobSafetyAnalysis.count({ where: { organizationId, status: JsaStatus.ACTIVE, reviewDueDate: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_CONTRACTORS) ? prisma.contractor.count({ where: { organizationId, status: ContractorStatus.APPROVED } }) : 0,
+    allowed.has(PermissionKey.VIEW_CONTRACTORS) ? prisma.contractor.count({ where: { organizationId, status: ContractorStatus.APPROVED, insuranceExpiresAt: { lte: credentialHorizon } } }) : 0,
+    allowed.has(PermissionKey.VIEW_PERMITS_TO_WORK) ? prisma.permitToWork.count({ where: { organizationId, status: { in: [PermitToWorkStatus.APPROVED, PermitToWorkStatus.ACTIVE, PermitToWorkStatus.SUSPENDED] } } }) : 0,
+    allowed.has(PermissionKey.VIEW_PERMITS_TO_WORK) ? prisma.permitToWork.count({ where: { organizationId, status: { in: [PermitToWorkStatus.DRAFT, PermitToWorkStatus.PENDING_APPROVAL, PermitToWorkStatus.APPROVED, PermitToWorkStatus.ACTIVE, PermitToWorkStatus.SUSPENDED] }, plannedEndAt: { lt: now } } }) : 0,
     allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE) ? prisma.exposureAssessment.count({ where: { organizationId, status: { notIn: [ExposureAssessmentStatus.COMPLETED, ExposureAssessmentStatus.CANCELLED] } } }) : 0,
     allowed.has(PermissionKey.VIEW_INDUSTRIAL_HYGIENE) ? prisma.exposureSample.count({ where: { assessment: { organizationId }, classification: ExposureResultClassification.ABOVE_LIMIT } }) : 0,
     allowed.has(PermissionKey.VIEW_OCCUPATIONAL_HEALTH) ? prisma.medicalSurveillanceEnrollment.count({ where: { program: { organizationId }, status: SurveillanceEnrollmentStatus.OVERDUE } }) : 0,
@@ -128,5 +172,14 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
   if (allowed.has(PermissionKey.VIEW_ASSETS)) modules.push({ label: "Assets & Equipment", value: assetExceptions + criticalAssetDefects, note: `${overdueAssetInspections} inspections overdue · ${criticalAssetDefects} critical defects`, href: "/assets/dashboard", tone: assetExceptions || criticalAssetDefects ? "danger" : overdueAssetInspections ? "warning" : "good" });
   if (allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY)) modules.push({ label: "Behavior-Based Safety", value: criticalBehaviorAtRisk + overdueBehaviorFollowUps, note: `${behaviorSessionsThisMonth} coaching sessions this month · ${overdueBehaviorFollowUps} follow-ups overdue`, href: "/behavior-safety/dashboard", tone: criticalBehaviorAtRisk || overdueBehaviorFollowUps ? "danger" : behaviorSessionsThisMonth ? "good" : "neutral" });
 
-  return { modules, attentionCount: modules.filter((item) => item.tone === "danger").reduce((sum, item) => sum + item.value, 0) };
+  const authorizedModules = modules.filter((item) =>
+    canViewExecutiveModule(item.label, allowed),
+  );
+
+  return {
+    modules: authorizedModules,
+    attentionCount: authorizedModules
+      .filter((item) => item.tone === "danger")
+      .reduce((sum, item) => sum + item.value, 0),
+  };
 }

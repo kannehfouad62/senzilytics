@@ -1,7 +1,18 @@
-import { getGlobalExecutivePortfolio } from "@/core/analytics/global-executive-dashboard.service";
+import {
+  canViewExecutiveModule,
+  getGlobalExecutivePortfolio,
+} from "@/core/analytics/global-executive-dashboard.service";
 import { getOpenAIClient, getOpenAIModel } from "@/core/ai/openai.service";
 import { prisma } from "@/lib/prisma";
 import { getOperationalAssuranceOverview } from "@/modules/assurance/operational-assurance.service";
+import {
+  getPerformanceWorkspace,
+  parsePerformanceFilters,
+} from "@/modules/performance/performance-scorecard.service";
+import {
+  getWorkflowProcessIntelligence,
+  parseWorkflowProcessFilters,
+} from "@/core/workflow/workflow-process-intelligence.service";
 import {
   ActivityAction,
   AiIntelligenceFeedbackRating,
@@ -111,32 +122,6 @@ const responseSchema = {
 const USER_HOURLY_ANALYSIS_LIMIT = 10;
 const ORGANIZATION_HOURLY_ANALYSIS_LIMIT = 100;
 
-const portfolioPermission: Record<string, PermissionKey> = {
-  Observations: PermissionKey.VIEW_OBSERVATIONS,
-  CAPA: PermissionKey.UPDATE_CAPA,
-  Risk: PermissionKey.VIEW_RISKS,
-  MOC: PermissionKey.VIEW_MOC,
-  Audits: PermissionKey.VIEW_AUDITS,
-  "Audit Findings": PermissionKey.VIEW_AUDITS,
-  Inspections: PermissionKey.VIEW_INSPECTIONS,
-  "Training & Competency": PermissionKey.VIEW_TRAINING,
-  Compliance: PermissionKey.VIEW_COMPLIANCE,
-  "Regulatory Change": PermissionKey.VIEW_COMPLIANCE,
-  Permits: PermissionKey.VIEW_COMPLIANCE,
-  Chemicals: PermissionKey.VIEW_CHEMICALS,
-  Environmental: PermissionKey.VIEW_ENVIRONMENTAL,
-  ESG: PermissionKey.VIEW_ESG,
-  "JSA / JHA": PermissionKey.VIEW_RISKS,
-  Contractors: PermissionKey.VIEW_CONTRACTORS,
-  "Permits to Work": PermissionKey.VIEW_PERMITS_TO_WORK,
-  "Industrial Hygiene": PermissionKey.VIEW_INDUSTRIAL_HYGIENE,
-  "Occupational Health": PermissionKey.VIEW_OCCUPATIONAL_HEALTH,
-  "SIF Prevention": PermissionKey.VIEW_SIF_INTELLIGENCE,
-  "Certification Readiness": PermissionKey.VIEW_CERTIFICATION_READINESS,
-  "Assets & Equipment": PermissionKey.VIEW_ASSETS,
-  "Behavior-Based Safety": PermissionKey.VIEW_BEHAVIOR_SAFETY,
-};
-
 const useCaseDirection: Record<AiIntelligenceUseCase, string> = {
   DAILY_BRIEFING: "Prioritize the most time-sensitive exceptions and decisions for today's EHS leadership briefing.",
   EXECUTIVE_RISK: "Analyze enterprise risk concentration, overdue exposure, and cross-module management priorities.",
@@ -159,16 +144,25 @@ async function collectTenantIntelligenceSources(
   permissions: PermissionKey[],
 ): Promise<AiIntelligenceSourceRecord[]> {
   const allowed = new Set(permissions);
-  const [portfolio, assurance] = await Promise.all([
+  const [portfolio, assurance, performance, workflow] = await Promise.all([
     getGlobalExecutivePortfolio(organizationId, permissions),
     getOperationalAssuranceOverview({ organizationId, permissions, limit: 30 }),
+    allowed.has(PermissionKey.VIEW_PERFORMANCE_SCORECARDS)
+      ? getPerformanceWorkspace({
+          organizationId,
+          filters: parsePerformanceFilters({ days: "90" }),
+        })
+      : null,
+    allowed.has(PermissionKey.MANAGE_WORKFLOWS)
+      ? getWorkflowProcessIntelligence({
+          organizationId,
+          filters: parseWorkflowProcessFilters({ days: "90" }),
+        })
+      : null,
   ]);
 
   const portfolioRecords: Omit<AiIntelligenceSourceRecord, "sourceKey">[] = portfolio.modules
-    .filter((item) => {
-      const required = portfolioPermission[item.label];
-      return Boolean(required && allowed.has(required));
-    })
+    .filter((item) => canViewExecutiveModule(item.label, allowed))
     .map((item) => ({
       sourceType: AiIntelligenceSourceType.PORTFOLIO_METRIC,
       module: item.label,
@@ -191,7 +185,54 @@ async function collectTenantIntelligenceSources(
     href: signal.href,
   }));
 
-  return buildSourceKeys([...portfolioRecords, ...assuranceRecords]);
+  const performanceRecords: Omit<AiIntelligenceSourceRecord, "sourceKey">[] =
+    performance
+      ? performance.rows
+          .filter((row) => ["OFF_TARGET", "CRITICAL"].includes(row.rating))
+          .slice(0, 20)
+          .map((row) => ({
+            sourceType: AiIntelligenceSourceType.PORTFOLIO_METRIC,
+            module: "Performance Scorecards",
+            entityType: "PerformanceIndicator",
+            entityId: row.id,
+            reference: row.code,
+            title: row.name,
+            summary: `${row.rating} indicator. Actual ${row.value ?? "not available"} ${row.unit}; target ${row.targetValue ?? "not configured"} ${row.unit}. ${row.provenance}`,
+            href: "/performance",
+          }))
+      : [];
+  const workflowRecords: Omit<AiIntelligenceSourceRecord, "sourceKey">[] =
+    workflow
+      ? [
+          {
+            sourceType: AiIntelligenceSourceType.PORTFOLIO_METRIC,
+            module: "Workflow Intelligence",
+            entityType: "WorkflowProcessSummary",
+            entityId: "rolling-90-days",
+            reference: null,
+            title: "Workflow process reliability",
+            summary: `${workflow.summary.started} workflows started; ${workflow.summary.completionRate ?? "unmeasured"}% completion; ${workflow.summary.slaAdherenceRate ?? "unmeasured"}% SLA adherence; ${workflow.summary.overdueActiveSteps} overdue active steps; ${workflow.summary.outcomesFailed} failed outcomes.`,
+            href: "/workflows/analytics",
+          },
+          ...workflow.bottlenecks.slice(0, 10).map((item) => ({
+            sourceType: AiIntelligenceSourceType.PORTFOLIO_METRIC,
+            module: "Workflow Intelligence",
+            entityType: "WorkflowBottleneck",
+            entityId: item.templateStepId,
+            reference: null,
+            title: `${item.templateName}: ${item.stepName}`,
+            summary: `${item.activeCount} active; ${item.overdueActiveCount} overdue; average cycle ${item.averageCycleHours ?? "unmeasured"} hours; P90 ${item.p90CycleHours ?? "unmeasured"} hours.`,
+            href: "/workflows/analytics",
+          })),
+        ]
+      : [];
+
+  return buildSourceKeys([
+    ...portfolioRecords,
+    ...assuranceRecords,
+    ...performanceRecords,
+    ...workflowRecords,
+  ]);
 }
 
 function sourceContext(sources: AiIntelligenceSourceRecord[]) {

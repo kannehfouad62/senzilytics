@@ -58,6 +58,7 @@ export async function generateEnterpriseAiAnalysis(
     });
 
     revalidatePath("/intelligence");
+    revalidatePath("/dashboard");
     return {
       status: "SUCCESS",
       message: "Review-only intelligence generated and saved for human disposition.",
