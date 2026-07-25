@@ -42,7 +42,8 @@ type SupportedEntityType =
   | typeof DocumentEntityType.ASSET_SAFETY
   | typeof DocumentEntityType.BEHAVIOR_SAFETY
   | typeof DocumentEntityType.REGULATORY_CHANGE
-  | typeof DocumentEntityType.EMERGENCY_PREPAREDNESS;
+  | typeof DocumentEntityType.EMERGENCY_PREPAREDNESS
+  | typeof DocumentEntityType.BUSINESS_CONTINUITY;
 
 function entityFolder(
   entityType: SupportedEntityType
@@ -88,6 +89,8 @@ function entityFolder(
       return "regulatory-changes";
     case DocumentEntityType.EMERGENCY_PREPAREDNESS:
       return "emergency-preparedness";
+    case DocumentEntityType.BUSINESS_CONTINUITY:
+      return "business-continuity";
   }
 }
 

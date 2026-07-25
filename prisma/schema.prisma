@@ -190,6 +190,9 @@ enum PermissionKey {
   VIEW_EMERGENCY_PREPAREDNESS
   MANAGE_EMERGENCY_PREPAREDNESS
   RECORD_EMERGENCY_RESPONSE
+  VIEW_BUSINESS_CONTINUITY
+  MANAGE_BUSINESS_CONTINUITY
+  RECORD_CONTINUITY_EVENT
 }
 
 enum EmergencyPlanType {
@@ -267,6 +270,93 @@ enum EmergencyActivationStatus {
 }
 
 enum EmergencyImprovementStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  CANCELLED
+}
+
+enum ContinuityPlanType {
+  ORGANIZATION
+  SITE
+  DEPARTMENT
+  PROCESS
+  TECHNOLOGY
+  SUPPLY_CHAIN
+  OTHER
+}
+
+enum ContinuityPlanStatus {
+  DRAFT
+  IN_REVIEW
+  ACTIVE
+  REJECTED
+  ARCHIVED
+}
+
+enum ContinuityCriticality {
+  TIER_0_CRITICAL
+  TIER_1_HIGH
+  TIER_2_MEDIUM
+  TIER_3_LOW
+}
+
+enum ContinuityDependencyType {
+  PEOPLE
+  FACILITY
+  TECHNOLOGY
+  DATA
+  SUPPLIER
+  UTILITY
+  EQUIPMENT
+  COMMUNICATION
+  TRANSPORTATION
+  OTHER
+}
+
+enum ContinuityExerciseType {
+  TABLETOP
+  CALL_TREE
+  FUNCTIONAL
+  FAILOVER
+  FULL_SCALE
+}
+
+enum ContinuityExerciseStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ContinuityExerciseResult {
+  MET_OBJECTIVES
+  PARTIALLY_MET
+  NOT_MET
+}
+
+enum ContinuityDisruptionCategory {
+  TECHNOLOGY
+  FACILITY
+  PEOPLE
+  SUPPLIER
+  UTILITY
+  CYBER
+  TRANSPORTATION
+  ENVIRONMENTAL
+  SECURITY
+  OTHER
+}
+
+enum ContinuityActivationStatus {
+  ACTIVE
+  RECOVERING
+  RESTORED
+  CLOSED
+}
+
+enum ContinuityImprovementStatus {
   OPEN
   IN_PROGRESS
   COMPLETED
@@ -422,6 +512,7 @@ enum ConfigurableFormModule {
   BEHAVIOR_SAFETY
   REGULATORY_INTELLIGENCE
   EMERGENCY_PREPAREDNESS
+  BUSINESS_CONTINUITY
   GENERAL
 }
 
@@ -1168,6 +1259,7 @@ enum DocumentEntityType {
   BEHAVIOR_SAFETY
   REGULATORY_CHANGE
   EMERGENCY_PREPAREDNESS
+  BUSINESS_CONTINUITY
 }
 
 enum DocumentCategory {
@@ -1687,6 +1779,12 @@ model Organization {
   emergencyDrills                EmergencyDrill[]
   emergencyActivations           EmergencyActivation[]
   emergencyImprovements          EmergencyImprovement[]
+  continuityPlans                BusinessContinuityPlan[]
+  businessImpactAnalyses         BusinessImpactAnalysis[]
+  continuityDependencies         ContinuityDependency[]
+  continuityExercises            ContinuityExercise[]
+  continuityActivations          ContinuityActivation[]
+  continuityImprovements         ContinuityImprovement[]
 }
 
 model PricingInquiry {
@@ -1752,6 +1850,7 @@ model Site {
   performanceTargets            PerformanceIndicatorTarget[]
   performanceMeasurements       PerformanceIndicatorMeasurement[]
   emergencyPlans                EmergencyPlan[]
+  continuityPlans               BusinessContinuityPlan[]
 }
 
 model Department {
@@ -1787,6 +1886,7 @@ model Department {
   performanceTargets       PerformanceIndicatorTarget[]
   performanceMeasurements  PerformanceIndicatorMeasurement[]
   emergencyPlans           EmergencyPlan[]
+  continuityPlans          BusinessContinuityPlan[]
 }
 
 model User {
@@ -1958,6 +2058,21 @@ model User {
   ownedEmergencyImprovements          EmergencyImprovement[]          @relation("EmergencyImprovementOwner")
   createdEmergencyImprovements        EmergencyImprovement[]          @relation("EmergencyImprovementCreatedBy")
   verifiedEmergencyImprovements       EmergencyImprovement[]          @relation("EmergencyImprovementVerifiedBy")
+  ownedContinuityPlans                BusinessContinuityPlan[]        @relation("ContinuityPlanOwner")
+  createdContinuityPlans              BusinessContinuityPlan[]        @relation("ContinuityPlanCreatedBy")
+  submittedContinuityPlans            BusinessContinuityPlan[]        @relation("ContinuityPlanSubmittedBy")
+  approvedContinuityPlans             BusinessContinuityPlan[]        @relation("ContinuityPlanApprovedBy")
+  ownedBusinessImpactAnalyses         BusinessImpactAnalysis[]        @relation("BusinessImpactAnalysisOwner")
+  ledContinuityExercises              ContinuityExercise[]            @relation("ContinuityExerciseLead")
+  createdContinuityExercises          ContinuityExercise[]            @relation("ContinuityExerciseCreatedBy")
+  reviewedContinuityExercises         ContinuityExercise[]            @relation("ContinuityExerciseReviewedBy")
+  declaredContinuityActivations       ContinuityActivation[]          @relation("ContinuityActivationDeclaredBy")
+  coordinatedContinuityActivations    ContinuityActivation[]          @relation("ContinuityActivationCoordinator")
+  restoredContinuityActivations       ContinuityActivation[]          @relation("ContinuityActivationRestoredBy")
+  closedContinuityActivations         ContinuityActivation[]          @relation("ContinuityActivationClosedBy")
+  ownedContinuityImprovements         ContinuityImprovement[]         @relation("ContinuityImprovementOwner")
+  createdContinuityImprovements       ContinuityImprovement[]         @relation("ContinuityImprovementCreatedBy")
+  verifiedContinuityImprovements      ContinuityImprovement[]         @relation("ContinuityImprovementVerifiedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -2334,6 +2449,7 @@ model CorrectiveAction {
   assetDefects                 AssetDefect[]
   regulatoryChangeLinks        RegulatoryChangeActionLink[]
   emergencyImprovements        EmergencyImprovement[]
+  continuityImprovements       ContinuityImprovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6597,6 +6713,7 @@ model EmergencyActivation {
   stoodDownBy       User?                  @relation("EmergencyActivationStoodDownBy", fields: [stoodDownById], references: [id], onDelete: SetNull)
   reviewedBy        User?                  @relation("EmergencyActivationReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   improvements      EmergencyImprovement[]
+  continuityEvents  ContinuityActivation[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, declaredAt])
@@ -6640,6 +6757,268 @@ model EmergencyImprovement {
   @@index([organizationId, status, dueAt])
   @@index([planId, status])
   @@index([drillId, status])
+  @@index([activationId, status])
+  @@index([ownerId, status])
+}
+
+// ============================================================
+// BUSINESS CONTINUITY MANAGEMENT 2.0
+// ============================================================
+
+model BusinessContinuityPlan {
+  id                         String               @id @default(cuid())
+  organizationId             String
+  siteId                     String?
+  departmentId               String?
+  ownerId                    String
+  createdById                String
+  submittedById              String?
+  approvedById               String?
+  previousVersionId          String?              @unique
+  reference                  String
+  version                    Int                  @default(1)
+  title                      String
+  type                       ContinuityPlanType
+  status                     ContinuityPlanStatus @default(DRAFT)
+  scope                      String
+  criticalActivitiesSummary  String
+  activationCriteria         String
+  governanceStructure        String
+  communicationStrategy      String
+  alternateWorkStrategy      String
+  technologyRecoveryStrategy String
+  supplierContinuityStrategy String?
+  manualWorkarounds          String
+  recoveryPriorities         String
+  effectiveAt                DateTime?
+  reviewDueAt                DateTime
+  submittedAt                DateTime?
+  approvedAt                 DateTime?
+  rejectedAt                 DateTime?
+  archivedAt                 DateTime?
+  reviewReminderAt           DateTime?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+
+  organization           Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site                   Site?                    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  department             Department?              @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  owner                  User                     @relation("ContinuityPlanOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdBy              User                     @relation("ContinuityPlanCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  submittedBy            User?                    @relation("ContinuityPlanSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  approvedBy             User?                    @relation("ContinuityPlanApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  previousVersion        BusinessContinuityPlan?  @relation("ContinuityPlanRevision", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  revisions              BusinessContinuityPlan[] @relation("ContinuityPlanRevision")
+  businessImpactAnalyses BusinessImpactAnalysis[]
+  exercises              ContinuityExercise[]
+  activations            ContinuityActivation[]
+  improvements           ContinuityImprovement[]
+
+  @@unique([organizationId, reference, version])
+  @@index([organizationId, status, reviewDueAt])
+  @@index([siteId, status])
+  @@index([ownerId, status])
+}
+
+model BusinessImpactAnalysis {
+  id                            String                @id @default(cuid())
+  organizationId                String
+  planId                        String
+  ownerId                       String
+  reference                     String
+  processName                   String
+  criticality                   ContinuityCriticality
+  description                   String
+  maximumTolerableDowntimeHours Int
+  recoveryTimeObjectiveHours    Int
+  recoveryPointObjectiveHours   Int
+  minimumStaff                  Int                   @default(1)
+  peakPeriods                   String?
+  operationalImpact             String
+  financialImpact               String?
+  legalRegulatoryImpact         String?
+  customerStakeholderImpact     String?
+  minimumResources              String
+  vitalRecords                  String?
+  recoveryStrategy              String
+  workaroundProcedure           String
+  reviewDueAt                   DateTime
+  isActive                      Boolean               @default(true)
+  reviewReminderAt              DateTime?
+  createdAt                     DateTime              @default(now())
+  updatedAt                     DateTime              @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         BusinessContinuityPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  owner        User                   @relation("BusinessImpactAnalysisOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  dependencies ContinuityDependency[]
+  exercises    ContinuityExercise[]
+
+  @@unique([organizationId, reference])
+  @@unique([planId, processName])
+  @@index([organizationId, criticality, reviewDueAt])
+  @@index([planId, isActive])
+  @@index([ownerId, reviewDueAt])
+}
+
+model ContinuityDependency {
+  id                    String                   @id @default(cuid())
+  organizationId        String
+  analysisId            String
+  type                  ContinuityDependencyType
+  name                  String
+  description           String?
+  provider              String?
+  contactDetails        String?
+  recoveryLeadTimeHours Int?
+  fallbackArrangement   String
+  isSinglePointFailure  Boolean                  @default(false)
+  isActive              Boolean                  @default(true)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  analysis     BusinessImpactAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, type, name])
+  @@index([organizationId, type, isSinglePointFailure])
+  @@index([analysisId, isActive])
+}
+
+model ContinuityExercise {
+  id                       String                    @id @default(cuid())
+  organizationId           String
+  planId                   String
+  analysisId               String?
+  leadId                   String
+  createdById              String
+  reviewedById             String?
+  reference                String
+  type                     ContinuityExerciseType
+  status                   ContinuityExerciseStatus  @default(PLANNED)
+  scheduledAt              DateTime
+  startedAt                DateTime?
+  completedAt              DateTime?
+  objectives               String
+  scenario                 String
+  expectedParticipants     Int                       @default(1)
+  actualParticipants       Int?
+  targetRecoveryTimeHours  Int?
+  actualRecoveryTimeHours  Int?
+  targetRecoveryPointHours Int?
+  actualRecoveryPointHours Int?
+  result                   ContinuityExerciseResult?
+  strengths                String?
+  gaps                     String?
+  afterActionSummary       String?
+  cancelledReason          String?
+  reviewedAt               DateTime?
+  reminderSentAt           DateTime?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         BusinessContinuityPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  analysis     BusinessImpactAnalysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  lead         User                    @relation("ContinuityExerciseLead", fields: [leadId], references: [id], onDelete: Restrict)
+  createdBy    User                    @relation("ContinuityExerciseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  reviewedBy   User?                   @relation("ContinuityExerciseReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  improvements ContinuityImprovement[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, scheduledAt])
+  @@index([planId, scheduledAt])
+  @@index([analysisId, scheduledAt])
+  @@index([leadId, status])
+}
+
+model ContinuityActivation {
+  id                       String                       @id @default(cuid())
+  organizationId           String
+  planId                   String
+  emergencyActivationId    String?
+  declaredById             String
+  coordinatorId            String
+  restoredById             String?
+  closedById               String?
+  reference                String
+  category                 ContinuityDisruptionCategory
+  severity                 RiskLevel
+  status                   ContinuityActivationStatus   @default(ACTIVE)
+  title                    String
+  location                 String?
+  disruptionSummary        String
+  impactedProcesses        String
+  activationRationale      String
+  recoveryActions          String
+  stakeholderCommunication String
+  workaroundStatus         String?
+  declaredAt               DateTime
+  expectedRecoveryAt       DateTime
+  restoredAt               DateTime?
+  restorationEvidence      String?
+  closedAt                 DateTime?
+  closureSummary           String?
+  afterActionDueAt         DateTime
+  lessonsLearned           String?
+  estimatedDowntimeHours   Int?
+  actualDowntimeHours      Int?
+  reminderSentAt           DateTime?
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
+
+  organization        Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan                BusinessContinuityPlan  @relation(fields: [planId], references: [id], onDelete: Restrict)
+  emergencyActivation EmergencyActivation?    @relation(fields: [emergencyActivationId], references: [id], onDelete: SetNull)
+  declaredBy          User                    @relation("ContinuityActivationDeclaredBy", fields: [declaredById], references: [id], onDelete: Restrict)
+  coordinator         User                    @relation("ContinuityActivationCoordinator", fields: [coordinatorId], references: [id], onDelete: Restrict)
+  restoredBy          User?                   @relation("ContinuityActivationRestoredBy", fields: [restoredById], references: [id], onDelete: SetNull)
+  closedBy            User?                   @relation("ContinuityActivationClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  improvements        ContinuityImprovement[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, declaredAt])
+  @@index([planId, declaredAt])
+  @@index([coordinatorId, status])
+  @@index([organizationId, afterActionDueAt, status])
+  @@index([emergencyActivationId])
+}
+
+model ContinuityImprovement {
+  id                 String                      @id @default(cuid())
+  organizationId     String
+  planId             String
+  exerciseId         String?
+  activationId       String?
+  ownerId            String
+  createdById        String
+  verifiedById       String?
+  correctiveActionId String?                     @unique
+  title              String
+  description        String
+  priority           RiskLevel
+  status             ContinuityImprovementStatus @default(OPEN)
+  dueAt              DateTime
+  completionEvidence String?
+  verificationNotes  String?
+  completedAt        DateTime?
+  verifiedAt         DateTime?
+  reminderSentAt     DateTime?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  organization     Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan             BusinessContinuityPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  exercise         ContinuityExercise?    @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+  activation       ContinuityActivation?  @relation(fields: [activationId], references: [id], onDelete: SetNull)
+  owner            User                   @relation("ContinuityImprovementOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdBy        User                   @relation("ContinuityImprovementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  verifiedBy       User?                  @relation("ContinuityImprovementVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  correctiveAction CorrectiveAction?      @relation(fields: [correctiveActionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, dueAt])
+  @@index([planId, status])
+  @@index([exerciseId, status])
   @@index([activationId, status])
   @@index([ownerId, status])
 }

@@ -125,6 +125,8 @@ export function formSubmissionDirectSourceHref(
       return `/compliance/regulatory/changes/${encodedId}`;
     case ConfigurableFormModule.EMERGENCY_PREPAREDNESS:
       return `/emergency/plans/${encodedId}`;
+    case ConfigurableFormModule.BUSINESS_CONTINUITY:
+      return `/business-continuity/plans/${encodedId}`;
     case ConfigurableFormModule.SIF_ASSURANCE:
     case ConfigurableFormModule.ASSET_SAFETY:
     case ConfigurableFormModule.GENERAL:

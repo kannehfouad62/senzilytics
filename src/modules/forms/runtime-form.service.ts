@@ -67,6 +67,8 @@ export function configurableFormModuleForDocumentEntity(
       return ConfigurableFormModule.REGULATORY_INTELLIGENCE;
     case DocumentEntityType.EMERGENCY_PREPAREDNESS:
       return ConfigurableFormModule.EMERGENCY_PREPAREDNESS;
+    case DocumentEntityType.BUSINESS_CONTINUITY:
+      return ConfigurableFormModule.BUSINESS_CONTINUITY;
     default:
       return null;
   }

@@ -28,7 +28,8 @@ type SupportedEntityType =
   | typeof DocumentEntityType.ASSET_SAFETY
   | typeof DocumentEntityType.BEHAVIOR_SAFETY
   | typeof DocumentEntityType.REGULATORY_CHANGE
-  | typeof DocumentEntityType.EMERGENCY_PREPAREDNESS;
+  | typeof DocumentEntityType.EMERGENCY_PREPAREDNESS
+  | typeof DocumentEntityType.BUSINESS_CONTINUITY;
 
 function displayValue(
   value: unknown

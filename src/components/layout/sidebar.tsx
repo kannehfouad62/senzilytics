@@ -47,6 +47,7 @@ import {
   ServerCog,
   Target,
   Siren,
+  RefreshCw,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -153,6 +154,12 @@ export const primaryNavItems: NavigationItem[] = [
 ];
 
 export const ehsNavItems: NavigationItem[] = [
+  {
+    label: "Business Continuity",
+    href: "/business-continuity",
+    icon: RefreshCw,
+    permission: PermissionKey.VIEW_BUSINESS_CONTINUITY,
+  },
   {
     label: "Emergency Preparedness",
     href: "/emergency",
