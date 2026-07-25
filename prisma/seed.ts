@@ -172,6 +172,9 @@ async function main() {
       PermissionKey.MANAGE_INTEGRATIONS,
       PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
       PermissionKey.MANAGE_PERFORMANCE_SCORECARDS,
+      PermissionKey.VIEW_EMERGENCY_PREPAREDNESS,
+      PermissionKey.MANAGE_EMERGENCY_PREPAREDNESS,
+      PermissionKey.RECORD_EMERGENCY_RESPONSE,
     ],
 
     EHS_MANAGER: [
@@ -219,6 +222,9 @@ async function main() {
       PermissionKey.MANAGE_BEHAVIOR_SAFETY,
       PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
       PermissionKey.MANAGE_PERFORMANCE_SCORECARDS,
+      PermissionKey.VIEW_EMERGENCY_PREPAREDNESS,
+      PermissionKey.MANAGE_EMERGENCY_PREPAREDNESS,
+      PermissionKey.RECORD_EMERGENCY_RESPONSE,
     ],
 
     SUPERVISOR: [
@@ -249,6 +255,8 @@ async function main() {
       PermissionKey.VIEW_BEHAVIOR_SAFETY,
       PermissionKey.RECORD_BEHAVIOR_COACHING,
       PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
+      PermissionKey.VIEW_EMERGENCY_PREPAREDNESS,
+      PermissionKey.RECORD_EMERGENCY_RESPONSE,
     ],
 
     EMPLOYEE: [
@@ -263,6 +271,7 @@ async function main() {
       PermissionKey.VIEW_PERMITS_TO_WORK,
       PermissionKey.VIEW_BEHAVIOR_SAFETY,
       PermissionKey.RECORD_BEHAVIOR_COACHING,
+      PermissionKey.VIEW_EMERGENCY_PREPAREDNESS,
     ],
 
     AUDITOR: [
@@ -284,6 +293,7 @@ async function main() {
       PermissionKey.VIEW_ASSETS,
       PermissionKey.VIEW_BEHAVIOR_SAFETY,
       PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
+      PermissionKey.VIEW_EMERGENCY_PREPAREDNESS,
     ],
     DEMO_VIEWER: [
       PermissionKey.VIEW_DASHBOARD,
@@ -309,6 +319,7 @@ async function main() {
       PermissionKey.VIEW_ASSETS,
       PermissionKey.VIEW_BEHAVIOR_SAFETY,
       PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
+      PermissionKey.VIEW_EMERGENCY_PREPAREDNESS,
     ],
   };
 

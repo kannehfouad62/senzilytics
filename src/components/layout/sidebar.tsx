@@ -46,6 +46,7 @@ import {
   Rocket,
   ServerCog,
   Target,
+  Siren,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -152,6 +153,12 @@ export const primaryNavItems: NavigationItem[] = [
 ];
 
 export const ehsNavItems: NavigationItem[] = [
+  {
+    label: "Emergency Preparedness",
+    href: "/emergency",
+    icon: Siren,
+    permission: PermissionKey.VIEW_EMERGENCY_PREPAREDNESS,
+  },
   {
     label: "Behavior-Based Safety",
     href: "/behavior-safety",

@@ -187,6 +187,91 @@ enum PermissionKey {
   MANAGE_INTEGRATIONS
   VIEW_PERFORMANCE_SCORECARDS
   MANAGE_PERFORMANCE_SCORECARDS
+  VIEW_EMERGENCY_PREPAREDNESS
+  MANAGE_EMERGENCY_PREPAREDNESS
+  RECORD_EMERGENCY_RESPONSE
+}
+
+enum EmergencyPlanType {
+  ALL_HAZARDS
+  FIRE
+  MEDICAL
+  CHEMICAL_RELEASE
+  ENVIRONMENTAL_RELEASE
+  SEVERE_WEATHER
+  SECURITY
+  UTILITY_FAILURE
+  TRANSPORTATION
+  NATURAL_DISASTER
+  OTHER
+}
+
+enum EmergencyPlanStatus {
+  DRAFT
+  IN_REVIEW
+  ACTIVE
+  REJECTED
+  ARCHIVED
+}
+
+enum EmergencyScenarioCategory {
+  FIRE
+  MEDICAL
+  CHEMICAL_RELEASE
+  ENVIRONMENTAL_RELEASE
+  SEVERE_WEATHER
+  SECURITY
+  UTILITY_FAILURE
+  TRANSPORTATION
+  NATURAL_DISASTER
+  OTHER
+}
+
+enum EmergencyContactType {
+  INTERNAL
+  FIRE_RESCUE
+  MEDICAL
+  POLICE
+  ENVIRONMENTAL_AGENCY
+  UTILITY
+  MUTUAL_AID
+  CONTRACTOR
+  OTHER
+}
+
+enum EmergencyDrillType {
+  TABLETOP
+  FUNCTIONAL
+  EVACUATION
+  FULL_SCALE
+}
+
+enum EmergencyDrillStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum EmergencyDrillRating {
+  EFFECTIVE
+  PARTIALLY_EFFECTIVE
+  INEFFECTIVE
+}
+
+enum EmergencyActivationStatus {
+  ACTIVE
+  STABILIZED
+  STOOD_DOWN
+  REVIEWED
+}
+
+enum EmergencyImprovementStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  CANCELLED
 }
 
 enum PerformanceIndicatorType {
@@ -336,6 +421,7 @@ enum ConfigurableFormModule {
   ASSET_SAFETY
   BEHAVIOR_SAFETY
   REGULATORY_INTELLIGENCE
+  EMERGENCY_PREPAREDNESS
   GENERAL
 }
 
@@ -1081,6 +1167,7 @@ enum DocumentEntityType {
   ASSET_SAFETY
   BEHAVIOR_SAFETY
   REGULATORY_CHANGE
+  EMERGENCY_PREPAREDNESS
 }
 
 enum DocumentCategory {
@@ -1595,6 +1682,11 @@ model Organization {
   productionReadinessReviews     ProductionReadinessReview[]
   performanceIndicators          PerformanceIndicatorDefinition[]
   performanceMeasurements        PerformanceIndicatorMeasurement[]
+  emergencyPlans                 EmergencyPlan[]
+  emergencyContacts              EmergencyContact[]
+  emergencyDrills                EmergencyDrill[]
+  emergencyActivations           EmergencyActivation[]
+  emergencyImprovements          EmergencyImprovement[]
 }
 
 model PricingInquiry {
@@ -1659,6 +1751,7 @@ model Site {
   behaviorCoachingSessions      BehaviorCoachingSession[]
   performanceTargets            PerformanceIndicatorTarget[]
   performanceMeasurements       PerformanceIndicatorMeasurement[]
+  emergencyPlans                EmergencyPlan[]
 }
 
 model Department {
@@ -1693,6 +1786,7 @@ model Department {
   behaviorCoachingSessions BehaviorCoachingSession[]
   performanceTargets       PerformanceIndicatorTarget[]
   performanceMeasurements  PerformanceIndicatorMeasurement[]
+  emergencyPlans           EmergencyPlan[]
 }
 
 model User {
@@ -1850,6 +1944,20 @@ model User {
   ownedProductionReadinessControls    ProductionReadinessControl[]    @relation("ProductionReadinessControlOwner")
   testedProductionReadinessControls   ProductionReadinessControl[]    @relation("ProductionReadinessControlTestedBy")
   updatedProductionReadinessControls  ProductionReadinessControl[]    @relation("ProductionReadinessControlUpdatedBy")
+  ownedEmergencyPlans                 EmergencyPlan[]                 @relation("EmergencyPlanOwner")
+  createdEmergencyPlans               EmergencyPlan[]                 @relation("EmergencyPlanCreatedBy")
+  submittedEmergencyPlans             EmergencyPlan[]                 @relation("EmergencyPlanSubmittedBy")
+  approvedEmergencyPlans              EmergencyPlan[]                 @relation("EmergencyPlanApprovedBy")
+  ledEmergencyDrills                  EmergencyDrill[]                @relation("EmergencyDrillLead")
+  createdEmergencyDrills              EmergencyDrill[]                @relation("EmergencyDrillCreatedBy")
+  reviewedEmergencyDrills             EmergencyDrill[]                @relation("EmergencyDrillReviewedBy")
+  declaredEmergencyActivations        EmergencyActivation[]           @relation("EmergencyActivationDeclaredBy")
+  commandedEmergencyActivations       EmergencyActivation[]           @relation("EmergencyActivationCommander")
+  stoodDownEmergencyActivations       EmergencyActivation[]           @relation("EmergencyActivationStoodDownBy")
+  reviewedEmergencyActivations        EmergencyActivation[]           @relation("EmergencyActivationReviewedBy")
+  ownedEmergencyImprovements          EmergencyImprovement[]          @relation("EmergencyImprovementOwner")
+  createdEmergencyImprovements        EmergencyImprovement[]          @relation("EmergencyImprovementCreatedBy")
+  verifiedEmergencyImprovements       EmergencyImprovement[]          @relation("EmergencyImprovementVerifiedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -2225,6 +2333,7 @@ model CorrectiveAction {
   certificationReviewActions   CertificationReviewActionLink[]
   assetDefects                 AssetDefect[]
   regulatoryChangeLinks        RegulatoryChangeActionLink[]
+  emergencyImprovements        EmergencyImprovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6283,6 +6392,256 @@ model Document {
   @@index([organizationId, checksum])
   @@index([organizationId, versionGroupId, version])
   @@index([uploadedById])
+}
+
+// ============================================================
+// EMERGENCY PREPAREDNESS AND RESPONSE
+// ============================================================
+
+model EmergencyPlan {
+  id                      String              @id @default(cuid())
+  organizationId          String
+  siteId                  String
+  departmentId            String?
+  ownerId                 String
+  createdById             String
+  submittedById           String?
+  approvedById            String?
+  previousVersionId       String?             @unique
+  reference               String
+  version                 Int                 @default(1)
+  title                   String
+  type                    EmergencyPlanType
+  status                  EmergencyPlanStatus @default(DRAFT)
+  scope                   String
+  purpose                 String?
+  hazardProfile           String
+  commandStructure        String
+  communicationProcedure  String
+  evacuationProcedure     String
+  shelterProcedure        String?
+  accountabilityProcedure String
+  medicalProcedure        String?
+  externalCoordination    String?
+  recoveryCriteria        String
+  effectiveAt             DateTime?
+  reviewDueAt             DateTime
+  submittedAt             DateTime?
+  approvedAt              DateTime?
+  rejectedAt              DateTime?
+  archivedAt              DateTime?
+  reviewReminderAt        DateTime?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site            Site                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  department      Department?            @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  owner           User                   @relation("EmergencyPlanOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdBy       User                   @relation("EmergencyPlanCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  submittedBy     User?                  @relation("EmergencyPlanSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  approvedBy      User?                  @relation("EmergencyPlanApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  previousVersion EmergencyPlan?         @relation("EmergencyPlanRevision", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  revisions       EmergencyPlan[]        @relation("EmergencyPlanRevision")
+  scenarios       EmergencyScenario[]
+  contacts        EmergencyContact[]
+  drills          EmergencyDrill[]
+  activations     EmergencyActivation[]
+  improvements    EmergencyImprovement[]
+
+  @@unique([organizationId, reference, version])
+  @@index([organizationId, status, reviewDueAt])
+  @@index([siteId, status])
+  @@index([ownerId, status])
+}
+
+model EmergencyScenario {
+  id                 String                    @id @default(cuid())
+  planId             String
+  category           EmergencyScenarioCategory
+  riskLevel          RiskLevel
+  title              String
+  triggerCriteria    String
+  immediateActions   String
+  protectiveActions  String
+  evacuationAreas    String?
+  musterPoints       String?
+  shutdownSteps      String?
+  requiredEquipment  String?
+  specialAssistance  String?
+  externalAgencies   String?
+  evacuationRequired Boolean                   @default(false)
+  shelterInPlace     Boolean                   @default(false)
+  sequence           Int                       @default(0)
+  isActive           Boolean                   @default(true)
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  plan        EmergencyPlan         @relation(fields: [planId], references: [id], onDelete: Cascade)
+  drills      EmergencyDrill[]
+  activations EmergencyActivation[]
+
+  @@unique([planId, title])
+  @@index([planId, isActive, sequence])
+}
+
+model EmergencyContact {
+  id               String               @id @default(cuid())
+  organizationId   String
+  planId           String
+  type             EmergencyContactType
+  name             String
+  role             String?
+  organizationName String?
+  phone            String
+  alternatePhone   String?
+  email            String?
+  availability     String?
+  priority         Int                  @default(0)
+  isActive         Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         EmergencyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, name, phone])
+  @@index([organizationId, type, isActive])
+  @@index([planId, priority])
+}
+
+model EmergencyDrill {
+  id                     String                @id @default(cuid())
+  organizationId         String
+  planId                 String
+  scenarioId             String?
+  leadId                 String
+  createdById            String
+  reviewedById           String?
+  reference              String
+  type                   EmergencyDrillType
+  status                 EmergencyDrillStatus  @default(PLANNED)
+  scheduledAt            DateTime
+  startedAt              DateTime?
+  completedAt            DateTime?
+  objectives             String
+  scope                  String?
+  expectedParticipants   Int                   @default(0)
+  actualParticipants     Int?
+  notificationMethod     String?
+  alarmActivationSeconds Int?
+  evacuationSeconds      Int?
+  accountabilitySeconds  Int?
+  rating                 EmergencyDrillRating?
+  strengths              String?
+  gaps                   String?
+  observerNotes          String?
+  afterActionSummary     String?
+  cancelledReason        String?
+  reviewedAt             DateTime?
+  reminderSentAt         DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         EmergencyPlan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+  scenario     EmergencyScenario?     @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+  lead         User                   @relation("EmergencyDrillLead", fields: [leadId], references: [id], onDelete: Restrict)
+  createdBy    User                   @relation("EmergencyDrillCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  reviewedBy   User?                  @relation("EmergencyDrillReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  improvements EmergencyImprovement[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, scheduledAt])
+  @@index([planId, scheduledAt])
+  @@index([leadId, status])
+}
+
+model EmergencyActivation {
+  id                       String                    @id @default(cuid())
+  organizationId           String
+  planId                   String
+  scenarioId               String?
+  declaredById             String
+  incidentCommanderId      String
+  stoodDownById            String?
+  reviewedById             String?
+  reference                String
+  status                   EmergencyActivationStatus @default(ACTIVE)
+  severity                 RiskLevel
+  location                 String
+  summary                  String
+  declaredAt               DateTime
+  notificationMethod       String
+  protectiveActions        String
+  externalAgenciesNotified String?
+  peopleAtRisk             Int                       @default(0)
+  injuriesReported         Int                       @default(0)
+  missingPersons           Int                       @default(0)
+  stabilizedAt             DateTime?
+  stoodDownAt              DateTime?
+  stoodDownRationale       String?
+  afterActionDueAt         DateTime
+  reviewedAt               DateTime?
+  afterActionSummary       String?
+  lessonsLearned           String?
+  reminderSentAt           DateTime?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+
+  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan              EmergencyPlan          @relation(fields: [planId], references: [id], onDelete: Restrict)
+  scenario          EmergencyScenario?     @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+  declaredBy        User                   @relation("EmergencyActivationDeclaredBy", fields: [declaredById], references: [id], onDelete: Restrict)
+  incidentCommander User                   @relation("EmergencyActivationCommander", fields: [incidentCommanderId], references: [id], onDelete: Restrict)
+  stoodDownBy       User?                  @relation("EmergencyActivationStoodDownBy", fields: [stoodDownById], references: [id], onDelete: SetNull)
+  reviewedBy        User?                  @relation("EmergencyActivationReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  improvements      EmergencyImprovement[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, declaredAt])
+  @@index([planId, declaredAt])
+  @@index([incidentCommanderId, status])
+  @@index([organizationId, afterActionDueAt, status])
+}
+
+model EmergencyImprovement {
+  id                 String                     @id @default(cuid())
+  organizationId     String
+  planId             String
+  drillId            String?
+  activationId       String?
+  ownerId            String
+  createdById        String
+  verifiedById       String?
+  correctiveActionId String?                    @unique
+  title              String
+  description        String
+  priority           RiskLevel
+  status             EmergencyImprovementStatus @default(OPEN)
+  dueAt              DateTime
+  completionEvidence String?
+  verificationNotes  String?
+  completedAt        DateTime?
+  verifiedAt         DateTime?
+  reminderSentAt     DateTime?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan             EmergencyPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  drill            EmergencyDrill?      @relation(fields: [drillId], references: [id], onDelete: SetNull)
+  activation       EmergencyActivation? @relation(fields: [activationId], references: [id], onDelete: SetNull)
+  owner            User                 @relation("EmergencyImprovementOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdBy        User                 @relation("EmergencyImprovementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  verifiedBy       User?                @relation("EmergencyImprovementVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  correctiveAction CorrectiveAction?    @relation(fields: [correctiveActionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, dueAt])
+  @@index([planId, status])
+  @@index([drillId, status])
+  @@index([activationId, status])
+  @@index([ownerId, status])
 }
 
 // ============================================================

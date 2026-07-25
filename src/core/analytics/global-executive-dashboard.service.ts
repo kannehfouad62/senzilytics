@@ -56,6 +56,7 @@ const modulePermissions: Record<string, readonly PermissionKey[]> = {
   "Certification Readiness": [PermissionKey.VIEW_CERTIFICATION_READINESS],
   "Assets & Equipment": [PermissionKey.VIEW_ASSETS],
   "Behavior-Based Safety": [PermissionKey.VIEW_BEHAVIOR_SAFETY],
+  "Emergency Preparedness": [PermissionKey.VIEW_EMERGENCY_PREPAREDNESS],
 };
 
 export function canViewExecutiveModule(
@@ -107,6 +108,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     aboveLimitExposureSamples, overdueSurveillance, assetExceptions, overdueAssetInspections, criticalAssetDefects,
     behaviorSessionsThisMonth, criticalBehaviorAtRisk, overdueBehaviorFollowUps,
     openRegulatoryChanges, overdueRegulatoryAssessments, criticalRegulatoryExposure,
+    openEmergencyActivations, overdueEmergencyPlanReviews, overdueEmergencyDrills, overdueEmergencyImprovements,
   ] = await Promise.all([
     allowed.has(PermissionKey.VIEW_OBSERVATIONS) ? prisma.safetyObservation.count({ where: { organizationId, status: { notIn: [SafetyObservationStatus.RESOLVED, SafetyObservationStatus.CLOSED] } } }) : 0,
     canViewCapa ? prisma.correctiveAction.count({ where: { ...actionTenantScope, status: { notIn: closedStatuses } } }) : 0,
@@ -144,6 +146,10 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
     allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.regulatoryChange.count({ where: { organizationId, status: { in: ["DETECTED", "UNDER_REVIEW", "IMPACT_ASSESSMENT", "ACTION_REQUIRED"] } } }) : 0,
     allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.regulatoryChange.count({ where: { organizationId, status: { in: ["DETECTED", "UNDER_REVIEW", "IMPACT_ASSESSMENT"] }, assessmentDueAt: { lt: now } } }) : 0,
     allowed.has(PermissionKey.VIEW_COMPLIANCE) ? prisma.regulatoryChange.count({ where: { organizationId, significance: "CRITICAL", status: { in: ["DETECTED", "UNDER_REVIEW", "IMPACT_ASSESSMENT", "ACTION_REQUIRED"] } } }) : 0,
+    allowed.has(PermissionKey.VIEW_EMERGENCY_PREPAREDNESS) ? prisma.emergencyActivation.count({ where: { organizationId, status: { in: ["ACTIVE", "STABILIZED"] } } }) : 0,
+    allowed.has(PermissionKey.VIEW_EMERGENCY_PREPAREDNESS) ? prisma.emergencyPlan.count({ where: { organizationId, status: "ACTIVE", reviewDueAt: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_EMERGENCY_PREPAREDNESS) ? prisma.emergencyDrill.count({ where: { organizationId, status: "PLANNED", scheduledAt: { lt: now } } }) : 0,
+    allowed.has(PermissionKey.VIEW_EMERGENCY_PREPAREDNESS) ? prisma.emergencyImprovement.count({ where: { organizationId, status: { in: ["OPEN", "IN_PROGRESS", "COMPLETED"] }, dueAt: { lt: now } } }) : 0,
   ]);
 
   const modules: { label: string; value: number; note: string; href: string; tone: "danger" | "warning" | "good" | "neutral" }[] = [
@@ -171,6 +177,7 @@ export async function getGlobalExecutivePortfolio(organizationId: string, permis
   if (allowed.has(PermissionKey.VIEW_CERTIFICATION_READINESS)) modules.push({ label: "Certification Readiness", value: certificationMetrics.attentionCount, note: `${certificationMetrics.programCount} standard programs · ${certificationMetrics.overdueReviews} reviews overdue`, href: "/assurance/certification", tone: certificationMetrics.overdueReviews ? "danger" : certificationMetrics.withoutManagementReview ? "warning" : "good" });
   if (allowed.has(PermissionKey.VIEW_ASSETS)) modules.push({ label: "Assets & Equipment", value: assetExceptions + criticalAssetDefects, note: `${overdueAssetInspections} inspections overdue · ${criticalAssetDefects} critical defects`, href: "/assets/dashboard", tone: assetExceptions || criticalAssetDefects ? "danger" : overdueAssetInspections ? "warning" : "good" });
   if (allowed.has(PermissionKey.VIEW_BEHAVIOR_SAFETY)) modules.push({ label: "Behavior-Based Safety", value: criticalBehaviorAtRisk + overdueBehaviorFollowUps, note: `${behaviorSessionsThisMonth} coaching sessions this month · ${overdueBehaviorFollowUps} follow-ups overdue`, href: "/behavior-safety/dashboard", tone: criticalBehaviorAtRisk || overdueBehaviorFollowUps ? "danger" : behaviorSessionsThisMonth ? "good" : "neutral" });
+  if (allowed.has(PermissionKey.VIEW_EMERGENCY_PREPAREDNESS)) modules.push({ label: "Emergency Preparedness", value: openEmergencyActivations + overdueEmergencyPlanReviews + overdueEmergencyDrills + overdueEmergencyImprovements, note: `${openEmergencyActivations} active responses · ${overdueEmergencyPlanReviews} plan reviews overdue · ${overdueEmergencyDrills} drills overdue`, href: "/emergency", tone: openEmergencyActivations || overdueEmergencyPlanReviews || overdueEmergencyDrills || overdueEmergencyImprovements ? "danger" : "good" });
 
   const authorizedModules = modules.filter((item) =>
     canViewExecutiveModule(item.label, allowed),

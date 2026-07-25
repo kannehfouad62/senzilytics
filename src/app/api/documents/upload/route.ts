@@ -390,6 +390,11 @@ async function validateRelatedEntity(input: {
       return Boolean(record);
     }
 
+    case DocumentEntityType.EMERGENCY_PREPAREDNESS: {
+      const record = await prisma.emergencyPlan.findFirst({ where: { id: input.entityId, organizationId: input.organizationId }, select: { id: true } });
+      return Boolean(record);
+    }
+
     case DocumentEntityType.WORKFLOW: {
       const record = await prisma.workflowInstance.findFirst({
         where: {
@@ -723,6 +728,11 @@ async function requireDocumentUploadPermission(
     case ConfigurableFormModule.REGULATORY_INTELLIGENCE:
       allowed = permissions.includes(
         PermissionKey.MANAGE_COMPLIANCE
+      );
+      break;
+    case ConfigurableFormModule.EMERGENCY_PREPAREDNESS:
+      allowed = permissions.includes(
+        PermissionKey.MANAGE_EMERGENCY_PREPAREDNESS
       );
       break;
   }

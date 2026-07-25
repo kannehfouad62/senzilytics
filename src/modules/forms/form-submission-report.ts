@@ -123,6 +123,8 @@ export function formSubmissionDirectSourceHref(
       return `/behavior-safety/sessions/${encodedId}`;
     case ConfigurableFormModule.REGULATORY_INTELLIGENCE:
       return `/compliance/regulatory/changes/${encodedId}`;
+    case ConfigurableFormModule.EMERGENCY_PREPAREDNESS:
+      return `/emergency/plans/${encodedId}`;
     case ConfigurableFormModule.SIF_ASSURANCE:
     case ConfigurableFormModule.ASSET_SAFETY:
     case ConfigurableFormModule.GENERAL:

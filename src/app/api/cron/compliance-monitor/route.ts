@@ -7,6 +7,7 @@ import { processCertificationReviewMonitoring } from "@/modules/assurance/certif
 import { processAssetMonitoring } from "@/modules/assets/asset.service";
 import { processBehaviorSafetyMonitoring } from "@/modules/behavior-safety/behavior-safety.service";
 import { processRegulatoryIntelligenceMonitoring } from "@/modules/compliance/regulatory-intelligence.service";
+import { processEmergencyPreparednessMonitoring } from "@/modules/emergency/emergency.service";
 import { runTrackedScheduledJob } from "@/modules/platform/scheduled-job-monitor.service";
 import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
@@ -14,8 +15,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   if (!isAuthorizedCronRequest(request.headers.get("authorization"))) return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
   try {
-    const [compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls, certificationReviews, assets, behaviorSafety, regulatoryIntelligence] = await runTrackedScheduledJob("compliance-monitor", () => Promise.all([processComplianceMonitoring(), generateComplianceCalendarOccurrences(), monitorComplianceCalendar(), processOccupationalHealthMonitoring(), processCriticalControlMonitoring(), processCertificationReviewMonitoring(), processAssetMonitoring(), processBehaviorSafetyMonitoring(), processRegulatoryIntelligenceMonitoring()]));
-    return NextResponse.json({ success: true, processedAt: new Date().toISOString(), compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls, certificationReviews, assets, behaviorSafety, regulatoryIntelligence });
+    const [compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls, certificationReviews, assets, behaviorSafety, regulatoryIntelligence, emergencyPreparedness] = await runTrackedScheduledJob("compliance-monitor", () => Promise.all([processComplianceMonitoring(), generateComplianceCalendarOccurrences(), monitorComplianceCalendar(), processOccupationalHealthMonitoring(), processCriticalControlMonitoring(), processCertificationReviewMonitoring(), processAssetMonitoring(), processBehaviorSafetyMonitoring(), processRegulatoryIntelligenceMonitoring(), processEmergencyPreparednessMonitoring()]));
+    return NextResponse.json({ success: true, processedAt: new Date().toISOString(), compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls, certificationReviews, assets, behaviorSafety, regulatoryIntelligence, emergencyPreparedness });
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Compliance monitoring failed." }, { status: 500 });
   }

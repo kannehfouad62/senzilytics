@@ -159,6 +159,7 @@ export function configurableFormWorkflowEntityType(
     case ConfigurableFormModule.CONTRACTOR:
     case ConfigurableFormModule.INDUSTRIAL_HYGIENE:
     case ConfigurableFormModule.REGULATORY_INTELLIGENCE:
+    case ConfigurableFormModule.EMERGENCY_PREPAREDNESS:
     case ConfigurableFormModule.ESG:
     case ConfigurableFormModule.GENERAL:
       return null;
