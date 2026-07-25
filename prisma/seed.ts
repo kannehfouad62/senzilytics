@@ -170,6 +170,8 @@ async function main() {
       PermissionKey.RECORD_BEHAVIOR_COACHING,
       PermissionKey.MANAGE_BEHAVIOR_SAFETY,
       PermissionKey.MANAGE_INTEGRATIONS,
+      PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
+      PermissionKey.MANAGE_PERFORMANCE_SCORECARDS,
     ],
 
     EHS_MANAGER: [
@@ -215,6 +217,8 @@ async function main() {
       PermissionKey.VIEW_BEHAVIOR_SAFETY,
       PermissionKey.RECORD_BEHAVIOR_COACHING,
       PermissionKey.MANAGE_BEHAVIOR_SAFETY,
+      PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
+      PermissionKey.MANAGE_PERFORMANCE_SCORECARDS,
     ],
 
     SUPERVISOR: [
@@ -244,6 +248,7 @@ async function main() {
       PermissionKey.MANAGE_ASSETS,
       PermissionKey.VIEW_BEHAVIOR_SAFETY,
       PermissionKey.RECORD_BEHAVIOR_COACHING,
+      PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
     ],
 
     EMPLOYEE: [
@@ -278,6 +283,7 @@ async function main() {
       PermissionKey.VIEW_CERTIFICATION_READINESS,
       PermissionKey.VIEW_ASSETS,
       PermissionKey.VIEW_BEHAVIOR_SAFETY,
+      PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
     ],
     DEMO_VIEWER: [
       PermissionKey.VIEW_DASHBOARD,
@@ -302,6 +308,7 @@ async function main() {
       PermissionKey.VIEW_CERTIFICATION_READINESS,
       PermissionKey.VIEW_ASSETS,
       PermissionKey.VIEW_BEHAVIOR_SAFETY,
+      PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
     ],
   };
 

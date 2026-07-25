@@ -45,6 +45,7 @@ import {
   PlugZap,
   Rocket,
   ServerCog,
+  Target,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -64,6 +65,12 @@ export const primaryNavItems: NavigationItem[] = [
     href: "/dashboard",
     icon: LayoutDashboard,
     permission: PermissionKey.VIEW_DASHBOARD,
+  },
+  {
+    label: "Performance Scorecards",
+    href: "/performance",
+    icon: Target,
+    permission: PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
   },
   {
     label: "Operational Assurance",

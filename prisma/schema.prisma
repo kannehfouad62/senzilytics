@@ -155,6 +155,47 @@ enum PermissionKey {
   RECORD_BEHAVIOR_COACHING
   MANAGE_BEHAVIOR_SAFETY
   MANAGE_INTEGRATIONS
+  VIEW_PERFORMANCE_SCORECARDS
+  MANAGE_PERFORMANCE_SCORECARDS
+}
+
+enum PerformanceIndicatorType {
+  LEADING
+  LAGGING
+}
+
+enum PerformanceIndicatorDirection {
+  HIGHER_IS_BETTER
+  LOWER_IS_BETTER
+}
+
+enum PerformanceIndicatorFrequency {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+enum PerformanceIndicatorSource {
+  MANUAL
+  SYSTEM
+}
+
+enum PerformanceSystemMetric {
+  INCIDENT_COUNT
+  HIGH_RISK_INCIDENT_COUNT
+  OVERDUE_CORRECTIVE_ACTION_COUNT
+  AUDIT_COMPLETION_RATE
+  INSPECTION_COMPLETION_RATE
+  TRAINING_COMPLETION_RATE
+  OPEN_HIGH_RISK_COUNT
+  SAFE_BEHAVIOR_RATE
+}
+
+enum PerformanceMeasurementStatus {
+  DRAFT
+  APPROVED
+  REJECTED
 }
 
 enum IntegrationApiScope {
@@ -1466,7 +1507,7 @@ model Organization {
 
   enterpriseAuditFindingsV2 EnterpriseAuditFinding[] @relation("EnterpriseAuditFindingOrganization")
 
-  enterpriseAuditHistoryV2       EnterpriseAuditHistory[]        @relation("EnterpriseAuditHistoryOrganization")
+  enterpriseAuditHistoryV2       EnterpriseAuditHistory[]          @relation("EnterpriseAuditHistoryOrganization")
   safetyObservations             SafetyObservation[]
   trainingCourses                TrainingCourse[]
   trainingRequirements           TrainingRequirement[]
@@ -1521,6 +1562,8 @@ model Organization {
   mobilePushTokens               MobilePushToken[]
   mobilePushDeliveries           MobilePushDelivery[]
   onboardingPlan                 TenantOnboardingPlan?
+  performanceIndicators          PerformanceIndicatorDefinition[]
+  performanceMeasurements        PerformanceIndicatorMeasurement[]
 }
 
 model PricingInquiry {
@@ -1564,8 +1607,8 @@ model Site {
 
   auditProgramScopesV2 AuditProgramSite[] @relation("AuditProgramSiteScope")
 
-  auditSchedulesV2              AuditSchedule[]                @relation("AuditScheduleSite")
-  enterpriseAuditsV2            EnterpriseAudit[]              @relation("EnterpriseAuditSite")
+  auditSchedulesV2              AuditSchedule[]                   @relation("AuditScheduleSite")
+  enterpriseAuditsV2            EnterpriseAudit[]                 @relation("EnterpriseAuditSite")
   safetyObservations            SafetyObservation[]
   trainingRequirements          TrainingRequirement[]
   competencyRequirements        CompetencyRequirement[]
@@ -1583,6 +1626,8 @@ model Site {
   assets                        Asset[]
   behaviorSafetyPrograms        BehaviorSafetyProgram[]
   behaviorCoachingSessions      BehaviorCoachingSession[]
+  performanceTargets            PerformanceIndicatorTarget[]
+  performanceMeasurements       PerformanceIndicatorMeasurement[]
 }
 
 model Department {
@@ -1605,8 +1650,8 @@ model Department {
   complianceCalendarTasks       ComplianceCalendarTask[]
   complianceCalendarOccurrences ComplianceCalendarOccurrence[]
 
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
+  createdAt                DateTime                          @default(now())
+  updatedAt                DateTime                          @updatedAt
   jobSafetyAnalyses        JobSafetyAnalysis[]
   permitsToWork            PermitToWork[]
   similarExposureGroups    SimilarExposureGroup[]
@@ -1615,6 +1660,8 @@ model Department {
   assets                   Asset[]
   behaviorSafetyPrograms   BehaviorSafetyProgram[]
   behaviorCoachingSessions BehaviorCoachingSession[]
+  performanceTargets       PerformanceIndicatorTarget[]
+  performanceMeasurements  PerformanceIndicatorMeasurement[]
 }
 
 model User {
@@ -1689,17 +1736,21 @@ model User {
   completedRiskReviews RiskReview[]  @relation("RiskReviewCompletedBy")
 
   startedWorkflowInstances          WorkflowInstance[]
-  initiatedWorkflowAutomationEvents WorkflowAutomationEvent[]    @relation("WorkflowAutomationEventInitiator")
-  assignedWorkflowSteps             WorkflowInstanceStep[]       @relation("WorkflowAssignedUser")
-  completedWorkflowSteps            WorkflowInstanceStep[]       @relation("WorkflowCompletedBy")
-  approvedWorkflowOutcomes          WorkflowOutcomeExecution[]   @relation("WorkflowOutcomeApprovedBy")
-  rejectedWorkflowOutcomes          WorkflowOutcomeExecution[]   @relation("WorkflowOutcomeRejectedBy")
-  assignedWorkflowGeneratedTasks    WorkflowGeneratedTask[]      @relation("WorkflowGeneratedTaskAssignee")
-  completedWorkflowGeneratedTasks   WorkflowGeneratedTask[]      @relation("WorkflowGeneratedTaskCompletedBy")
-  configurableFormsCreated          ConfigurableFormDefinition[] @relation("ConfigurableFormCreatedBy")
-  configurableFormVersionsCreated   ConfigurableFormVersion[]    @relation("ConfigurableFormVersionCreatedBy")
-  configurableFormVersionsPublished ConfigurableFormVersion[]    @relation("ConfigurableFormVersionPublishedBy")
-  configurableFormSubmissions       ConfigurableFormSubmission[] @relation("ConfigurableFormSubmittedBy")
+  initiatedWorkflowAutomationEvents WorkflowAutomationEvent[]         @relation("WorkflowAutomationEventInitiator")
+  assignedWorkflowSteps             WorkflowInstanceStep[]            @relation("WorkflowAssignedUser")
+  completedWorkflowSteps            WorkflowInstanceStep[]            @relation("WorkflowCompletedBy")
+  approvedWorkflowOutcomes          WorkflowOutcomeExecution[]        @relation("WorkflowOutcomeApprovedBy")
+  rejectedWorkflowOutcomes          WorkflowOutcomeExecution[]        @relation("WorkflowOutcomeRejectedBy")
+  assignedWorkflowGeneratedTasks    WorkflowGeneratedTask[]           @relation("WorkflowGeneratedTaskAssignee")
+  completedWorkflowGeneratedTasks   WorkflowGeneratedTask[]           @relation("WorkflowGeneratedTaskCompletedBy")
+  configurableFormsCreated          ConfigurableFormDefinition[]      @relation("ConfigurableFormCreatedBy")
+  configurableFormVersionsCreated   ConfigurableFormVersion[]         @relation("ConfigurableFormVersionCreatedBy")
+  configurableFormVersionsPublished ConfigurableFormVersion[]         @relation("ConfigurableFormVersionPublishedBy")
+  configurableFormSubmissions       ConfigurableFormSubmission[]      @relation("ConfigurableFormSubmittedBy")
+  ownedPerformanceIndicators        PerformanceIndicatorDefinition[]  @relation("PerformanceIndicatorOwner")
+  createdPerformanceTargets         PerformanceIndicatorTarget[]      @relation("PerformanceTargetCreatedBy")
+  enteredPerformanceMeasurements    PerformanceIndicatorMeasurement[] @relation("PerformanceMeasurementEnteredBy")
+  reviewedPerformanceMeasurements   PerformanceIndicatorMeasurement[] @relation("PerformanceMeasurementReviewedBy")
 
   approvedContractors              Contractor[]                    @relation("ContractorApprovedBy")
   requestedPermitsToWork           PermitToWork[]                  @relation("PermitToWorkRequestedBy")
@@ -6138,4 +6189,98 @@ model Document {
   @@index([organizationId, checksum])
   @@index([organizationId, versionGroupId, version])
   @@index([uploadedById])
+}
+
+// ============================================================
+// ENTERPRISE PERFORMANCE SCORECARDS
+// ============================================================
+
+model PerformanceIndicatorDefinition {
+  id                 String                        @id @default(cuid())
+  organizationId     String
+  code               String
+  name               String
+  description        String?
+  category           String
+  type               PerformanceIndicatorType
+  direction          PerformanceIndicatorDirection
+  unit               String
+  reportingFrequency PerformanceIndicatorFrequency @default(MONTHLY)
+  source             PerformanceIndicatorSource
+  systemMetric       PerformanceSystemMetric?
+  methodology        String?
+  ownerId            String?
+  isActive           Boolean                       @default(true)
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  organization Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User?                             @relation("PerformanceIndicatorOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  targets      PerformanceIndicatorTarget[]
+  measurements PerformanceIndicatorMeasurement[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, isActive, type])
+  @@index([ownerId, isActive])
+}
+
+model PerformanceIndicatorTarget {
+  id                String    @id @default(cuid())
+  indicatorId       String
+  scopeKey          String
+  siteId            String?
+  departmentId      String?
+  targetValue       Float
+  warningThreshold  Float
+  criticalThreshold Float
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  rationale         String?
+  createdById       String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  indicator  PerformanceIndicatorDefinition @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  site       Site?                          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  department Department?                    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdBy  User                           @relation("PerformanceTargetCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([indicatorId, scopeKey, effectiveFrom])
+  @@index([indicatorId, scopeKey, effectiveFrom, effectiveTo])
+  @@index([siteId, effectiveFrom])
+  @@index([departmentId, effectiveFrom])
+}
+
+model PerformanceIndicatorMeasurement {
+  id              String                       @id @default(cuid())
+  organizationId  String
+  indicatorId     String
+  scopeKey        String
+  siteId          String?
+  departmentId    String?
+  periodStart     DateTime
+  periodEnd       DateTime
+  value           Float
+  status          PerformanceMeasurementStatus @default(DRAFT)
+  evidenceSummary String?
+  notes           String?
+  enteredById     String
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  organization Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  indicator    PerformanceIndicatorDefinition @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  site         Site?                          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  department   Department?                    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  enteredBy    User                           @relation("PerformanceMeasurementEnteredBy", fields: [enteredById], references: [id], onDelete: Restrict)
+  reviewedBy   User?                          @relation("PerformanceMeasurementReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([indicatorId, scopeKey, periodStart, periodEnd])
+  @@index([organizationId, status, periodEnd])
+  @@index([indicatorId, scopeKey, periodEnd, status])
+  @@index([siteId, periodEnd, status])
+  @@index([departmentId, periodEnd, status])
 }
