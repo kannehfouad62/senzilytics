@@ -3,6 +3,7 @@ import { requirePlatformAdministrator } from "@/lib/platform-admin";
 import { prisma } from "@/lib/prisma";
 import { getScheduledJobHealth } from "@/modules/platform/scheduled-job-monitor.service";
 import { getProductionReadinessPortfolio } from "@/modules/platform/production-readiness.service";
+import { getPlatformReleaseMetrics } from "@/modules/platform/release-candidate.service";
 import {
   TenantInvitationStatus,
   TenantOnboardingStatus,
@@ -13,6 +14,7 @@ import {
   CheckCircle2,
   Clock3,
   Database,
+  Rocket,
   ServerCog,
   ShieldCheck,
   Users,
@@ -30,6 +32,7 @@ export default async function PlatformOperationsPage() {
     pendingInvitations,
     expiredInvitations,
     readinessPortfolio,
+    releaseMetrics,
   ] =
     await Promise.all([
       getScheduledJobHealth(now),
@@ -55,6 +58,7 @@ export default async function PlatformOperationsPage() {
         },
       }),
       getProductionReadinessPortfolio(),
+      getPlatformReleaseMetrics(),
     ]);
   const environment = inspectProductionEnvironment();
   const activeUsers = tenants.reduce(
@@ -88,7 +92,6 @@ export default async function PlatformOperationsPage() {
     tenants.length - readinessPortfolio.length,
     0,
   );
-
   return (
     <div>
       <p className="flex items-center gap-2 text-sm text-cyan-300">
@@ -102,7 +105,7 @@ export default async function PlatformOperationsPage() {
         configuration, and customer-access signals without exposing secrets.
       </p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <Metric
           icon={Users}
           label="Production tenants"
@@ -139,6 +142,22 @@ export default async function PlatformOperationsPage() {
           note={`${readinessAlerts} attention · ${unassessedTenants} not assessed`}
           alert={readinessAlerts > 0 || unassessedTenants > 0}
         />
+        <Metric
+          icon={Rocket}
+          label="Release candidates"
+          value={releaseMetrics.total.toString()}
+          note={`${releaseMetrics.active} active · ${releaseMetrics.rolledBack} rolled back`}
+          alert={releaseMetrics.rolledBack > 0}
+        />
+      </div>
+
+      <div className="mt-4 flex justify-end">
+        <Link
+          href="/platform/releases"
+          className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 px-4 py-2 text-sm font-semibold text-cyan-200"
+        >
+          <Rocket size={16} /> Open release certification
+        </Link>
       </div>
 
       <section className="mt-8 rounded-3xl border border-white/10 bg-white/[.04] p-6">

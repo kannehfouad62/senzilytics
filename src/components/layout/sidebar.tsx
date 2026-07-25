@@ -397,6 +397,11 @@ export async function Sidebar() {
           href: "/platform/operations",
           icon: ServerCog,
         },
+        {
+          label: "Release Certification",
+          href: "/platform/releases",
+          icon: Rocket,
+        },
       ]
     : isDemo
       ? entitledPrimaryItems.filter((item) => item.href === "/dashboard")

@@ -35,6 +35,7 @@ export async function getPlatformAdministrator() {
       role: true,
       isActive: true,
       isPlatformAdmin: true,
+      organizationId: true,
     },
   });
 

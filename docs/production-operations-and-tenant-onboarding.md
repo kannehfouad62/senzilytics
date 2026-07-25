@@ -11,6 +11,9 @@ evidence.
 - `/platform/tenants/[id]` and `/platform/operations` require an active
   `SUPER_ADMIN` who is explicitly marked as a platform administrator and uses a
   `senzilytics.com` email address.
+- `/platform/releases` applies the same platform-administrator boundary and
+  records software certification and pilot decisions separately from tenant
+  onboarding approval.
 - Tenant actions always derive the organization from the authenticated session.
   A tenant-supplied organization identifier is never trusted.
 - Internal Senzilytics implementation notes are not selected or rendered in the
@@ -72,11 +75,26 @@ customer data into onboarding notes.
 
 ## Deployment order
 
-1. Apply the code release.
-2. Run `npx prisma generate`.
-3. Run `npx prisma migrate deploy`.
-4. Run `npm run check`.
-5. Confirm `/api/health`.
-6. Confirm `/platform/operations` and wait for each scheduled job to establish
-   its first production heartbeat.
-7. Review tenant onboarding plans before recording go-live approval.
+1. Create the exact release candidate in `/platform/releases`, including its
+   version, commit SHA, candidate deployment URL, risk summary and rollback
+   plan.
+2. Apply the candidate release in the controlled validation environment.
+3. Run `npx prisma generate`.
+4. Run `npx prisma migrate deploy`.
+5. Run `npm run check`.
+6. Confirm `/api/health`.
+7. Complete all eight release-certification checks against the candidate
+   deployment and attach controlled evidence references.
+8. Confirm `/platform/operations` and wait for each scheduled job to establish
+   its expected production heartbeat.
+9. Assign at least one tenant whose latest Production Assurance review is
+   approved and whose onboarding plan is ready for review or live.
+10. Submit and approve the release candidate. Pilot start remains blocked until
+    every assigned tenant is formally live.
+11. Record a final outcome for every pilot tenant. Any failed or rolled-back
+    pilot closes the candidate as `ROLLED_BACK`; all passed pilots close it as
+    `RELEASED`.
+
+Release approval does not replace tenant go-live approval. Tenant onboarding,
+Production Assurance, release certification and pilot outcome are independent,
+auditable decisions.

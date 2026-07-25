@@ -103,6 +103,42 @@ enum ProductionReadinessControlKey {
   SUPPORT_ESCALATION
 }
 
+enum PlatformReleaseStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PILOT_ACTIVE
+  RELEASED
+  REJECTED
+  ROLLED_BACK
+}
+
+enum PlatformReleaseCheckStatus {
+  NOT_RUN
+  PASS
+  FAIL
+  NOT_APPLICABLE
+}
+
+enum PlatformReleaseCheckKey {
+  CODE_QUALITY
+  DATABASE_MIGRATION
+  SECURITY_ACCESS
+  TENANT_ISOLATION
+  AUTHENTICATION_RECOVERY
+  CRITICAL_WORKFLOWS
+  MOBILE_COMPATIBILITY
+  OPERATIONS_RECOVERY
+}
+
+enum PlatformReleasePilotStatus {
+  PLANNED
+  ACTIVE
+  PASSED
+  FAILED
+  ROLLED_BACK
+}
+
 enum RiskLevel {
   LOW
   MEDIUM
@@ -1888,6 +1924,7 @@ model Organization {
   mobilePushDeliveries           MobilePushDelivery[]
   onboardingPlan                 TenantOnboardingPlan?
   productionReadinessReviews     ProductionReadinessReview[]
+  platformReleasePilots          PlatformReleasePilot[]
   performanceIndicators          PerformanceIndicatorDefinition[]
   performanceMeasurements        PerformanceIndicatorMeasurement[]
   emergencyPlans                 EmergencyPlan[]
@@ -2174,6 +2211,12 @@ model User {
   ownedProductionReadinessControls    ProductionReadinessControl[]    @relation("ProductionReadinessControlOwner")
   testedProductionReadinessControls   ProductionReadinessControl[]    @relation("ProductionReadinessControlTestedBy")
   updatedProductionReadinessControls  ProductionReadinessControl[]    @relation("ProductionReadinessControlUpdatedBy")
+  createdPlatformReleases             PlatformRelease[]               @relation("PlatformReleaseCreatedBy")
+  submittedPlatformReleases           PlatformRelease[]               @relation("PlatformReleaseSubmittedBy")
+  reviewedPlatformReleases            PlatformRelease[]               @relation("PlatformReleaseReviewedBy")
+  testedPlatformReleaseChecks         PlatformReleaseCheck[]          @relation("PlatformReleaseCheckTestedBy")
+  updatedPlatformReleaseChecks        PlatformReleaseCheck[]          @relation("PlatformReleaseCheckUpdatedBy")
+  updatedPlatformReleasePilots        PlatformReleasePilot[]          @relation("PlatformReleasePilotUpdatedBy")
   ownedEmergencyPlans                 EmergencyPlan[]                 @relation("EmergencyPlanOwner")
   createdEmergencyPlans               EmergencyPlan[]                 @relation("EmergencyPlanCreatedBy")
   submittedEmergencyPlans             EmergencyPlan[]                 @relation("EmergencyPlanSubmittedBy")
@@ -2396,6 +2439,87 @@ model ProductionReadinessControl {
   @@unique([reviewId, key])
   @@index([status, dueAt])
   @@index([ownerId, status])
+}
+
+model PlatformRelease {
+  id                    String                @id @default(cuid())
+  version               String                @unique
+  commitSha             String                @unique
+  deploymentUrl         String
+  status                PlatformReleaseStatus @default(DRAFT)
+  releaseNotes          String?
+  riskSummary           String?
+  rollbackPlan          String?
+  targetCertificationAt DateTime?
+  submissionNotes       String?
+  reviewNotes           String?
+  createdById           String
+  submittedById         String?
+  submittedAt           DateTime?
+  reviewedById          String?
+  reviewedAt            DateTime?
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  pilotStartedAt        DateTime?
+  releasedAt            DateTime?
+  rolledBackAt          DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  createdBy   User                   @relation("PlatformReleaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  submittedBy User?                  @relation("PlatformReleaseSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewedBy  User?                  @relation("PlatformReleaseReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  checks      PlatformReleaseCheck[]
+  pilots      PlatformReleasePilot[]
+
+  @@index([status, targetCertificationAt])
+  @@index([createdAt])
+}
+
+model PlatformReleaseCheck {
+  id              String                     @id @default(cuid())
+  releaseId       String
+  key             PlatformReleaseCheckKey
+  status          PlatformReleaseCheckStatus @default(NOT_RUN)
+  testMethod      String?
+  evidenceSummary String?
+  resultNotes     String?
+  evidenceUrl     String?
+  testedAt        DateTime?
+  testedById      String?
+  updatedById     String
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  release   PlatformRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  testedBy  User?           @relation("PlatformReleaseCheckTestedBy", fields: [testedById], references: [id], onDelete: SetNull)
+  updatedBy User            @relation("PlatformReleaseCheckUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@unique([releaseId, key])
+  @@index([status, testedAt])
+}
+
+model PlatformReleasePilot {
+  id             String                     @id @default(cuid())
+  releaseId      String
+  organizationId String
+  status         PlatformReleasePilotStatus @default(PLANNED)
+  plannedStartAt DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  exitCriteria   String
+  resultSummary  String?
+  updatedById    String
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  release      PlatformRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  updatedBy    User            @relation("PlatformReleasePilotUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@unique([releaseId, organizationId])
+  @@index([organizationId, status])
+  @@index([status, plannedStartAt])
 }
 
 model DemoLead {
