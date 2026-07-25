@@ -207,7 +207,15 @@ export default async function ReportsPage({
           </p>
         </div>
 
-        <PrintReportButton />
+        <div className="flex flex-wrap gap-3 print:hidden">
+          <Link
+            href="/management-reviews"
+            className="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-400/[.06] px-5 py-3 text-sm font-medium text-cyan-200"
+          >
+            Management reviews
+          </Link>
+          <PrintReportButton />
+        </div>
       </div>
 
       <form

@@ -22,6 +22,7 @@ import {
   ShieldAlert,
   Target,
   TimerReset,
+  Presentation,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -45,6 +46,7 @@ const metricIcons = {
   scorecards: Target,
   workflow: Network,
   predictive: BrainCircuit,
+  managementReviews: Presentation,
 } as const;
 
 const ratingTone: Record<string, string> = {
@@ -113,6 +115,15 @@ export default async function DashboardPage({
               >
                 <FileChartColumn size={17} />
                 Board report
+              </Link>
+            ) : null}
+            {allowed.has(PermissionKey.VIEW_EXECUTIVE_REVIEWS) ? (
+              <Link
+                href="/management-reviews"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-cyan-400/30"
+              >
+                <Presentation size={17} />
+                Management reviews
               </Link>
             ) : null}
             <Link

@@ -195,6 +195,9 @@ enum PermissionKey {
   RECORD_CONTINUITY_EVENT
   VIEW_PREDICTIVE_INTELLIGENCE
   MANAGE_PREDICTIVE_INTELLIGENCE
+  VIEW_EXECUTIVE_REVIEWS
+  MANAGE_EXECUTIVE_REVIEWS
+  APPROVE_EXECUTIVE_REVIEWS
 }
 
 enum EmergencyPlanType {
@@ -439,6 +442,66 @@ enum PredictiveSignalReviewDecision {
   MONITOR
   RESOLVE
   DISMISS
+}
+
+enum ExecutiveReviewFrequency {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+  AD_HOC
+}
+
+enum ExecutiveReviewStatus {
+  DRAFT
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  PUBLISHED
+  CANCELLED
+  ARCHIVED
+}
+
+enum ExecutiveReviewAgendaStatus {
+  PENDING
+  READY
+  PRESENTED
+  DEFERRED
+  CLOSED
+}
+
+enum ExecutiveReviewAttendanceRole {
+  CHAIR
+  APPROVER
+  PRESENTER
+  ATTENDEE
+  OBSERVER
+}
+
+enum ExecutiveReviewDecisionType {
+  ACTION_REQUIRED
+  ESCALATE
+  INVESTIGATE
+  RESOURCE_ALLOCATION
+  POLICY_CHANGE
+  ACCEPT_RISK
+  NOTE
+}
+
+enum ExecutiveReviewDecisionStatus {
+  OPEN
+  ACTION_LINKED
+  IMPLEMENTED
+  CLOSED
+  CANCELLED
+}
+
+enum ExecutiveReviewConclusion {
+  EFFECTIVE
+  EFFECTIVE_WITH_CONCERNS
+  NEEDS_IMPROVEMENT
+  CRITICAL_INTERVENTION
 }
 
 enum IntegrationApiScope {
@@ -1827,6 +1890,10 @@ model Organization {
   predictiveIntelligenceRuns     PredictiveIntelligenceRun[]
   predictiveSignals              PredictiveSignal[]
   predictiveSignalReviews        PredictiveSignalReview[]
+  executiveManagementReviews     ExecutiveManagementReview[]
+  executiveReviewAgendaItems     ExecutiveReviewAgendaItem[]
+  executiveReviewAttendees       ExecutiveReviewAttendee[]
+  executiveReviewDecisions       ExecutiveReviewDecision[]
 }
 
 model PricingInquiry {
@@ -1894,6 +1961,7 @@ model Site {
   emergencyPlans                EmergencyPlan[]
   continuityPlans               BusinessContinuityPlan[]
   predictiveSignals             PredictiveSignal[]
+  executiveManagementReviews    ExecutiveManagementReview[]
 }
 
 model Department {
@@ -2121,6 +2189,15 @@ model User {
   ownedPredictiveSignals              PredictiveSignal[]              @relation("PredictiveSignalOwner")
   reviewedPredictiveSignals           PredictiveSignal[]              @relation("PredictiveSignalReviewer")
   predictiveSignalReviews             PredictiveSignalReview[]        @relation("PredictiveSignalReviewUser")
+  chairedExecutiveReviews             ExecutiveManagementReview[]     @relation("ExecutiveReviewChair")
+  createdExecutiveReviews             ExecutiveManagementReview[]     @relation("ExecutiveReviewCreatedBy")
+  completedExecutiveReviews           ExecutiveManagementReview[]     @relation("ExecutiveReviewCompletedBy")
+  approvedExecutiveReviews            ExecutiveManagementReview[]     @relation("ExecutiveReviewApprovedBy")
+  publishedExecutiveReviews           ExecutiveManagementReview[]     @relation("ExecutiveReviewPublishedBy")
+  ownedExecutiveAgendaItems           ExecutiveReviewAgendaItem[]     @relation("ExecutiveAgendaOwner")
+  executiveReviewAttendance           ExecutiveReviewAttendee[]       @relation("ExecutiveReviewAttendeeUser")
+  ownedExecutiveDecisions             ExecutiveReviewDecision[]       @relation("ExecutiveDecisionOwner")
+  closedExecutiveDecisions            ExecutiveReviewDecision[]       @relation("ExecutiveDecisionClosedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -2498,6 +2575,7 @@ model CorrectiveAction {
   regulatoryChangeLinks        RegulatoryChangeActionLink[]
   emergencyImprovements        EmergencyImprovement[]
   continuityImprovements       ContinuityImprovement[]
+  executiveReviewDecisions     ExecutiveReviewDecision[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -7287,4 +7365,154 @@ model PredictiveSignalReview {
   @@index([organizationId, createdAt])
   @@index([signalId, createdAt])
   @@index([reviewerId, createdAt])
+}
+
+// ============================================================
+// ENTERPRISE MANAGEMENT REVIEW & BOARD PACKS
+// ============================================================
+
+model ExecutiveManagementReview {
+  id                    String                     @id @default(cuid())
+  organizationId        String
+  siteId                String?
+  chairId               String
+  createdById           String
+  completedById         String?
+  approvedById          String?
+  publishedById         String?
+  reference             String
+  title                 String
+  frequency             ExecutiveReviewFrequency
+  status                ExecutiveReviewStatus      @default(DRAFT)
+  periodStart           DateTime
+  periodEnd             DateTime
+  scheduledAt           DateTime
+  scope                 String
+  objectives            String
+  sourceModules         String[]
+  snapshotVersion       String?
+  evidenceSnapshot      Json?
+  snapshotGeneratedAt   DateTime?
+  dataQualityScore      Float?
+  executiveSummary      String?
+  performanceConclusion String?
+  riskControlConclusion String?
+  complianceConclusion  String?
+  resourceAdequacy      String?
+  significantChanges    String?
+  decisionsSummary      String?
+  overallConclusion     ExecutiveReviewConclusion?
+  nextReviewAt          DateTime?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  approvedAt            DateTime?
+  publishedAt           DateTime?
+  cancelledAt           DateTime?
+  archivedAt            DateTime?
+  reminderSentAt        DateTime?
+  overdueNotifiedAt     DateTime?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site         Site?                       @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  chair        User                        @relation("ExecutiveReviewChair", fields: [chairId], references: [id], onDelete: Restrict)
+  createdBy    User                        @relation("ExecutiveReviewCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  completedBy  User?                       @relation("ExecutiveReviewCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  approvedBy   User?                       @relation("ExecutiveReviewApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  publishedBy  User?                       @relation("ExecutiveReviewPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  agendaItems  ExecutiveReviewAgendaItem[]
+  attendees    ExecutiveReviewAttendee[]
+  decisions    ExecutiveReviewDecision[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, scheduledAt])
+  @@index([organizationId, periodEnd])
+  @@index([siteId, status])
+  @@index([chairId, status])
+}
+
+model ExecutiveReviewAgendaItem {
+  id               String                      @id @default(cuid())
+  organizationId   String
+  reviewId         String
+  ownerId          String?
+  position         Int
+  topic            String
+  sourceModule     String
+  sourceHref       String?
+  reviewPrompt     String
+  status           ExecutiveReviewAgendaStatus @default(PENDING)
+  evidenceSnapshot Json?
+  discussion       String?
+  conclusion       String?
+  presentedAt      DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  review       ExecutiveManagementReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  owner        User?                     @relation("ExecutiveAgendaOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  decisions    ExecutiveReviewDecision[]
+
+  @@unique([reviewId, position])
+  @@index([organizationId, status])
+  @@index([reviewId, status])
+  @@index([ownerId, status])
+}
+
+model ExecutiveReviewAttendee {
+  id             String                        @id @default(cuid())
+  organizationId String
+  reviewId       String
+  userId         String
+  role           ExecutiveReviewAttendanceRole @default(ATTENDEE)
+  attended       Boolean                       @default(false)
+  attendanceNote String?
+  attendedAt     DateTime?
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  review       ExecutiveManagementReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user         User                      @relation("ExecutiveReviewAttendeeUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, userId])
+  @@index([organizationId, attended])
+  @@index([userId, attended])
+}
+
+model ExecutiveReviewDecision {
+  id                 String                        @id @default(cuid())
+  organizationId     String
+  reviewId           String
+  agendaItemId       String?
+  ownerId            String?
+  closedById         String?
+  correctiveActionId String?
+  type               ExecutiveReviewDecisionType
+  status             ExecutiveReviewDecisionStatus @default(OPEN)
+  title              String
+  rationale          String
+  expectedOutcome    String?
+  priority           RiskLevel                     @default(MEDIUM)
+  dueAt              DateTime?
+  implementedAt      DateTime?
+  closedAt           DateTime?
+  closureEvidence    String?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  organization     Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  review           ExecutiveManagementReview  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  agendaItem       ExecutiveReviewAgendaItem? @relation(fields: [agendaItemId], references: [id], onDelete: SetNull)
+  owner            User?                      @relation("ExecutiveDecisionOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  closedBy         User?                      @relation("ExecutiveDecisionClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  correctiveAction CorrectiveAction?          @relation(fields: [correctiveActionId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, dueAt])
+  @@index([reviewId, status])
+  @@index([agendaItemId])
+  @@index([ownerId, status])
+  @@index([correctiveActionId])
 }

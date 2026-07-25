@@ -49,6 +49,7 @@ import {
   Siren,
   RefreshCw,
   TrendingUp,
+  Presentation,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -74,6 +75,12 @@ export const primaryNavItems: NavigationItem[] = [
     href: "/performance",
     icon: Target,
     permission: PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
+  },
+  {
+    label: "Management Reviews",
+    href: "/management-reviews",
+    icon: Presentation,
+    permission: PermissionKey.VIEW_EXECUTIVE_REVIEWS,
   },
   {
     label: "Operational Assurance",

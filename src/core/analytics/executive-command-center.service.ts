@@ -251,6 +251,7 @@ export async function getExecutiveCommandCenter(input: {
     workflow,
     latestAiBriefing,
     predictiveSignals,
+    executiveReviews,
   ] = await Promise.all([
     getGlobalExecutivePortfolio(input.organizationId, input.permissions),
     getOperationalAssuranceOverview({
@@ -433,6 +434,25 @@ export async function getExecutiveCommandCenter(input: {
           orderBy: { attentionScore: "desc" },
         })
       : [],
+    allowed.has(PermissionKey.VIEW_EXECUTIVE_REVIEWS) && !scope.departmentId
+      ? prisma.executiveManagementReview.findMany({
+          where: {
+            organizationId: input.organizationId,
+            status: {
+              in: ["DRAFT", "SCHEDULED", "IN_PROGRESS", "COMPLETED"],
+            },
+            ...(scope.siteId
+              ? { OR: [{ siteId: scope.siteId }, { siteId: null }] }
+              : {}),
+          },
+          select: {
+            id: true,
+            status: true,
+            scheduledAt: true,
+            updatedAt: true,
+          },
+        })
+      : [],
   ]);
 
   const openActions = actions.filter((action) => !completedStatuses.has(action.status));
@@ -553,6 +573,21 @@ export async function getExecutiveCommandCenter(input: {
           value: predictiveSignals.length,
           note: `${predictiveSignals.filter((signal) => elevatedRiskLevels.includes(signal.severity)).length} high or critical`,
           href: "/intelligence/predictive",
+          tone: "danger" as const,
+        }
+      : null,
+    allowed.has(PermissionKey.VIEW_EXECUTIVE_REVIEWS) && !scope.departmentId
+      ? {
+          key: "managementReviews",
+          label: "Review governance",
+          value: executiveReviews.filter(
+            (review) =>
+              review.status === "COMPLETED" ||
+              ((review.status === "DRAFT" || review.status === "SCHEDULED") &&
+                review.scheduledAt < now),
+          ).length,
+          note: `${executiveReviews.filter((review) => review.status === "COMPLETED").length} awaiting approval · ${executiveReviews.length} active`,
+          href: "/management-reviews",
           tone: "danger" as const,
         }
       : null,
