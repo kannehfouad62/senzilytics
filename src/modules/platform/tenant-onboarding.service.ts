@@ -7,6 +7,7 @@ import {
 import {
   ActivityAction,
   OrganizationStatus,
+  ProductionReadinessReviewStatus,
   SubscriptionPlan,
   TenantOnboardingStatus,
   TenantOnboardingStepKey,
@@ -262,6 +263,20 @@ async function validateCompletionGate(
     if (incomplete.length) {
       throw new Error(
         `${incomplete.length} implementation prerequisite${incomplete.length === 1 ? "" : "s"} remain incomplete.`,
+      );
+    }
+    const latestReadinessReview =
+      await prisma.productionReadinessReview.findFirst({
+        where: { organizationId },
+        orderBy: { version: "desc" },
+        select: { status: true, version: true },
+      });
+    if (
+      latestReadinessReview?.status !==
+      ProductionReadinessReviewStatus.APPROVED
+    ) {
+      throw new Error(
+        "Approve the latest Production Assurance review before tenant go-live.",
       );
     }
     return;

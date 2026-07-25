@@ -2,6 +2,7 @@ import { inspectProductionEnvironment } from "@/lib/production-env";
 import { requirePlatformAdministrator } from "@/lib/platform-admin";
 import { prisma } from "@/lib/prisma";
 import { getScheduledJobHealth } from "@/modules/platform/scheduled-job-monitor.service";
+import { getProductionReadinessPortfolio } from "@/modules/platform/production-readiness.service";
 import {
   TenantInvitationStatus,
   TenantOnboardingStatus,
@@ -13,15 +14,23 @@ import {
   Clock3,
   Database,
   ServerCog,
+  ShieldCheck,
   Users,
 } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlatformOperationsPage() {
   await requirePlatformAdministrator();
   const now = new Date();
-  const [jobs, tenants, pendingInvitations, expiredInvitations] =
+  const [
+    jobs,
+    tenants,
+    pendingInvitations,
+    expiredInvitations,
+    readinessPortfolio,
+  ] =
     await Promise.all([
       getScheduledJobHealth(now),
       prisma.organization.findMany({
@@ -45,6 +54,7 @@ export default async function PlatformOperationsPage() {
           expiresAt: { lte: now },
         },
       }),
+      getProductionReadinessPortfolio(),
     ]);
   const environment = inspectProductionEnvironment();
   const activeUsers = tenants.reduce(
@@ -64,6 +74,20 @@ export default async function PlatformOperationsPage() {
   const unhealthyJobs = jobs.filter((job) =>
     ["FAILED", "STALE", "NEVER_RUN"].includes(job.status),
   ).length;
+  const approvedReadiness = readinessPortfolio.filter(
+    (review) => review.status === "APPROVED",
+  ).length;
+  const readinessAlerts = readinessPortfolio.filter(
+    (review) =>
+      review.status === "REJECTED" ||
+      review.failedControls > 0 ||
+      review.conditionalControls > 0 ||
+      review.overdueControls > 0,
+  ).length;
+  const unassessedTenants = Math.max(
+    tenants.length - readinessPortfolio.length,
+    0,
+  );
 
   return (
     <div>
@@ -78,7 +102,7 @@ export default async function PlatformOperationsPage() {
         configuration, and customer-access signals without exposing secrets.
       </p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Metric
           icon={Users}
           label="Production tenants"
@@ -107,6 +131,13 @@ export default async function PlatformOperationsPage() {
           value={unhealthyJobs.toString()}
           note={`${jobs.length - unhealthyJobs} of ${jobs.length} healthy or running`}
           alert={unhealthyJobs > 0}
+        />
+        <Metric
+          icon={readinessAlerts || unassessedTenants ? AlertTriangle : ShieldCheck}
+          label="Production Assurance"
+          value={`${approvedReadiness}/${tenants.length}`}
+          note={`${readinessAlerts} attention · ${unassessedTenants} not assessed`}
+          alert={readinessAlerts > 0 || unassessedTenants > 0}
         />
       </div>
 
@@ -158,6 +189,89 @@ export default async function PlatformOperationsPage() {
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-8 rounded-3xl border border-emerald-400/15 bg-emerald-400/[.025] p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="flex items-center gap-2 text-sm text-emerald-300">
+              <ShieldCheck size={16} /> Production Assurance 2.0
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold">Tenant readiness portfolio</h2>
+            <p className="mt-2 max-w-3xl text-sm text-slate-400">
+              Latest structured control review for each assessed production
+              tenant. Go-live requires the latest version to be approved.
+            </p>
+          </div>
+          <Link
+            href="/platform/tenants"
+            className="rounded-xl border border-emerald-400/20 px-4 py-2 text-sm font-semibold text-emerald-200"
+          >
+            Open tenant provisioning
+          </Link>
+        </div>
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full min-w-[860px] text-left text-sm">
+            <thead className="text-xs uppercase tracking-wider text-slate-500">
+              <tr>
+                <th className="pb-3">Tenant</th>
+                <th className="pb-3">Version</th>
+                <th className="pb-3">State</th>
+                <th className="pb-3">Readiness</th>
+                <th className="pb-3">Exceptions</th>
+                <th className="pb-3">Target review</th>
+                <th className="pb-3">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10">
+              {readinessPortfolio.map((review) => (
+                <tr key={review.id}>
+                  <td className="py-4 font-medium text-white">
+                    {review.organization.name}
+                  </td>
+                  <td className="py-4 text-slate-400">v{review.version}</td>
+                  <td className="py-4">
+                    <HealthBadge
+                      status={
+                        review.status === "APPROVED"
+                          ? "HEALTHY"
+                          : review.status === "IN_REVIEW"
+                            ? "RUNNING"
+                            : review.status
+                      }
+                    />
+                  </td>
+                  <td className="py-4 text-slate-300">{review.progress}%</td>
+                  <td className="py-4 text-slate-400">
+                    {review.failedControls} failed ·{" "}
+                    {review.conditionalControls} conditional ·{" "}
+                    {review.overdueControls} overdue
+                  </td>
+                  <td className="py-4 text-slate-400">
+                    {review.targetReviewAt
+                      ? formatDateTime(review.targetReviewAt)
+                      : "Not set"}
+                  </td>
+                  <td className="py-4">
+                    <Link
+                      href={`/platform/tenants/${review.organization.id}`}
+                      className="font-semibold text-cyan-300"
+                    >
+                      Review
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+              {readinessPortfolio.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                    No production readiness reviews have been initialized.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

@@ -73,6 +73,36 @@ enum ScheduledJobRunStatus {
   FAILED
 }
 
+enum ProductionReadinessReviewStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum ProductionReadinessControlStatus {
+  NOT_ASSESSED
+  PASS
+  CONDITIONAL
+  FAIL
+  NOT_APPLICABLE
+}
+
+enum ProductionReadinessControlKey {
+  TENANT_ISOLATION
+  ROLE_ACCESS_REVIEW
+  AUTHENTICATION_RECOVERY
+  SSO_VALIDATION
+  DOCUMENT_SECURITY
+  SCHEDULED_PROCESSING
+  NOTIFICATION_DELIVERY
+  DATA_QUALITY
+  BACKUP_RESTORE
+  DISASTER_RECOVERY
+  MOBILE_RELEASE
+  SUPPORT_ESCALATION
+}
+
 enum RiskLevel {
   LOW
   MEDIUM
@@ -1562,6 +1592,7 @@ model Organization {
   mobilePushTokens               MobilePushToken[]
   mobilePushDeliveries           MobilePushDelivery[]
   onboardingPlan                 TenantOnboardingPlan?
+  productionReadinessReviews     ProductionReadinessReview[]
   performanceIndicators          PerformanceIndicatorDefinition[]
   performanceMeasurements        PerformanceIndicatorMeasurement[]
 }
@@ -1752,67 +1783,73 @@ model User {
   enteredPerformanceMeasurements    PerformanceIndicatorMeasurement[] @relation("PerformanceMeasurementEnteredBy")
   reviewedPerformanceMeasurements   PerformanceIndicatorMeasurement[] @relation("PerformanceMeasurementReviewedBy")
 
-  approvedContractors              Contractor[]                    @relation("ContractorApprovedBy")
-  requestedPermitsToWork           PermitToWork[]                  @relation("PermitToWorkRequestedBy")
-  issuedPermitsToWork              PermitToWork[]                  @relation("PermitToWorkIssuedBy")
-  approvedPermitsToWork            PermitToWork[]                  @relation("PermitToWorkApprovedBy")
-  closedPermitsToWork              PermitToWork[]                  @relation("PermitToWorkClosedBy")
-  verifiedPermitControls           PermitToWorkControl[]           @relation("PermitControlVerifiedBy")
-  performedPermitGasTests          PermitToWorkGasTest[]           @relation("PermitGasTestPerformedBy")
-  createdCriticalControls          CriticalControlStandard[]       @relation("CriticalControlCreatedBy")
-  ownedCriticalControls            CriticalControlStandard[]       @relation("CriticalControlOwner")
-  criticalControlVerifications     CriticalControlVerification[]   @relation("CriticalControlVerifier")
-  sifSignalReviews                 SifSignalReview[]               @relation("SifSignalReviewer")
-  chairedCertificationReviews      CertificationManagementReview[] @relation("CertificationReviewChair")
-  createdCertificationReviews      CertificationManagementReview[] @relation("CertificationReviewCreatedBy")
-  completedCertificationReviews    CertificationManagementReview[] @relation("CertificationReviewCompletedBy")
-  approvedCertificationReviews     CertificationManagementReview[] @relation("CertificationReviewApprovedBy")
-  ownedAssets                      Asset[]                         @relation("AssetOwner")
-  createdAssets                    Asset[]                         @relation("AssetCreatedBy")
-  performedAssetInspections        AssetInspection[]               @relation("AssetInspector")
-  assignedAssetMaintenance         AssetMaintenanceRecord[]        @relation("AssetMaintenanceTechnician")
-  reportedAssetDefects             AssetDefect[]                   @relation("AssetDefectReportedBy")
-  ownedAssetDefects                AssetDefect[]                   @relation("AssetDefectOwner")
-  verifiedAssetDefects             AssetDefect[]                   @relation("AssetDefectVerifiedBy")
-  ownedBehaviorPrograms            BehaviorSafetyProgram[]         @relation("BehaviorProgramOwner")
-  createdBehaviorPrograms          BehaviorSafetyProgram[]         @relation("BehaviorProgramCreatedBy")
-  observedBehaviorSessions         BehaviorCoachingSession[]       @relation("BehaviorSessionObserver")
-  participatedBehaviorSessions     BehaviorCoachingSession[]       @relation("BehaviorSessionParticipant")
-  ownedBehaviorFollowUps           BehaviorCoachingSession[]       @relation("BehaviorSessionFollowUpOwner")
-  nominatedBehaviorRecognitions    BehaviorRecognition[]           @relation("BehaviorRecognitionNominee")
-  createdBehaviorRecognitions      BehaviorRecognition[]           @relation("BehaviorRecognitionNominator")
-  approvedBehaviorRecognitions     BehaviorRecognition[]           @relation("BehaviorRecognitionApprover")
-  ownedRegulatorySources           RegulatorySource[]              @relation("RegulatorySourceOwner")
-  reviewedRegulatorySources        RegulatorySource[]              @relation("RegulatorySourceReviewer")
-  ownedRegulatoryChanges           RegulatoryChange[]              @relation("RegulatoryChangeOwner")
-  detectedRegulatoryChanges        RegulatoryChange[]              @relation("RegulatoryChangeDetectedBy")
-  implementedRegulatoryChanges     RegulatoryChange[]              @relation("RegulatoryChangeImplementedBy")
-  regulatoryImpactAssessments      RegulatoryImpactAssessment[]    @relation("RegulatoryAssessmentAssessor")
-  reviewedRegulatoryAssessments    RegulatoryImpactAssessment[]    @relation("RegulatoryAssessmentReviewer")
-  requestedAiAnalyses              AiIntelligenceAnalysis[]        @relation("AiIntelligenceRequestedBy")
-  reviewedAiAnalyses               AiIntelligenceAnalysis[]        @relation("AiIntelligenceReviewedBy")
-  aiIntelligenceFeedback           AiIntelligenceFeedback[]
-  permitToWorkHistory              PermitToWorkHistory[]           @relation("PermitHistoryActor")
-  ownedExposureGroups              SimilarExposureGroup[]          @relation("ExposureGroupOwner")
-  assignedExposureAssessments      ExposureAssessment[]            @relation("ExposureAssessmentAssessor")
-  createdExposureSamples           ExposureSample[]                @relation("ExposureSampleCreatedBy")
-  sampledExposureRecords           ExposureSample[]                @relation("ExposureSampleWorker")
-  responsibleSurveillancePrograms  MedicalSurveillanceProgram[]    @relation("SurveillanceProgramResponsible")
-  surveillanceEnrollments          MedicalSurveillanceEnrollment[] @relation("SurveillanceEnrollmentUser")
-  completedSurveillanceEnrollments MedicalSurveillanceEnrollment[] @relation("SurveillanceEnrollmentCompletedBy")
-  createdIntegrationCredentials    IntegrationApiCredential[]      @relation("IntegrationCredentialCreatedBy")
-  revokedIntegrationCredentials    IntegrationApiCredential[]      @relation("IntegrationCredentialRevokedBy")
-  createdIntegrationWebhooks       IntegrationWebhookEndpoint[]    @relation("IntegrationWebhookCreatedBy")
-  revokedIntegrationWebhooks       IntegrationWebhookEndpoint[]    @relation("IntegrationWebhookRevokedBy")
-  authorizedMobileChallenges       MobileAuthChallenge[]           @relation("MobileChallengeAuthorizedBy")
-  mobileSessions                   MobileSession[]
-  mobilePushTokens                 MobilePushToken[]
-  mobilePushDeliveries             MobilePushDelivery[]
-  ownedTenantOnboardingPlans       TenantOnboardingPlan[]          @relation("TenantOnboardingCustomerOwner")
-  approvedTenantOnboardingPlans    TenantOnboardingPlan[]          @relation("TenantOnboardingApprovedBy")
-  ownedTenantOnboardingSteps       TenantOnboardingStep[]          @relation("TenantOnboardingStepOwner")
-  completedTenantOnboardingSteps   TenantOnboardingStep[]          @relation("TenantOnboardingStepCompletedBy")
-  updatedTenantOnboardingSteps     TenantOnboardingStep[]          @relation("TenantOnboardingStepUpdatedBy")
+  approvedContractors                 Contractor[]                    @relation("ContractorApprovedBy")
+  requestedPermitsToWork              PermitToWork[]                  @relation("PermitToWorkRequestedBy")
+  issuedPermitsToWork                 PermitToWork[]                  @relation("PermitToWorkIssuedBy")
+  approvedPermitsToWork               PermitToWork[]                  @relation("PermitToWorkApprovedBy")
+  closedPermitsToWork                 PermitToWork[]                  @relation("PermitToWorkClosedBy")
+  verifiedPermitControls              PermitToWorkControl[]           @relation("PermitControlVerifiedBy")
+  performedPermitGasTests             PermitToWorkGasTest[]           @relation("PermitGasTestPerformedBy")
+  createdCriticalControls             CriticalControlStandard[]       @relation("CriticalControlCreatedBy")
+  ownedCriticalControls               CriticalControlStandard[]       @relation("CriticalControlOwner")
+  criticalControlVerifications        CriticalControlVerification[]   @relation("CriticalControlVerifier")
+  sifSignalReviews                    SifSignalReview[]               @relation("SifSignalReviewer")
+  chairedCertificationReviews         CertificationManagementReview[] @relation("CertificationReviewChair")
+  createdCertificationReviews         CertificationManagementReview[] @relation("CertificationReviewCreatedBy")
+  completedCertificationReviews       CertificationManagementReview[] @relation("CertificationReviewCompletedBy")
+  approvedCertificationReviews        CertificationManagementReview[] @relation("CertificationReviewApprovedBy")
+  ownedAssets                         Asset[]                         @relation("AssetOwner")
+  createdAssets                       Asset[]                         @relation("AssetCreatedBy")
+  performedAssetInspections           AssetInspection[]               @relation("AssetInspector")
+  assignedAssetMaintenance            AssetMaintenanceRecord[]        @relation("AssetMaintenanceTechnician")
+  reportedAssetDefects                AssetDefect[]                   @relation("AssetDefectReportedBy")
+  ownedAssetDefects                   AssetDefect[]                   @relation("AssetDefectOwner")
+  verifiedAssetDefects                AssetDefect[]                   @relation("AssetDefectVerifiedBy")
+  ownedBehaviorPrograms               BehaviorSafetyProgram[]         @relation("BehaviorProgramOwner")
+  createdBehaviorPrograms             BehaviorSafetyProgram[]         @relation("BehaviorProgramCreatedBy")
+  observedBehaviorSessions            BehaviorCoachingSession[]       @relation("BehaviorSessionObserver")
+  participatedBehaviorSessions        BehaviorCoachingSession[]       @relation("BehaviorSessionParticipant")
+  ownedBehaviorFollowUps              BehaviorCoachingSession[]       @relation("BehaviorSessionFollowUpOwner")
+  nominatedBehaviorRecognitions       BehaviorRecognition[]           @relation("BehaviorRecognitionNominee")
+  createdBehaviorRecognitions         BehaviorRecognition[]           @relation("BehaviorRecognitionNominator")
+  approvedBehaviorRecognitions        BehaviorRecognition[]           @relation("BehaviorRecognitionApprover")
+  ownedRegulatorySources              RegulatorySource[]              @relation("RegulatorySourceOwner")
+  reviewedRegulatorySources           RegulatorySource[]              @relation("RegulatorySourceReviewer")
+  ownedRegulatoryChanges              RegulatoryChange[]              @relation("RegulatoryChangeOwner")
+  detectedRegulatoryChanges           RegulatoryChange[]              @relation("RegulatoryChangeDetectedBy")
+  implementedRegulatoryChanges        RegulatoryChange[]              @relation("RegulatoryChangeImplementedBy")
+  regulatoryImpactAssessments         RegulatoryImpactAssessment[]    @relation("RegulatoryAssessmentAssessor")
+  reviewedRegulatoryAssessments       RegulatoryImpactAssessment[]    @relation("RegulatoryAssessmentReviewer")
+  requestedAiAnalyses                 AiIntelligenceAnalysis[]        @relation("AiIntelligenceRequestedBy")
+  reviewedAiAnalyses                  AiIntelligenceAnalysis[]        @relation("AiIntelligenceReviewedBy")
+  aiIntelligenceFeedback              AiIntelligenceFeedback[]
+  permitToWorkHistory                 PermitToWorkHistory[]           @relation("PermitHistoryActor")
+  ownedExposureGroups                 SimilarExposureGroup[]          @relation("ExposureGroupOwner")
+  assignedExposureAssessments         ExposureAssessment[]            @relation("ExposureAssessmentAssessor")
+  createdExposureSamples              ExposureSample[]                @relation("ExposureSampleCreatedBy")
+  sampledExposureRecords              ExposureSample[]                @relation("ExposureSampleWorker")
+  responsibleSurveillancePrograms     MedicalSurveillanceProgram[]    @relation("SurveillanceProgramResponsible")
+  surveillanceEnrollments             MedicalSurveillanceEnrollment[] @relation("SurveillanceEnrollmentUser")
+  completedSurveillanceEnrollments    MedicalSurveillanceEnrollment[] @relation("SurveillanceEnrollmentCompletedBy")
+  createdIntegrationCredentials       IntegrationApiCredential[]      @relation("IntegrationCredentialCreatedBy")
+  revokedIntegrationCredentials       IntegrationApiCredential[]      @relation("IntegrationCredentialRevokedBy")
+  createdIntegrationWebhooks          IntegrationWebhookEndpoint[]    @relation("IntegrationWebhookCreatedBy")
+  revokedIntegrationWebhooks          IntegrationWebhookEndpoint[]    @relation("IntegrationWebhookRevokedBy")
+  authorizedMobileChallenges          MobileAuthChallenge[]           @relation("MobileChallengeAuthorizedBy")
+  mobileSessions                      MobileSession[]
+  mobilePushTokens                    MobilePushToken[]
+  mobilePushDeliveries                MobilePushDelivery[]
+  ownedTenantOnboardingPlans          TenantOnboardingPlan[]          @relation("TenantOnboardingCustomerOwner")
+  approvedTenantOnboardingPlans       TenantOnboardingPlan[]          @relation("TenantOnboardingApprovedBy")
+  ownedTenantOnboardingSteps          TenantOnboardingStep[]          @relation("TenantOnboardingStepOwner")
+  completedTenantOnboardingSteps      TenantOnboardingStep[]          @relation("TenantOnboardingStepCompletedBy")
+  updatedTenantOnboardingSteps        TenantOnboardingStep[]          @relation("TenantOnboardingStepUpdatedBy")
+  createdProductionReadinessReviews   ProductionReadinessReview[]     @relation("ProductionReadinessCreatedBy")
+  submittedProductionReadinessReviews ProductionReadinessReview[]     @relation("ProductionReadinessSubmittedBy")
+  reviewedProductionReadinessReviews  ProductionReadinessReview[]     @relation("ProductionReadinessReviewedBy")
+  ownedProductionReadinessControls    ProductionReadinessControl[]    @relation("ProductionReadinessControlOwner")
+  testedProductionReadinessControls   ProductionReadinessControl[]    @relation("ProductionReadinessControlTestedBy")
+  updatedProductionReadinessControls  ProductionReadinessControl[]    @relation("ProductionReadinessControlUpdatedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -1936,6 +1973,63 @@ model ScheduledJobRun {
 
   @@index([jobKey, startedAt])
   @@index([status, startedAt])
+}
+
+model ProductionReadinessReview {
+  id               String                          @id @default(cuid())
+  organizationId   String
+  version          Int
+  status           ProductionReadinessReviewStatus @default(DRAFT)
+  targetReviewAt   DateTime?
+  executiveSummary String?
+  submissionNotes  String?
+  reviewNotes      String?
+  createdById      String
+  submittedById    String?
+  submittedAt      DateTime?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  approvedAt       DateTime?
+  rejectedAt       DateTime?
+  createdAt        DateTime                        @default(now())
+  updatedAt        DateTime                        @updatedAt
+
+  organization Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                         @relation("ProductionReadinessCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  submittedBy  User?                        @relation("ProductionReadinessSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewedBy   User?                        @relation("ProductionReadinessReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  controls     ProductionReadinessControl[]
+
+  @@unique([organizationId, version])
+  @@index([organizationId, status, updatedAt])
+  @@index([status, targetReviewAt])
+}
+
+model ProductionReadinessControl {
+  id              String                           @id @default(cuid())
+  reviewId        String
+  key             ProductionReadinessControlKey
+  status          ProductionReadinessControlStatus @default(NOT_ASSESSED)
+  ownerId         String?
+  dueAt           DateTime?
+  testMethod      String?
+  evidenceSummary String?
+  resultNotes     String?
+  evidenceUrl     String?
+  testedAt        DateTime?
+  testedById      String?
+  updatedById     String
+  createdAt       DateTime                         @default(now())
+  updatedAt       DateTime                         @updatedAt
+
+  review    ProductionReadinessReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  owner     User?                     @relation("ProductionReadinessControlOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  testedBy  User?                     @relation("ProductionReadinessControlTestedBy", fields: [testedById], references: [id], onDelete: SetNull)
+  updatedBy User                      @relation("ProductionReadinessControlUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@unique([reviewId, key])
+  @@index([status, dueAt])
+  @@index([ownerId, status])
 }
 
 model DemoLead {
