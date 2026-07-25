@@ -5785,6 +5785,9 @@ model ConfigurableFormSubmission {
 
   @@unique([definitionId, entityType, entityId])
   @@index([organizationId, entityType, entityId])
+  @@index([organizationId, submittedAt])
+  @@index([organizationId, status, submittedAt])
+  @@index([organizationId, entityType, submittedAt])
   @@index([submittedById, submittedAt])
 }
 

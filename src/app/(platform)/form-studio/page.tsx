@@ -2,7 +2,7 @@ import { requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { PermissionKey } from "@prisma/client";
-import { FileCog, Plus } from "lucide-react";
+import { ClipboardList, FileCog, Plus } from "lucide-react";
 import Link from "next/link";
 
 export default async function FormStudioPage({
@@ -46,13 +46,22 @@ export default async function FormStudioPage({
             remain defensible.
           </p>
         </div>
-        <Link
-          href="/form-studio/new"
-          className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2 font-semibold text-slate-950"
-        >
-          <Plus size={16} />
-          New Form
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/form-studio/submissions"
+            className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-2 font-semibold text-cyan-200"
+          >
+            <ClipboardList size={16} />
+            Submission Center
+          </Link>
+          <Link
+            href="/form-studio/new"
+            className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2 font-semibold text-slate-950"
+          >
+            <Plus size={16} />
+            New Form
+          </Link>
+        </div>
       </div>
 
       {message && (
