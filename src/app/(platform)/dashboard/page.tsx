@@ -23,6 +23,7 @@ import {
   Target,
   TimerReset,
   Presentation,
+  MessageSquareText,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -108,6 +109,15 @@ export default async function DashboardPage({
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
+            {allowed.has(PermissionKey.USE_AI) ? (
+              <Link
+                href="/intelligence/copilot"
+                className="inline-flex items-center gap-2 rounded-xl border border-purple-400/20 bg-purple-400/[.08] px-4 py-2.5 text-sm font-semibold text-purple-100 transition hover:border-purple-300/40"
+              >
+                <MessageSquareText size={17} />
+                Ask EHS Copilot
+              </Link>
+            ) : null}
             {allowed.has(PermissionKey.VIEW_REPORTS) ? (
               <Link
                 href="/reports"

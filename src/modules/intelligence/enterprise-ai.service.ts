@@ -139,7 +139,7 @@ function buildSourceKeys(records: Omit<AiIntelligenceSourceRecord, "sourceKey">[
   return records.map((record, index) => ({ ...record, sourceKey: `SRC-${String(index + 1).padStart(3, "0")}` }));
 }
 
-async function collectTenantIntelligenceSources(
+export async function collectTenantIntelligenceSources(
   organizationId: string,
   permissions: PermissionKey[],
 ): Promise<AiIntelligenceSourceRecord[]> {

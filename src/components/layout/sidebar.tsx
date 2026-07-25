@@ -50,6 +50,7 @@ import {
   RefreshCw,
   TrendingUp,
   Presentation,
+  MessageSquareText,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -93,6 +94,14 @@ export const primaryNavItems: NavigationItem[] = [
     href: "/intelligence",
     icon: BrainCircuit,
     permission: PermissionKey.USE_AI,
+    anyPermissions: [PermissionKey.VIEW_DASHBOARD],
+  },
+  {
+    label: "EHS Copilot",
+    href: "/intelligence/copilot",
+    icon: MessageSquareText,
+    permission: PermissionKey.USE_AI,
+    anyPermissions: [PermissionKey.VIEW_DASHBOARD],
   },
   {
     label: "Predictive Intelligence",

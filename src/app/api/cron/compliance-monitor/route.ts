@@ -11,6 +11,7 @@ import { processEmergencyPreparednessMonitoring } from "@/modules/emergency/emer
 import { processBusinessContinuityMonitoring } from "@/modules/continuity/continuity.service";
 import { processPredictiveIntelligenceMonitoring } from "@/modules/intelligence/predictive-intelligence.service";
 import { processExecutiveReviewMonitoring } from "@/modules/executive-review/executive-review.service";
+import { purgeExpiredAiCopilotConversationsService } from "@/modules/intelligence/enterprise-copilot.service";
 import { runTrackedScheduledJob } from "@/modules/platform/scheduled-job-monitor.service";
 import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
@@ -18,8 +19,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   if (!isAuthorizedCronRequest(request.headers.get("authorization"))) return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
   try {
-    const [compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls, certificationReviews, assets, behaviorSafety, regulatoryIntelligence, emergencyPreparedness, businessContinuity, predictiveIntelligence, executiveReviews] = await runTrackedScheduledJob("compliance-monitor", () => Promise.all([processComplianceMonitoring(), generateComplianceCalendarOccurrences(), monitorComplianceCalendar(), processOccupationalHealthMonitoring(), processCriticalControlMonitoring(), processCertificationReviewMonitoring(), processAssetMonitoring(), processBehaviorSafetyMonitoring(), processRegulatoryIntelligenceMonitoring(), processEmergencyPreparednessMonitoring(), processBusinessContinuityMonitoring(), processPredictiveIntelligenceMonitoring(), processExecutiveReviewMonitoring()]));
-    return NextResponse.json({ success: true, processedAt: new Date().toISOString(), compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls, certificationReviews, assets, behaviorSafety, regulatoryIntelligence, emergencyPreparedness, businessContinuity, predictiveIntelligence, executiveReviews });
+    const [compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls, certificationReviews, assets, behaviorSafety, regulatoryIntelligence, emergencyPreparedness, businessContinuity, predictiveIntelligence, executiveReviews, copilotRetention] = await runTrackedScheduledJob("compliance-monitor", () => Promise.all([processComplianceMonitoring(), generateComplianceCalendarOccurrences(), monitorComplianceCalendar(), processOccupationalHealthMonitoring(), processCriticalControlMonitoring(), processCertificationReviewMonitoring(), processAssetMonitoring(), processBehaviorSafetyMonitoring(), processRegulatoryIntelligenceMonitoring(), processEmergencyPreparednessMonitoring(), processBusinessContinuityMonitoring(), processPredictiveIntelligenceMonitoring(), processExecutiveReviewMonitoring(), purgeExpiredAiCopilotConversationsService()]));
+    return NextResponse.json({ success: true, processedAt: new Date().toISOString(), compliance, calendarGeneration, calendarMonitoring, occupationalHealth, criticalControls, certificationReviews, assets, behaviorSafety, regulatoryIntelligence, emergencyPreparedness, businessContinuity, predictiveIntelligence, executiveReviews, copilotRetention });
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Compliance monitoring failed." }, { status: 500 });
   }

@@ -3,7 +3,7 @@ import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { listEnterpriseAiAnalysesService } from "@/modules/intelligence/enterprise-ai.service";
 import { AiIntelligenceStatus, PermissionKey } from "@prisma/client";
-import { Activity, BrainCircuit, CheckCircle2, Clock3, DatabaseZap, ShieldCheck, XCircle } from "lucide-react";
+import { Activity, BrainCircuit, CheckCircle2, Clock3, DatabaseZap, MessageSquareText, ShieldCheck, XCircle } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +28,11 @@ export default async function EnterpriseIntelligencePage() {
       <Metric icon={CheckCircle2} label="Approved analyses" value={approved} tone="text-emerald-300" />
       <Metric icon={XCircle} label="Rejected analyses" value={rejected} tone="text-red-300" />
     </div>
+
+    <Link href="/intelligence/copilot" className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-purple-300/20 bg-purple-300/[.05] p-6 transition hover:border-purple-300/40">
+      <div><p className="flex items-center gap-2 text-sm text-purple-300"><MessageSquareText size={17} />Private conversational decision support</p><h2 className="mt-2 text-2xl font-semibold">Enterprise EHS Copilot</h2><p className="mt-1 max-w-2xl text-sm text-slate-400">Ask follow-up questions across records available to your role. Every turn is permission-filtered, source-cited, rate-limited, retained under tenant policy, and unable to change operational data.</p></div>
+      <span className="rounded-xl border border-purple-300/30 px-4 py-2 text-sm text-purple-200">Open Copilot</span>
+    </Link>
 
     <Link href="/intelligence/predictive" className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-cyan-300/20 bg-cyan-300/[.05] p-6 transition hover:border-cyan-300/40">
       <div><p className="flex items-center gap-2 text-sm text-cyan-300"><Activity size={17} />Explainable leading indicators</p><h2 className="mt-2 text-2xl font-semibold">Predictive Risk Intelligence</h2><p className="mt-1 max-w-2xl text-sm text-slate-400">Review governed trend and concentration signals derived from tenant source records. Indicators are transparent, auditable, and never presented as event probabilities.</p></div>

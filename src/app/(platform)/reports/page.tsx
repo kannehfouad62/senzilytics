@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   FileWarning,
+  MessageSquareText,
   SearchCheck,
   ShieldCheck,
   TimerReset,
@@ -208,6 +209,15 @@ export default async function ReportsPage({
         </div>
 
         <div className="flex flex-wrap gap-3 print:hidden">
+          {canUseAi ? (
+            <Link
+              href="/intelligence/copilot"
+              className="inline-flex items-center gap-2 rounded-2xl border border-purple-400/20 bg-purple-400/[.06] px-5 py-3 text-sm font-medium text-purple-200"
+            >
+              <MessageSquareText size={16} />
+              Ask EHS Copilot
+            </Link>
+          ) : null}
           <Link
             href="/management-reviews"
             className="inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-400/[.06] px-5 py-3 text-sm font-medium text-cyan-200"
