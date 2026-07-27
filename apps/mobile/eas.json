@@ -43,13 +43,14 @@
     }
   },
   "submit": {
-  "production": {
-    "android": {
-      "track": "internal"
-    },
-    "ios": {
-      "metadataPath": "./store.config.json"
+    "production": {
+      "android": {
+        "track": "internal"
+      },
+      "ios": {
+        "ascAppId": "6793741558",
+        "metadataPath": "./store.config.json"
+      }
     }
   }
-}
 }
