@@ -317,6 +317,27 @@ export const auditNavItems: NavigationItem[] = [
   },
 ];
 
+export const researchNavItems: NavigationItem[] = [
+  {
+    label: "Research Portfolio",
+    href: "/research",
+    icon: FlaskConical,
+    permission: PermissionKey.VIEW_RESEARCH,
+  },
+  {
+    label: "Research Projects",
+    href: "/research/projects",
+    icon: ClipboardList,
+    permission: PermissionKey.VIEW_RESEARCH,
+  },
+  {
+    label: "Research Clients",
+    href: "/research/clients",
+    icon: Building2,
+    permission: PermissionKey.MANAGE_RESEARCH_CLIENTS,
+  },
+];
+
 export const complianceNavItems: NavigationItem[] = [
   {
     label: "Sustainability & ESG",
@@ -412,6 +433,7 @@ export async function Sidebar() {
     : permittedGovernanceItems.filter(item => item.href !== "/notifications" || entitlements.IN_APP_NOTIFICATIONS);
   const visibleEhsItems = filterNavigationItems(ehsNavItems, permissions);
   const visibleAuditItems = filterNavigationItems(auditNavItems, permissions);
+  const visibleResearchItems = filterNavigationItems(researchNavItems, permissions);
   const visibleInspectionItems = filterNavigationItems(inspectionNavItems, permissions);
 
   return (
@@ -449,6 +471,12 @@ export async function Sidebar() {
         <NavigationSection
           label="Audit Management 2.0"
           items={visibleAuditItems}
+          featured
+        />
+
+        <NavigationSection
+          label="Research & Analytics"
+          items={visibleResearchItems}
           featured
         />
 

@@ -21,6 +21,7 @@ import {
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireFormDefinitionManagement } from "@/modules/forms/form-authorization";
 
 const text = (data: FormData, key: string) =>
   String(data.get(key) || "").trim();
@@ -70,9 +71,8 @@ export async function createConfigurableForm(data: FormData) {
 }
 
 export async function addConfigurableField(data: FormData) {
-  await requirePermission(PermissionKey.MANAGE_ORGANIZATION);
-  const { organizationId } = await getCurrentUserTenant();
   const definitionId = required(data, "definitionId");
+  const { organizationId } = await requireFormDefinitionManagement(definitionId);
   try {
     const fieldType = required(data, "fieldType") as ConfigurableFieldType;
     if (!Object.values(ConfigurableFieldType).includes(fieldType)) {
@@ -100,9 +100,8 @@ export async function addConfigurableField(data: FormData) {
 }
 
 export async function removeConfigurableField(data: FormData) {
-  await requirePermission(PermissionKey.MANAGE_ORGANIZATION);
-  const { organizationId } = await getCurrentUserTenant();
   const definitionId = required(data, "definitionId");
+  const { organizationId } = await requireFormDefinitionManagement(definitionId);
   try {
     await deleteDraftField({
       organizationId,
@@ -117,10 +116,10 @@ export async function removeConfigurableField(data: FormData) {
 }
 
 export async function publishConfigurableForm(data: FormData) {
-  await requirePermission(PermissionKey.MANAGE_ORGANIZATION);
-  const { organizationId, user } = await getCurrentUserTenant();
   const definitionId = required(data, "definitionId");
+  const { organizationId, user, permissions, definition } = await requireFormDefinitionManagement(definitionId);
   try {
+    if (definition.module === ConfigurableFormModule.RESEARCH && !permissions.includes(PermissionKey.PUBLISH_RESEARCH_QUESTIONNAIRES)) throw new Error("Questionnaire publication permission is required.");
     await publishFormVersion({
       organizationId,
       versionId: required(data, "versionId"),
@@ -135,9 +134,8 @@ export async function publishConfigurableForm(data: FormData) {
 }
 
 export async function reviseConfigurableForm(data: FormData) {
-  await requirePermission(PermissionKey.MANAGE_ORGANIZATION);
-  const { organizationId, user } = await getCurrentUserTenant();
   const definitionId = required(data, "definitionId");
+  const { organizationId, user } = await requireFormDefinitionManagement(definitionId);
   try {
     await createDraftRevision({
       organizationId,
@@ -157,15 +155,15 @@ export async function updateConfigurableFormSettings(
   data: FormData,
 ): Promise<FormActionState> {
   void state;
-  await requirePermission(PermissionKey.MANAGE_ORGANIZATION);
-  const { organizationId, user } = await getCurrentUserTenant();
   const definitionId = text(data, "definitionId");
   try {
     if (!definitionId) throw new Error("Form is required.");
+    const { organizationId, user, permissions, definition } = await requireFormDefinitionManagement(definitionId);
     const formModule = required(data, "module") as ConfigurableFormModule;
     if (!Object.values(ConfigurableFormModule).includes(formModule)) {
       throw new Error("Select a valid module assignment.");
     }
+    if (formModule !== definition.module && !permissions.includes(PermissionKey.MANAGE_ORGANIZATION)) throw new Error("Only organization administrators can reassign a form to another module.");
     await updateFormDefinitionSettings({
       organizationId,
       definitionId,
@@ -186,11 +184,10 @@ export async function changeConfigurableFormAssignment(
   data: FormData,
 ): Promise<FormActionState> {
   void state;
-  await requirePermission(PermissionKey.MANAGE_ORGANIZATION);
-  const { organizationId, user } = await getCurrentUserTenant();
   const definitionId = text(data, "definitionId");
   try {
     if (!definitionId) throw new Error("Form is required.");
+    const { organizationId, user } = await requireFormDefinitionManagement(definitionId);
     const assignment = required(data, "assignment");
     if (!["ASSIGNED", "UNASSIGNED"].includes(assignment)) {
       throw new Error("Select a valid assignment state.");
@@ -219,11 +216,10 @@ export async function deleteConfigurableForm(
   data: FormData,
 ): Promise<FormActionState> {
   void state;
-  await requirePermission(PermissionKey.MANAGE_ORGANIZATION);
-  const { organizationId, user } = await getCurrentUserTenant();
   const definitionId = text(data, "definitionId");
   try {
     if (!definitionId) throw new Error("Form is required.");
+    const { organizationId, user } = await requireFormDefinitionManagement(definitionId);
     await deleteFormDefinition({
       organizationId,
       definitionId,

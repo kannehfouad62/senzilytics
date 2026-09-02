@@ -234,6 +234,83 @@ enum PermissionKey {
   VIEW_EXECUTIVE_REVIEWS
   MANAGE_EXECUTIVE_REVIEWS
   APPROVE_EXECUTIVE_REVIEWS
+  VIEW_RESEARCH
+  CREATE_RESEARCH_PROJECT
+  MANAGE_RESEARCH_PROJECTS
+  MANAGE_RESEARCH_CLIENTS
+  MANAGE_RESEARCH_TEAMS
+  DESIGN_RESEARCH_QUESTIONNAIRES
+  PUBLISH_RESEARCH_QUESTIONNAIRES
+  COLLECT_RESEARCH_DATA
+  MANAGE_RESEARCH_DATASETS
+  RUN_RESEARCH_ANALYSIS
+  PUBLISH_RESEARCH_DASHBOARDS
+  EXPORT_RESEARCH_OUTPUTS
+  APPROVE_RESEARCH_OUTPUTS
+}
+
+enum ResearchClientStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ResearchProjectStatus {
+  DRAFT
+  PLANNING
+  IN_REVIEW
+  APPROVED
+  ACTIVE
+  DATA_COLLECTION
+  ANALYSIS
+  CLIENT_REVIEW
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+  ARCHIVED
+}
+
+enum ResearchMethodology {
+  QUANTITATIVE
+  QUALITATIVE
+  MIXED_METHODS
+  DESK_RESEARCH
+  EXPERIMENTAL
+  OTHER
+}
+
+enum ResearchDataClassification {
+  PUBLIC
+  INTERNAL
+  CONFIDENTIAL
+  RESTRICTED
+}
+
+enum ResearchTeamRole {
+  PROJECT_MANAGER
+  PRINCIPAL_INVESTIGATOR
+  RESEARCHER
+  STATISTICIAN
+  DATA_SCIENTIST
+  DATA_MANAGER
+  ENUMERATOR
+  QUALITY_REVIEWER
+  CLIENT_REVIEWER
+  OBSERVER
+}
+
+enum ResearchMilestoneStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum ResearchResponseIdentityMode {
+  ANONYMOUS
+  IDENTIFIED
+  PSEUDONYMIZED
 }
 
 enum EmergencyPlanType {
@@ -660,6 +737,7 @@ enum ConfigurableFormModule {
   REGULATORY_INTELLIGENCE
   EMERGENCY_PREPAREDNESS
   BUSINESS_CONTINUITY
+  RESEARCH
   GENERAL
 }
 
@@ -1946,6 +2024,10 @@ model Organization {
   executiveReviewAgendaItems     ExecutiveReviewAgendaItem[]
   executiveReviewAttendees       ExecutiveReviewAttendee[]
   executiveReviewDecisions       ExecutiveReviewDecision[]
+  researchClients                ResearchClient[]
+  researchProjects               ResearchProject[]
+  researchMilestones             ResearchMilestone[]
+  researchQuestionnaires         ResearchQuestionnaire[]
 }
 
 model PricingInquiry {
@@ -2259,6 +2341,14 @@ model User {
   executiveReviewAttendance           ExecutiveReviewAttendee[]       @relation("ExecutiveReviewAttendeeUser")
   ownedExecutiveDecisions             ExecutiveReviewDecision[]       @relation("ExecutiveDecisionOwner")
   closedExecutiveDecisions            ExecutiveReviewDecision[]       @relation("ExecutiveDecisionClosedBy")
+  createdResearchClients              ResearchClient[]                @relation("ResearchClientCreatedBy")
+  managedResearchProjects             ResearchProject[]               @relation("ResearchProjectManager")
+  principalResearchProjects           ResearchProject[]               @relation("ResearchPrincipalInvestigator")
+  createdResearchProjects             ResearchProject[]               @relation("ResearchProjectCreatedBy")
+  approvedResearchProjects            ResearchProject[]               @relation("ResearchProjectApprovedBy")
+  researchTeamMemberships             ResearchTeamMember[]
+  ownedResearchMilestones             ResearchMilestone[]             @relation("ResearchMilestoneOwner")
+  completedResearchMilestones         ResearchMilestone[]             @relation("ResearchMilestoneCompletedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -6506,6 +6596,7 @@ model ConfigurableFormDefinition {
   createdBy    User                         @relation("ConfigurableFormCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   versions     ConfigurableFormVersion[]
   submissions  ConfigurableFormSubmission[]
+  researchQuestionnaire ResearchQuestionnaire?
 
   @@unique([organizationId, slug])
   @@index([organizationId, module, isActive])
@@ -7760,4 +7851,158 @@ model ExecutiveReviewDecision {
   @@index([agendaItemId])
   @@index([ownerId, status])
   @@index([correctiveActionId])
+}
+
+// ============================================================
+// RESEARCH & ANALYTICS MANAGEMENT — GOVERNED FOUNDATION
+// ============================================================
+
+model ResearchClient {
+  id                  String                     @id @default(cuid())
+  organizationId      String
+  name                String
+  legalName           String?
+  code                String?
+  industry            String?
+  country             String?
+  website             String?
+  primaryContactName  String?
+  primaryContactEmail String?
+  dataOwnerName       String?
+  dataOwnerEmail      String?
+  status              ResearchClientStatus       @default(ACTIVE)
+  dataClassification  ResearchDataClassification @default(CONFIDENTIAL)
+  retentionDays       Int?
+  contractualNotes    String?
+  createdById         String
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User              @relation("ResearchClientCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  projects     ResearchProject[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@index([createdById])
+}
+
+model ResearchProject {
+  id                      String                     @id @default(cuid())
+  organizationId          String
+  clientId                String?
+  reference               String
+  title                   String
+  purpose                 String
+  objectives              String
+  researchQuestions       String
+  hypotheses              String?
+  methodology             ResearchMethodology
+  targetPopulation        String?
+  geographicScope         String?
+  samplingStrategy        String?
+  sampleTarget            Int?
+  status                  ResearchProjectStatus      @default(DRAFT)
+  dataClassification      ResearchDataClassification @default(CONFIDENTIAL)
+  intendedUse             String?
+  dataOwnershipStatement  String?
+  confidentialityTerms    String?
+  retentionDays           Int?
+  ethicsApprovalRequired  Boolean                    @default(false)
+  ethicsApprovalReference String?
+  consentRequired         Boolean                    @default(false)
+  startDate               DateTime?
+  dueDate                 DateTime?
+  projectManagerId        String
+  principalInvestigatorId String?
+  createdById             String
+  approvedById            String?
+  approvedAt              DateTime?
+  activatedAt             DateTime?
+  completedAt             DateTime?
+  archivedAt              DateTime?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  organization          Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client                ResearchClient?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  projectManager        User                 @relation("ResearchProjectManager", fields: [projectManagerId], references: [id], onDelete: Restrict)
+  principalInvestigator User?                @relation("ResearchPrincipalInvestigator", fields: [principalInvestigatorId], references: [id], onDelete: SetNull)
+  createdBy             User                 @relation("ResearchProjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy            User?                @relation("ResearchProjectApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  teamMembers           ResearchTeamMember[]
+  milestones            ResearchMilestone[]
+  questionnaires        ResearchQuestionnaire[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, dueDate])
+  @@index([organizationId, clientId])
+  @@index([projectManagerId, status])
+  @@index([principalInvestigatorId])
+}
+
+model ResearchTeamMember {
+  id         String           @id @default(cuid())
+  projectId  String
+  userId     String
+  role       ResearchTeamRole
+  isLead     Boolean          @default(false)
+  isRequired Boolean          @default(true)
+  joinedAt   DateTime         @default(now())
+
+  project ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId, role])
+  @@index([projectId, role])
+}
+
+model ResearchMilestone {
+  id             String                  @id @default(cuid())
+  organizationId String
+  projectId      String
+  title          String
+  description    String?
+  status         ResearchMilestoneStatus @default(NOT_STARTED)
+  dueDate        DateTime?
+  ownerId        String?
+  completedById  String?
+  completedAt    DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner        User?           @relation("ResearchMilestoneOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  completedBy  User?           @relation("ResearchMilestoneCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, dueDate])
+  @@index([projectId, status])
+  @@index([ownerId, status])
+}
+
+model ResearchQuestionnaire {
+  id                String                       @id @default(cuid())
+  organizationId    String
+  projectId         String
+  formDefinitionId  String                       @unique
+  name              String
+  purpose           String
+  targetAudience    String?
+  identityMode      ResearchResponseIdentityMode @default(PSEUDONYMIZED)
+  defaultLanguage   String                       @default("en")
+  consentStatement  String?
+  isActive          Boolean                      @default(true)
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  organization   Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        ResearchProject             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  formDefinition ConfigurableFormDefinition  @relation(fields: [formDefinitionId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, name])
+  @@index([organizationId, isActive])
+  @@index([projectId, isActive])
 }

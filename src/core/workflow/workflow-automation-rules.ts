@@ -161,6 +161,7 @@ export function configurableFormWorkflowEntityType(
     case ConfigurableFormModule.REGULATORY_INTELLIGENCE:
     case ConfigurableFormModule.EMERGENCY_PREPAREDNESS:
     case ConfigurableFormModule.BUSINESS_CONTINUITY:
+    case ConfigurableFormModule.RESEARCH:
     case ConfigurableFormModule.ESG:
     case ConfigurableFormModule.GENERAL:
       return null;

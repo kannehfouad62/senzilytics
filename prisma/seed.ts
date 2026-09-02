@@ -183,6 +183,19 @@ async function main() {
       PermissionKey.VIEW_EXECUTIVE_REVIEWS,
       PermissionKey.MANAGE_EXECUTIVE_REVIEWS,
       PermissionKey.APPROVE_EXECUTIVE_REVIEWS,
+      PermissionKey.VIEW_RESEARCH,
+      PermissionKey.CREATE_RESEARCH_PROJECT,
+      PermissionKey.MANAGE_RESEARCH_PROJECTS,
+      PermissionKey.MANAGE_RESEARCH_CLIENTS,
+      PermissionKey.MANAGE_RESEARCH_TEAMS,
+      PermissionKey.DESIGN_RESEARCH_QUESTIONNAIRES,
+      PermissionKey.PUBLISH_RESEARCH_QUESTIONNAIRES,
+      PermissionKey.COLLECT_RESEARCH_DATA,
+      PermissionKey.MANAGE_RESEARCH_DATASETS,
+      PermissionKey.RUN_RESEARCH_ANALYSIS,
+      PermissionKey.PUBLISH_RESEARCH_DASHBOARDS,
+      PermissionKey.EXPORT_RESEARCH_OUTPUTS,
+      PermissionKey.APPROVE_RESEARCH_OUTPUTS,
     ],
 
     EHS_MANAGER: [
@@ -240,6 +253,19 @@ async function main() {
       PermissionKey.MANAGE_PREDICTIVE_INTELLIGENCE,
       PermissionKey.VIEW_EXECUTIVE_REVIEWS,
       PermissionKey.MANAGE_EXECUTIVE_REVIEWS,
+      PermissionKey.VIEW_RESEARCH,
+      PermissionKey.CREATE_RESEARCH_PROJECT,
+      PermissionKey.MANAGE_RESEARCH_PROJECTS,
+      PermissionKey.MANAGE_RESEARCH_CLIENTS,
+      PermissionKey.MANAGE_RESEARCH_TEAMS,
+      PermissionKey.DESIGN_RESEARCH_QUESTIONNAIRES,
+      PermissionKey.PUBLISH_RESEARCH_QUESTIONNAIRES,
+      PermissionKey.COLLECT_RESEARCH_DATA,
+      PermissionKey.MANAGE_RESEARCH_DATASETS,
+      PermissionKey.RUN_RESEARCH_ANALYSIS,
+      PermissionKey.PUBLISH_RESEARCH_DASHBOARDS,
+      PermissionKey.EXPORT_RESEARCH_OUTPUTS,
+      PermissionKey.APPROVE_RESEARCH_OUTPUTS,
     ],
 
     SUPERVISOR: [
@@ -276,6 +302,13 @@ async function main() {
       PermissionKey.RECORD_CONTINUITY_EVENT,
       PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE,
       PermissionKey.VIEW_EXECUTIVE_REVIEWS,
+      PermissionKey.VIEW_RESEARCH,
+      PermissionKey.CREATE_RESEARCH_PROJECT,
+      PermissionKey.MANAGE_RESEARCH_PROJECTS,
+      PermissionKey.MANAGE_RESEARCH_TEAMS,
+      PermissionKey.DESIGN_RESEARCH_QUESTIONNAIRES,
+      PermissionKey.COLLECT_RESEARCH_DATA,
+      PermissionKey.RUN_RESEARCH_ANALYSIS,
     ],
 
     EMPLOYEE: [
@@ -292,6 +325,8 @@ async function main() {
       PermissionKey.RECORD_BEHAVIOR_COACHING,
       PermissionKey.VIEW_EMERGENCY_PREPAREDNESS,
       PermissionKey.VIEW_BUSINESS_CONTINUITY,
+      PermissionKey.VIEW_RESEARCH,
+      PermissionKey.COLLECT_RESEARCH_DATA,
     ],
 
     AUDITOR: [
@@ -317,6 +352,9 @@ async function main() {
       PermissionKey.VIEW_BUSINESS_CONTINUITY,
       PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE,
       PermissionKey.VIEW_EXECUTIVE_REVIEWS,
+      PermissionKey.VIEW_RESEARCH,
+      PermissionKey.RUN_RESEARCH_ANALYSIS,
+      PermissionKey.EXPORT_RESEARCH_OUTPUTS,
     ],
     DEMO_VIEWER: [
       PermissionKey.VIEW_DASHBOARD,
@@ -346,6 +384,7 @@ async function main() {
       PermissionKey.VIEW_BUSINESS_CONTINUITY,
       PermissionKey.VIEW_PREDICTIVE_INTELLIGENCE,
       PermissionKey.VIEW_EXECUTIVE_REVIEWS,
+      PermissionKey.VIEW_RESEARCH,
     ],
   };
 
