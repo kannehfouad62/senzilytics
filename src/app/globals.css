@@ -22,12 +22,27 @@ body {
 }
 
 html { scroll-behavior: smooth; }
-.landing-grid { background-image: linear-gradient(rgba(34,211,238,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,.035) 1px,transparent 1px); background-size: 56px 56px; mask-image: linear-gradient(to bottom,black,transparent 92%); }
+.landing-canvas { background: radial-gradient(circle at 12% 2%,rgba(34,211,238,.13),transparent 31rem),radial-gradient(circle at 92% 8%,rgba(59,130,246,.16),transparent 34rem),linear-gradient(145deg,#081827 0%,#0a1928 46%,#071421 100%); }
+.landing-canvas section > .mx-auto,.landing-canvas header > .mx-auto,.landing-canvas footer > .mx-auto { max-width:90rem; }
+.landing-canvas .text-slate-400 { color:#cbd5e1; }
+.landing-canvas .text-slate-500 { color:#a8b8ca; }
+.landing-canvas .text-slate-600 { color:#94a3b8; }
+.landing-canvas .text-slate-700 { color:#64748b; }
+.landing-grid { background-image: linear-gradient(rgba(103,232,249,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(103,232,249,.055) 1px,transparent 1px); background-size: 56px 56px; mask-image: linear-gradient(to bottom,black,transparent 92%); }
 .landing-orb { animation: landing-drift 11s ease-in-out infinite; }
 .landing-orb-reverse { animation: landing-drift 14s ease-in-out infinite reverse; }
 .landing-rise { animation: landing-rise .8s ease-out both; }
 .landing-float { animation: landing-float 7s ease-in-out infinite; }
 .landing-bar { transform-origin: bottom; animation: landing-grow .8s ease-out both; }
+.landing-network { aspect-ratio:1.1/1; min-height:32rem; isolation:isolate; }
+.landing-network::before { content:""; position:absolute; inset:13%; border-radius:50%; background:radial-gradient(circle,rgba(34,211,238,.17),rgba(37,99,235,.06) 42%,transparent 70%); filter:blur(12px); animation:network-aura 6s ease-in-out infinite; }
+.landing-network-grid { border:1px solid rgba(103,232,249,.11); border-radius:2.5rem; background-image:linear-gradient(rgba(103,232,249,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(103,232,249,.045) 1px,transparent 1px); background-size:28px 28px; mask-image:radial-gradient(circle,black 25%,transparent 76%); transform:perspective(800px) rotateX(58deg) scale(1.08); }
+.landing-scan { background:linear-gradient(90deg,transparent,rgba(103,232,249,.8),transparent); box-shadow:0 0 28px rgba(34,211,238,.5); animation:network-scan 5s ease-in-out infinite; }
+.landing-signal-path { stroke-dasharray:8 13; animation:signal-flow 4s linear infinite; }
+.landing-signal-path-delay { animation-delay:-1s; }.landing-signal-path-delay-2 { animation-delay:-2s; }.landing-signal-path-delay-3 { animation-delay:-3s; }
+.landing-core { animation:core-breathe 5s ease-in-out infinite; }
+.landing-core-ring { animation:core-spin 18s linear infinite; }.landing-core-ring-reverse { animation-direction:reverse; animation-duration:24s; }
+.landing-node { animation:node-float 6s ease-in-out infinite; }
 .landing-card { transition: transform .3s ease,border-color .3s ease,background-color .3s ease; }
 .landing-card:hover { transform: translateY(-6px); border-color: rgba(34,211,238,.35); background-color: rgba(34,211,238,.055); }
 .pricing-card { animation: pricing-breathe 7s ease-in-out infinite; transition:transform .3s ease,border-color .3s ease; }
@@ -37,5 +52,12 @@ html { scroll-behavior: smooth; }
 @keyframes landing-float { 0%,100% { transform:translateY(0) rotate(.001deg) } 50% { transform:translateY(-10px) rotate(.001deg) } }
 @keyframes landing-drift { 0%,100% { transform:translate3d(0,0,0) scale(1) } 50% { transform:translate3d(35px,25px,0) scale(1.08) } }
 @keyframes landing-grow { from { transform:scaleY(0); opacity:.25 } to { transform:scaleY(1); opacity:1 } }
+@keyframes network-aura { 0%,100% { opacity:.65; transform:scale(.96) } 50% { opacity:1; transform:scale(1.06) } }
+@keyframes network-scan { 0%,100% { opacity:0; transform:translateY(-13rem) } 15%,85% { opacity:.8 } 50% { opacity:1; transform:translateY(13rem) } }
+@keyframes signal-flow { to { stroke-dashoffset:-84 } }
+@keyframes core-breathe { 0%,100% { box-shadow:0 0 55px rgba(34,211,238,.14); transform:translate(-50%,-50%) scale(.98) } 50% { box-shadow:0 0 100px rgba(34,211,238,.26); transform:translate(-50%,-50%) scale(1.025) } }
+@keyframes core-spin { to { transform:rotate(360deg) } }
+@keyframes node-float { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-8px) } }
 @keyframes pricing-breathe { 0%,100% { box-shadow:0 0 0 rgba(34,211,238,0) } 50% { box-shadow:0 16px 60px rgba(34,211,238,.07) } }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto } .landing-orb,.landing-orb-reverse,.landing-rise,.landing-float,.landing-bar,.pricing-card { animation:none } .landing-card,.pricing-card { transition:none } }
+@media (max-width:640px) { .landing-network { min-height:28rem; } .landing-node { max-width:10rem; } .landing-node > div { gap:.5rem; padding:.65rem; } .landing-node svg { width:17px; height:17px; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto } .landing-orb,.landing-orb-reverse,.landing-rise,.landing-float,.landing-bar,.landing-network::before,.landing-scan,.landing-signal-path,.landing-core,.landing-core-ring,.landing-node,.pricing-card { animation:none } .landing-card,.pricing-card { transition:none } }
