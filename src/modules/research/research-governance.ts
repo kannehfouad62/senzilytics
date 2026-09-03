@@ -1,4 +1,4 @@
-import { ResearchProjectStatus } from "@prisma/client";
+import { ResearchCollectionStatus, ResearchProjectStatus } from "@prisma/client";
 
 const transitions: Record<ResearchProjectStatus, readonly ResearchProjectStatus[]> = {
   DRAFT: [ResearchProjectStatus.PLANNING, ResearchProjectStatus.CANCELLED],
@@ -24,6 +24,10 @@ export function assertResearchProjectTransition(from: ResearchProjectStatus, to:
     throw new Error(`Research project cannot move from ${pretty(from)} to ${pretty(to)}.`);
   }
 }
+
+const collectionTransitions:Record<ResearchCollectionStatus,readonly ResearchCollectionStatus[]>={DRAFT:[ResearchCollectionStatus.ACTIVE,ResearchCollectionStatus.CANCELLED],ACTIVE:[ResearchCollectionStatus.PAUSED,ResearchCollectionStatus.CLOSED],PAUSED:[ResearchCollectionStatus.ACTIVE,ResearchCollectionStatus.CLOSED,ResearchCollectionStatus.CANCELLED],CLOSED:[],CANCELLED:[]};
+export function availableResearchCollectionStatuses(status:ResearchCollectionStatus){return [...collectionTransitions[status]]}
+export function assertResearchCollectionTransition(from:ResearchCollectionStatus,to:ResearchCollectionStatus){if(!collectionTransitions[from].includes(to))throw new Error(`Research collection cannot move from ${pretty(from)} to ${pretty(to)}.`)}
 
 export function normalizeResearchReference(value: string) {
   const normalized = value.trim().toUpperCase().replace(/[^A-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "");

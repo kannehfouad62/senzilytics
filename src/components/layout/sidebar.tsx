@@ -319,6 +319,12 @@ export const auditNavItems: NavigationItem[] = [
 
 export const researchNavItems: NavigationItem[] = [
   {
+    label: "My Questionnaires",
+    href: "/research/my-questionnaires",
+    icon: ClipboardCheck,
+    permission: PermissionKey.COLLECT_RESEARCH_DATA,
+  },
+  {
     label: "Research Portfolio",
     href: "/research",
     icon: FlaskConical,

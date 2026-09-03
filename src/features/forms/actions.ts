@@ -97,6 +97,7 @@ export async function addConfigurableField(data: FormData) {
       `/form-studio/${definitionId}?error=${encodeURIComponent(message(cause))}`,
     );
   }
+  redirect(`/form-studio/${definitionId}`);
 }
 
 export async function removeConfigurableField(data: FormData) {

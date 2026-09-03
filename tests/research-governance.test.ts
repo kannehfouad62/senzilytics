@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ResearchProjectStatus } from "@prisma/client";
-import { assertResearchProjectTransition, availableResearchProjectStatuses, normalizeResearchReference, researchProjectReadiness } from "../src/modules/research/research-governance";
+import { ResearchCollectionStatus, ResearchProjectStatus } from "@prisma/client";
+import { assertResearchCollectionTransition, assertResearchProjectTransition, availableResearchCollectionStatuses, availableResearchProjectStatuses, normalizeResearchReference, researchProjectReadiness } from "../src/modules/research/research-governance";
 
 test("research projects follow a controlled lifecycle", () => {
   assert.doesNotThrow(() => assertResearchProjectTransition(ResearchProjectStatus.DRAFT, ResearchProjectStatus.PLANNING));
@@ -9,6 +9,13 @@ test("research projects follow a controlled lifecycle", () => {
   assert.throws(() => assertResearchProjectTransition(ResearchProjectStatus.DRAFT, ResearchProjectStatus.ACTIVE), /cannot move/);
   assert.throws(() => assertResearchProjectTransition(ResearchProjectStatus.COMPLETED, ResearchProjectStatus.DATA_COLLECTION), /cannot move/);
   assert.deepEqual(availableResearchProjectStatuses(ResearchProjectStatus.ARCHIVED), []);
+});
+
+test("research collection waves use a controlled lifecycle",()=>{
+  assert.doesNotThrow(()=>assertResearchCollectionTransition(ResearchCollectionStatus.DRAFT,ResearchCollectionStatus.ACTIVE));
+  assert.doesNotThrow(()=>assertResearchCollectionTransition(ResearchCollectionStatus.PAUSED,ResearchCollectionStatus.ACTIVE));
+  assert.throws(()=>assertResearchCollectionTransition(ResearchCollectionStatus.CLOSED,ResearchCollectionStatus.ACTIVE),/cannot move/);
+  assert.deepEqual(availableResearchCollectionStatuses(ResearchCollectionStatus.CANCELLED),[]);
 });
 
 test("research references are stable and safe", () => {

@@ -108,6 +108,14 @@ export async function preparePublishedFormSubmissions(input:{organizationId:stri
   return prepared;
 }
 
+export async function preparePublishedFormVersionSubmission(input:{organizationId:string;definitionId:string;versionId:string;module:ConfigurableFormModule;data:FormData}){
+  const version=await prisma.configurableFormVersion.findFirst({where:{id:input.versionId,definitionId:input.definitionId,status:ConfigurableFormVersionStatus.PUBLISHED,definition:{organizationId:input.organizationId,module:input.module,isActive:true}},include:{fields:{orderBy:{sequence:"asc"}}}});
+  if(!version)throw new Error("The assigned questionnaire version is not available.");
+  const raw=new Map<string,unknown>();for(const field of version.fields)raw.set(field.key,readValue(field,input.data));
+  const answers:PreparedSubmission["answers"]=[];for(const field of version.fields){if(!isRuntimeFieldVisible(field.visibilityRule,raw))continue;const value=validateValue(field,raw.get(field.key));if(value!==undefined)answers.push({fieldId:field.id,value})}
+  return {definitionId:input.definitionId,versionId:version.id,status:runtimeSubmissionStatus(version.fields,raw),answers} satisfies PreparedSubmission;
+}
+
 export async function prepareCapturedFormSubmissions(input:{organizationId:string;module:ConfigurableFormModule;capturedAt:Date;forms:CapturedRuntimeForm[]}){
   if(!input.forms.length)return [];
   if(new Set(input.forms.map(form=>form.definitionId)).size!==input.forms.length)throw new Error("A captured custom form is duplicated.");
