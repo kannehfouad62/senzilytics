@@ -8200,7 +8200,8 @@ model ResearchQuestionnaireAssignment {
 model ResearchAnalysis {
   id                   String                 @id @default(cuid())
   organizationId       String
-  collectionId         String
+  collectionId         String?
+  datasetVersionId     String?
   title                String
   method               String
   xVariableKey         String
@@ -8224,16 +8225,19 @@ model ResearchAnalysis {
   updatedAt            DateTime               @updatedAt
 
   organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  collection   ResearchCollectionWave @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collection   ResearchCollectionWave? @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  datasetVersion ResearchDatasetVersion? @relation(fields: [datasetVersionId], references: [id], onDelete: Cascade)
   analyst      User                   @relation("ResearchAnalysisAnalyst", fields: [analystId], references: [id], onDelete: Restrict)
   reviewer     User?                  @relation("ResearchAnalysisReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
   approvedBy   User?                  @relation("ResearchAnalysisApprover", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@index([organizationId, status, updatedAt])
   @@index([collectionId, status, updatedAt])
+  @@index([datasetVersionId, status, updatedAt])
   @@index([analystId, status])
   @@index([reviewerId, status])
   @@unique([collectionId, title, version])
+  @@unique([datasetVersionId, title, version])
 }
 
 model ResearchReport {
@@ -8380,6 +8384,7 @@ model ResearchDatasetVersion {
   createdBy    User                    @relation("ResearchDatasetVersionCreator", fields: [createdById], references: [id], onDelete: Restrict)
   reviewer     User?                   @relation("ResearchDatasetVersionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
   approvedBy   User?                   @relation("ResearchDatasetVersionApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  analyses     ResearchAnalysis[]
 
   @@unique([datasetId, version])
   @@index([organizationId, status, createdAt])

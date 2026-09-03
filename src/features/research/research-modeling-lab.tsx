@@ -29,10 +29,12 @@ export function ResearchModelingLab({
   variables,
   rows,
   collectionId,
+  datasetVersionId,
 }: {
   variables: ResearchVariable[];
   rows: ResearchDataRow[];
-  collectionId: string;
+  collectionId?: string;
+  datasetVersionId?: string;
 }) {
   const [saveState, saveAction, savePending] = useActionState(
     saveResearchAnalysis,
@@ -210,7 +212,8 @@ export function ResearchModelingLab({
           action={saveAction}
           className="mt-8 rounded-2xl border border-violet-400/20 p-5"
         >
-          <input type="hidden" name="collectionId" value={collectionId} />
+          <input type="hidden" name="collectionId" value={collectionId ?? ""} />
+          <input type="hidden" name="datasetVersionId" value={datasetVersionId ?? ""} />
           <input
             type="hidden"
             name="method"

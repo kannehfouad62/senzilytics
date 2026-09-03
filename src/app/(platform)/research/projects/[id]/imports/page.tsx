@@ -172,6 +172,7 @@ export default async function ResearchImportsPage({
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div><strong>Version {version.version}</strong><span className="ml-2 text-xs text-cyan-300">{version.status.replaceAll("_", " ")}</span><p className="mt-1 text-xs text-slate-500">{version.rowCount.toLocaleString()} rows · {version.columnCount} columns · {version.createdBy.name} · {version.createdAt.toLocaleString()}</p></div>
                             {(version.status === ResearchDatasetVersionStatus.APPROVED || version.status === ResearchDatasetVersionStatus.SUPERSEDED) && permissions.includes(PermissionKey.EXPORT_RESEARCH_OUTPUTS) && <a href={`/api/research/imports/versions/${version.id}/download`} className="rounded-lg border border-white/15 px-3 py-1.5 text-xs">Download CSV</a>}
+                            {version.status === ResearchDatasetVersionStatus.APPROVED && permissions.includes(PermissionKey.RUN_RESEARCH_ANALYSIS) && <Link href={`/research/imported-datasets/${version.id}`} className="rounded-lg bg-violet-300 px-3 py-1.5 text-xs font-semibold text-slate-950">Open Analysis Studio</Link>}
                           </div>
                           <p className="mt-2 text-xs text-slate-400">Quality snapshot: {JSON.stringify(version.qualitySnapshot)}</p>
                           <div className="mt-3 flex flex-wrap gap-2">

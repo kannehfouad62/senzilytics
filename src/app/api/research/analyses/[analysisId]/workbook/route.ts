@@ -18,18 +18,24 @@ export async function GET(
       where: { id: analysisId, organizationId },
       include: {
         collection: { include: { project: true } },
+        datasetVersion: { include: { dataset: { include: { project: true } } } },
         analyst: { select: { name: true } },
         approvedBy: { select: { name: true } },
       },
     });
   if (!analysis) return new Response("Analysis not found.", { status: 404 });
+  const project=analysis.collection?.project??analysis.datasetVersion?.dataset.project;
+  if(!project)return new Response("Analysis source not found.",{status:404});
+  const source=analysis.collection?`Collection ${analysis.collection.name}`:`Imported dataset v${analysis.datasetVersion?.version}`;
   const workbook = new ExcelJS.Workbook(),
     governance = workbook.addWorksheet("Governance"),
     results = workbook.addWorksheet("Model Results");
   governance.addRows(
     [
       ["Senzilytics Governed Research Model"],
-      ["Project", analysis.collection.project.reference],
+      ["Project", project.reference],
+      ["Governed source",source],
+      ["Dataset version ID",analysis.datasetVersionId??""],
       ["Title", analysis.title],
       ["Method", analysis.method],
       ["Version", analysis.version],
@@ -53,7 +59,7 @@ export async function GET(
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${analysis.collection.project.reference}-model-v${analysis.version}.xlsx"`,
+      "Content-Disposition": `attachment; filename="${project.reference}-model-v${analysis.version}.xlsx"`,
       "Cache-Control": "private, no-store",
     },
   });

@@ -76,7 +76,7 @@ export async function createResearchReport(
           id: { in: analysisIds },
           organizationId,
           status: ResearchAnalysisStatus.APPROVED,
-          collection: { projectId },
+          OR: [{ collection: { projectId } }, { datasetVersion: { dataset: { projectId } } }],
         },
         include: {
           collection: {
@@ -87,6 +87,7 @@ export async function createResearchReport(
               datasetApprovedAt: true,
             },
           },
+          datasetVersion: { select: { id:true,version:true,dataset:{select:{name:true}} } },
           analyst: { select: { id: true, name: true } },
           approvedBy: { select: { id: true, name: true } },
         },
@@ -122,7 +123,7 @@ export async function createResearchReport(
           variables: analysis.variableKeys,
           population: analysis.datasetResponseCount,
           result: analysis.resultSnapshot,
-          collection: analysis.collection,
+          collection: analysis.collection??{id:analysis.datasetVersion?.id,name:`${analysis.datasetVersion?.dataset.name} v${analysis.datasetVersion?.version}`,datasetStatus:"APPROVED",datasetApprovedAt:analysis.approvedAt},
           analyst: analysis.analyst,
           approvedBy: analysis.approvedBy,
           approvedAt: analysis.approvedAt,
@@ -208,7 +209,7 @@ export async function changeResearchReportStatus(
           id: { in: report.analysisIds },
           organizationId,
           status: ResearchAnalysisStatus.APPROVED,
-          collection: { projectId: report.projectId },
+          OR: [{ collection: { projectId: report.projectId } }, { datasetVersion: { dataset: { projectId: report.projectId } } }],
         },
       });
       if (approvedCount !== report.analysisIds.length) {

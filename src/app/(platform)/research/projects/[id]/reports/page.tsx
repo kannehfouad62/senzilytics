@@ -40,6 +40,7 @@ export default async function ResearchReportsPage({
           },
         },
       },
+      importedDatasets:{include:{versions:{where:{status:"APPROVED"},include:{analyses:{where:{status:ResearchAnalysisStatus.APPROVED},select:{id:true,title:true,method:true},orderBy:{approvedAt:"desc"}}}}}},
     },
   });
   if (!project) notFound();
@@ -48,7 +49,7 @@ export default async function ResearchReportsPage({
       ...analysis,
       collectionName: collection.name,
     })),
-  );
+  ).concat(project.importedDatasets.flatMap(dataset=>dataset.versions.flatMap(version=>version.analyses.map(analysis=>({...analysis,collectionName:`${dataset.name} · imported v${version.version}`})))));
   const canCreate = permissions.includes(PermissionKey.RUN_RESEARCH_ANALYSIS);
 
   return (
