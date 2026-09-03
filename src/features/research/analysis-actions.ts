@@ -10,8 +10,9 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { getResearchDataset } from "@/modules/research/research-dataset.service";
 import { buildAnalysisSnapshot } from "@/modules/research/research-statistics";
+import { cronbachAlpha, logisticRegression, multipleLinearRegression } from "@/modules/research/research-modeling";
 
-const methods = new Set(["AUTO", "DISTRIBUTION", "BOX_PLOT", "CROSSTAB", "CORRELATION", "GROUP_COMPARISON", "REGRESSION"]);
+const methods = new Set(["AUTO", "DISTRIBUTION", "BOX_PLOT", "CROSSTAB", "CORRELATION", "GROUP_COMPARISON", "REGRESSION", "MULTIPLE_REGRESSION", "LOGISTIC_REGRESSION", "RELIABILITY"]);
 const text = (data: FormData, key: string, maximum = 2000) => String(data.get(key) ?? "").trim().slice(0, maximum);
 const failure = (cause: unknown): FormActionState => ({ status: "ERROR", message: cause instanceof Error ? cause.message : "The analysis could not be updated." });
 const refresh = (collectionId: string) => { revalidatePath("/research", "layout"); revalidatePath(`/research/datasets/${collectionId}`); };
@@ -26,6 +27,7 @@ export async function saveResearchAnalysis(_state: FormActionState, data: FormDa
     const method = text(data, "method", 40);
     const xVariableKey = text(data, "xVariableKey", 160);
     const yVariableKey = text(data, "yVariableKey", 160) || null;
+    const variableKeys = [...new Set(text(data, "variableKeys", 4000).split(",").map(value => value.trim()).filter(Boolean))].slice(0, 30);
     const filterVariableKey = text(data, "filterVariableKey", 160) || null;
     const filterValue = text(data, "filterValue", 500) || null;
     if (!title) throw new Error("Give this analysis a title.");
@@ -34,10 +36,14 @@ export async function saveResearchAnalysis(_state: FormActionState, data: FormDa
     if (!dataset) throw new Error("Research dataset not found.");
     const x = dataset.variables.find(variable => variable.key === xVariableKey);
     const y = yVariableKey ? dataset.variables.find(variable => variable.key === yVariableKey) : null;
+    const selectedVariables = variableKeys.map(key => dataset.variables.find(variable => variable.key === key)).filter((variable): variable is NonNullable<typeof variable> => Boolean(variable));
     if (!x || (yVariableKey && !y)) throw new Error("The selected variables are not part of this questionnaire version.");
     if (filterVariableKey && !dataset.variables.some(variable => variable.key === filterVariableKey)) throw new Error("The selected filter is not part of this questionnaire version.");
     const rows = filterVariableKey && filterValue ? dataset.analysisRows.filter(row => categories(row.values[filterVariableKey]).includes(filterValue)) : dataset.analysisRows;
-    const resultSnapshot = JSON.parse(JSON.stringify(buildAnalysisSnapshot(method, rows, x, y)));
+    if (selectedVariables.length !== variableKeys.length) throw new Error("One or more selected model variables are not part of this questionnaire version.");
+    const modelResult = method === "MULTIPLE_REGRESSION" && y ? multipleLinearRegression(rows, selectedVariables, y) : method === "LOGISTIC_REGRESSION" && y ? logisticRegression(rows, selectedVariables, y) : method === "RELIABILITY" ? cronbachAlpha(rows, selectedVariables) : null;
+    if (["MULTIPLE_REGRESSION", "LOGISTIC_REGRESSION", "RELIABILITY"].includes(method) && !modelResult) throw new Error("The selected variables do not provide enough complete, compatible observations for this model.");
+    const resultSnapshot = JSON.parse(JSON.stringify(modelResult ? { method, result: modelResult } : buildAnalysisSnapshot(method, rows, x, y)));
     const previous = await prisma.researchAnalysis.aggregate({ where: { organizationId, collectionId, title }, _max: { version: true } });
     const analysis = await prisma.researchAnalysis.create({ data: {
       organizationId,
@@ -46,6 +52,7 @@ export async function saveResearchAnalysis(_state: FormActionState, data: FormDa
       method,
       xVariableKey,
       yVariableKey,
+      variableKeys,
       filterVariableKey,
       filterValue,
       hypothesis: text(data, "hypothesis", 2000) || null,
