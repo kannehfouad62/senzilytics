@@ -329,6 +329,19 @@ enum ResearchAssignmentStatus {
   REVOKED
 }
 
+enum ResearchDatasetStatus {
+  OPEN
+  UNDER_REVIEW
+  LOCKED
+  APPROVED
+}
+
+enum ResearchResponseDisposition {
+  INCLUDED
+  FLAGGED
+  EXCLUDED
+}
+
 enum EmergencyPlanType {
   ALL_HAZARDS
   FIRE
@@ -2370,6 +2383,10 @@ model User {
   createdResearchCollectionWaves      ResearchCollectionWave[]          @relation("ResearchCollectionCreatedBy")
   assignedResearchQuestionnaires      ResearchQuestionnaireAssignment[] @relation("ResearchAssignmentRespondent")
   issuedResearchAssignments           ResearchQuestionnaireAssignment[] @relation("ResearchAssignmentAssignedBy")
+  ownedResearchDatasets               ResearchCollectionWave[]           @relation("ResearchDatasetOwner")
+  lockedResearchDatasets              ResearchCollectionWave[]           @relation("ResearchDatasetLockedBy")
+  approvedResearchDatasets            ResearchCollectionWave[]           @relation("ResearchDatasetApprovedBy")
+  reviewedResearchResponses           ResearchQuestionnaireAssignment[]  @relation("ResearchResponseReviewedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8048,6 +8065,12 @@ model ResearchCollectionWave {
   createdById         String
   activatedAt         DateTime?
   closedAt            DateTime?
+  datasetStatus       ResearchDatasetStatus      @default(OPEN)
+  datasetOwnerId      String?
+  datasetLockedById   String?
+  datasetLockedAt     DateTime?
+  datasetApprovedById String?
+  datasetApprovedAt   DateTime?
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
 
@@ -8056,12 +8079,17 @@ model ResearchCollectionWave {
   questionnaire ResearchQuestionnaire             @relation(fields: [questionnaireId], references: [id], onDelete: Restrict)
   formVersion   ConfigurableFormVersion           @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
   createdBy     User                              @relation("ResearchCollectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  datasetOwner  User?                             @relation("ResearchDatasetOwner", fields: [datasetOwnerId], references: [id], onDelete: SetNull)
+  datasetLockedBy User?                           @relation("ResearchDatasetLockedBy", fields: [datasetLockedById], references: [id], onDelete: SetNull)
+  datasetApprovedBy User?                         @relation("ResearchDatasetApprovedBy", fields: [datasetApprovedById], references: [id], onDelete: SetNull)
   assignments   ResearchQuestionnaireAssignment[]
 
   @@unique([questionnaireId, name])
   @@index([organizationId, status, closesAt])
   @@index([projectId, status])
   @@index([formVersionId])
+  @@index([organizationId, datasetStatus, updatedAt])
+  @@index([datasetOwnerId, datasetStatus])
 }
 
 model ResearchQuestionnaireAssignment {
@@ -8076,6 +8104,10 @@ model ResearchQuestionnaireAssignment {
   completedAt    DateTime?
   revokedAt      DateTime?
   submissionId   String?                  @unique
+  disposition    ResearchResponseDisposition @default(INCLUDED)
+  qualityNotes   String?
+  reviewedById   String?
+  reviewedAt     DateTime?
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
 
@@ -8083,9 +8115,12 @@ model ResearchQuestionnaireAssignment {
   collection   ResearchCollectionWave      @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   respondent   User                        @relation("ResearchAssignmentRespondent", fields: [respondentId], references: [id], onDelete: Cascade)
   assignedBy   User                        @relation("ResearchAssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+  reviewedBy   User?                       @relation("ResearchResponseReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   submission   ConfigurableFormSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
 
   @@unique([collectionId, respondentId])
   @@index([organizationId, status, dueAt])
   @@index([respondentId, status, dueAt])
+  @@index([collectionId, disposition, completedAt])
+  @@index([reviewedById, reviewedAt])
 }

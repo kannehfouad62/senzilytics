@@ -331,6 +331,12 @@ export const researchNavItems: NavigationItem[] = [
     permission: PermissionKey.VIEW_RESEARCH,
   },
   {
+    label: "Research Datasets",
+    href: "/research/datasets",
+    icon: BarChart3,
+    permission: PermissionKey.RUN_RESEARCH_ANALYSIS,
+  },
+  {
     label: "Research Projects",
     href: "/research/projects",
     icon: ClipboardList,
