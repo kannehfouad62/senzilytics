@@ -294,6 +294,13 @@ export default async function ResearchProjectPage({
                 <span>Governed Report Builder</span>
                 <span>Open →</span>
               </Link>
+              <Link
+                href={`/research/projects/${project.id}/imports`}
+                className="flex items-center justify-between rounded-xl border border-emerald-300/15 bg-emerald-300/[.05] p-4 text-sm font-semibold text-emerald-200"
+              >
+                <span>Data Import & Dictionary</span>
+                <span>Open →</span>
+              </Link>
               <p className="text-sm leading-6 text-slate-400">
                 Data management, statistical analysis, frozen evidence,
                 publication review, and controlled exports remain attached to

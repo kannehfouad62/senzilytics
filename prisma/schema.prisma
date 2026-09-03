@@ -357,6 +357,27 @@ enum ResearchReportStatus {
   ARCHIVED
 }
 
+enum ResearchImportStatus {
+  UPLOADED
+  PROFILED
+  MAPPED
+  REJECTED
+}
+
+enum ResearchVariableDataType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  DATE
+}
+
+enum ResearchMeasurementLevel {
+  NOMINAL
+  ORDINAL
+  INTERVAL
+  RATIO
+}
+
 enum EmergencyPlanType {
   ALL_HAZARDS
   FIRE
@@ -2076,6 +2097,7 @@ model Organization {
   researchQuestionnaireAssignments ResearchQuestionnaireAssignment[]
   researchAnalyses                  ResearchAnalysis[]
   researchReports                   ResearchReport[]
+  researchImportedDatasets          ResearchImportedDataset[]
 }
 
 model PricingInquiry {
@@ -2411,6 +2433,7 @@ model User {
   reviewedResearchReports              ResearchReport[]                    @relation("ResearchReportReviewer")
   approvedResearchReports              ResearchReport[]                    @relation("ResearchReportApprover")
   publishedResearchReports             ResearchReport[]                    @relation("ResearchReportPublisher")
+  importedResearchDatasets              ResearchImportedDataset[]            @relation("ResearchDatasetImporter")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8000,6 +8023,7 @@ model ResearchProject {
   questionnaires        ResearchQuestionnaire[]
   collectionWaves       ResearchCollectionWave[]
   reports               ResearchReport[]
+  importedDatasets      ResearchImportedDataset[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
@@ -8232,4 +8256,55 @@ model ResearchReport {
   @@index([organizationId, status, updatedAt])
   @@index([projectId, status, updatedAt])
   @@index([authorId, status])
+}
+
+model ResearchImportedDataset {
+  id                String               @id @default(cuid())
+  organizationId    String
+  projectId         String
+  name              String
+  status            ResearchImportStatus @default(UPLOADED)
+  sourceFileName    String
+  sourceBlobPath    String
+  mimeType          String
+  sizeBytes         Int
+  rowCount          Int                  @default(0)
+  columnCount       Int                  @default(0)
+  previewSnapshot   Json?
+  profileErrors     String[]             @default([])
+  importedById      String
+  importedAt        DateTime             @default(now())
+  profiledAt        DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  importedBy   User                   @relation("ResearchDatasetImporter", fields: [importedById], references: [id], onDelete: Restrict)
+  variables    ResearchDataVariable[]
+
+  @@unique([projectId, name])
+  @@index([organizationId, status, updatedAt])
+  @@index([projectId, status])
+}
+
+model ResearchDataVariable {
+  id               String                   @id @default(cuid())
+  datasetId        String
+  sourceColumn     String
+  key              String
+  label            String
+  dataType         ResearchVariableDataType
+  measurementLevel ResearchMeasurementLevel
+  unit             String?
+  missingValues    String[]                 @default([])
+  position         Int
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  dataset ResearchImportedDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@unique([datasetId, sourceColumn])
+  @@unique([datasetId, key])
+  @@index([datasetId, position])
 }
