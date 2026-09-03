@@ -349,6 +349,14 @@ enum ResearchAnalysisStatus {
   ARCHIVED
 }
 
+enum ResearchReportStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
 enum EmergencyPlanType {
   ALL_HAZARDS
   FIRE
@@ -2067,6 +2075,7 @@ model Organization {
   researchCollectionWaves          ResearchCollectionWave[]
   researchQuestionnaireAssignments ResearchQuestionnaireAssignment[]
   researchAnalyses                  ResearchAnalysis[]
+  researchReports                   ResearchReport[]
 }
 
 model PricingInquiry {
@@ -2398,6 +2407,10 @@ model User {
   authoredResearchAnalyses            ResearchAnalysis[]                  @relation("ResearchAnalysisAnalyst")
   reviewedResearchAnalyses            ResearchAnalysis[]                  @relation("ResearchAnalysisReviewer")
   approvedResearchAnalyses            ResearchAnalysis[]                  @relation("ResearchAnalysisApprover")
+  authoredResearchReports              ResearchReport[]                    @relation("ResearchReportAuthor")
+  reviewedResearchReports              ResearchReport[]                    @relation("ResearchReportReviewer")
+  approvedResearchReports              ResearchReport[]                    @relation("ResearchReportApprover")
+  publishedResearchReports             ResearchReport[]                    @relation("ResearchReportPublisher")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -7986,6 +7999,7 @@ model ResearchProject {
   milestones            ResearchMilestone[]
   questionnaires        ResearchQuestionnaire[]
   collectionWaves       ResearchCollectionWave[]
+  reports               ResearchReport[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
@@ -8174,4 +8188,48 @@ model ResearchAnalysis {
   @@index([analystId, status])
   @@index([reviewerId, status])
   @@unique([collectionId, title, version])
+}
+
+model ResearchReport {
+  id                   String               @id @default(cuid())
+  organizationId       String
+  projectId            String
+  reference            String
+  title                String
+  version              Int                  @default(1)
+  status               ResearchReportStatus @default(DRAFT)
+  executiveSummary     String
+  background           String?
+  methodology          String
+  findings             String
+  discussion           String?
+  conclusions          String
+  recommendations      String
+  limitations          String
+  analysisIds          String[]             @default([])
+  evidenceSnapshot     Json
+  snapshotGeneratedAt  DateTime             @default(now())
+  authorId             String
+  reviewerId           String?
+  approvedById         String?
+  publishedById        String?
+  submittedAt          DateTime?
+  reviewedAt           DateTime?
+  approvedAt           DateTime?
+  publishedAt          DateTime?
+  archivedAt           DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author       User            @relation("ResearchReportAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  reviewer     User?           @relation("ResearchReportReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  approvedBy   User?           @relation("ResearchReportApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  publishedBy  User?           @relation("ResearchReportPublisher", fields: [publishedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, reference, version])
+  @@index([organizationId, status, updatedAt])
+  @@index([projectId, status, updatedAt])
+  @@index([authorId, status])
 }
