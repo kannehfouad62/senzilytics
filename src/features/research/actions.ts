@@ -39,7 +39,7 @@ const success = (message: string): FormActionState => ({ status: "SUCCESS", mess
 const failure = (cause: unknown, fallback: string): FormActionState => ({ status: "ERROR", message: cause instanceof Error ? cause.message : fallback });
 
 function refresh(projectId?: string) {
-  revalidatePath("/research");
+  revalidatePath("/research", "layout");
   revalidatePath("/research/projects");
   revalidatePath("/research/clients");
   revalidatePath("/dashboard");
