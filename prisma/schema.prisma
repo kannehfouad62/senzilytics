@@ -378,6 +378,15 @@ enum ResearchMeasurementLevel {
   RATIO
 }
 
+enum ResearchTransformationType {
+  REPLACE_MISSING
+  RECODE_VALUE
+  DERIVE_NUMERIC
+  FILTER_VALUE
+  REMOVE_DUPLICATES
+  FLAG_OUTLIERS
+}
+
 enum EmergencyPlanType {
   ALL_HAZARDS
   FIRE
@@ -2098,6 +2107,7 @@ model Organization {
   researchAnalyses                  ResearchAnalysis[]
   researchReports                   ResearchReport[]
   researchImportedDatasets          ResearchImportedDataset[]
+  researchDataTransformations       ResearchDataTransformation[]
 }
 
 model PricingInquiry {
@@ -2434,6 +2444,7 @@ model User {
   approvedResearchReports              ResearchReport[]                    @relation("ResearchReportApprover")
   publishedResearchReports             ResearchReport[]                    @relation("ResearchReportPublisher")
   importedResearchDatasets              ResearchImportedDataset[]            @relation("ResearchDatasetImporter")
+  createdResearchTransformations         ResearchDataTransformation[]          @relation("ResearchTransformationCreator")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8282,6 +8293,7 @@ model ResearchImportedDataset {
   project      ResearchProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   importedBy   User                   @relation("ResearchDatasetImporter", fields: [importedById], references: [id], onDelete: Restrict)
   variables    ResearchDataVariable[]
+  transformations ResearchDataTransformation[]
 
   @@unique([projectId, name])
   @@index([organizationId, status, updatedAt])
@@ -8307,4 +8319,27 @@ model ResearchDataVariable {
   @@unique([datasetId, sourceColumn])
   @@unique([datasetId, key])
   @@index([datasetId, position])
+}
+
+model ResearchDataTransformation {
+  id                   String                     @id @default(cuid())
+  organizationId       String
+  datasetId            String
+  type                 ResearchTransformationType
+  sourceVariableKey    String?
+  secondaryVariableKey String?
+  outputVariableKey    String?
+  parameters           Json
+  rationale            String
+  position             Int
+  createdById          String
+  createdAt            DateTime                   @default(now())
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dataset      ResearchImportedDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  createdBy    User                    @relation("ResearchTransformationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([datasetId, position])
+  @@index([organizationId, createdAt])
+  @@index([datasetId, createdAt])
 }

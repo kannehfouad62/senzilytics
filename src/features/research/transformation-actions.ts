@@ -1,0 +1,17 @@
+"use server";
+import { ActivityAction,PermissionKey,ResearchImportStatus,ResearchTransformationType } from "@prisma/client";
+import { revalidatePath } from "next/cache";
+import type{FormActionState}from"@/core/actions/action-state";
+import{logActivity}from"@/core/activity-log/activity-log.service";import{requirePermission}from"@/lib/permissions";import{prisma}from"@/lib/prisma";import{getCurrentUserTenant}from"@/lib/tenant";
+const text=(data:FormData,key:string,max=1000)=>String(data.get(key)??"").trim().slice(0,max);const fail=(cause:unknown):FormActionState=>({status:"ERROR",message:cause instanceof Error?cause.message:"Transformation could not be saved."});
+export async function createResearchTransformation(_state:FormActionState,data:FormData):Promise<FormActionState>{await requirePermission(PermissionKey.MANAGE_RESEARCH_DATASETS);const{organizationId,user}=await getCurrentUserTenant();try{
+ const datasetId=text(data,"datasetId",100),type=text(data,"type",40)as ResearchTransformationType,sourceVariableKey=text(data,"sourceVariableKey",100)||null,secondaryVariableKey=text(data,"secondaryVariableKey",100)||null,outputVariableKey=text(data,"outputVariableKey",100).toLowerCase().replace(/[^a-z0-9_]/g,"_")||null,rationale=text(data,"rationale",1000);
+ if(!Object.values(ResearchTransformationType).includes(type)||rationale.length<10)throw new Error("Select a transformation and record its rationale.");
+ const dataset=await prisma.researchImportedDataset.findFirst({where:{id:datasetId,organizationId,status:ResearchImportStatus.MAPPED},include:{variables:{select:{key:true}},_count:{select:{transformations:true}}}});
+ if(!dataset)throw new Error("Complete the data dictionary mapping before creating transformations.");if(dataset._count.transformations>=100)throw new Error("A dataset supports up to 100 transformation steps.");
+ const keys=new Set(dataset.variables.map(v=>v.key));if(sourceVariableKey&&!keys.has(sourceVariableKey))throw new Error("The source variable is invalid.");if(secondaryVariableKey&&!keys.has(secondaryVariableKey))throw new Error("The secondary variable is invalid.");
+ const parameters=type===ResearchTransformationType.REPLACE_MISSING?{codes:text(data,"fromValue",500).split(",").map(v=>v.trim()).filter(Boolean)}:type===ResearchTransformationType.RECODE_VALUE?{from:text(data,"fromValue",500),to:text(data,"toValue",500)}:type===ResearchTransformationType.FILTER_VALUE?{value:text(data,"fromValue",500)}:type===ResearchTransformationType.DERIVE_NUMERIC?{operation:text(data,"operation",20)}:{};
+ if(type===ResearchTransformationType.DERIVE_NUMERIC&&(!sourceVariableKey||!secondaryVariableKey||!outputVariableKey))throw new Error("Derived variables require two sources and an output key.");if(type===ResearchTransformationType.FLAG_OUTLIERS&&!sourceVariableKey)throw new Error("Select the numeric variable to assess.");
+ const recipe=await prisma.researchDataTransformation.create({data:{organizationId,datasetId,type,sourceVariableKey,secondaryVariableKey,outputVariableKey,parameters,rationale,position:dataset._count.transformations+1,createdById:user.id}});
+ await logActivity({organizationId,userId:user.id,action:ActivityAction.CREATE,entityType:"ResearchDataTransformation",entityId:recipe.id,title:"Research transformation added",description:recipe.position+". "+type,metadata:{datasetId,rationale}});revalidatePath("/research","layout");return{status:"SUCCESS",message:"Transformation added to the governed lineage."}}
+ catch(cause){return fail(cause)}}
