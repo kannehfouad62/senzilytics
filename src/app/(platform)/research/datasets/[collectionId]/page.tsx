@@ -4,6 +4,7 @@ import { PermissionKey, ResearchAnalysisStatus } from "@prisma/client";
 
 import { AnalysisGovernanceControl } from "@/features/research/analysis-governance";
 import { ResearchAnalysisStudio } from "@/features/research/analysis-studio";
+import { ResearchModelingLab } from "@/features/research/research-modeling-lab";
 import { DatasetStatusControl, ResponseQualityControl } from "@/features/research/dataset-controls";
 import { getCurrentUserPermissions, requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
@@ -22,6 +23,7 @@ export default async function ResearchDatasetPage({ params }: { params: Promise<
     <div className="mt-5 flex flex-wrap justify-between gap-5"><div><p className="text-sm text-cyan-300">{collection.project.reference} · {collection.questionnaire.name}</p><h1 className="mt-2 text-4xl font-bold">{collection.name}</h1><p className="mt-2 text-slate-400">{rows.length} completed · {analysisRows.length} included · Published questionnaire v{collection.formVersion.version}</p></div>{canManage && <DatasetStatusControl collectionId={collection.id} status={collection.datasetStatus} canApprove={canApprove} canLock={collection.status === "CLOSED"}/>}</div>
     <div className="mt-7 grid gap-4 sm:grid-cols-4"><Metric label="Dataset status" value={collection.datasetStatus}/><Metric label="Variables" value={variables.length}/><Metric label="Auto-detected issues" value={[...qualityIssues.values()].reduce((sum, list) => sum + list.length, 0)}/><Metric label="Saved analyses" value={collection.analyses.length}/></div>
     <div className="mt-9"><ResearchAnalysisStudio variables={variables} rows={analysisRows} collectionId={collection.id}/></div>
+    <ResearchModelingLab variables={variables} rows={analysisRows}/>
 
     <section className="mt-9 rounded-3xl border border-white/10 bg-white/[.04] p-6"><h2 className="text-xl font-semibold">Saved analysis register</h2><p className="mt-1 text-sm text-slate-400">Reproducible specifications and result snapshots governed independently from the live exploratory workspace.</p><div className="mt-5 grid gap-4 xl:grid-cols-2">{collection.analyses.map(analysis => {
       const next: ResearchAnalysisStatus[] = [];

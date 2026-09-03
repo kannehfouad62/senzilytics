@@ -10,6 +10,7 @@ import {
   type ResearchVariable,
 } from "../src/modules/research/research-analysis";
 import { createResearchPresentation } from "../src/modules/research/research-presentation";
+import { cronbachAlpha, logisticRegression, multipleLinearRegression } from "../src/modules/research/research-modeling";
 import {
   boxPlot,
   confidenceInterval,
@@ -173,3 +174,9 @@ test("saved analysis governance reauthorizes, tenant-scopes and requires indepen
   assert.match(source, /_max: \{ version: true \}/);
   assert.match(source, /revalidatePath\("\/research", "layout"\)/);
 });
+
+test("multiple regression returns coefficients, fit and residual diagnostics",()=>{const predictors=[{...score,key:"x1",label:"X1"},{...score,key:"x2",label:"X2"}],outcome={...score,key:"y",label:"Y"},modelRows=Array.from({length:12},(_,i)=>({assignmentId:String(i),responseId:String(i),submittedAt:"",values:{x1:i+1,x2:(i%3)*2+i/10,y:5+2*(i+1)-3*((i%3)*2+i/10)}}));const result=multipleLinearRegression(modelRows,predictors,outcome);assert.ok(result&&result.rSquared>.9999);assert.ok(result&&Math.abs(result.terms[1].coefficient-2)<.0001);assert.ok(result&&Math.abs(result.terms[2].coefficient+3)<.0001);assert.equal(result?.diagnostics.length,12)});
+
+test("Cronbach alpha summarizes internally consistent numeric scale items",()=>{const items=[{...score,key:"a"},{...score,key:"b"},{...score,key:"c"}],scaleRows=Array.from({length:10},(_,i)=>({assignmentId:String(i),responseId:String(i),submittedAt:"",values:{a:i+1,b:i+2,c:i+3}}));const result=cronbachAlpha(scaleRows,items);assert.ok(result&&result.alpha>.99);assert.equal(result?.itemCount,3)});
+
+test("binary logistic regression reports odds ratios and predicted probabilities",()=>{const predictor={...score,key:"x"},outcome={...department,key:"outcome"},modelRows=Array.from({length:20},(_,i)=>({assignmentId:String(i),responseId:String(i),submittedAt:"",values:{x:i-10,outcome:i<10?"No":"Yes"}}));const result=logisticRegression(modelRows,[predictor],outcome);assert.ok(result&&result.accuracy>.9);assert.ok(result?.diagnostics.every(item=>item.probability>=0&&item.probability<=1))});
