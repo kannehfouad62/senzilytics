@@ -387,6 +387,13 @@ enum ResearchTransformationType {
   FLAG_OUTLIERS
 }
 
+enum ResearchDatasetVersionStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  SUPERSEDED
+}
+
 enum EmergencyPlanType {
   ALL_HAZARDS
   FIRE
@@ -2108,6 +2115,7 @@ model Organization {
   researchReports                   ResearchReport[]
   researchImportedDatasets          ResearchImportedDataset[]
   researchDataTransformations       ResearchDataTransformation[]
+  researchDatasetVersions           ResearchDatasetVersion[]
 }
 
 model PricingInquiry {
@@ -2445,6 +2453,9 @@ model User {
   publishedResearchReports             ResearchReport[]                    @relation("ResearchReportPublisher")
   importedResearchDatasets              ResearchImportedDataset[]            @relation("ResearchDatasetImporter")
   createdResearchTransformations         ResearchDataTransformation[]          @relation("ResearchTransformationCreator")
+  createdResearchDatasetVersions          ResearchDatasetVersion[]              @relation("ResearchDatasetVersionCreator")
+  reviewedResearchDatasetVersions         ResearchDatasetVersion[]              @relation("ResearchDatasetVersionReviewer")
+  approvedResearchDatasetVersions         ResearchDatasetVersion[]              @relation("ResearchDatasetVersionApprover")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8294,6 +8305,7 @@ model ResearchImportedDataset {
   importedBy   User                   @relation("ResearchDatasetImporter", fields: [importedById], references: [id], onDelete: Restrict)
   variables    ResearchDataVariable[]
   transformations ResearchDataTransformation[]
+  versions        ResearchDatasetVersion[]
 
   @@unique([projectId, name])
   @@index([organizationId, status, updatedAt])
@@ -8342,4 +8354,34 @@ model ResearchDataTransformation {
   @@unique([datasetId, position])
   @@index([organizationId, createdAt])
   @@index([datasetId, createdAt])
+}
+
+model ResearchDatasetVersion {
+  id                     String                       @id @default(cuid())
+  organizationId         String
+  datasetId              String
+  version                Int
+  status                 ResearchDatasetVersionStatus @default(DRAFT)
+  storagePath            String
+  rowCount               Int
+  columnCount            Int
+  transformationSnapshot Json
+  qualitySnapshot        Json
+  createdById            String
+  reviewerId             String?
+  approvedById           String?
+  createdAt              DateTime                     @default(now())
+  submittedAt            DateTime?
+  reviewedAt             DateTime?
+  approvedAt             DateTime?
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dataset      ResearchImportedDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  createdBy    User                    @relation("ResearchDatasetVersionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  reviewer     User?                   @relation("ResearchDatasetVersionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  approvedBy   User?                   @relation("ResearchDatasetVersionApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([datasetId, version])
+  @@index([organizationId, status, createdAt])
+  @@index([datasetId, status, version])
 }

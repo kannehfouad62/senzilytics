@@ -1,9 +1,13 @@
-import { PermissionKey } from "@prisma/client";
+import { PermissionKey, ResearchDatasetVersionStatus } from "@prisma/client";
 import { ArrowLeft, DatabaseZap } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ResearchImportUpload } from "@/features/research/research-import-upload";
 import { ResearchTransformationForm } from "@/features/research/research-transformation-form";
+import {
+  DatasetVersionStatusControl,
+  MaterializeDatasetVersion,
+} from "@/features/research/research-dataset-version-controls";
 import {
   FinalizeDictionary,
   ResearchVariableEditor,
@@ -22,7 +26,7 @@ export default async function ResearchImportsPage({
   params: Promise<{ id: string }>;
 }) {
   await requirePermission(PermissionKey.VIEW_RESEARCH);
-  const [{ id }, { organizationId }, permissions] = await Promise.all([
+  const [{ id }, { organizationId, user }, permissions] = await Promise.all([
     params,
     getCurrentUserTenant(),
     getCurrentUserPermissions(),
@@ -38,6 +42,13 @@ export default async function ResearchImportsPage({
             orderBy: { position: "asc" },
           },
           importedBy: { select: { name: true } },
+          versions: {
+            include: {
+              createdBy: { select: { name: true } },
+              approvedBy: { select: { name: true } },
+            },
+            orderBy: { version: "desc" },
+          },
         },
         orderBy: { createdAt: "desc" },
       },
@@ -119,10 +130,10 @@ export default async function ResearchImportsPage({
                   permissions.includes(
                     PermissionKey.MANAGE_RESEARCH_DATASETS,
                   ) && (
-                    <ResearchTransformationForm
-                      datasetId={dataset.id}
-                      variables={dataset.variables}
-                    />
+                    <>
+                      <ResearchTransformationForm datasetId={dataset.id} variables={dataset.variables}/>
+                      <MaterializeDatasetVersion datasetId={dataset.id}/>
+                    </>
                   )}
                 {!!dataset.transformations.length && (
                   <section className="mt-5 rounded-2xl border border-white/10 p-5">
@@ -146,6 +157,29 @@ export default async function ResearchImportsPage({
                               {step.createdBy.name} · {step.createdAt.toLocaleString()}
                             </p>
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {!!dataset.versions.length && (
+                  <section className="mt-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/[.03] p-5">
+                    <h3 className="font-semibold">Analysis-ready versions</h3>
+                    <p className="mt-1 text-xs text-slate-500">Immutable transformation and quality snapshots with independent approval.</p>
+                    <div className="mt-3 space-y-3">
+                      {dataset.versions.map((version) => (
+                        <div key={version.id} className="rounded-xl border border-white/10 p-4 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div><strong>Version {version.version}</strong><span className="ml-2 text-xs text-cyan-300">{version.status.replaceAll("_", " ")}</span><p className="mt-1 text-xs text-slate-500">{version.rowCount.toLocaleString()} rows · {version.columnCount} columns · {version.createdBy.name} · {version.createdAt.toLocaleString()}</p></div>
+                            {(version.status === ResearchDatasetVersionStatus.APPROVED || version.status === ResearchDatasetVersionStatus.SUPERSEDED) && permissions.includes(PermissionKey.EXPORT_RESEARCH_OUTPUTS) && <a href={`/api/research/imports/versions/${version.id}/download`} className="rounded-lg border border-white/15 px-3 py-1.5 text-xs">Download CSV</a>}
+                          </div>
+                          <p className="mt-2 text-xs text-slate-400">Quality snapshot: {JSON.stringify(version.qualitySnapshot)}</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {version.status === ResearchDatasetVersionStatus.DRAFT && permissions.includes(PermissionKey.MANAGE_RESEARCH_DATASETS) && <DatasetVersionStatusControl versionId={version.id} target={ResearchDatasetVersionStatus.UNDER_REVIEW} label="Submit for review"/>}
+                            {version.status === ResearchDatasetVersionStatus.UNDER_REVIEW && permissions.includes(PermissionKey.MANAGE_RESEARCH_DATASETS) && <DatasetVersionStatusControl versionId={version.id} target={ResearchDatasetVersionStatus.DRAFT} label="Return to draft"/>}
+                            {version.status === ResearchDatasetVersionStatus.UNDER_REVIEW && version.createdById !== user.id && permissions.includes(PermissionKey.APPROVE_RESEARCH_OUTPUTS) && <DatasetVersionStatusControl versionId={version.id} target={ResearchDatasetVersionStatus.APPROVED} label="Approve version"/>}
+                          </div>
+                          {version.approvedBy && <p className="mt-2 text-xs text-emerald-300">Approved independently by {version.approvedBy.name}</p>}
                         </div>
                       ))}
                     </div>

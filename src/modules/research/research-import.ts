@@ -18,9 +18,7 @@ export async function profileResearchFile(
   mimeType: string,
   fileName: string,
 ) {
-  const rows = fileName.toLowerCase().endsWith(".csv") || mimeType === "text/csv"
-    ? parseCsv(new TextDecoder().decode(bytes))
-    : await parseWorkbook(bytes);
+  const rows = await parseResearchFileRows(bytes, mimeType, fileName);
   if (rows.length < 2) throw new Error("The file must contain a header and at least one data row.");
   if (rows.length > 50_001) throw new Error("This import supports up to 50,000 rows per file.");
   const headers = uniqueHeaders(rows[0] ?? []);
@@ -49,6 +47,10 @@ export async function profileResearchFile(
       Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])),
     ),
   };
+}
+
+export async function parseResearchFileRows(bytes:ArrayBuffer,mimeType:string,fileName:string){
+  return fileName.toLowerCase().endsWith(".csv")||mimeType==="text/csv"?parseCsv(new TextDecoder().decode(bytes)):parseWorkbook(bytes);
 }
 
 async function parseWorkbook(bytes: ArrayBuffer) {
