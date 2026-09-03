@@ -10,6 +10,18 @@ import {
   type ResearchVariable,
 } from "../src/modules/research/research-analysis";
 import { createResearchPresentation } from "../src/modules/research/research-presentation";
+import {
+  boxPlot,
+  confidenceInterval,
+  contingencyTable,
+  histogram,
+  linearRegression,
+  oneWayAnova,
+  pearsonCorrelation,
+  spearmanCorrelation,
+  welchTTest,
+  buildAnalysisSnapshot,
+} from "../src/modules/research/research-statistics";
 
 const score: ResearchVariable = {
   id: "score",
@@ -90,4 +102,74 @@ test("PowerPoint export is a valid Open XML package with editable slide shapes",
   ]]);
   assert.equal(String.fromCharCode(...output.slice(0, 2)), "PK");
   assert.ok(output.byteLength > 2_000);
+});
+
+test("advanced distribution analysis produces stable confidence intervals, histograms and box plots", () => {
+  const interval = confidenceInterval(rows, score);
+  assert.equal(interval?.mean, 40);
+  assert.ok(interval && interval.lower < 40 && interval.upper > 40);
+  assert.equal(histogram(rows, score, 4).reduce((sum, bin) => sum + bin.value, 0), 4);
+  assert.deepEqual(boxPlot(rows, score)?.outliers, [100]);
+});
+
+test("Pearson and Spearman correlations report coefficients and inference", () => {
+  const x = { ...score, key: "x" };
+  const y = { ...score, key: "y" };
+  const correlationRows = [1, 2, 3, 4, 5].map((value, index) => ({ assignmentId: String(index), responseId: String(index), submittedAt: "", values: { x: value, y: value * 2 + 1 } }));
+  assert.ok((pearsonCorrelation(correlationRows, x, y)?.coefficient ?? 0) > .9999);
+  assert.ok((spearmanCorrelation(correlationRows, x, y)?.coefficient ?? 0) > .9999);
+  assert.ok((pearsonCorrelation(correlationRows, x, y)?.pValue ?? 1) < .001);
+});
+
+test("crosstabs calculate chi-square and Cramer's V", () => {
+  const outcome = { ...department, key: "outcome", label: "Outcome" };
+  const tableRows = Array.from({ length: 20 }, (_, index) => ({ assignmentId: String(index), responseId: String(index), submittedAt: "", values: { department: index < 10 ? "A" : "B", outcome: index < 8 || index >= 18 ? "Yes" : "No" } }));
+  const result = contingencyTable(tableRows, department, outcome);
+  assert.deepEqual(result.cells, [[8, 2], [2, 8]]);
+  assert.ok(result.statistic > 7);
+  assert.ok((result.pValue ?? 1) < .01);
+  assert.ok((result.cramersV ?? 0) > .5);
+  const multiSelect = contingencyTable([{ assignmentId: "m1", responseId: "m1", submittedAt: "", values: { department: ["A", "B"], outcome: "Yes" } }], department, outcome);
+  assert.equal(multiSelect.total, 1);
+});
+
+test("group comparisons provide Welch t tests and one-way ANOVA effect sizes", () => {
+  const groupRows = [1, 2, 3, 4, 5, 6].map((value, index) => ({ assignmentId: String(index), responseId: String(index), submittedAt: "", values: { department: index < 3 ? "A" : "B", score: value } }));
+  const tTest = welchTTest(groupRows, department, score);
+  const anova = oneWayAnova(groupRows, department, score);
+  assert.ok(tTest && Math.abs(tTest.statistic + 3.6742346) < .00001);
+  assert.ok(tTest && tTest.pValue < .05 && Math.abs((tTest.cohensD ?? 0) + 3) < .00001);
+  assert.ok(anova && Math.abs(anova.statistic - 13.5) < .00001);
+  assert.ok(anova && anova.pValue < .05 && (anova.etaSquared ?? 0) > .7);
+});
+
+test("simple linear regression reports slope, intercept, fit and significance", () => {
+  const x = { ...score, key: "x" };
+  const y = { ...score, key: "y" };
+  const regressionRows = [1, 2, 3, 4, 5].map((value, index) => ({ assignmentId: String(index), responseId: String(index), submittedAt: "", values: { x: value, y: 2 * value + 1 } }));
+  const result = linearRegression(regressionRows, x, y);
+  assert.equal(result?.slope, 2);
+  assert.equal(result?.intercept, 1);
+  assert.equal(result?.rSquared, 1);
+  assert.equal(result?.pValue, 0);
+});
+
+test("saved advanced analyses use reproducible server-calculated snapshots", () => {
+  const snapshot = buildAnalysisSnapshot("GROUP_COMPARISON", rows, department, score);
+  assert.equal(snapshot.method, "GROUP_COMPARISON");
+  assert.ok("anova" in snapshot);
+});
+
+test("saved analysis governance reauthorizes, tenant-scopes and requires independent approval", async () => {
+  const source = await readFile(new URL("../src/features/research/analysis-actions.ts", import.meta.url), "utf8");
+  assert.match(source, /RUN_RESEARCH_ANALYSIS/);
+  assert.match(source, /organizationId/);
+  assert.match(source, /APPROVE_RESEARCH_OUTPUTS/);
+  assert.match(source, /analyst cannot approve their own work/);
+  assert.match(source, /dataset must be approved/);
+  assert.match(source, /Lock the governed dataset before submitting/);
+  assert.match(source, /analytical population changed/);
+  assert.match(source, /buildAnalysisSnapshot/);
+  assert.match(source, /_max: \{ version: true \}/);
+  assert.match(source, /revalidatePath\("\/research", "layout"\)/);
 });

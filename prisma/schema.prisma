@@ -342,6 +342,13 @@ enum ResearchResponseDisposition {
   EXCLUDED
 }
 
+enum ResearchAnalysisStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  ARCHIVED
+}
+
 enum EmergencyPlanType {
   ALL_HAZARDS
   FIRE
@@ -2059,6 +2066,7 @@ model Organization {
   researchQuestionnaires           ResearchQuestionnaire[]
   researchCollectionWaves          ResearchCollectionWave[]
   researchQuestionnaireAssignments ResearchQuestionnaireAssignment[]
+  researchAnalyses                  ResearchAnalysis[]
 }
 
 model PricingInquiry {
@@ -2387,6 +2395,9 @@ model User {
   lockedResearchDatasets              ResearchCollectionWave[]           @relation("ResearchDatasetLockedBy")
   approvedResearchDatasets            ResearchCollectionWave[]           @relation("ResearchDatasetApprovedBy")
   reviewedResearchResponses           ResearchQuestionnaireAssignment[]  @relation("ResearchResponseReviewedBy")
+  authoredResearchAnalyses            ResearchAnalysis[]                  @relation("ResearchAnalysisAnalyst")
+  reviewedResearchAnalyses            ResearchAnalysis[]                  @relation("ResearchAnalysisReviewer")
+  approvedResearchAnalyses            ResearchAnalysis[]                  @relation("ResearchAnalysisApprover")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8083,6 +8094,7 @@ model ResearchCollectionWave {
   datasetLockedBy User?                           @relation("ResearchDatasetLockedBy", fields: [datasetLockedById], references: [id], onDelete: SetNull)
   datasetApprovedBy User?                         @relation("ResearchDatasetApprovedBy", fields: [datasetApprovedById], references: [id], onDelete: SetNull)
   assignments   ResearchQuestionnaireAssignment[]
+  analyses      ResearchAnalysis[]
 
   @@unique([questionnaireId, name])
   @@index([organizationId, status, closesAt])
@@ -8123,4 +8135,42 @@ model ResearchQuestionnaireAssignment {
   @@index([respondentId, status, dueAt])
   @@index([collectionId, disposition, completedAt])
   @@index([reviewedById, reviewedAt])
+}
+
+model ResearchAnalysis {
+  id                   String                 @id @default(cuid())
+  organizationId       String
+  collectionId         String
+  title                String
+  method               String
+  xVariableKey         String
+  yVariableKey         String?
+  filterVariableKey    String?
+  filterValue          String?
+  hypothesis           String?
+  methodologyNotes     String?
+  status               ResearchAnalysisStatus @default(DRAFT)
+  version              Int                    @default(1)
+  datasetResponseCount Int
+  resultSnapshot       Json
+  analystId            String
+  reviewerId           String?
+  submittedAt          DateTime?
+  reviewedAt           DateTime?
+  approvedById         String?
+  approvedAt           DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  collection   ResearchCollectionWave @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  analyst      User                   @relation("ResearchAnalysisAnalyst", fields: [analystId], references: [id], onDelete: Restrict)
+  reviewer     User?                  @relation("ResearchAnalysisReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  approvedBy   User?                  @relation("ResearchAnalysisApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, updatedAt])
+  @@index([collectionId, status, updatedAt])
+  @@index([analystId, status])
+  @@index([reviewerId, status])
+  @@unique([collectionId, title, version])
 }

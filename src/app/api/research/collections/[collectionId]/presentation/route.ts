@@ -4,6 +4,7 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import { buildChartData, summarizeVariable } from "@/modules/research/research-analysis";
 import { getResearchDataset } from "@/modules/research/research-dataset.service";
 import { chartElements, createResearchPresentation, type SlideElement } from "@/modules/research/research-presentation";
+import { buildAnalysisSnapshot, histogram } from "@/modules/research/research-statistics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,8 +18,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
   const url = new URL(request.url);
   const x = variables.find(item => item.key === url.searchParams.get("x")) ?? variables[0];
   const y = variables.find(item => item.key === url.searchParams.get("y")) ?? null;
+  const method = url.searchParams.get("mode") ?? "AUTO";
   const stats = x ? summarizeVariable(x, analysisRows) : null;
-  const chart = (x ? buildChartData(analysisRows, x, y) : []).map((item, index) => ({
+  const chartSource = x && method === "DISTRIBUTION" ? histogram(analysisRows, x) : x ? buildChartData(analysisRows, x, y) : [];
+  const chart = chartSource.map((item, index) => ({
     name: "name" in item ? String(item.name) : `Observation ${index + 1}`,
     value: Number("value" in item ? item.value : "y" in item ? item.y : 0),
   }));
@@ -29,7 +32,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
     { x: .7, y: 3.25, w: 5.6, h: .45, text: `Client: ${collection.project.client?.name ?? "Internal research"}`, size: 16, color: "CBD5E1" },
     { x: .7, y: 3.8, w: 5.6, h: .45, text: `Included responses: ${analysisRows.length}`, size: 16, color: "CBD5E1" },
     { x: .7, y: 4.35, w: 5.6, h: .45, text: `Dataset status: ${collection.datasetStatus}`, size: 16, color: "CBD5E1" },
+    { x: 6.9, y: 3.25, w: 5.6, h: .45, text: `Method: ${method.replaceAll("_", " ")}`, size: 16, color: "CBD5E1" },
     { x: .7, y: 5.45, w: 11.7, h: .55, text: collection.questionnaire.purpose, size: 13, color: "94A3B8" },
+  ];
+  const snapshot = x ? buildAnalysisSnapshot(method, analysisRows, x, y) : null;
+  const inference: SlideElement[] = [
+    { x: .7, y: .5, w: 11, h: .6, text: "Statistical Results", size: 26, bold: true },
+    { x: .8, y: 1.2, w: 11, h: .4, text: `${method.replaceAll("_", " ")} · ${x?.label ?? ""}${y ? ` · ${y.label}` : ""}`, size: 14, color: "67E8F9", bold: true },
+    ...snapshotLines(snapshot).map((line, index) => ({ x: .8 + (index % 2) * 6, y: 2 + Math.floor(index / 2) * .72, w: 5.4, h: .42, text: line, size: 14, color: "CBD5E1" })),
+    { x: .8, y: 6.35, w: 11.6, h: .35, text: "Inference depends on sampling, independence and model assumptions. Qualified analyst review is required.", size: 10, color: "64748B" },
   ];
   const analysis: SlideElement[] = [
     { x: .65, y: .45, w: 11.8, h: .5, text: y ? `${y.label} by ${x?.label}` : `Distribution of ${x?.label ?? "selected variable"}`, size: 24, bold: true },
@@ -55,7 +66,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
     { x: .8, y: 5.05, w: 11, h: .45, text: collection.project.client?.dataOwnerName ?? collection.project.client?.name ?? "Internal organization", size: 16, color: "CBD5E1" },
     { x: .8, y: 6.15, w: 11.6, h: .35, text: "Automated analysis supports—rather than replaces—qualified statistical interpretation.", size: 10, color: "64748B" },
   ];
-  const output = await createResearchPresentation([title, analysis, governance]);
+  const output = await createResearchPresentation([title, analysis, inference, governance]);
   const body = new Uint8Array(output.byteLength);
   body.set(output);
   return new Response(body, { headers: {
@@ -63,4 +74,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
     "Content-Disposition": `attachment; filename="${collection.project.reference}-research-analysis.pptx"`,
     "Cache-Control": "private, no-store",
   } });
+}
+
+function snapshotLines(value: unknown, path = "result"): string[] {
+  if (typeof value === "number" && Number.isFinite(value)) return [`${path.replaceAll(".", " › ")}: ${Math.abs(value) < .001 && value !== 0 ? value.toExponential(2) : Number(value.toFixed(4))}`];
+  if (typeof value === "string" || typeof value === "boolean") return [`${path.replaceAll(".", " › ")}: ${value}`];
+  if (!value || typeof value !== "object") return [];
+  const entries = Array.isArray(value) ? value.map((item, index) => [String(index), item] as const) : Object.entries(value);
+  return entries.flatMap(([key, item]) => snapshotLines(item, `${path}.${key}`)).slice(0, 12);
 }
