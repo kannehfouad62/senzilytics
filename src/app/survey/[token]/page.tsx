@@ -18,6 +18,11 @@ import {
   resumeCookieName,
 } from "@/modules/research/research-response-integrity";
 import { screeningCookieName } from "@/modules/research/research-screening";
+import {
+  localizedResearchField,
+  normalizeResearchLocale,
+  researchFieldTranslations,
+} from "@/modules/research/research-localization";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -30,7 +35,7 @@ export default async function PublicSurveyPage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ invite?: string }>;
+  searchParams: Promise<{ invite?: string; lang?: string }>;
 }) {
   const [{ token }, query] = await Promise.all([params, searchParams]);
   const link = await prisma.researchPublicSurveyLink.findUnique({
@@ -41,7 +46,13 @@ export default async function PublicSurveyPage({
           project: { include: { client: true } },
           questionnaire: true,
           formVersion: {
-            include: { fields: { orderBy: { sequence: "asc" } } },
+            include: {
+              fields: { orderBy: { sequence: "asc" } },
+              researchQuestionnaireLocalizations: {
+                where: { status: "APPROVED" },
+                orderBy: { languageName: "asc" },
+              },
+            },
           },
         },
       },
@@ -72,6 +83,19 @@ export default async function PublicSurveyPage({
         </section>
       </SurveyShell>
     );
+
+  const defaultLocale =
+    normalizeResearchLocale(link.collection.questionnaire.defaultLanguage) ??
+    "en";
+  const requestedLocale = normalizeResearchLocale(query.lang ?? "");
+  const localization = requestedLocale
+    ? link.collection.formVersion.researchQuestionnaireLocalizations.find(
+        (item) => item.locale === requestedLocale,
+      )
+    : null;
+  const translations = researchFieldTranslations(
+    localization?.fieldTranslations,
+  );
 
   const invitation = query.invite
     ? await prisma.researchSurveyInvitation.findFirst({
@@ -129,7 +153,7 @@ export default async function PublicSurveyPage({
         <PublicSurveyScreeningForm
           token={token}
           invitationToken={invitation?.token ?? null}
-          field={link.screeningField}
+          field={localizedResearchField(link.screeningField, translations)}
         />
       </SurveyShell>
     );
@@ -157,28 +181,58 @@ export default async function PublicSurveyPage({
 
   const collection = link.collection;
   const orderingSeed = invitation?.token ?? resumeToken ?? token;
-  const fields = link.randomizeQuestions
+  const orderedFields = link.randomizeQuestions
     ? deterministicFieldOrder(collection.formVersion.fields, orderingSeed)
     : collection.formVersion.fields;
+  const fields = orderedFields.map((field) =>
+    localizedResearchField(field, translations),
+  );
   const form = {
     id: collection.questionnaire.formDefinitionId,
-    name: collection.questionnaire.name,
-    description: collection.questionnaire.purpose,
-    version: { ...collection.formVersion, fields },
+    name: localization?.questionnaireName ?? collection.questionnaire.name,
+    description: localization?.purpose ?? collection.questionnaire.purpose,
+    version: {
+      ...collection.formVersion,
+      instructions:
+        localization?.instructions ?? collection.formVersion.instructions,
+      fields,
+    },
   };
   const initialValues = jsonRecord(savedSession?.answers);
   const initialIdentity = jsonRecord(savedSession?.identity);
   return (
     <SurveyShell>
       <header className="mb-8">
+        <nav className="mb-5 flex flex-wrap items-center gap-2" aria-label="Survey language">
+          <LanguageLink
+            token={token}
+            invite={query.invite}
+            locale={defaultLocale}
+            label={collection.questionnaire.defaultLanguage.toUpperCase()}
+            active={!localization}
+            isDefault
+          />
+          {collection.formVersion.researchQuestionnaireLocalizations.map(
+            (item) => (
+              <LanguageLink
+                key={item.id}
+                token={token}
+                invite={query.invite}
+                locale={item.locale}
+                label={item.languageName}
+                active={localization?.id === item.id}
+              />
+            ),
+          )}
+        </nav>
         <p className="text-sm font-semibold text-cyan-300">
           {collection.project.client?.name ?? collection.project.title}
         </p>
         <h1 className="mt-2 text-3xl font-bold sm:text-4xl">
-          {collection.questionnaire.name}
+          {localization?.questionnaireName ?? collection.questionnaire.name}
         </h1>
         <p className="mt-3 max-w-3xl leading-7 text-slate-300">
-          {collection.questionnaire.purpose}
+          {localization?.purpose ?? collection.questionnaire.purpose}
         </p>
         <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-400">
           <span className="rounded-full border border-white/10 px-3 py-1.5">
@@ -189,16 +243,19 @@ export default async function PublicSurveyPage({
             Questionnaire v{collection.formVersion.version}
           </span>
         </div>
-        {collection.instructions && (
+        {(localization?.instructions ?? collection.instructions) && (
           <p className="mt-5 rounded-2xl border border-white/10 bg-white/[.04] p-4 text-sm text-slate-300">
-            {collection.instructions}
+            {localization?.instructions ?? collection.instructions}
           </p>
         )}
       </header>
       <PublicResearchSurveyForm
         token={token}
         identityMode={collection.questionnaire.identityMode}
-        consentStatement={collection.questionnaire.consentStatement}
+        consentStatement={
+          localization?.consentStatement ??
+          collection.questionnaire.consentStatement
+        }
         form={form}
         invitationToken={invitation?.token ?? null}
         invitedName={invitation?.participantName ?? null}
@@ -212,8 +269,44 @@ export default async function PublicSurveyPage({
             initialIdentity.pseudonymousReference,
           ),
         }}
+        locale={localization?.locale ?? defaultLocale}
       />
     </SurveyShell>
+  );
+}
+
+function LanguageLink({
+  token,
+  invite,
+  locale,
+  label,
+  active,
+  isDefault = false,
+}: {
+  token: string;
+  invite?: string;
+  locale: string;
+  label: string;
+  active: boolean;
+  isDefault?: boolean;
+}) {
+  const query = new URLSearchParams();
+  if (invite) query.set("invite", invite);
+  if (!isDefault) query.set("lang", locale);
+  const suffix = query.toString();
+  return (
+    <Link
+      href={`/survey/${token}${suffix ? `?${suffix}` : ""}`}
+      hrefLang={locale}
+      aria-current={active ? "page" : undefined}
+      className={`rounded-full border px-3 py-1.5 text-xs ${
+        active
+          ? "border-cyan-300 bg-cyan-300/15 text-cyan-100"
+          : "border-white/10 text-slate-400 hover:text-white"
+      }`}
+    >
+      {label}
+    </Link>
   );
 }
 

@@ -48,10 +48,24 @@ export function PublicSurveyScreeningForm({
   );
   useRefreshOnSuccess(state);
   const options = Array.isArray(field.options)
-    ? field.options.filter((item): item is string => typeof item === "string")
-    : field.fieldType === "BOOLEAN"
-      ? ["Yes", "No"]
-      : [];
+    ? field.options.flatMap((option) => {
+        if (typeof option === "string") return [{ value: option, label: option }];
+        if (
+          option &&
+          typeof option === "object" &&
+          !Array.isArray(option) &&
+          typeof (option as { value?: unknown }).value === "string" &&
+          typeof (option as { label?: unknown }).label === "string"
+        )
+          return [option as { value: string; label: string }];
+        return [];
+      })
+    : [];
+  if (!options.length && field.fieldType === "BOOLEAN")
+    options.push(
+      { value: "Yes", label: "Yes" },
+      { value: "No", label: "No" },
+    );
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="token" value={token} />
@@ -87,8 +101,8 @@ export function PublicSurveyScreeningForm({
               Select an answer
             </option>
             {options.map((option) => (
-              <option key={option} value={option}>
-                {option}
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>
@@ -345,6 +359,7 @@ export function PublicResearchSurveyForm({
   allowSaveResume,
   initialValues,
   initialIdentity,
+  locale,
 }: {
   token: string;
   identityMode: ResearchResponseIdentityMode;
@@ -360,6 +375,7 @@ export function PublicResearchSurveyForm({
     participantEmail?: string | null;
     pseudonymousReference?: string | null;
   };
+  locale: string;
 }) {
   const [state, action, pending] = useActionState(
     submitPublicResearchSurvey,
@@ -388,6 +404,7 @@ export function PublicResearchSurveyForm({
   return (
     <form action={action} className="space-y-6">
       <input type="hidden" name="token" value={token} />
+      <input type="hidden" name="locale" value={locale} />
       {invitationToken && (
         <input type="hidden" name="invitationToken" value={invitationToken} />
       )}

@@ -355,7 +355,14 @@ export function getResearchCollection(
     include: {
       project: { include: { client: true } },
       questionnaire: true,
-      formVersion: { include: { fields: { orderBy: { sequence: "asc" } } } },
+      formVersion: {
+        include: {
+          fields: { orderBy: { sequence: "asc" } },
+          researchQuestionnaireLocalizations: {
+            orderBy: [{ status: "asc" }, { languageName: "asc" }],
+          },
+        },
+      },
       assignments: {
         include: {
           respondent: { select: { id: true, name: true, email: true } },

@@ -18,6 +18,7 @@ import { logActivity } from "@/core/activity-log/activity-log.service";
 import { prisma } from "@/lib/prisma";
 import { preparePublishedFormVersionSubmission } from "@/modules/forms/runtime-form.service";
 import { isPanelMemberEligible } from "@/modules/research/research-panel-governance";
+import { normalizeResearchLocale } from "@/modules/research/research-localization";
 import {
   calculateResponseIntegrity,
   resumeCookieName,
@@ -280,7 +281,21 @@ export async function submitPublicResearchSurvey(
     const invitationToken = value(data, "invitationToken", 100) || null;
     const link = await prisma.researchPublicSurveyLink.findUnique({
       where: { token },
-      include: { collection: { include: { questionnaire: true } } },
+      include: {
+        collection: {
+          include: {
+            questionnaire: true,
+            formVersion: {
+              include: {
+                researchQuestionnaireLocalizations: {
+                  where: { status: "APPROVED" },
+                  select: { locale: true },
+                },
+              },
+            },
+          },
+        },
+      },
     });
     if (!link || link.status !== ResearchPublicLinkStatus.ACTIVE) {
       throw new Error("This public survey link is not available.");
@@ -341,6 +356,17 @@ export async function submitPublicResearchSurvey(
         })
       : null;
     const collection = link.collection;
+    const defaultLocale =
+      normalizeResearchLocale(collection.questionnaire.defaultLanguage) ?? "en";
+    const responseLocale = normalizeResearchLocale(value(data, "locale", 20));
+    if (
+      !responseLocale ||
+      (responseLocale !== defaultLocale &&
+        !collection.formVersion.researchQuestionnaireLocalizations.some(
+          (item) => item.locale === responseLocale,
+        ))
+    )
+      throw new Error("Select an approved questionnaire language.");
     if (collection.status !== ResearchCollectionStatus.ACTIVE) {
       throw new Error("This survey is not currently accepting responses.");
     }
@@ -491,6 +517,7 @@ export async function submitPublicResearchSurvey(
               identityMode === ResearchResponseIdentityMode.PSEUDONYMIZED
                 ? pseudonymousReference
                 : null,
+            locale: responseLocale,
             consentedAt: collection.questionnaire.consentStatement ? now : null,
             invitationId: currentInvitation?.id ?? null,
             completionSeconds:

@@ -10,6 +10,7 @@ import {
   PublicSurveyLinkCard,
   PublicSurveyLinkForm,
 } from "@/features/research/public-survey-forms";
+import { QuestionnaireLocalizationWorkspace } from "@/features/research/questionnaire-localization-forms";
 import {
   CampaignReminderButton,
   CampaignStatusButton,
@@ -22,6 +23,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { getResearchCollection } from "@/modules/research/research-collection.service";
+import { researchFieldTranslations } from "@/modules/research/research-localization";
 
 export default async function ResearchCollectionPage({
   params,
@@ -34,6 +36,12 @@ export default async function ResearchCollectionPage({
   );
   const canManage = permissions.includes(
     PermissionKey.MANAGE_RESEARCH_DATASETS,
+  );
+  const canDesign = permissions.includes(
+    PermissionKey.DESIGN_RESEARCH_QUESTIONNAIRES,
+  );
+  const canPublish = permissions.includes(
+    PermissionKey.PUBLISH_RESEARCH_QUESTIONNAIRES,
   );
   const [collection, users] = await Promise.all([
     getResearchCollection(organizationId, collectionId),
@@ -155,6 +163,43 @@ export default async function ResearchCollectionPage({
           </div>
         </section>
       )}
+
+      <QuestionnaireLocalizationWorkspace
+        collectionId={collection.id}
+        defaultLanguage={collection.questionnaire.defaultLanguage}
+        base={{
+          questionnaireName: collection.questionnaire.name,
+          purpose: collection.questionnaire.purpose,
+          consentStatement: collection.questionnaire.consentStatement,
+          instructions: collection.instructions,
+        }}
+        fields={collection.formVersion.fields.map((field) => ({
+          id: field.id,
+          label: field.label,
+          description: field.description,
+          placeholder: field.placeholder,
+          options: Array.isArray(field.options)
+            ? field.options.filter(
+                (item): item is string => typeof item === "string",
+              )
+            : [],
+        }))}
+        localizations={collection.formVersion.researchQuestionnaireLocalizations.map(
+          (localization) => ({
+            id: localization.id,
+            locale: localization.locale,
+            languageName: localization.languageName,
+            status: localization.status,
+            questionnaireName: localization.questionnaireName,
+            purpose: localization.purpose,
+            consentStatement: localization.consentStatement,
+            instructions: localization.instructions,
+            fields: researchFieldTranslations(localization.fieldTranslations),
+          }),
+        )}
+        canDesign={canDesign}
+        canPublish={canPublish}
+      />
 
       {canManage && (
         <section className="mt-8 space-y-5">

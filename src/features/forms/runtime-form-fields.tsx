@@ -106,7 +106,24 @@ function RuntimeField({
 }) {
   const name = `custom_${field.id}`,
     options = Array.isArray(field.options)
-      ? field.options.filter((x): x is string => typeof x === "string")
+      ? field.options.flatMap((option) => {
+          if (typeof option === "string")
+            return [{ value: option, label: option }];
+          if (
+            option &&
+            typeof option === "object" &&
+            !Array.isArray(option) &&
+            typeof (option as { value?: unknown }).value === "string" &&
+            typeof (option as { label?: unknown }).label === "string"
+          )
+            return [
+              option as {
+                value: string;
+                label: string;
+              },
+            ];
+          return [];
+        })
       : [],
     label = (
       <span className="text-sm text-slate-300">
@@ -171,7 +188,9 @@ function RuntimeField({
         >
           <option value="">Select</option>
           {options.map((option) => (
-            <option key={option}>{option}</option>
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
           ))}
         </select>
       </label>
@@ -193,7 +212,9 @@ function RuntimeField({
           className={input}
         >
           {options.map((option) => (
-            <option key={option}>{option}</option>
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
           ))}
         </select>
       </label>

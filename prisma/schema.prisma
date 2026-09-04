@@ -338,6 +338,12 @@ enum ResearchScreeningOutcome {
   DISQUALIFIED
 }
 
+enum ResearchQuestionnaireLocalizationStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
 enum ResearchSurveyCampaignStatus {
   DRAFT
   ACTIVE
@@ -2152,115 +2158,116 @@ model Organization {
 
   enterpriseAuditFindingsV2 EnterpriseAuditFinding[] @relation("EnterpriseAuditFindingOrganization")
 
-  enterpriseAuditHistoryV2         EnterpriseAuditHistory[]          @relation("EnterpriseAuditHistoryOrganization")
-  safetyObservations               SafetyObservation[]
-  trainingCourses                  TrainingCourse[]
-  trainingRequirements             TrainingRequirement[]
-  competencies                     CompetencyDefinition[]
-  competencyRequirements           CompetencyRequirement[]
-  competencyAssessments            CompetencyAssessment[]
-  permits                          Permit[]
-  chemicals                        Chemical[]
-  environmentalMetrics             EnvironmentalMetricDefinition[]
-  environmentalTargets             EnvironmentalTarget[]
-  esgFrameworks                    EsgFramework[]
-  esgMetrics                       EsgMetricDefinition[]
-  esgDisclosurePeriods             EsgDisclosurePeriod[]
-  esgInitiatives                   EsgInitiative[]
-  jobSafetyAnalyses                JobSafetyAnalysis[]
-  identityProviders                OrganizationIdentityProvider[]
-  tenantInvitations                TenantInvitation[]
-  demoLeads                        DemoLead[]
-  complianceCalendarTasks          ComplianceCalendarTask[]
-  complianceCalendarOccurrences    ComplianceCalendarOccurrence[]
-  offlineSubmissions               OfflineSubmission[]
-  pricingInquiries                 PricingInquiry[]
-  contractors                      Contractor[]
-  permitsToWork                    PermitToWork[]
-  hygieneAgents                    HygieneAgent[]
-  similarExposureGroups            SimilarExposureGroup[]
-  exposureAssessments              ExposureAssessment[]
-  surveillancePrograms             MedicalSurveillanceProgram[]
-  criticalControls                 CriticalControlStandard[]
-  criticalControlVerifications     CriticalControlVerification[]
-  sifSignalReviews                 SifSignalReview[]
-  certificationManagementReviews   CertificationManagementReview[]
-  assets                           Asset[]
-  assetInspections                 AssetInspection[]
-  assetMaintenanceRecords          AssetMaintenanceRecord[]
-  assetDefects                     AssetDefect[]
-  behaviorSafetyPrograms           BehaviorSafetyProgram[]
-  behaviorCoachingSessions         BehaviorCoachingSession[]
-  behaviorRecognitions             BehaviorRecognition[]
-  regulatorySources                RegulatorySource[]
-  regulatoryChanges                RegulatoryChange[]
-  regulatoryImpactAssessments      RegulatoryImpactAssessment[]
-  aiIntelligenceAnalyses           AiIntelligenceAnalysis[]
-  aiIntelligenceSources            AiIntelligenceSource[]
-  aiIntelligenceFeedback           AiIntelligenceFeedback[]
-  aiCopilotPolicy                  AiCopilotPolicy?
-  aiCopilotConversations           AiCopilotConversation[]
-  aiCopilotMessages                AiCopilotMessage[]
-  aiCopilotCitations               AiCopilotCitation[]
-  aiCopilotFeedback                AiCopilotFeedback[]
-  integrationApiCredentials        IntegrationApiCredential[]
-  integrationApiRequestLogs        IntegrationApiRequestLog[]
-  integrationWebhookEndpoints      IntegrationWebhookEndpoint[]
-  integrationWebhookDeliveries     IntegrationWebhookDelivery[]
-  mobileAuthChallenges             MobileAuthChallenge[]
-  mobileSessions                   MobileSession[]
-  mobilePushTokens                 MobilePushToken[]
-  mobilePushDeliveries             MobilePushDelivery[]
-  onboardingPlan                   TenantOnboardingPlan?
-  productionReadinessReviews       ProductionReadinessReview[]
-  platformReleasePilots            PlatformReleasePilot[]
-  performanceIndicators            PerformanceIndicatorDefinition[]
-  performanceMeasurements          PerformanceIndicatorMeasurement[]
-  emergencyPlans                   EmergencyPlan[]
-  emergencyContacts                EmergencyContact[]
-  emergencyDrills                  EmergencyDrill[]
-  emergencyActivations             EmergencyActivation[]
-  emergencyImprovements            EmergencyImprovement[]
-  continuityPlans                  BusinessContinuityPlan[]
-  businessImpactAnalyses           BusinessImpactAnalysis[]
-  continuityDependencies           ContinuityDependency[]
-  continuityExercises              ContinuityExercise[]
-  continuityActivations            ContinuityActivation[]
-  continuityImprovements           ContinuityImprovement[]
-  predictiveIntelligencePolicy     PredictiveIntelligencePolicy?
-  predictiveIntelligenceRuns       PredictiveIntelligenceRun[]
-  predictiveSignals                PredictiveSignal[]
-  predictiveSignalReviews          PredictiveSignalReview[]
-  executiveManagementReviews       ExecutiveManagementReview[]
-  executiveReviewAgendaItems       ExecutiveReviewAgendaItem[]
-  executiveReviewAttendees         ExecutiveReviewAttendee[]
-  executiveReviewDecisions         ExecutiveReviewDecision[]
-  researchClients                  ResearchClient[]
-  researchProjects                 ResearchProject[]
-  researchMilestones               ResearchMilestone[]
-  researchQuestionnaires           ResearchQuestionnaire[]
-  researchCollectionWaves          ResearchCollectionWave[]
-  researchQuestionnaireAssignments ResearchQuestionnaireAssignment[]
-  researchAnalyses                 ResearchAnalysis[]
-  researchReports                  ResearchReport[]
-  researchImportedDatasets         ResearchImportedDataset[]
-  researchDataTransformations      ResearchDataTransformation[]
-  researchDatasetVersions          ResearchDatasetVersion[]
-  researchSamplingDesigns          ResearchSamplingDesign[]
-  researchPublicSurveyLinks        ResearchPublicSurveyLink[]
-  researchPublicResponses          ResearchPublicResponse[]
-  researchSamplingFrames           ResearchSamplingFrame[]
-  researchSamplingExecutions       ResearchSamplingExecution[]
-  researchSurveyCampaigns          ResearchSurveyCampaign[]
-  researchSurveyInvitations        ResearchSurveyInvitation[]
-  researchPanels                   ResearchPanel[]
-  researchPanelMembers             ResearchPanelMember[]
-  researchConsentEvents            ResearchPanelConsentEvent[]
-  researchCampaignQuotas           ResearchCampaignQuota[]
-  researchLongitudinalStudies      ResearchLongitudinalStudy[]
-  researchLongitudinalParticipants ResearchLongitudinalParticipant[]
-  researchPublicSurveySessions     ResearchPublicSurveySession[]
-  researchScreeningRecords         ResearchSurveyScreeningRecord[]
+  enterpriseAuditHistoryV2           EnterpriseAuditHistory[]            @relation("EnterpriseAuditHistoryOrganization")
+  safetyObservations                 SafetyObservation[]
+  trainingCourses                    TrainingCourse[]
+  trainingRequirements               TrainingRequirement[]
+  competencies                       CompetencyDefinition[]
+  competencyRequirements             CompetencyRequirement[]
+  competencyAssessments              CompetencyAssessment[]
+  permits                            Permit[]
+  chemicals                          Chemical[]
+  environmentalMetrics               EnvironmentalMetricDefinition[]
+  environmentalTargets               EnvironmentalTarget[]
+  esgFrameworks                      EsgFramework[]
+  esgMetrics                         EsgMetricDefinition[]
+  esgDisclosurePeriods               EsgDisclosurePeriod[]
+  esgInitiatives                     EsgInitiative[]
+  jobSafetyAnalyses                  JobSafetyAnalysis[]
+  identityProviders                  OrganizationIdentityProvider[]
+  tenantInvitations                  TenantInvitation[]
+  demoLeads                          DemoLead[]
+  complianceCalendarTasks            ComplianceCalendarTask[]
+  complianceCalendarOccurrences      ComplianceCalendarOccurrence[]
+  offlineSubmissions                 OfflineSubmission[]
+  pricingInquiries                   PricingInquiry[]
+  contractors                        Contractor[]
+  permitsToWork                      PermitToWork[]
+  hygieneAgents                      HygieneAgent[]
+  similarExposureGroups              SimilarExposureGroup[]
+  exposureAssessments                ExposureAssessment[]
+  surveillancePrograms               MedicalSurveillanceProgram[]
+  criticalControls                   CriticalControlStandard[]
+  criticalControlVerifications       CriticalControlVerification[]
+  sifSignalReviews                   SifSignalReview[]
+  certificationManagementReviews     CertificationManagementReview[]
+  assets                             Asset[]
+  assetInspections                   AssetInspection[]
+  assetMaintenanceRecords            AssetMaintenanceRecord[]
+  assetDefects                       AssetDefect[]
+  behaviorSafetyPrograms             BehaviorSafetyProgram[]
+  behaviorCoachingSessions           BehaviorCoachingSession[]
+  behaviorRecognitions               BehaviorRecognition[]
+  regulatorySources                  RegulatorySource[]
+  regulatoryChanges                  RegulatoryChange[]
+  regulatoryImpactAssessments        RegulatoryImpactAssessment[]
+  aiIntelligenceAnalyses             AiIntelligenceAnalysis[]
+  aiIntelligenceSources              AiIntelligenceSource[]
+  aiIntelligenceFeedback             AiIntelligenceFeedback[]
+  aiCopilotPolicy                    AiCopilotPolicy?
+  aiCopilotConversations             AiCopilotConversation[]
+  aiCopilotMessages                  AiCopilotMessage[]
+  aiCopilotCitations                 AiCopilotCitation[]
+  aiCopilotFeedback                  AiCopilotFeedback[]
+  integrationApiCredentials          IntegrationApiCredential[]
+  integrationApiRequestLogs          IntegrationApiRequestLog[]
+  integrationWebhookEndpoints        IntegrationWebhookEndpoint[]
+  integrationWebhookDeliveries       IntegrationWebhookDelivery[]
+  mobileAuthChallenges               MobileAuthChallenge[]
+  mobileSessions                     MobileSession[]
+  mobilePushTokens                   MobilePushToken[]
+  mobilePushDeliveries               MobilePushDelivery[]
+  onboardingPlan                     TenantOnboardingPlan?
+  productionReadinessReviews         ProductionReadinessReview[]
+  platformReleasePilots              PlatformReleasePilot[]
+  performanceIndicators              PerformanceIndicatorDefinition[]
+  performanceMeasurements            PerformanceIndicatorMeasurement[]
+  emergencyPlans                     EmergencyPlan[]
+  emergencyContacts                  EmergencyContact[]
+  emergencyDrills                    EmergencyDrill[]
+  emergencyActivations               EmergencyActivation[]
+  emergencyImprovements              EmergencyImprovement[]
+  continuityPlans                    BusinessContinuityPlan[]
+  businessImpactAnalyses             BusinessImpactAnalysis[]
+  continuityDependencies             ContinuityDependency[]
+  continuityExercises                ContinuityExercise[]
+  continuityActivations              ContinuityActivation[]
+  continuityImprovements             ContinuityImprovement[]
+  predictiveIntelligencePolicy       PredictiveIntelligencePolicy?
+  predictiveIntelligenceRuns         PredictiveIntelligenceRun[]
+  predictiveSignals                  PredictiveSignal[]
+  predictiveSignalReviews            PredictiveSignalReview[]
+  executiveManagementReviews         ExecutiveManagementReview[]
+  executiveReviewAgendaItems         ExecutiveReviewAgendaItem[]
+  executiveReviewAttendees           ExecutiveReviewAttendee[]
+  executiveReviewDecisions           ExecutiveReviewDecision[]
+  researchClients                    ResearchClient[]
+  researchProjects                   ResearchProject[]
+  researchMilestones                 ResearchMilestone[]
+  researchQuestionnaires             ResearchQuestionnaire[]
+  researchCollectionWaves            ResearchCollectionWave[]
+  researchQuestionnaireAssignments   ResearchQuestionnaireAssignment[]
+  researchAnalyses                   ResearchAnalysis[]
+  researchReports                    ResearchReport[]
+  researchImportedDatasets           ResearchImportedDataset[]
+  researchDataTransformations        ResearchDataTransformation[]
+  researchDatasetVersions            ResearchDatasetVersion[]
+  researchSamplingDesigns            ResearchSamplingDesign[]
+  researchPublicSurveyLinks          ResearchPublicSurveyLink[]
+  researchPublicResponses            ResearchPublicResponse[]
+  researchSamplingFrames             ResearchSamplingFrame[]
+  researchSamplingExecutions         ResearchSamplingExecution[]
+  researchSurveyCampaigns            ResearchSurveyCampaign[]
+  researchSurveyInvitations          ResearchSurveyInvitation[]
+  researchPanels                     ResearchPanel[]
+  researchPanelMembers               ResearchPanelMember[]
+  researchConsentEvents              ResearchPanelConsentEvent[]
+  researchCampaignQuotas             ResearchCampaignQuota[]
+  researchLongitudinalStudies        ResearchLongitudinalStudy[]
+  researchLongitudinalParticipants   ResearchLongitudinalParticipant[]
+  researchPublicSurveySessions       ResearchPublicSurveySession[]
+  researchScreeningRecords           ResearchSurveyScreeningRecord[]
+  researchQuestionnaireLocalizations ResearchQuestionnaireLocalization[]
 }
 
 model PricingInquiry {
@@ -2456,164 +2463,166 @@ model User {
   enteredPerformanceMeasurements    PerformanceIndicatorMeasurement[] @relation("PerformanceMeasurementEnteredBy")
   reviewedPerformanceMeasurements   PerformanceIndicatorMeasurement[] @relation("PerformanceMeasurementReviewedBy")
 
-  approvedContractors                 Contractor[]                      @relation("ContractorApprovedBy")
-  requestedPermitsToWork              PermitToWork[]                    @relation("PermitToWorkRequestedBy")
-  issuedPermitsToWork                 PermitToWork[]                    @relation("PermitToWorkIssuedBy")
-  approvedPermitsToWork               PermitToWork[]                    @relation("PermitToWorkApprovedBy")
-  closedPermitsToWork                 PermitToWork[]                    @relation("PermitToWorkClosedBy")
-  verifiedPermitControls              PermitToWorkControl[]             @relation("PermitControlVerifiedBy")
-  performedPermitGasTests             PermitToWorkGasTest[]             @relation("PermitGasTestPerformedBy")
-  createdCriticalControls             CriticalControlStandard[]         @relation("CriticalControlCreatedBy")
-  ownedCriticalControls               CriticalControlStandard[]         @relation("CriticalControlOwner")
-  criticalControlVerifications        CriticalControlVerification[]     @relation("CriticalControlVerifier")
-  sifSignalReviews                    SifSignalReview[]                 @relation("SifSignalReviewer")
-  chairedCertificationReviews         CertificationManagementReview[]   @relation("CertificationReviewChair")
-  createdCertificationReviews         CertificationManagementReview[]   @relation("CertificationReviewCreatedBy")
-  completedCertificationReviews       CertificationManagementReview[]   @relation("CertificationReviewCompletedBy")
-  approvedCertificationReviews        CertificationManagementReview[]   @relation("CertificationReviewApprovedBy")
-  ownedAssets                         Asset[]                           @relation("AssetOwner")
-  createdAssets                       Asset[]                           @relation("AssetCreatedBy")
-  performedAssetInspections           AssetInspection[]                 @relation("AssetInspector")
-  assignedAssetMaintenance            AssetMaintenanceRecord[]          @relation("AssetMaintenanceTechnician")
-  reportedAssetDefects                AssetDefect[]                     @relation("AssetDefectReportedBy")
-  ownedAssetDefects                   AssetDefect[]                     @relation("AssetDefectOwner")
-  verifiedAssetDefects                AssetDefect[]                     @relation("AssetDefectVerifiedBy")
-  ownedBehaviorPrograms               BehaviorSafetyProgram[]           @relation("BehaviorProgramOwner")
-  createdBehaviorPrograms             BehaviorSafetyProgram[]           @relation("BehaviorProgramCreatedBy")
-  observedBehaviorSessions            BehaviorCoachingSession[]         @relation("BehaviorSessionObserver")
-  participatedBehaviorSessions        BehaviorCoachingSession[]         @relation("BehaviorSessionParticipant")
-  ownedBehaviorFollowUps              BehaviorCoachingSession[]         @relation("BehaviorSessionFollowUpOwner")
-  nominatedBehaviorRecognitions       BehaviorRecognition[]             @relation("BehaviorRecognitionNominee")
-  createdBehaviorRecognitions         BehaviorRecognition[]             @relation("BehaviorRecognitionNominator")
-  approvedBehaviorRecognitions        BehaviorRecognition[]             @relation("BehaviorRecognitionApprover")
-  ownedRegulatorySources              RegulatorySource[]                @relation("RegulatorySourceOwner")
-  reviewedRegulatorySources           RegulatorySource[]                @relation("RegulatorySourceReviewer")
-  ownedRegulatoryChanges              RegulatoryChange[]                @relation("RegulatoryChangeOwner")
-  detectedRegulatoryChanges           RegulatoryChange[]                @relation("RegulatoryChangeDetectedBy")
-  implementedRegulatoryChanges        RegulatoryChange[]                @relation("RegulatoryChangeImplementedBy")
-  regulatoryImpactAssessments         RegulatoryImpactAssessment[]      @relation("RegulatoryAssessmentAssessor")
-  reviewedRegulatoryAssessments       RegulatoryImpactAssessment[]      @relation("RegulatoryAssessmentReviewer")
-  requestedAiAnalyses                 AiIntelligenceAnalysis[]          @relation("AiIntelligenceRequestedBy")
-  reviewedAiAnalyses                  AiIntelligenceAnalysis[]          @relation("AiIntelligenceReviewedBy")
-  aiIntelligenceFeedback              AiIntelligenceFeedback[]
-  aiCopilotConversations              AiCopilotConversation[]
-  aiCopilotFeedback                   AiCopilotFeedback[]
-  updatedAiCopilotPolicies            AiCopilotPolicy[]                 @relation("AiCopilotPolicyUpdatedBy")
-  permitToWorkHistory                 PermitToWorkHistory[]             @relation("PermitHistoryActor")
-  ownedExposureGroups                 SimilarExposureGroup[]            @relation("ExposureGroupOwner")
-  assignedExposureAssessments         ExposureAssessment[]              @relation("ExposureAssessmentAssessor")
-  createdExposureSamples              ExposureSample[]                  @relation("ExposureSampleCreatedBy")
-  sampledExposureRecords              ExposureSample[]                  @relation("ExposureSampleWorker")
-  responsibleSurveillancePrograms     MedicalSurveillanceProgram[]      @relation("SurveillanceProgramResponsible")
-  surveillanceEnrollments             MedicalSurveillanceEnrollment[]   @relation("SurveillanceEnrollmentUser")
-  completedSurveillanceEnrollments    MedicalSurveillanceEnrollment[]   @relation("SurveillanceEnrollmentCompletedBy")
-  createdIntegrationCredentials       IntegrationApiCredential[]        @relation("IntegrationCredentialCreatedBy")
-  revokedIntegrationCredentials       IntegrationApiCredential[]        @relation("IntegrationCredentialRevokedBy")
-  createdIntegrationWebhooks          IntegrationWebhookEndpoint[]      @relation("IntegrationWebhookCreatedBy")
-  revokedIntegrationWebhooks          IntegrationWebhookEndpoint[]      @relation("IntegrationWebhookRevokedBy")
-  authorizedMobileChallenges          MobileAuthChallenge[]             @relation("MobileChallengeAuthorizedBy")
-  mobileSessions                      MobileSession[]
-  mobilePushTokens                    MobilePushToken[]
-  mobilePushDeliveries                MobilePushDelivery[]
-  ownedTenantOnboardingPlans          TenantOnboardingPlan[]            @relation("TenantOnboardingCustomerOwner")
-  approvedTenantOnboardingPlans       TenantOnboardingPlan[]            @relation("TenantOnboardingApprovedBy")
-  ownedTenantOnboardingSteps          TenantOnboardingStep[]            @relation("TenantOnboardingStepOwner")
-  completedTenantOnboardingSteps      TenantOnboardingStep[]            @relation("TenantOnboardingStepCompletedBy")
-  updatedTenantOnboardingSteps        TenantOnboardingStep[]            @relation("TenantOnboardingStepUpdatedBy")
-  createdProductionReadinessReviews   ProductionReadinessReview[]       @relation("ProductionReadinessCreatedBy")
-  submittedProductionReadinessReviews ProductionReadinessReview[]       @relation("ProductionReadinessSubmittedBy")
-  reviewedProductionReadinessReviews  ProductionReadinessReview[]       @relation("ProductionReadinessReviewedBy")
-  ownedProductionReadinessControls    ProductionReadinessControl[]      @relation("ProductionReadinessControlOwner")
-  testedProductionReadinessControls   ProductionReadinessControl[]      @relation("ProductionReadinessControlTestedBy")
-  updatedProductionReadinessControls  ProductionReadinessControl[]      @relation("ProductionReadinessControlUpdatedBy")
-  createdPlatformReleases             PlatformRelease[]                 @relation("PlatformReleaseCreatedBy")
-  submittedPlatformReleases           PlatformRelease[]                 @relation("PlatformReleaseSubmittedBy")
-  reviewedPlatformReleases            PlatformRelease[]                 @relation("PlatformReleaseReviewedBy")
-  testedPlatformReleaseChecks         PlatformReleaseCheck[]            @relation("PlatformReleaseCheckTestedBy")
-  updatedPlatformReleaseChecks        PlatformReleaseCheck[]            @relation("PlatformReleaseCheckUpdatedBy")
-  updatedPlatformReleasePilots        PlatformReleasePilot[]            @relation("PlatformReleasePilotUpdatedBy")
-  ownedEmergencyPlans                 EmergencyPlan[]                   @relation("EmergencyPlanOwner")
-  createdEmergencyPlans               EmergencyPlan[]                   @relation("EmergencyPlanCreatedBy")
-  submittedEmergencyPlans             EmergencyPlan[]                   @relation("EmergencyPlanSubmittedBy")
-  approvedEmergencyPlans              EmergencyPlan[]                   @relation("EmergencyPlanApprovedBy")
-  ledEmergencyDrills                  EmergencyDrill[]                  @relation("EmergencyDrillLead")
-  createdEmergencyDrills              EmergencyDrill[]                  @relation("EmergencyDrillCreatedBy")
-  reviewedEmergencyDrills             EmergencyDrill[]                  @relation("EmergencyDrillReviewedBy")
-  declaredEmergencyActivations        EmergencyActivation[]             @relation("EmergencyActivationDeclaredBy")
-  commandedEmergencyActivations       EmergencyActivation[]             @relation("EmergencyActivationCommander")
-  stoodDownEmergencyActivations       EmergencyActivation[]             @relation("EmergencyActivationStoodDownBy")
-  reviewedEmergencyActivations        EmergencyActivation[]             @relation("EmergencyActivationReviewedBy")
-  ownedEmergencyImprovements          EmergencyImprovement[]            @relation("EmergencyImprovementOwner")
-  createdEmergencyImprovements        EmergencyImprovement[]            @relation("EmergencyImprovementCreatedBy")
-  verifiedEmergencyImprovements       EmergencyImprovement[]            @relation("EmergencyImprovementVerifiedBy")
-  ownedContinuityPlans                BusinessContinuityPlan[]          @relation("ContinuityPlanOwner")
-  createdContinuityPlans              BusinessContinuityPlan[]          @relation("ContinuityPlanCreatedBy")
-  submittedContinuityPlans            BusinessContinuityPlan[]          @relation("ContinuityPlanSubmittedBy")
-  approvedContinuityPlans             BusinessContinuityPlan[]          @relation("ContinuityPlanApprovedBy")
-  ownedBusinessImpactAnalyses         BusinessImpactAnalysis[]          @relation("BusinessImpactAnalysisOwner")
-  ledContinuityExercises              ContinuityExercise[]              @relation("ContinuityExerciseLead")
-  createdContinuityExercises          ContinuityExercise[]              @relation("ContinuityExerciseCreatedBy")
-  reviewedContinuityExercises         ContinuityExercise[]              @relation("ContinuityExerciseReviewedBy")
-  declaredContinuityActivations       ContinuityActivation[]            @relation("ContinuityActivationDeclaredBy")
-  coordinatedContinuityActivations    ContinuityActivation[]            @relation("ContinuityActivationCoordinator")
-  restoredContinuityActivations       ContinuityActivation[]            @relation("ContinuityActivationRestoredBy")
-  closedContinuityActivations         ContinuityActivation[]            @relation("ContinuityActivationClosedBy")
-  ownedContinuityImprovements         ContinuityImprovement[]           @relation("ContinuityImprovementOwner")
-  createdContinuityImprovements       ContinuityImprovement[]           @relation("ContinuityImprovementCreatedBy")
-  verifiedContinuityImprovements      ContinuityImprovement[]           @relation("ContinuityImprovementVerifiedBy")
-  requestedPredictiveRuns             PredictiveIntelligenceRun[]       @relation("PredictiveRunRequestedBy")
-  ownedPredictiveSignals              PredictiveSignal[]                @relation("PredictiveSignalOwner")
-  reviewedPredictiveSignals           PredictiveSignal[]                @relation("PredictiveSignalReviewer")
-  predictiveSignalReviews             PredictiveSignalReview[]          @relation("PredictiveSignalReviewUser")
-  chairedExecutiveReviews             ExecutiveManagementReview[]       @relation("ExecutiveReviewChair")
-  createdExecutiveReviews             ExecutiveManagementReview[]       @relation("ExecutiveReviewCreatedBy")
-  completedExecutiveReviews           ExecutiveManagementReview[]       @relation("ExecutiveReviewCompletedBy")
-  approvedExecutiveReviews            ExecutiveManagementReview[]       @relation("ExecutiveReviewApprovedBy")
-  publishedExecutiveReviews           ExecutiveManagementReview[]       @relation("ExecutiveReviewPublishedBy")
-  ownedExecutiveAgendaItems           ExecutiveReviewAgendaItem[]       @relation("ExecutiveAgendaOwner")
-  executiveReviewAttendance           ExecutiveReviewAttendee[]         @relation("ExecutiveReviewAttendeeUser")
-  ownedExecutiveDecisions             ExecutiveReviewDecision[]         @relation("ExecutiveDecisionOwner")
-  closedExecutiveDecisions            ExecutiveReviewDecision[]         @relation("ExecutiveDecisionClosedBy")
-  createdResearchClients              ResearchClient[]                  @relation("ResearchClientCreatedBy")
-  managedResearchProjects             ResearchProject[]                 @relation("ResearchProjectManager")
-  principalResearchProjects           ResearchProject[]                 @relation("ResearchPrincipalInvestigator")
-  createdResearchProjects             ResearchProject[]                 @relation("ResearchProjectCreatedBy")
-  approvedResearchProjects            ResearchProject[]                 @relation("ResearchProjectApprovedBy")
-  researchTeamMemberships             ResearchTeamMember[]
-  ownedResearchMilestones             ResearchMilestone[]               @relation("ResearchMilestoneOwner")
-  completedResearchMilestones         ResearchMilestone[]               @relation("ResearchMilestoneCompletedBy")
-  createdResearchCollectionWaves      ResearchCollectionWave[]          @relation("ResearchCollectionCreatedBy")
-  assignedResearchQuestionnaires      ResearchQuestionnaireAssignment[] @relation("ResearchAssignmentRespondent")
-  issuedResearchAssignments           ResearchQuestionnaireAssignment[] @relation("ResearchAssignmentAssignedBy")
-  ownedResearchDatasets               ResearchCollectionWave[]          @relation("ResearchDatasetOwner")
-  lockedResearchDatasets              ResearchCollectionWave[]          @relation("ResearchDatasetLockedBy")
-  approvedResearchDatasets            ResearchCollectionWave[]          @relation("ResearchDatasetApprovedBy")
-  reviewedResearchResponses           ResearchQuestionnaireAssignment[] @relation("ResearchResponseReviewedBy")
-  authoredResearchAnalyses            ResearchAnalysis[]                @relation("ResearchAnalysisAnalyst")
-  reviewedResearchAnalyses            ResearchAnalysis[]                @relation("ResearchAnalysisReviewer")
-  approvedResearchAnalyses            ResearchAnalysis[]                @relation("ResearchAnalysisApprover")
-  authoredResearchReports             ResearchReport[]                  @relation("ResearchReportAuthor")
-  reviewedResearchReports             ResearchReport[]                  @relation("ResearchReportReviewer")
-  approvedResearchReports             ResearchReport[]                  @relation("ResearchReportApprover")
-  publishedResearchReports            ResearchReport[]                  @relation("ResearchReportPublisher")
-  importedResearchDatasets            ResearchImportedDataset[]         @relation("ResearchDatasetImporter")
-  createdResearchTransformations      ResearchDataTransformation[]      @relation("ResearchTransformationCreator")
-  createdResearchDatasetVersions      ResearchDatasetVersion[]          @relation("ResearchDatasetVersionCreator")
-  reviewedResearchDatasetVersions     ResearchDatasetVersion[]          @relation("ResearchDatasetVersionReviewer")
-  approvedResearchDatasetVersions     ResearchDatasetVersion[]          @relation("ResearchDatasetVersionApprover")
-  createdResearchSamplingDesigns      ResearchSamplingDesign[]          @relation("ResearchSamplingDesignCreator")
-  approvedResearchSamplingDesigns     ResearchSamplingDesign[]          @relation("ResearchSamplingDesignApprover")
-  createdResearchPublicSurveyLinks    ResearchPublicSurveyLink[]        @relation("ResearchPublicSurveyLinkCreator")
-  reviewedResearchPublicResponses     ResearchPublicResponse[]          @relation("ResearchPublicResponseReviewer")
-  createdResearchSamplingFrames       ResearchSamplingFrame[]           @relation("ResearchSamplingFrameCreator")
-  generatedResearchSamples            ResearchSamplingExecution[]       @relation("ResearchSamplingExecutionGenerator")
-  approvedResearchSamplingExecutions  ResearchSamplingExecution[]       @relation("ResearchSamplingExecutionApprover")
-  assignedResearchSampleUnits         ResearchSampleUnit[]              @relation("ResearchSampleUnitAssignee")
-  createdResearchSurveyCampaigns      ResearchSurveyCampaign[]          @relation("ResearchSurveyCampaignCreator")
-  createdResearchPanels               ResearchPanel[]                   @relation("ResearchPanelCreator")
-  managedResearchPanelMembers         ResearchPanelMember[]             @relation("ResearchPanelMemberManager")
-  recordedResearchConsentEvents       ResearchPanelConsentEvent[]       @relation("ResearchConsentRecorder")
-  createdResearchLongitudinalStudies  ResearchLongitudinalStudy[]       @relation("ResearchLongitudinalStudyCreator")
+  approvedContractors                        Contractor[]                        @relation("ContractorApprovedBy")
+  requestedPermitsToWork                     PermitToWork[]                      @relation("PermitToWorkRequestedBy")
+  issuedPermitsToWork                        PermitToWork[]                      @relation("PermitToWorkIssuedBy")
+  approvedPermitsToWork                      PermitToWork[]                      @relation("PermitToWorkApprovedBy")
+  closedPermitsToWork                        PermitToWork[]                      @relation("PermitToWorkClosedBy")
+  verifiedPermitControls                     PermitToWorkControl[]               @relation("PermitControlVerifiedBy")
+  performedPermitGasTests                    PermitToWorkGasTest[]               @relation("PermitGasTestPerformedBy")
+  createdCriticalControls                    CriticalControlStandard[]           @relation("CriticalControlCreatedBy")
+  ownedCriticalControls                      CriticalControlStandard[]           @relation("CriticalControlOwner")
+  criticalControlVerifications               CriticalControlVerification[]       @relation("CriticalControlVerifier")
+  sifSignalReviews                           SifSignalReview[]                   @relation("SifSignalReviewer")
+  chairedCertificationReviews                CertificationManagementReview[]     @relation("CertificationReviewChair")
+  createdCertificationReviews                CertificationManagementReview[]     @relation("CertificationReviewCreatedBy")
+  completedCertificationReviews              CertificationManagementReview[]     @relation("CertificationReviewCompletedBy")
+  approvedCertificationReviews               CertificationManagementReview[]     @relation("CertificationReviewApprovedBy")
+  ownedAssets                                Asset[]                             @relation("AssetOwner")
+  createdAssets                              Asset[]                             @relation("AssetCreatedBy")
+  performedAssetInspections                  AssetInspection[]                   @relation("AssetInspector")
+  assignedAssetMaintenance                   AssetMaintenanceRecord[]            @relation("AssetMaintenanceTechnician")
+  reportedAssetDefects                       AssetDefect[]                       @relation("AssetDefectReportedBy")
+  ownedAssetDefects                          AssetDefect[]                       @relation("AssetDefectOwner")
+  verifiedAssetDefects                       AssetDefect[]                       @relation("AssetDefectVerifiedBy")
+  ownedBehaviorPrograms                      BehaviorSafetyProgram[]             @relation("BehaviorProgramOwner")
+  createdBehaviorPrograms                    BehaviorSafetyProgram[]             @relation("BehaviorProgramCreatedBy")
+  observedBehaviorSessions                   BehaviorCoachingSession[]           @relation("BehaviorSessionObserver")
+  participatedBehaviorSessions               BehaviorCoachingSession[]           @relation("BehaviorSessionParticipant")
+  ownedBehaviorFollowUps                     BehaviorCoachingSession[]           @relation("BehaviorSessionFollowUpOwner")
+  nominatedBehaviorRecognitions              BehaviorRecognition[]               @relation("BehaviorRecognitionNominee")
+  createdBehaviorRecognitions                BehaviorRecognition[]               @relation("BehaviorRecognitionNominator")
+  approvedBehaviorRecognitions               BehaviorRecognition[]               @relation("BehaviorRecognitionApprover")
+  ownedRegulatorySources                     RegulatorySource[]                  @relation("RegulatorySourceOwner")
+  reviewedRegulatorySources                  RegulatorySource[]                  @relation("RegulatorySourceReviewer")
+  ownedRegulatoryChanges                     RegulatoryChange[]                  @relation("RegulatoryChangeOwner")
+  detectedRegulatoryChanges                  RegulatoryChange[]                  @relation("RegulatoryChangeDetectedBy")
+  implementedRegulatoryChanges               RegulatoryChange[]                  @relation("RegulatoryChangeImplementedBy")
+  regulatoryImpactAssessments                RegulatoryImpactAssessment[]        @relation("RegulatoryAssessmentAssessor")
+  reviewedRegulatoryAssessments              RegulatoryImpactAssessment[]        @relation("RegulatoryAssessmentReviewer")
+  requestedAiAnalyses                        AiIntelligenceAnalysis[]            @relation("AiIntelligenceRequestedBy")
+  reviewedAiAnalyses                         AiIntelligenceAnalysis[]            @relation("AiIntelligenceReviewedBy")
+  aiIntelligenceFeedback                     AiIntelligenceFeedback[]
+  aiCopilotConversations                     AiCopilotConversation[]
+  aiCopilotFeedback                          AiCopilotFeedback[]
+  updatedAiCopilotPolicies                   AiCopilotPolicy[]                   @relation("AiCopilotPolicyUpdatedBy")
+  permitToWorkHistory                        PermitToWorkHistory[]               @relation("PermitHistoryActor")
+  ownedExposureGroups                        SimilarExposureGroup[]              @relation("ExposureGroupOwner")
+  assignedExposureAssessments                ExposureAssessment[]                @relation("ExposureAssessmentAssessor")
+  createdExposureSamples                     ExposureSample[]                    @relation("ExposureSampleCreatedBy")
+  sampledExposureRecords                     ExposureSample[]                    @relation("ExposureSampleWorker")
+  responsibleSurveillancePrograms            MedicalSurveillanceProgram[]        @relation("SurveillanceProgramResponsible")
+  surveillanceEnrollments                    MedicalSurveillanceEnrollment[]     @relation("SurveillanceEnrollmentUser")
+  completedSurveillanceEnrollments           MedicalSurveillanceEnrollment[]     @relation("SurveillanceEnrollmentCompletedBy")
+  createdIntegrationCredentials              IntegrationApiCredential[]          @relation("IntegrationCredentialCreatedBy")
+  revokedIntegrationCredentials              IntegrationApiCredential[]          @relation("IntegrationCredentialRevokedBy")
+  createdIntegrationWebhooks                 IntegrationWebhookEndpoint[]        @relation("IntegrationWebhookCreatedBy")
+  revokedIntegrationWebhooks                 IntegrationWebhookEndpoint[]        @relation("IntegrationWebhookRevokedBy")
+  authorizedMobileChallenges                 MobileAuthChallenge[]               @relation("MobileChallengeAuthorizedBy")
+  mobileSessions                             MobileSession[]
+  mobilePushTokens                           MobilePushToken[]
+  mobilePushDeliveries                       MobilePushDelivery[]
+  ownedTenantOnboardingPlans                 TenantOnboardingPlan[]              @relation("TenantOnboardingCustomerOwner")
+  approvedTenantOnboardingPlans              TenantOnboardingPlan[]              @relation("TenantOnboardingApprovedBy")
+  ownedTenantOnboardingSteps                 TenantOnboardingStep[]              @relation("TenantOnboardingStepOwner")
+  completedTenantOnboardingSteps             TenantOnboardingStep[]              @relation("TenantOnboardingStepCompletedBy")
+  updatedTenantOnboardingSteps               TenantOnboardingStep[]              @relation("TenantOnboardingStepUpdatedBy")
+  createdProductionReadinessReviews          ProductionReadinessReview[]         @relation("ProductionReadinessCreatedBy")
+  submittedProductionReadinessReviews        ProductionReadinessReview[]         @relation("ProductionReadinessSubmittedBy")
+  reviewedProductionReadinessReviews         ProductionReadinessReview[]         @relation("ProductionReadinessReviewedBy")
+  ownedProductionReadinessControls           ProductionReadinessControl[]        @relation("ProductionReadinessControlOwner")
+  testedProductionReadinessControls          ProductionReadinessControl[]        @relation("ProductionReadinessControlTestedBy")
+  updatedProductionReadinessControls         ProductionReadinessControl[]        @relation("ProductionReadinessControlUpdatedBy")
+  createdPlatformReleases                    PlatformRelease[]                   @relation("PlatformReleaseCreatedBy")
+  submittedPlatformReleases                  PlatformRelease[]                   @relation("PlatformReleaseSubmittedBy")
+  reviewedPlatformReleases                   PlatformRelease[]                   @relation("PlatformReleaseReviewedBy")
+  testedPlatformReleaseChecks                PlatformReleaseCheck[]              @relation("PlatformReleaseCheckTestedBy")
+  updatedPlatformReleaseChecks               PlatformReleaseCheck[]              @relation("PlatformReleaseCheckUpdatedBy")
+  updatedPlatformReleasePilots               PlatformReleasePilot[]              @relation("PlatformReleasePilotUpdatedBy")
+  ownedEmergencyPlans                        EmergencyPlan[]                     @relation("EmergencyPlanOwner")
+  createdEmergencyPlans                      EmergencyPlan[]                     @relation("EmergencyPlanCreatedBy")
+  submittedEmergencyPlans                    EmergencyPlan[]                     @relation("EmergencyPlanSubmittedBy")
+  approvedEmergencyPlans                     EmergencyPlan[]                     @relation("EmergencyPlanApprovedBy")
+  ledEmergencyDrills                         EmergencyDrill[]                    @relation("EmergencyDrillLead")
+  createdEmergencyDrills                     EmergencyDrill[]                    @relation("EmergencyDrillCreatedBy")
+  reviewedEmergencyDrills                    EmergencyDrill[]                    @relation("EmergencyDrillReviewedBy")
+  declaredEmergencyActivations               EmergencyActivation[]               @relation("EmergencyActivationDeclaredBy")
+  commandedEmergencyActivations              EmergencyActivation[]               @relation("EmergencyActivationCommander")
+  stoodDownEmergencyActivations              EmergencyActivation[]               @relation("EmergencyActivationStoodDownBy")
+  reviewedEmergencyActivations               EmergencyActivation[]               @relation("EmergencyActivationReviewedBy")
+  ownedEmergencyImprovements                 EmergencyImprovement[]              @relation("EmergencyImprovementOwner")
+  createdEmergencyImprovements               EmergencyImprovement[]              @relation("EmergencyImprovementCreatedBy")
+  verifiedEmergencyImprovements              EmergencyImprovement[]              @relation("EmergencyImprovementVerifiedBy")
+  ownedContinuityPlans                       BusinessContinuityPlan[]            @relation("ContinuityPlanOwner")
+  createdContinuityPlans                     BusinessContinuityPlan[]            @relation("ContinuityPlanCreatedBy")
+  submittedContinuityPlans                   BusinessContinuityPlan[]            @relation("ContinuityPlanSubmittedBy")
+  approvedContinuityPlans                    BusinessContinuityPlan[]            @relation("ContinuityPlanApprovedBy")
+  ownedBusinessImpactAnalyses                BusinessImpactAnalysis[]            @relation("BusinessImpactAnalysisOwner")
+  ledContinuityExercises                     ContinuityExercise[]                @relation("ContinuityExerciseLead")
+  createdContinuityExercises                 ContinuityExercise[]                @relation("ContinuityExerciseCreatedBy")
+  reviewedContinuityExercises                ContinuityExercise[]                @relation("ContinuityExerciseReviewedBy")
+  declaredContinuityActivations              ContinuityActivation[]              @relation("ContinuityActivationDeclaredBy")
+  coordinatedContinuityActivations           ContinuityActivation[]              @relation("ContinuityActivationCoordinator")
+  restoredContinuityActivations              ContinuityActivation[]              @relation("ContinuityActivationRestoredBy")
+  closedContinuityActivations                ContinuityActivation[]              @relation("ContinuityActivationClosedBy")
+  ownedContinuityImprovements                ContinuityImprovement[]             @relation("ContinuityImprovementOwner")
+  createdContinuityImprovements              ContinuityImprovement[]             @relation("ContinuityImprovementCreatedBy")
+  verifiedContinuityImprovements             ContinuityImprovement[]             @relation("ContinuityImprovementVerifiedBy")
+  requestedPredictiveRuns                    PredictiveIntelligenceRun[]         @relation("PredictiveRunRequestedBy")
+  ownedPredictiveSignals                     PredictiveSignal[]                  @relation("PredictiveSignalOwner")
+  reviewedPredictiveSignals                  PredictiveSignal[]                  @relation("PredictiveSignalReviewer")
+  predictiveSignalReviews                    PredictiveSignalReview[]            @relation("PredictiveSignalReviewUser")
+  chairedExecutiveReviews                    ExecutiveManagementReview[]         @relation("ExecutiveReviewChair")
+  createdExecutiveReviews                    ExecutiveManagementReview[]         @relation("ExecutiveReviewCreatedBy")
+  completedExecutiveReviews                  ExecutiveManagementReview[]         @relation("ExecutiveReviewCompletedBy")
+  approvedExecutiveReviews                   ExecutiveManagementReview[]         @relation("ExecutiveReviewApprovedBy")
+  publishedExecutiveReviews                  ExecutiveManagementReview[]         @relation("ExecutiveReviewPublishedBy")
+  ownedExecutiveAgendaItems                  ExecutiveReviewAgendaItem[]         @relation("ExecutiveAgendaOwner")
+  executiveReviewAttendance                  ExecutiveReviewAttendee[]           @relation("ExecutiveReviewAttendeeUser")
+  ownedExecutiveDecisions                    ExecutiveReviewDecision[]           @relation("ExecutiveDecisionOwner")
+  closedExecutiveDecisions                   ExecutiveReviewDecision[]           @relation("ExecutiveDecisionClosedBy")
+  createdResearchClients                     ResearchClient[]                    @relation("ResearchClientCreatedBy")
+  managedResearchProjects                    ResearchProject[]                   @relation("ResearchProjectManager")
+  principalResearchProjects                  ResearchProject[]                   @relation("ResearchPrincipalInvestigator")
+  createdResearchProjects                    ResearchProject[]                   @relation("ResearchProjectCreatedBy")
+  approvedResearchProjects                   ResearchProject[]                   @relation("ResearchProjectApprovedBy")
+  researchTeamMemberships                    ResearchTeamMember[]
+  ownedResearchMilestones                    ResearchMilestone[]                 @relation("ResearchMilestoneOwner")
+  completedResearchMilestones                ResearchMilestone[]                 @relation("ResearchMilestoneCompletedBy")
+  createdResearchCollectionWaves             ResearchCollectionWave[]            @relation("ResearchCollectionCreatedBy")
+  assignedResearchQuestionnaires             ResearchQuestionnaireAssignment[]   @relation("ResearchAssignmentRespondent")
+  issuedResearchAssignments                  ResearchQuestionnaireAssignment[]   @relation("ResearchAssignmentAssignedBy")
+  ownedResearchDatasets                      ResearchCollectionWave[]            @relation("ResearchDatasetOwner")
+  lockedResearchDatasets                     ResearchCollectionWave[]            @relation("ResearchDatasetLockedBy")
+  approvedResearchDatasets                   ResearchCollectionWave[]            @relation("ResearchDatasetApprovedBy")
+  reviewedResearchResponses                  ResearchQuestionnaireAssignment[]   @relation("ResearchResponseReviewedBy")
+  authoredResearchAnalyses                   ResearchAnalysis[]                  @relation("ResearchAnalysisAnalyst")
+  reviewedResearchAnalyses                   ResearchAnalysis[]                  @relation("ResearchAnalysisReviewer")
+  approvedResearchAnalyses                   ResearchAnalysis[]                  @relation("ResearchAnalysisApprover")
+  authoredResearchReports                    ResearchReport[]                    @relation("ResearchReportAuthor")
+  reviewedResearchReports                    ResearchReport[]                    @relation("ResearchReportReviewer")
+  approvedResearchReports                    ResearchReport[]                    @relation("ResearchReportApprover")
+  publishedResearchReports                   ResearchReport[]                    @relation("ResearchReportPublisher")
+  importedResearchDatasets                   ResearchImportedDataset[]           @relation("ResearchDatasetImporter")
+  createdResearchTransformations             ResearchDataTransformation[]        @relation("ResearchTransformationCreator")
+  createdResearchDatasetVersions             ResearchDatasetVersion[]            @relation("ResearchDatasetVersionCreator")
+  reviewedResearchDatasetVersions            ResearchDatasetVersion[]            @relation("ResearchDatasetVersionReviewer")
+  approvedResearchDatasetVersions            ResearchDatasetVersion[]            @relation("ResearchDatasetVersionApprover")
+  createdResearchSamplingDesigns             ResearchSamplingDesign[]            @relation("ResearchSamplingDesignCreator")
+  approvedResearchSamplingDesigns            ResearchSamplingDesign[]            @relation("ResearchSamplingDesignApprover")
+  createdResearchPublicSurveyLinks           ResearchPublicSurveyLink[]          @relation("ResearchPublicSurveyLinkCreator")
+  reviewedResearchPublicResponses            ResearchPublicResponse[]            @relation("ResearchPublicResponseReviewer")
+  createdResearchSamplingFrames              ResearchSamplingFrame[]             @relation("ResearchSamplingFrameCreator")
+  generatedResearchSamples                   ResearchSamplingExecution[]         @relation("ResearchSamplingExecutionGenerator")
+  approvedResearchSamplingExecutions         ResearchSamplingExecution[]         @relation("ResearchSamplingExecutionApprover")
+  assignedResearchSampleUnits                ResearchSampleUnit[]                @relation("ResearchSampleUnitAssignee")
+  createdResearchSurveyCampaigns             ResearchSurveyCampaign[]            @relation("ResearchSurveyCampaignCreator")
+  createdResearchPanels                      ResearchPanel[]                     @relation("ResearchPanelCreator")
+  managedResearchPanelMembers                ResearchPanelMember[]               @relation("ResearchPanelMemberManager")
+  recordedResearchConsentEvents              ResearchPanelConsentEvent[]         @relation("ResearchConsentRecorder")
+  createdResearchLongitudinalStudies         ResearchLongitudinalStudy[]         @relation("ResearchLongitudinalStudyCreator")
+  createdResearchQuestionnaireLocalizations  ResearchQuestionnaireLocalization[] @relation("ResearchQuestionnaireLocalizationCreator")
+  approvedResearchQuestionnaireLocalizations ResearchQuestionnaireLocalization[] @relation("ResearchQuestionnaireLocalizationApprover")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -6879,13 +6888,14 @@ model ConfigurableFormVersion {
   createdAt     DateTime                      @default(now())
   updatedAt     DateTime                      @updatedAt
 
-  definition                   ConfigurableFormDefinition    @relation(fields: [definitionId], references: [id], onDelete: Cascade)
-  createdBy                    User                          @relation("ConfigurableFormVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  publishedBy                  User?                         @relation("ConfigurableFormVersionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
-  fields                       ConfigurableFormField[]
-  submissions                  ConfigurableFormSubmission[]
-  researchCollectionWaves      ResearchCollectionWave[]
-  researchPublicSurveySessions ResearchPublicSurveySession[]
+  definition                         ConfigurableFormDefinition          @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  createdBy                          User                                @relation("ConfigurableFormVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedBy                        User?                               @relation("ConfigurableFormVersionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  fields                             ConfigurableFormField[]
+  submissions                        ConfigurableFormSubmission[]
+  researchCollectionWaves            ResearchCollectionWave[]
+  researchPublicSurveySessions       ResearchPublicSurveySession[]
+  researchQuestionnaireLocalizations ResearchQuestionnaireLocalization[]
 
   @@unique([definitionId, version])
   @@index([definitionId, status])
@@ -8275,15 +8285,46 @@ model ResearchQuestionnaire {
   createdAt        DateTime                     @default(now())
   updatedAt        DateTime                     @updatedAt
 
-  organization        Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project             ResearchProject             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  formDefinition      ConfigurableFormDefinition  @relation(fields: [formDefinitionId], references: [id], onDelete: Restrict)
+  organization        Organization                        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project             ResearchProject                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  formDefinition      ConfigurableFormDefinition          @relation(fields: [formDefinitionId], references: [id], onDelete: Restrict)
   collectionWaves     ResearchCollectionWave[]
   longitudinalStudies ResearchLongitudinalStudy[]
+  localizations       ResearchQuestionnaireLocalization[]
 
   @@unique([projectId, name])
   @@index([organizationId, isActive])
   @@index([projectId, isActive])
+}
+
+model ResearchQuestionnaireLocalization {
+  id                String                                  @id @default(cuid())
+  organizationId    String
+  questionnaireId   String
+  formVersionId     String
+  locale            String
+  languageName      String
+  status            ResearchQuestionnaireLocalizationStatus @default(DRAFT)
+  questionnaireName String
+  purpose           String
+  consentStatement  String?
+  instructions      String?
+  fieldTranslations Json
+  createdById       String
+  approvedById      String?
+  approvedAt        DateTime?
+  createdAt         DateTime                                @default(now())
+  updatedAt         DateTime                                @updatedAt
+
+  organization  Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  questionnaire ResearchQuestionnaire   @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  formVersion   ConfigurableFormVersion @relation(fields: [formVersionId], references: [id], onDelete: Cascade)
+  createdBy     User                    @relation("ResearchQuestionnaireLocalizationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy    User?                   @relation("ResearchQuestionnaireLocalizationApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([formVersionId, locale])
+  @@index([organizationId, status, locale])
+  @@index([questionnaireId, status])
 }
 
 model ResearchCollectionWave {
@@ -8377,6 +8418,7 @@ model ResearchPublicResponse {
   participantName       String?
   participantEmail      String?
   pseudonymousReference String?
+  locale                 String?
   consentedAt           DateTime?
   disposition           ResearchResponseDisposition     @default(INCLUDED)
   qualityNotes          String?
