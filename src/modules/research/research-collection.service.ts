@@ -379,6 +379,21 @@ export function getResearchCollection(
           pseudonymousReference: true,
         },
       },
+      surveyCampaigns: {
+        include: {
+          _count: { select: { invitations: true } },
+          invitations: {
+            select: {
+              status: true,
+              sentAt: true,
+              openedAt: true,
+              completedAt: true,
+              remindersSent: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 }

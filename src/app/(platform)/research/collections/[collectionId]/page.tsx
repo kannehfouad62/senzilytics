@@ -11,6 +11,11 @@ import {
   PublicSurveyLinkForm,
 } from "@/features/research/public-survey-forms";
 import {
+  CampaignReminderButton,
+  CampaignStatusButton,
+  SurveyCampaignForm,
+} from "@/features/research/survey-campaign-forms";
+import {
   getCurrentUserPermissions,
   requirePermission,
 } from "@/lib/permissions";
@@ -80,10 +85,7 @@ export default async function ResearchCollectionPage({
         <Metric label="Assigned" value={collection.assignments.length} />
         <Metric label="Assigned responses" value={assignedCompleted} />
         <Metric label="Public responses" value={publicCompleted} />
-        <Metric
-          label="Progress"
-          value={progress}
-        />
+        <Metric label="Progress" value={progress} />
         <Metric label="Target" value={collection.targetResponseCount ?? "—"} />
       </div>
 
@@ -145,6 +147,121 @@ export default async function ResearchCollectionPage({
                 </p>
               )}
             </div>
+          </div>
+        </section>
+      )}
+
+      {canManage && (
+        <section className="mt-8 space-y-5">
+          <SurveyCampaignForm
+            collectionId={collection.id}
+            links={collection.publicLinks
+              .filter((link) => link.status === "ACTIVE")
+              .map((link) => ({ id: link.id, label: link.label }))}
+          />
+          <div>
+            <p className="text-sm text-violet-300">Distribution intelligence</p>
+            <h2 className="mt-1 text-2xl font-semibold">
+              Invitation campaigns
+            </h2>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {collection.surveyCampaigns.map((campaign) => {
+              const sent = campaign.invitations.filter(
+                  (item) =>
+                    item.status !== "PENDING" && item.status !== "FAILED",
+                ).length,
+                opened = campaign.invitations.filter(
+                  (item) => item.openedAt,
+                ).length,
+                completed = campaign.invitations.filter(
+                  (item) => item.completedAt,
+                ).length,
+                total = campaign._count.invitations,
+                completionDurations = campaign.invitations
+                  .filter((item) => item.openedAt && item.completedAt)
+                  .map((item) =>
+                    Math.max(
+                      0,
+                      item.completedAt!.getTime() - item.openedAt!.getTime(),
+                    ),
+                  ),
+                averageMinutes = completionDurations.length
+                  ? Math.round(
+                      completionDurations.reduce((sum, item) => sum + item, 0) /
+                        completionDurations.length /
+                        60_000,
+                    )
+                  : null;
+              return (
+                <article
+                  key={campaign.id}
+                  className="rounded-2xl border border-white/10 bg-white/[.04] p-5"
+                >
+                  <div className="flex justify-between gap-4">
+                    <div>
+                      <h3 className="font-semibold">{campaign.name}</h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {campaign.status} · {campaign.channel} · reminder limit{" "}
+                        {campaign.reminderLimit}
+                      </p>
+                    </div>
+                    {campaign.status === "ACTIVE" && (
+                      <div className="flex gap-2">
+                        <CampaignReminderButton campaignId={campaign.id} />
+                        <CampaignStatusButton
+                          campaignId={campaign.id}
+                          status="PAUSED"
+                          label="Pause"
+                        />
+                        <CampaignStatusButton
+                          campaignId={campaign.id}
+                          status="CLOSED"
+                          label="Close"
+                        />
+                      </div>
+                    )}
+                    {campaign.status === "PAUSED" && (
+                      <CampaignStatusButton
+                        campaignId={campaign.id}
+                        status="ACTIVE"
+                        label="Resume"
+                      />
+                    )}
+                  </div>
+                  <div className="mt-4 grid grid-cols-4 gap-2">
+                    <Metric label="Invited" value={total} />
+                    <Metric label="Sent" value={sent} />
+                    <Metric label="Opened" value={opened} />
+                    <Metric label="Completed" value={completed} />
+                  </div>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full bg-gradient-to-r from-violet-400 to-cyan-300"
+                      style={{
+                        width: `${total ? Math.round((completed / total) * 100) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Completion funnel{" "}
+                    {total ? Math.round((completed / total) * 100) : 0}% · Open
+                    rate {sent ? Math.round((opened / sent) * 100) : 0}% ·{" "}
+                    Average completion {averageMinutes ?? "—"} min ·{" "}
+                    {campaign.invitations.reduce(
+                      (sum, item) => sum + item.remindersSent,
+                      0,
+                    )}{" "}
+                    reminders sent
+                  </p>
+                </article>
+              );
+            })}
+            {!collection.surveyCampaigns.length && (
+              <p className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">
+                No invitation campaigns launched.
+              </p>
+            )}
           </div>
         </section>
       )}

@@ -17,10 +17,12 @@ export const metadata: Metadata = {
 
 export default async function PublicSurveyPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ invite?: string }>;
 }) {
-  const { token } = await params;
+  const [{ token }, query] = await Promise.all([params, searchParams]);
   const link = await prisma.researchPublicSurveyLink.findUnique({
     where: { token },
     include: {
@@ -59,6 +61,32 @@ export default async function PublicSurveyPage({
         </section>
       </SurveyShell>
     );
+
+  const invitation = query.invite
+    ? await prisma.researchSurveyInvitation.findFirst({
+        where: {
+          token: query.invite,
+          campaign: { publicLinkId: link.id, status: "ACTIVE" },
+          status: { in: ["SENT", "OPENED"] },
+        },
+      })
+    : null;
+  if (query.invite && !invitation)
+    return (
+      <SurveyShell>
+        <section className="rounded-3xl border border-amber-400/20 bg-amber-400/[.05] p-8 text-center">
+          <h1 className="text-3xl font-bold">Invitation unavailable</h1>
+          <p className="mt-3 text-slate-300">
+            This invitation is invalid, completed, or no longer active.
+          </p>
+        </section>
+      </SurveyShell>
+    );
+  if (invitation?.status === "SENT")
+    await prisma.researchSurveyInvitation.updateMany({
+      where: { id: invitation.id, status: "SENT" },
+      data: { status: "OPENED", openedAt: new Date() },
+    });
 
   const collection = link.collection;
   const form = {
@@ -99,6 +127,9 @@ export default async function PublicSurveyPage({
         identityMode={collection.questionnaire.identityMode}
         consentStatement={collection.questionnaire.consentStatement}
         form={form}
+        invitationToken={invitation?.token ?? null}
+        invitedName={invitation?.participantName ?? null}
+        invitedEmail={invitation?.participantEmail ?? null}
       />
     </SurveyShell>
   );

@@ -194,11 +194,17 @@ export function PublicResearchSurveyForm({
   identityMode,
   consentStatement,
   form,
+  invitationToken,
+  invitedName,
+  invitedEmail,
 }: {
   token: string;
   identityMode: ResearchResponseIdentityMode;
   consentStatement: string | null;
   form: Parameters<typeof RuntimeFormFields>[0]["forms"][number];
+  invitationToken: string | null;
+  invitedName: string | null;
+  invitedEmail: string | null;
 }) {
   const [state, action, pending] = useActionState(
     submitPublicResearchSurvey,
@@ -210,17 +216,22 @@ export function PublicResearchSurveyForm({
         <Check className="mx-auto text-emerald-300" size={34} />
         <h2 className="mt-4 text-2xl font-semibold">Response submitted</h2>
         <p className="mt-2 text-slate-300">{state.message}</p>
-        <a
-          href={`/survey/${token}`}
-          className="mt-6 inline-block rounded-xl border border-emerald-400/25 px-5 py-3 text-sm font-semibold text-emerald-200"
-        >
-          Submit another response
-        </a>
+        {!invitationToken && (
+          <a
+            href={`/survey/${token}`}
+            className="mt-6 inline-block rounded-xl border border-emerald-400/25 px-5 py-3 text-sm font-semibold text-emerald-200"
+          >
+            Submit another response
+          </a>
+        )}
       </section>
     );
   return (
     <form action={action} className="space-y-6">
       <input type="hidden" name="token" value={token} />
+      {invitationToken && (
+        <input type="hidden" name="invitationToken" value={invitationToken} />
+      )}
       <label className="absolute -left-[10000px]" aria-hidden="true">
         Website
         <input name="website" tabIndex={-1} autoComplete="off" />
@@ -233,6 +244,7 @@ export function PublicResearchSurveyForm({
               required
               maxLength={160}
               autoComplete="name"
+              defaultValue={invitedName ?? ""}
               className={input}
             />
           </Label>
@@ -243,6 +255,7 @@ export function PublicResearchSurveyForm({
               type="email"
               maxLength={254}
               autoComplete="email"
+              defaultValue={invitedEmail ?? ""}
               className={input}
             />
           </Label>

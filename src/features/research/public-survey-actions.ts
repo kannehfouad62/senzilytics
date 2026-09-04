@@ -31,6 +31,7 @@ export async function submitPublicResearchSurvey(
       };
     }
     const token = value(data, "token", 100);
+    const invitationToken = value(data, "invitationToken", 100) || null;
     const link = await prisma.researchPublicSurveyLink.findUnique({
       where: { token },
       include: { collection: { include: { questionnaire: true } } },
@@ -38,6 +39,19 @@ export async function submitPublicResearchSurvey(
     if (!link || link.status !== ResearchPublicLinkStatus.ACTIVE) {
       throw new Error("This public survey link is not available.");
     }
+    const invitation = invitationToken
+      ? await prisma.researchSurveyInvitation.findFirst({
+          where: {
+            token: invitationToken,
+            campaign: { publicLinkId: link.id, status: "ACTIVE" },
+            status: { in: ["SENT", "OPENED"] },
+          },
+        })
+      : null;
+    if (invitationToken && !invitation)
+      throw new Error(
+        "This invitation is invalid, completed, or no longer active.",
+      );
 
     const now = new Date();
     const collection = link.collection;
@@ -68,6 +82,13 @@ export async function submitPublicResearchSurvey(
         throw new Error("Name and email are required for this survey.");
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(participantEmail))
         throw new Error("Enter a valid email address.");
+      if (
+        invitation &&
+        participantEmail !== invitation.participantEmail.toLowerCase()
+      )
+        throw new Error(
+          "Use the email address associated with this invitation.",
+        );
     }
     if (
       identityMode === ResearchResponseIdentityMode.PSEUDONYMIZED &&
@@ -93,7 +114,10 @@ export async function submitPublicResearchSurvey(
       async (tx) => {
         const current = await tx.researchPublicSurveyLink.findUnique({
           where: { id: link.id },
-          include: { collection: true, _count: { select: { responses: true } } },
+          include: {
+            collection: true,
+            _count: { select: { responses: true } },
+          },
         });
         if (!current || current.status !== ResearchPublicLinkStatus.ACTIVE) {
           throw new Error("This public survey link is not available.");
@@ -101,11 +125,26 @@ export async function submitPublicResearchSurvey(
         if (
           current.collection.status !== ResearchCollectionStatus.ACTIVE ||
           Boolean(current.expiresAt && current.expiresAt < now) ||
-          Boolean(current.collection.opensAt && current.collection.opensAt > now) ||
-          Boolean(current.collection.closesAt && current.collection.closesAt < now)
+          Boolean(
+            current.collection.opensAt && current.collection.opensAt > now,
+          ) ||
+          Boolean(
+            current.collection.closesAt && current.collection.closesAt < now,
+          )
         ) {
           throw new Error("This survey is not currently accepting responses.");
         }
+        const currentInvitation = invitation
+          ? await tx.researchSurveyInvitation.findFirst({
+              where: {
+                id: invitation.id,
+                campaign: { publicLinkId: current.id, status: "ACTIVE" },
+                status: { in: ["SENT", "OPENED"] },
+              },
+            })
+          : null;
+        if (invitation && !currentInvitation)
+          throw new Error("This invitation has already been used or revoked.");
         if (
           current.maxResponses !== null &&
           current._count.responses >= current.maxResponses
@@ -131,6 +170,7 @@ export async function submitPublicResearchSurvey(
                 ? pseudonymousReference
                 : null,
             consentedAt: collection.questionnaire.consentStatement ? now : null,
+            invitationId: currentInvitation?.id ?? null,
           },
         });
         const submission = await tx.configurableFormSubmission.create({
@@ -145,10 +185,16 @@ export async function submitPublicResearchSurvey(
             answers: { create: prepared.answers },
           },
         });
-        return tx.researchPublicResponse.update({
+        const completed = await tx.researchPublicResponse.update({
           where: { id: created.id },
           data: { submissionId: submission.id },
         });
+        if (currentInvitation)
+          await tx.researchSurveyInvitation.update({
+            where: { id: currentInvitation.id },
+            data: { status: "COMPLETED", completedAt: now },
+          });
+        return completed;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
@@ -165,6 +211,7 @@ export async function submitPublicResearchSurvey(
         collectionId: collection.id,
         publicLinkId: link.id,
         identityMode,
+        invitationId: invitation?.id ?? null,
       },
     });
     return {
