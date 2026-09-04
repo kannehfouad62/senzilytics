@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { buildInterviewerQuality, detectFieldworkLocationClusters, fieldworkIntegritySignals, selectDeterministicBackcheckSample, summarizeFieldworkAssurance } from "../src/modules/research/research-fieldwork-assurance";
+import { buildInterviewerQuality, detectFieldworkLocationClusters, fieldworkIntegritySignals, selectDeterministicBackcheckSample, summarizeFieldworkAssurance, validateFieldworkIntegrityPolicy } from "../src/modules/research/research-fieldwork-assurance";
 
 const response = {
   id: "response-1", enumeratorId: "enumerator-1",
@@ -46,8 +46,16 @@ test("interviewer quality aggregates transparent response indicators", () => {
   assert.equal(quality.reviewPriority, 2);
 });
 
+test("fieldwork integrity thresholds are governed and configurable", () => {
+  const policy = validateFieldworkIntegrityPolicy({ minimumInterviewMinutes: 12, maximumSyncDelayHours: 4, maximumLocationAccuracyM: 50, locationClusterRadiusM: 15 });
+  const result = fieldworkIntegritySignals(response, new Date("2026-09-04T00:00:00Z"), policy);
+  assert.ok(result.signals.includes("VERY_SHORT_INTERVIEW"));
+  assert.ok(result.signals.includes("DELAYED_SYNCHRONIZATION"));
+  assert.throws(() => validateFieldworkIntegrityPolicy({ ...policy, maximumSyncDelayHours: 0 }), /between 1 and 720/);
+});
+
 test("fieldwork assurance actions remain tenant scoped and independently reviewed", async () => {
-  const [actions, schema, migration, page, collectionActions, sync, sla, slaMigration, workbook, presentation] = await Promise.all([
+  const [actions, schema, migration, page, collectionActions, sync, sla, slaMigration, workbook, presentation, policyMigration, forms] = await Promise.all([
     readFile(new URL("../src/features/research/sampling-fieldwork-actions.ts", import.meta.url), "utf8"),
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
     readFile(new URL("../prisma/migrations/20260908170000_research_fieldwork_assurance/migration.sql", import.meta.url), "utf8"),
@@ -58,6 +66,8 @@ test("fieldwork assurance actions remain tenant scoped and independently reviewe
     readFile(new URL("../prisma/migrations/20260909200000_research_backcheck_sla/migration.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/app/api/research/sampling-executions/[executionId]/fieldwork-workbook/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/app/api/research/sampling-executions/[executionId]/fieldwork-presentation/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../prisma/migrations/20260910120000_research_fieldwork_integrity_policy/migration.sql", import.meta.url), "utf8"),
+    readFile(new URL("../src/features/research/sampling-fieldwork-forms.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(actions, /requirePermission\(PermissionKey\.MANAGE_RESEARCH_DATASETS\)/);
   assert.match(actions, /organizationId/);
@@ -80,4 +90,8 @@ test("fieldwork assurance actions remain tenant scoped and independently reviewe
   assert.match(page, /Interviewer monitoring/);
   assert.match(workbook, /Interviewer Quality/);
   assert.match(presentation, /not automated performance scores/);
+  assert.match(actions, /Only an approved tenant sampling execution can be configured/);
+  assert.match(actions, /ResearchFieldworkIntegrityPolicy/);
+  assert.match(policyMigration, /minimumInterviewMinutes/);
+  assert.match(forms, /Pre-activation integrity policy/);
 });

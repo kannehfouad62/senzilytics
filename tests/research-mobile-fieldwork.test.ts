@@ -29,7 +29,7 @@ test("offline interviews preserve immutable lineage and idempotency", async () =
     readFile(new URL("../src/app/api/research/collections/[collectionId]/export/route.ts", import.meta.url), "utf8"),
   ]);
   assert.match(schema, /model ResearchFieldworkResponse/);
-  assert.match(schema, /deviceSubmissionId String\s+@unique/);
+  assert.match(schema, /deviceSubmissionId\s+String\s+@unique/);
   assert.match(schema, /backcheckStatus\s+ResearchFieldworkBackcheckStatus/);
   assert.match(migration, /ResearchFieldworkResponse_deviceSubmissionId_key/);
   assert.match(sync, /type: z\.literal\("RESEARCH_FIELDWORK_RESPONSE"\)/);

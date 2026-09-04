@@ -53,9 +53,15 @@ export default async function ResearchFieldworkDashboard({
   if (!execution) return <Empty project={project} />;
   const analytics = buildFieldworkAnalytics(execution.units);
   const responses = execution.units.flatMap((unit) => unit.fieldworkResponse ? [unit.fieldworkResponse] : []);
-  const assurance = summarizeFieldworkAssurance(responses);
-  const locationClusters = detectFieldworkLocationClusters(responses);
-  const interviewerQuality = buildInterviewerQuality(responses);
+  const integrityPolicy = {
+    minimumInterviewMinutes: execution.minimumInterviewMinutes,
+    maximumSyncDelayHours: execution.maximumSyncDelayHours,
+    maximumLocationAccuracyM: execution.maximumLocationAccuracyM,
+    locationClusterRadiusM: execution.locationClusterRadiusM,
+  };
+  const assurance = summarizeFieldworkAssurance(responses, new Date(), integrityPolicy);
+  const locationClusters = detectFieldworkLocationClusters(responses, integrityPolicy.locationClusterRadiusM);
+  const interviewerQuality = buildInterviewerQuality(responses, new Date(), integrityPolicy);
   const canManage = permissions.includes(PermissionKey.MANAGE_RESEARCH_DATASETS);
   const reviewerRoles = canManage ? await prisma.rolePermission.findMany({ where: { permission: PermissionKey.MANAGE_RESEARCH_DATASETS }, select: { role: true } }) : [];
   const reviewers = canManage ? await prisma.user.findMany({ where: { organizationId, isActive: true, OR: [{ role: UserRole.SUPER_ADMIN }, { role: { in: reviewerRoles.map((item) => item.role) } }] }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : [];
@@ -141,6 +147,12 @@ export default async function ResearchFieldworkDashboard({
           <Metric label="Proximity signals" value={locationClusters.responseIds.length} alert={locationClusters.responseIds.length > 0} />
         </div>
         {canManage && assurance.total ? <BackcheckSampleForm executionId={execution.id} reviewers={reviewers} /> : null}
+        <div className="mt-5 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Short interview threshold" value={`< ${integrityPolicy.minimumInterviewMinutes} min`} />
+          <Metric label="Sync delay threshold" value={`> ${integrityPolicy.maximumSyncDelayHours}h`} />
+          <Metric label="GPS uncertainty threshold" value={`> ${integrityPolicy.maximumLocationAccuracyM} m`} />
+          <Metric label="Proximity radius" value={`${integrityPolicy.locationClusterRadiusM} m`} />
+        </div>
       </section>
       <section className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/[.035]">
         <div className="border-b border-white/10 p-6"><h2 className="text-xl font-semibold">Interview integrity register</h2><p className="mt-1 text-sm text-slate-400">Operational signals support review prioritization; they do not automatically invalidate a response.</p></div>

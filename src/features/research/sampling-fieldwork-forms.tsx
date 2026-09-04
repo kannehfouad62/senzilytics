@@ -15,6 +15,7 @@ import {
   recordResearchFieldworkDisposition,
   reviewResearchFieldworkBackcheck,
   selectResearchBackcheckSample,
+  updateFieldworkIntegrityPolicy,
 } from "@/features/research/sampling-fieldwork-actions";
 import { useRefreshOnSuccess } from "@/features/research/use-refresh-on-success";
 
@@ -61,6 +62,22 @@ export function BackcheckReviewForm({ responseId }: { responseId: string }) {
       <input name="recontactDueAt" type="date" aria-label="Recontact due date" className={field} />
       <button disabled={pending} className={button}>{pending ? "Saving…" : "Record review"}</button>
     </div>
+    <Feedback state={state} />
+  </form>;
+}
+
+export function FieldworkIntegrityPolicyForm({ execution }: { execution: { id: string; minimumInterviewMinutes: number; maximumSyncDelayHours: number; maximumLocationAccuracyM: number; locationClusterRadiusM: number } }) {
+  const [state, action, pending] = useActionState(updateFieldworkIntegrityPolicy, initialFormActionState);
+  return <form action={action} className="mt-5 rounded-2xl border border-violet-400/15 bg-violet-400/[.035] p-5">
+    <input type="hidden" name="executionId" value={execution.id} />
+    <div><p className="text-sm font-semibold text-violet-200">Pre-activation integrity policy</p><p className="mt-1 text-xs text-slate-400">These thresholds create transparent review indicators. They never invalidate a response or score an employee automatically.</p></div>
+    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <label className="text-xs text-slate-400">Minimum interview (minutes)<input name="minimumInterviewMinutes" type="number" min="0.5" max="240" step="0.5" defaultValue={execution.minimumInterviewMinutes} required className={`${field} mt-1 w-full`} /></label>
+      <label className="text-xs text-slate-400">Maximum sync delay (hours)<input name="maximumSyncDelayHours" type="number" min="1" max="720" step="1" defaultValue={execution.maximumSyncDelayHours} required className={`${field} mt-1 w-full`} /></label>
+      <label className="text-xs text-slate-400">Maximum GPS uncertainty (metres)<input name="maximumLocationAccuracyM" type="number" min="5" max="10000" step="1" defaultValue={execution.maximumLocationAccuracyM} required className={`${field} mt-1 w-full`} /></label>
+      <label className="text-xs text-slate-400">Location-cluster radius (metres)<input name="locationClusterRadiusM" type="number" min="1" max="1000" step="1" defaultValue={execution.locationClusterRadiusM} required className={`${field} mt-1 w-full`} /></label>
+    </div>
+    <button disabled={pending} className={`${button} mt-4`}>{pending ? "Saving…" : "Save integrity policy"}</button>
     <Feedback state={state} />
   </form>;
 }

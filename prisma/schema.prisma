@@ -2281,7 +2281,7 @@ model Organization {
   researchPublicSurveySessions       ResearchPublicSurveySession[]
   researchScreeningRecords           ResearchSurveyScreeningRecord[]
   researchQuestionnaireLocalizations ResearchQuestionnaireLocalization[]
-  researchFieldworkResponses          ResearchFieldworkResponse[]
+  researchFieldworkResponses         ResearchFieldworkResponse[]
 }
 
 model PricingInquiry {
@@ -2637,9 +2637,9 @@ model User {
   createdResearchLongitudinalStudies         ResearchLongitudinalStudy[]         @relation("ResearchLongitudinalStudyCreator")
   createdResearchQuestionnaireLocalizations  ResearchQuestionnaireLocalization[] @relation("ResearchQuestionnaireLocalizationCreator")
   approvedResearchQuestionnaireLocalizations ResearchQuestionnaireLocalization[] @relation("ResearchQuestionnaireLocalizationApprover")
-  enumeratedResearchFieldworkResponses       ResearchFieldworkResponse[]          @relation("ResearchFieldworkEnumerator")
-  backcheckedResearchFieldworkResponses      ResearchFieldworkResponse[]          @relation("ResearchFieldworkBackchecker")
-  assignedResearchFieldworkBackchecks        ResearchFieldworkResponse[]          @relation("ResearchFieldworkBackcheckAssignee")
+  enumeratedResearchFieldworkResponses       ResearchFieldworkResponse[]         @relation("ResearchFieldworkEnumerator")
+  backcheckedResearchFieldworkResponses      ResearchFieldworkResponse[]         @relation("ResearchFieldworkBackchecker")
+  assignedResearchFieldworkBackchecks        ResearchFieldworkResponse[]         @relation("ResearchFieldworkBackcheckAssignee")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -6957,14 +6957,14 @@ model ConfigurableFormSubmission {
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
 
-  organization           Organization                     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  definition             ConfigurableFormDefinition       @relation(fields: [definitionId], references: [id], onDelete: Restrict)
-  version                ConfigurableFormVersion          @relation(fields: [versionId], references: [id], onDelete: Restrict)
-  submittedBy            User?                            @relation("ConfigurableFormSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
-  answers                ConfigurableFormAnswer[]
-  fileAnswers            ConfigurableFormFileAnswer[]
-  researchAssignment     ResearchQuestionnaireAssignment?
-  researchPublicResponse ResearchPublicResponse?
+  organization              Organization                     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  definition                ConfigurableFormDefinition       @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  version                   ConfigurableFormVersion          @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  submittedBy               User?                            @relation("ConfigurableFormSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  answers                   ConfigurableFormAnswer[]
+  fileAnswers               ConfigurableFormFileAnswer[]
+  researchAssignment        ResearchQuestionnaireAssignment?
+  researchPublicResponse    ResearchPublicResponse?
   researchFieldworkResponse ResearchFieldworkResponse?
 
   @@unique([definitionId, entityType, entityId])
@@ -8346,47 +8346,47 @@ model ResearchQuestionnaireLocalization {
 }
 
 model ResearchCollectionWave {
-  id                  String                   @id @default(cuid())
-  organizationId      String
-  projectId           String
-  questionnaireId     String
-  formVersionId       String
-  name                String
-  status              ResearchCollectionStatus @default(DRAFT)
-  opensAt             DateTime?
-  closesAt            DateTime?
-  assignmentDueAt     DateTime?
-  targetResponseCount Int?
-  instructions        String?
-  locationCapturePolicy ResearchLocationCapturePolicy @default(OPTIONAL)
-  maximumLocationAccuracyM Float?                       @default(250)
-  retainPreciseLocation Boolean                         @default(false)
-  createdById         String
-  activatedAt         DateTime?
-  closedAt            DateTime?
-  datasetStatus       ResearchDatasetStatus    @default(OPEN)
-  datasetOwnerId      String?
-  datasetLockedById   String?
-  datasetLockedAt     DateTime?
-  datasetApprovedById String?
-  datasetApprovedAt   DateTime?
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
+  id                       String                        @id @default(cuid())
+  organizationId           String
+  projectId                String
+  questionnaireId          String
+  formVersionId            String
+  name                     String
+  status                   ResearchCollectionStatus      @default(DRAFT)
+  opensAt                  DateTime?
+  closesAt                 DateTime?
+  assignmentDueAt          DateTime?
+  targetResponseCount      Int?
+  instructions             String?
+  locationCapturePolicy    ResearchLocationCapturePolicy @default(OPTIONAL)
+  maximumLocationAccuracyM Float?                        @default(250)
+  retainPreciseLocation    Boolean                       @default(false)
+  createdById              String
+  activatedAt              DateTime?
+  closedAt                 DateTime?
+  datasetStatus            ResearchDatasetStatus         @default(OPEN)
+  datasetOwnerId           String?
+  datasetLockedById        String?
+  datasetLockedAt          DateTime?
+  datasetApprovedById      String?
+  datasetApprovedAt        DateTime?
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
 
-  organization      Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project           ResearchProject                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  questionnaire     ResearchQuestionnaire             @relation(fields: [questionnaireId], references: [id], onDelete: Restrict)
-  formVersion       ConfigurableFormVersion           @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
-  createdBy         User                              @relation("ResearchCollectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  datasetOwner      User?                             @relation("ResearchDatasetOwner", fields: [datasetOwnerId], references: [id], onDelete: SetNull)
-  datasetLockedBy   User?                             @relation("ResearchDatasetLockedBy", fields: [datasetLockedById], references: [id], onDelete: SetNull)
-  datasetApprovedBy User?                             @relation("ResearchDatasetApprovedBy", fields: [datasetApprovedById], references: [id], onDelete: SetNull)
-  assignments       ResearchQuestionnaireAssignment[]
-  publicLinks       ResearchPublicSurveyLink[]
-  publicResponses   ResearchPublicResponse[]
-  surveyCampaigns   ResearchSurveyCampaign[]
-  analyses          ResearchAnalysis[]
-  longitudinalWave  ResearchLongitudinalWave?
+  organization       Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project            ResearchProject                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  questionnaire      ResearchQuestionnaire             @relation(fields: [questionnaireId], references: [id], onDelete: Restrict)
+  formVersion        ConfigurableFormVersion           @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
+  createdBy          User                              @relation("ResearchCollectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  datasetOwner       User?                             @relation("ResearchDatasetOwner", fields: [datasetOwnerId], references: [id], onDelete: SetNull)
+  datasetLockedBy    User?                             @relation("ResearchDatasetLockedBy", fields: [datasetLockedById], references: [id], onDelete: SetNull)
+  datasetApprovedBy  User?                             @relation("ResearchDatasetApprovedBy", fields: [datasetApprovedById], references: [id], onDelete: SetNull)
+  assignments        ResearchQuestionnaireAssignment[]
+  publicLinks        ResearchPublicSurveyLink[]
+  publicResponses    ResearchPublicResponse[]
+  surveyCampaigns    ResearchSurveyCampaign[]
+  analyses           ResearchAnalysis[]
+  longitudinalWave   ResearchLongitudinalWave?
   fieldworkResponses ResearchFieldworkResponse[]
 
   @@unique([questionnaireId, name])
@@ -8440,7 +8440,7 @@ model ResearchPublicResponse {
   participantName       String?
   participantEmail      String?
   pseudonymousReference String?
-  locale                 String?
+  locale                String?
   consentedAt           DateTime?
   disposition           ResearchResponseDisposition     @default(INCLUDED)
   qualityNotes          String?
@@ -9037,27 +9037,31 @@ model ResearchSamplingFrame {
 }
 
 model ResearchSamplingExecution {
-  id                 String                          @id @default(cuid())
-  organizationId     String
-  projectId          String
-  samplingDesignId   String
-  samplingFrameId    String
-  version            Int
-  status             ResearchSamplingExecutionStatus @default(GENERATED)
-  seed               String
-  targetSampleSize   Int
-  reserveSampleSize  Int                             @default(0)
-  selectedSampleSize Int
-  algorithmSnapshot  Json
-  designSnapshot     Json
-  generatedById      String
-  approvedById       String?
-  generatedAt        DateTime                        @default(now())
-  submittedAt        DateTime?
-  approvedAt         DateTime?
-  activatedAt        DateTime?
-  closedAt           DateTime?
-  archivedAt         DateTime?
+  id                       String                          @id @default(cuid())
+  organizationId           String
+  projectId                String
+  samplingDesignId         String
+  samplingFrameId          String
+  version                  Int
+  status                   ResearchSamplingExecutionStatus @default(GENERATED)
+  seed                     String
+  targetSampleSize         Int
+  reserveSampleSize        Int                             @default(0)
+  selectedSampleSize       Int
+  minimumInterviewMinutes  Float                           @default(2)
+  maximumSyncDelayHours    Int                             @default(72)
+  maximumLocationAccuracyM Float                           @default(250)
+  locationClusterRadiusM   Float                           @default(25)
+  algorithmSnapshot        Json
+  designSnapshot           Json
+  generatedById            String
+  approvedById             String?
+  generatedAt              DateTime                        @default(now())
+  submittedAt              DateTime?
+  approvedAt               DateTime?
+  activatedAt              DateTime?
+  closedAt                 DateTime?
+  archivedAt               DateTime?
 
   organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project        ResearchProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -9098,10 +9102,10 @@ model ResearchSampleUnit {
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
 
-  execution      ResearchSamplingExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
-  assignedTo     User?                     @relation("ResearchSampleUnitAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  replacementFor ResearchSampleUnit?       @relation("ResearchSampleUnitReplacement", fields: [replacementForId], references: [id], onDelete: SetNull)
-  replacedBy     ResearchSampleUnit[]      @relation("ResearchSampleUnitReplacement")
+  execution         ResearchSamplingExecution  @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  assignedTo        User?                      @relation("ResearchSampleUnitAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  replacementFor    ResearchSampleUnit?        @relation("ResearchSampleUnitReplacement", fields: [replacementForId], references: [id], onDelete: SetNull)
+  replacedBy        ResearchSampleUnit[]       @relation("ResearchSampleUnitReplacement")
   fieldworkResponse ResearchFieldworkResponse?
 
   @@unique([executionId, unitReference])
@@ -9115,41 +9119,41 @@ model ResearchSampleUnit {
 }
 
 model ResearchFieldworkResponse {
-  id                 String                            @id @default(cuid())
-  organizationId     String
-  sampleUnitId       String                            @unique
-  collectionId       String
-  submissionId       String                            @unique
-  enumeratorId       String
-  deviceSubmissionId String                            @unique
-  locale             String
-  interviewStartedAt DateTime
-  capturedAt         DateTime
-  synchronizedAt     DateTime                          @default(now())
-  latitude           Float?
-  longitude          Float?
-  locationAccuracyM  Float?
-  disposition        ResearchResponseDisposition      @default(INCLUDED)
-  backcheckRequired  Boolean                           @default(false)
-  backcheckStatus    ResearchFieldworkBackcheckStatus @default(PENDING)
-  backcheckSelectedAt DateTime?
-  backcheckDueAt     DateTime?
-  backcheckAssignedToId String?
-  backcheckEscalationLevel Int                            @default(0)
+  id                       String                           @id @default(cuid())
+  organizationId           String
+  sampleUnitId             String                           @unique
+  collectionId             String
+  submissionId             String                           @unique
+  enumeratorId             String
+  deviceSubmissionId       String                           @unique
+  locale                   String
+  interviewStartedAt       DateTime
+  capturedAt               DateTime
+  synchronizedAt           DateTime                         @default(now())
+  latitude                 Float?
+  longitude                Float?
+  locationAccuracyM        Float?
+  disposition              ResearchResponseDisposition      @default(INCLUDED)
+  backcheckRequired        Boolean                          @default(false)
+  backcheckStatus          ResearchFieldworkBackcheckStatus @default(PENDING)
+  backcheckSelectedAt      DateTime?
+  backcheckDueAt           DateTime?
+  backcheckAssignedToId    String?
+  backcheckEscalationLevel Int                              @default(0)
   backcheckLastEscalatedAt DateTime?
-  backcheckedById    String?
-  backcheckedAt      DateTime?
-  backcheckNotes     String?
-  createdAt          DateTime                          @default(now())
-  updatedAt          DateTime                          @updatedAt
+  backcheckedById          String?
+  backcheckedAt            DateTime?
+  backcheckNotes           String?
+  createdAt                DateTime                         @default(now())
+  updatedAt                DateTime                         @updatedAt
 
-  organization  Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sampleUnit    ResearchSampleUnit          @relation(fields: [sampleUnitId], references: [id], onDelete: Restrict)
-  collection    ResearchCollectionWave      @relation(fields: [collectionId], references: [id], onDelete: Restrict)
-  submission    ConfigurableFormSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
-  enumerator    User                       @relation("ResearchFieldworkEnumerator", fields: [enumeratorId], references: [id], onDelete: Restrict)
-  backcheckedBy User?                      @relation("ResearchFieldworkBackchecker", fields: [backcheckedById], references: [id], onDelete: SetNull)
-  backcheckAssignedTo User?                @relation("ResearchFieldworkBackcheckAssignee", fields: [backcheckAssignedToId], references: [id], onDelete: SetNull)
+  organization        Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sampleUnit          ResearchSampleUnit         @relation(fields: [sampleUnitId], references: [id], onDelete: Restrict)
+  collection          ResearchCollectionWave     @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+  submission          ConfigurableFormSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  enumerator          User                       @relation("ResearchFieldworkEnumerator", fields: [enumeratorId], references: [id], onDelete: Restrict)
+  backcheckedBy       User?                      @relation("ResearchFieldworkBackchecker", fields: [backcheckedById], references: [id], onDelete: SetNull)
+  backcheckAssignedTo User?                      @relation("ResearchFieldworkBackcheckAssignee", fields: [backcheckAssignedToId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, backcheckStatus, capturedAt])
   @@index([organizationId, backcheckRequired, backcheckDueAt])

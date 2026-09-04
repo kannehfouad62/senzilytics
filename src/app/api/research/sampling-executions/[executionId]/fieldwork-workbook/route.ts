@@ -41,7 +41,8 @@ export async function GET(
     return new Response("Sampling execution not found.", { status: 404 });
   const analytics = buildFieldworkAnalytics(execution.units),
     workbook = new ExcelJS.Workbook();
-  const interviewerQuality = buildInterviewerQuality(execution.units.flatMap((unit) => unit.fieldworkResponse ? [unit.fieldworkResponse] : []));
+  const policy = { minimumInterviewMinutes: execution.minimumInterviewMinutes, maximumSyncDelayHours: execution.maximumSyncDelayHours, maximumLocationAccuracyM: execution.maximumLocationAccuracyM, locationClusterRadiusM: execution.locationClusterRadiusM };
+  const interviewerQuality = buildInterviewerQuality(execution.units.flatMap((unit) => unit.fieldworkResponse ? [unit.fieldworkResponse] : []), new Date(), policy);
   const summary = workbook.addWorksheet("Fieldwork Summary");
   summary.addRows(
     [
@@ -60,6 +61,10 @@ export async function GET(
       ["Cooperation rate", analytics.cooperationRate],
       ["Overdue", analytics.overdue],
       ["Average attempts", analytics.averageAttempts],
+      ["Minimum interview threshold (minutes)", policy.minimumInterviewMinutes],
+      ["Maximum synchronization delay (hours)", policy.maximumSyncDelayHours],
+      ["Maximum GPS uncertainty (metres)", policy.maximumLocationAccuracyM],
+      ["Location-cluster radius (metres)", policy.locationClusterRadiusM],
     ].map((row) => row.map(safe)),
   );
   addGrouped(workbook, "Researcher Performance", analytics.researchers);

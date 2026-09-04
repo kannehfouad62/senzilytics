@@ -14,14 +14,37 @@ export type FieldworkIntegrityResponse = {
   backcheckDueAt: Date | null;
 };
 
-export function fieldworkIntegritySignals(response: FieldworkIntegrityResponse, now = new Date()) {
+export type FieldworkIntegrityPolicy = {
+  minimumInterviewMinutes: number;
+  maximumSyncDelayHours: number;
+  maximumLocationAccuracyM: number;
+  locationClusterRadiusM: number;
+};
+
+export const defaultFieldworkIntegrityPolicy: FieldworkIntegrityPolicy = {
+  minimumInterviewMinutes: 2,
+  maximumSyncDelayHours: 72,
+  maximumLocationAccuracyM: 250,
+  locationClusterRadiusM: 25,
+};
+
+export function validateFieldworkIntegrityPolicy(policy: FieldworkIntegrityPolicy) {
+  if (!Number.isFinite(policy.minimumInterviewMinutes) || policy.minimumInterviewMinutes < 0.5 || policy.minimumInterviewMinutes > 240) throw new Error("Minimum interview duration must be between 0.5 and 240 minutes.");
+  if (!Number.isInteger(policy.maximumSyncDelayHours) || policy.maximumSyncDelayHours < 1 || policy.maximumSyncDelayHours > 720) throw new Error("Maximum synchronization delay must be between 1 and 720 hours.");
+  if (!Number.isFinite(policy.maximumLocationAccuracyM) || policy.maximumLocationAccuracyM < 5 || policy.maximumLocationAccuracyM > 10_000) throw new Error("Maximum location accuracy must be between 5 and 10,000 metres.");
+  if (!Number.isFinite(policy.locationClusterRadiusM) || policy.locationClusterRadiusM < 1 || policy.locationClusterRadiusM > 1000) throw new Error("Location-cluster radius must be between 1 and 1,000 metres.");
+  return policy;
+}
+
+export function fieldworkIntegritySignals(response: FieldworkIntegrityResponse, now = new Date(), policy: FieldworkIntegrityPolicy = defaultFieldworkIntegrityPolicy) {
+  validateFieldworkIntegrityPolicy(policy);
   const durationMinutes = Math.max(0, (response.capturedAt.getTime() - response.interviewStartedAt.getTime()) / 60_000);
   const syncDelayHours = Math.max(0, (response.synchronizedAt.getTime() - response.capturedAt.getTime()) / 3_600_000);
   const signals: string[] = [];
-  if (durationMinutes < 2) signals.push("VERY_SHORT_INTERVIEW");
-  if (syncDelayHours > 72) signals.push("DELAYED_SYNCHRONIZATION");
+  if (durationMinutes < policy.minimumInterviewMinutes) signals.push("VERY_SHORT_INTERVIEW");
+  if (syncDelayHours > policy.maximumSyncDelayHours) signals.push("DELAYED_SYNCHRONIZATION");
   if (response.latitude === null || response.longitude === null) signals.push("LOCATION_NOT_CAPTURED");
-  else if (response.locationAccuracyM !== null && response.locationAccuracyM > 250) signals.push("LOW_LOCATION_ACCURACY");
+  else if (response.locationAccuracyM !== null && response.locationAccuracyM > policy.maximumLocationAccuracyM) signals.push("LOW_LOCATION_ACCURACY");
   if (response.backcheckRequired && response.backcheckStatus === "PENDING" && response.backcheckDueAt && response.backcheckDueAt < now) signals.push("BACKCHECK_OVERDUE");
   return {
     durationMinutes: Number(durationMinutes.toFixed(1)),
@@ -39,8 +62,8 @@ export function selectDeterministicBackcheckSample<T extends { id: string }>(res
     .slice(0, count);
 }
 
-export function summarizeFieldworkAssurance<T extends FieldworkIntegrityResponse>(responses: T[], now = new Date()) {
-  const assessed = responses.map((response) => ({ response, integrity: fieldworkIntegritySignals(response, now) }));
+export function summarizeFieldworkAssurance<T extends FieldworkIntegrityResponse>(responses: T[], now = new Date(), policy: FieldworkIntegrityPolicy = defaultFieldworkIntegrityPolicy) {
+  const assessed = responses.map((response) => ({ response, integrity: fieldworkIntegritySignals(response, now, policy) }));
   return {
     total: responses.length,
     selected: responses.filter((item) => item.backcheckRequired).length,
@@ -72,11 +95,11 @@ function haversineMetres(latitudeA: number, longitudeA: number, latitudeB: numbe
   return 6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }
 
-export function buildInterviewerQuality<T extends FieldworkIntegrityResponse & { enumerator: { name: string } }>(responses: T[], now = new Date()) {
+export function buildInterviewerQuality<T extends FieldworkIntegrityResponse & { enumerator: { name: string } }>(responses: T[], now = new Date(), policy: FieldworkIntegrityPolicy = defaultFieldworkIntegrityPolicy) {
   const groups = new Map<string, T[]>();
   for (const response of responses) groups.set(response.enumeratorId, [...(groups.get(response.enumeratorId) ?? []), response]);
   return [...groups.entries()].map(([enumeratorId, rows]) => {
-    const assessed = rows.map((response) => ({ response, integrity: fieldworkIntegritySignals(response, now) }));
+    const assessed = rows.map((response) => ({ response, integrity: fieldworkIntegritySignals(response, now, policy) }));
     const durations = assessed.map((item) => item.integrity.durationMinutes).sort((a, b) => a - b);
     const middle = Math.floor(durations.length / 2);
     const medianDurationMinutes = durations.length % 2 ? durations[middle] : (durations[middle - 1] + durations[middle]) / 2;

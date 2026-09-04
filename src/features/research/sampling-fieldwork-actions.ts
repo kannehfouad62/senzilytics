@@ -26,7 +26,10 @@ import {
   assertActiveExecution,
   assertFieldworkTransition,
 } from "@/modules/research/research-fieldwork";
-import { selectDeterministicBackcheckSample } from "@/modules/research/research-fieldwork-assurance";
+import {
+  selectDeterministicBackcheckSample,
+  validateFieldworkIntegrityPolicy,
+} from "@/modules/research/research-fieldwork-assurance";
 
 const value = (data: FormData, key: string, max = 500) =>
   String(data.get(key) ?? "")
@@ -42,6 +45,47 @@ const refresh = (projectId: string) => {
   revalidatePath(`/research/projects/${projectId}/sampling-design`);
   revalidatePath(`/research/projects/${projectId}/fieldwork`);
 };
+
+export async function updateFieldworkIntegrityPolicy(
+  _state: FormActionState,
+  data: FormData,
+): Promise<FormActionState> {
+  await requirePermission(PermissionKey.MANAGE_RESEARCH_DATASETS);
+  const { organizationId, user } = await getCurrentUserTenant();
+  try {
+    const executionId = value(data, "executionId", 100);
+    const policy = validateFieldworkIntegrityPolicy({
+      minimumInterviewMinutes: Number(value(data, "minimumInterviewMinutes", 10)),
+      maximumSyncDelayHours: Number(value(data, "maximumSyncDelayHours", 10)),
+      maximumLocationAccuracyM: Number(value(data, "maximumLocationAccuracyM", 10)),
+      locationClusterRadiusM: Number(value(data, "locationClusterRadiusM", 10)),
+    });
+    const execution = await prisma.researchSamplingExecution.findFirst({
+      where: { id: executionId, organizationId, status: ResearchSamplingExecutionStatus.APPROVED },
+      select: { id: true, projectId: true },
+    });
+    if (!execution) throw new Error("Only an approved tenant sampling execution can be configured before activation.");
+    await prisma.$transaction([
+      prisma.researchSamplingExecution.update({ where: { id: execution.id }, data: policy }),
+      prisma.activityLog.create({
+        data: {
+          organizationId,
+          userId: user.id,
+          action: ActivityAction.UPDATE,
+          entityType: "ResearchFieldworkIntegrityPolicy",
+          entityId: execution.id,
+          title: "Fieldwork integrity policy configured",
+          description: "Transparent review thresholds were frozen before fieldwork activation.",
+          metadata: { projectId: execution.projectId, ...policy },
+        },
+      }),
+    ]);
+    refresh(execution.projectId);
+    return { status: "SUCCESS", message: "Fieldwork integrity policy saved." };
+  } catch (error) {
+    return fail(error);
+  }
+}
 
 export async function selectResearchBackcheckSample(
   _state: FormActionState,

@@ -18,6 +18,7 @@ import {
 import {
   ActivateFieldworkControl,
   CloseFieldworkControl,
+  FieldworkIntegrityPolicyForm,
   ReserveReplacementControl,
   SampleUnitAssignmentForm,
   SampleUnitDispositionForm,
@@ -391,6 +392,7 @@ export default async function SamplingDesignPage({
                   Approved independently by {execution.approvedBy.name}
                 </p>
               )}
+              {execution.status === ResearchSamplingExecutionStatus.APPROVED && canManage && <FieldworkIntegrityPolicyForm execution={execution} />}
               {operationalExecutions.has(execution.status) &&
                 (() => {
                   const summary = summarizeFieldworkCounts(
