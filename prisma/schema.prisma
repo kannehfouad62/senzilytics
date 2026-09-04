@@ -532,6 +532,7 @@ enum ResearchSampleUnitStatus {
 
 enum ResearchFieldworkBackcheckStatus {
   PENDING
+  RECONTACT_REQUIRED
   APPROVED
   REJECTED
 }
@@ -9119,7 +9120,10 @@ model ResearchFieldworkResponse {
   longitude          Float?
   locationAccuracyM  Float?
   disposition        ResearchResponseDisposition      @default(INCLUDED)
+  backcheckRequired  Boolean                           @default(false)
   backcheckStatus    ResearchFieldworkBackcheckStatus @default(PENDING)
+  backcheckSelectedAt DateTime?
+  backcheckDueAt     DateTime?
   backcheckedById    String?
   backcheckedAt      DateTime?
   backcheckNotes     String?
@@ -9134,6 +9138,7 @@ model ResearchFieldworkResponse {
   backcheckedBy User?                      @relation("ResearchFieldworkBackchecker", fields: [backcheckedById], references: [id], onDelete: SetNull)
 
   @@index([organizationId, backcheckStatus, capturedAt])
+  @@index([organizationId, backcheckRequired, backcheckDueAt])
   @@index([collectionId, capturedAt])
   @@index([enumeratorId, capturedAt])
 }

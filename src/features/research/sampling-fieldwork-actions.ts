@@ -4,6 +4,8 @@ import {
   ActivityAction,
   NotificationType,
   PermissionKey,
+  ResearchFieldworkBackcheckStatus,
+  ResearchResponseDisposition,
   ResearchSampleUnitStatus,
   ResearchSamplingExecutionStatus,
 } from "@prisma/client";
@@ -23,6 +25,7 @@ import {
   assertActiveExecution,
   assertFieldworkTransition,
 } from "@/modules/research/research-fieldwork";
+import { selectDeterministicBackcheckSample } from "@/modules/research/research-fieldwork-assurance";
 
 const value = (data: FormData, key: string, max = 500) =>
   String(data.get(key) ?? "")
@@ -36,7 +39,83 @@ const fail = (error: unknown): FormActionState => ({
 const refresh = (projectId: string) => {
   revalidatePath("/research", "layout");
   revalidatePath(`/research/projects/${projectId}/sampling-design`);
+  revalidatePath(`/research/projects/${projectId}/fieldwork`);
 };
+
+export async function selectResearchBackcheckSample(
+  _state: FormActionState,
+  data: FormData,
+): Promise<FormActionState> {
+  await requirePermission(PermissionKey.MANAGE_RESEARCH_DATASETS);
+  const { organizationId, user } = await getCurrentUserTenant();
+  try {
+    const executionId = value(data, "executionId", 100);
+    const percentage = Number(value(data, "percentage", 3));
+    const dueAt = new Date(value(data, "dueAt", 40));
+    if (!Number.isInteger(percentage) || percentage < 1 || percentage > 100)
+      throw new Error("Back-check percentage must be between 1 and 100.");
+    if (Number.isNaN(dueAt.valueOf()) || dueAt <= new Date())
+      throw new Error("A future back-check due date is required.");
+    const execution = await prisma.researchSamplingExecution.findFirst({
+      where: { id: executionId, organizationId, status: { in: [ResearchSamplingExecutionStatus.ACTIVE, ResearchSamplingExecutionStatus.CLOSED] } },
+      include: { units: { where: { fieldworkResponse: { isNot: null } }, include: { fieldworkResponse: true } } },
+    });
+    if (!execution) throw new Error("An active or closed tenant sampling execution is required.");
+    const responses = execution.units.flatMap((unit) => unit.fieldworkResponse ? [unit.fieldworkResponse] : []);
+    if (responses.some((response) => response.backcheckRequired))
+      throw new Error("A governed back-check sample has already been established for this execution.");
+    const available = responses;
+    if (!available.length) throw new Error("No unselected fieldwork responses are available.");
+    const selected = selectDeterministicBackcheckSample(available, percentage, `${execution.id}:${execution.version}`);
+    await prisma.$transaction([
+      prisma.researchFieldworkResponse.updateMany({
+        where: { organizationId, id: { in: selected.map((item) => item.id) }, backcheckRequired: false },
+        data: { backcheckRequired: true, backcheckSelectedAt: new Date(), backcheckDueAt: dueAt, backcheckStatus: ResearchFieldworkBackcheckStatus.PENDING },
+      }),
+      prisma.activityLog.create({
+        data: { organizationId, userId: user.id, action: ActivityAction.CREATE, entityType: "ResearchFieldworkBackcheckSample", entityId: execution.id, title: "Fieldwork back-check sample selected", description: `${selected.length} of ${available.length} available responses selected`, metadata: { projectId: execution.projectId, percentage, dueAt: dueAt.toISOString(), responseIds: selected.map((item) => item.id) } },
+      }),
+    ]);
+    refresh(execution.projectId);
+    return { status: "SUCCESS", message: `${selected.length} response${selected.length === 1 ? "" : "s"} selected for back-check.` };
+  } catch (error) { return fail(error); }
+}
+
+export async function reviewResearchFieldworkBackcheck(
+  _state: FormActionState,
+  data: FormData,
+): Promise<FormActionState> {
+  await requirePermission(PermissionKey.MANAGE_RESEARCH_DATASETS);
+  const { organizationId, user } = await getCurrentUserTenant();
+  try {
+    const responseId = value(data, "responseId", 100);
+    const status = value(data, "status", 40) as ResearchFieldworkBackcheckStatus;
+    const notes = value(data, "notes", 2000);
+    const allowed = new Set<ResearchFieldworkBackcheckStatus>([ResearchFieldworkBackcheckStatus.APPROVED, ResearchFieldworkBackcheckStatus.REJECTED, ResearchFieldworkBackcheckStatus.RECONTACT_REQUIRED]);
+    if (!allowed.has(status))
+      throw new Error("Select a valid back-check decision.");
+    if (notes.length < 10) throw new Error("Enter at least 10 characters of verification evidence.");
+    const response = await prisma.researchFieldworkResponse.findFirst({
+      where: { id: responseId, organizationId, backcheckRequired: true },
+      include: { sampleUnit: { include: { execution: true } } },
+    });
+    if (!response) throw new Error("Selected tenant fieldwork response not found.");
+    if (response.enumeratorId === user.id) throw new Error("Enumerators cannot back-check their own interviews.");
+    if (response.backcheckStatus === ResearchFieldworkBackcheckStatus.APPROVED || response.backcheckStatus === ResearchFieldworkBackcheckStatus.REJECTED)
+      throw new Error("This back-check has already received a final decision.");
+    await prisma.$transaction([
+      prisma.researchFieldworkResponse.update({
+        where: { id: response.id },
+        data: { backcheckStatus: status, backcheckedById: user.id, backcheckedAt: new Date(), backcheckNotes: notes, disposition: status === ResearchFieldworkBackcheckStatus.REJECTED ? ResearchResponseDisposition.FLAGGED : response.disposition },
+      }),
+      prisma.activityLog.create({
+        data: { organizationId, userId: user.id, action: ActivityAction.UPDATE, entityType: "ResearchFieldworkResponse", entityId: response.id, title: "Fieldwork back-check reviewed", description: status, metadata: { projectId: response.sampleUnit.execution.projectId, sampleUnitId: response.sampleUnitId, notes } },
+      }),
+    ]);
+    refresh(response.sampleUnit.execution.projectId);
+    return { status: "SUCCESS", message: "Back-check decision recorded." };
+  } catch (error) { return fail(error); }
+}
 
 export async function activateSamplingFieldwork(
   _state: FormActionState,

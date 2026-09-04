@@ -13,6 +13,8 @@ import {
   assignResearchSampleUnit,
   closeSamplingFieldwork,
   recordResearchFieldworkDisposition,
+  reviewResearchFieldworkBackcheck,
+  selectResearchBackcheckSample,
 } from "@/features/research/sampling-fieldwork-actions";
 import { useRefreshOnSuccess } from "@/features/research/use-refresh-on-success";
 
@@ -30,6 +32,35 @@ function Feedback({ state }: { state: FormActionState }) {
       {state.message}
     </p>
   ) : null;
+}
+
+export function BackcheckSampleForm({ executionId }: { executionId: string }) {
+  const [state, action, pending] = useActionState(selectResearchBackcheckSample, initialFormActionState);
+  return <form action={action} className="mt-4 grid gap-3 sm:grid-cols-[120px_180px_auto]">
+    <input type="hidden" name="executionId" value={executionId} />
+    <label className="text-xs text-slate-400">Sample %<input name="percentage" type="number" min="1" max="100" defaultValue="10" required className={`${field} mt-1 w-full`} /></label>
+    <label className="text-xs text-slate-400">Due date<input name="dueAt" type="date" required className={`${field} mt-1 w-full`} /></label>
+    <div className="self-end"><button disabled={pending} className={button}>{pending ? "Selecting…" : "Select governed sample"}</button></div>
+    <div className="sm:col-span-3"><Feedback state={state} /></div>
+  </form>;
+}
+
+export function BackcheckReviewForm({ responseId }: { responseId: string }) {
+  const [state, action, pending] = useActionState(reviewResearchFieldworkBackcheck, initialFormActionState);
+  return <form action={action} className="min-w-[520px]">
+    <input type="hidden" name="responseId" value={responseId} />
+    <div className="flex gap-2">
+      <select name="status" required defaultValue="" className={field}>
+        <option value="" disabled>Decision</option>
+        <option value="APPROVED">Verified</option>
+        <option value="RECONTACT_REQUIRED">Recontact required</option>
+        <option value="REJECTED">Rejected / flag response</option>
+      </select>
+      <input name="notes" minLength={10} maxLength={2000} required placeholder="Verification evidence" className={`${field} flex-1`} />
+      <button disabled={pending} className={button}>{pending ? "Saving…" : "Record review"}</button>
+    </div>
+    <Feedback state={state} />
+  </form>;
 }
 
 function ExecutionAction({

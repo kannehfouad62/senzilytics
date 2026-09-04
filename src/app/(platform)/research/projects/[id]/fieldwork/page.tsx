@@ -3,10 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ResearchFieldworkCharts } from "@/features/research/research-fieldwork-charts";
-import { requirePermission } from "@/lib/permissions";
+import { BackcheckReviewForm, BackcheckSampleForm } from "@/features/research/sampling-fieldwork-forms";
+import { getCurrentUserPermissions, requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { buildFieldworkAnalytics } from "@/modules/research/research-fieldwork-analytics";
+import { summarizeFieldworkAssurance } from "@/modules/research/research-fieldwork-assurance";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +18,10 @@ export default async function ResearchFieldworkDashboard({
   params: Promise<{ id: string }>;
 }) {
   await requirePermission(PermissionKey.VIEW_RESEARCH);
-  const [{ id }, { organizationId }] = await Promise.all([
+  const [{ id }, { organizationId, user }, permissions] = await Promise.all([
     params,
     getCurrentUserTenant(),
+    getCurrentUserPermissions(),
   ]);
   const project = await prisma.researchProject.findFirst({
     where: { id, organizationId },
@@ -40,7 +43,7 @@ export default async function ResearchFieldworkDashboard({
         include: {
           samplingDesign: true,
           samplingFrame: true,
-          units: { include: { assignedTo: { select: { name: true } } } },
+          units: { include: { assignedTo: { select: { name: true } }, fieldworkResponse: { include: { enumerator: { select: { name: true } }, backcheckedBy: { select: { name: true } }, collection: { select: { name: true } } } } } },
         },
       },
     },
@@ -49,6 +52,9 @@ export default async function ResearchFieldworkDashboard({
   const execution = project.samplingExecutions[0];
   if (!execution) return <Empty project={project} />;
   const analytics = buildFieldworkAnalytics(execution.units);
+  const responses = execution.units.flatMap((unit) => unit.fieldworkResponse ? [unit.fieldworkResponse] : []);
+  const assurance = summarizeFieldworkAssurance(responses);
+  const canManage = permissions.includes(PermissionKey.MANAGE_RESEARCH_DATASETS);
   return (
     <div>
       <Link href={`/research/projects/${id}`} className="text-sm text-cyan-300">
@@ -114,6 +120,27 @@ export default async function ResearchFieldworkDashboard({
         strata={analytics.strata}
         clusters={analytics.clusters}
       />
+      <section className="mt-6 rounded-3xl border border-cyan-400/15 bg-cyan-400/[.035] p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div><p className="text-sm text-cyan-300">Independent quality control</p><h2 className="mt-1 text-xl font-semibold">Fieldwork assurance</h2><p className="mt-2 max-w-3xl text-sm text-slate-400">Select a deterministic percentage of synchronized interviews for independent verification. Enumerators cannot review their own work, and every decision retains evidence and audit lineage.</p></div>
+          <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">Reviewer: {user.name}</span>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Responses" value={assurance.total} />
+          <Metric label="Selected" value={assurance.selected} />
+          <Metric label="Pending / recontact" value={assurance.pending} alert={assurance.overdue > 0} />
+          <Metric label="Verified" value={assurance.approved} />
+          <Metric label="Rejected" value={assurance.rejected} alert={assurance.rejected > 0} />
+          <Metric label="High-risk signals" value={assurance.highRisk} alert={assurance.highRisk > 0} />
+          <Metric label="Overdue reviews" value={assurance.overdue} alert={assurance.overdue > 0} />
+          <Metric label="GPS captured" value={`${assurance.locationCaptured}/${assurance.total}`} />
+        </div>
+        {canManage && assurance.total ? <BackcheckSampleForm executionId={execution.id} /> : null}
+      </section>
+      <section className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/[.035]">
+        <div className="border-b border-white/10 p-6"><h2 className="text-xl font-semibold">Interview integrity register</h2><p className="mt-1 text-sm text-slate-400">Operational signals support review prioritization; they do not automatically invalidate a response.</p></div>
+        <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-white/[.03] text-xs text-slate-400"><tr><th className="px-4 py-3">Unit / enumerator</th><th className="px-4 py-3">Interview</th><th className="px-4 py-3">Integrity</th><th className="px-4 py-3">Back-check</th>{canManage ? <th className="px-4 py-3">Review</th> : null}</tr></thead><tbody className="divide-y divide-white/10">{assurance.assessed.map(({ response, integrity }) => <tr key={response.id} className="align-top"><td className="px-4 py-4"><p className="font-medium">{execution.units.find((unit) => unit.fieldworkResponse?.id === response.id)?.unitReference}</p><p className="text-xs text-slate-500">{response.enumerator.name} · {response.collection.name}</p></td><td className="px-4 py-4"><p>{integrity.durationMinutes.toFixed(1)} min</p><p className="text-xs text-slate-500">Sync delay {integrity.syncDelayHours.toFixed(1)}h</p></td><td className="px-4 py-4"><span className={`rounded-full px-2 py-1 text-xs ${integrity.risk === "HIGH" ? "bg-red-400/10 text-red-200" : integrity.risk === "MEDIUM" ? "bg-amber-400/10 text-amber-200" : "bg-emerald-400/10 text-emerald-200"}`}>{integrity.risk}</span><p className="mt-2 max-w-xs text-xs text-slate-500">{integrity.signals.length ? integrity.signals.map((item) => item.replaceAll("_", " ")).join(" · ") : "No automated signals"}</p></td><td className="px-4 py-4"><p>{response.backcheckRequired ? response.backcheckStatus.replaceAll("_", " ") : "NOT SELECTED"}</p><p className="text-xs text-slate-500">{response.backcheckedBy?.name ?? (response.backcheckDueAt ? `Due ${response.backcheckDueAt.toLocaleDateString("en-US")}` : "—")}</p></td>{canManage ? <td className="px-4 py-4">{response.backcheckRequired && (response.backcheckStatus === "PENDING" || response.backcheckStatus === "RECONTACT_REQUIRED") && response.enumeratorId !== user.id ? <BackcheckReviewForm responseId={response.id} /> : <span className="text-xs text-slate-500">{response.enumeratorId === user.id && response.backcheckRequired ? "Independent reviewer required" : "No action"}</span>}</td> : null}</tr>)}</tbody></table></div>
+      </section>
       <section className="mt-6 rounded-3xl border border-white/10 bg-white/[.035] p-6">
         <h2 className="text-xl font-semibold">Governance and interpretation</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
