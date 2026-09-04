@@ -3,23 +3,15 @@ import { processWorkflowSlaNotifications } from "@/core/workflow/workflow-sla.se
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { processIntegrationWebhookDeliveries } from "@/modules/integrations/webhook-delivery.service";
 import { processMobilePushDeliveries } from "@/modules/mobile/mobile-push.service";
-import {
-  NextRequest,
-  NextResponse,
-} from "next/server";
+import { processResearchFieldworkSla } from "@/modules/research/research-fieldwork-sla.service";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function GET(
-  request: NextRequest
-) {
-  if (
-    !isAuthorizedCronRequest(
-      request.headers.get("authorization")
-    )
-  ) {
+export async function GET(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request.headers.get("authorization"))) {
     if (!process.env.CRON_SECRET?.trim()) {
       console.error("CRON_SECRET is missing.");
     }
@@ -31,12 +23,11 @@ export async function GET(
       },
       {
         status: 401,
-      }
+      },
     );
   }
 
-  const processedAt =
-    new Date().toISOString();
+  const processedAt = new Date().toISOString();
 
   try {
     const [
@@ -44,33 +35,33 @@ export async function GET(
       mocResult,
       integrationResult,
       mobilePushResult,
+      researchFieldworkResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
       processMocSlaNotifications(),
       processIntegrationWebhookDeliveries(),
       processMobilePushDeliveries(),
+      processResearchFieldworkSla(),
     ]);
 
     return NextResponse.json({
       success: true,
       processedAt,
 
-      workflow:
-        workflowResult,
+      workflow: workflowResult,
 
-      moc:
-        mocResult,
+      moc: mocResult,
 
-      integrations:
-        integrationResult,
+      integrations: integrationResult,
 
-      mobilePush:
-        mobilePushResult,
+      mobilePush: mobilePushResult,
+
+      researchFieldwork: researchFieldworkResult,
     });
   } catch (error) {
     console.error(
       "Workflow, MOC, integration, or mobile-push processing failed:",
-      error
+      error,
     );
 
     return NextResponse.json(
@@ -85,7 +76,7 @@ export async function GET(
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }

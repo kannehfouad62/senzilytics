@@ -2520,6 +2520,7 @@ model User {
   createdResearchSamplingFrames       ResearchSamplingFrame[]           @relation("ResearchSamplingFrameCreator")
   generatedResearchSamples            ResearchSamplingExecution[]       @relation("ResearchSamplingExecutionGenerator")
   approvedResearchSamplingExecutions  ResearchSamplingExecution[]       @relation("ResearchSamplingExecutionApprover")
+  assignedResearchSampleUnits         ResearchSampleUnit[]               @relation("ResearchSampleUnitAssignee")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8638,14 +8639,30 @@ model ResearchSampleUnit {
   baseWeight           Float?
   isReserve            Boolean                  @default(false)
   status               ResearchSampleUnitStatus @default(SELECTED)
+  assignedToId         String?
+  assignedAt           DateTime?
+  dueAt                DateTime?
+  lastContactedAt      DateTime?
+  completedAt          DateTime?
+  contactAttempts      Int                      @default(0)
+  dispositionNote      String?
+  replacementForId     String?
+  escalationLevel      Int                      @default(0)
+  lastEscalatedAt      DateTime?
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
 
-  execution ResearchSamplingExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  execution     ResearchSamplingExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  assignedTo    User?                     @relation("ResearchSampleUnitAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  replacementFor ResearchSampleUnit?       @relation("ResearchSampleUnitReplacement", fields: [replacementForId], references: [id], onDelete: SetNull)
+  replacedBy     ResearchSampleUnit[]       @relation("ResearchSampleUnitReplacement")
 
   @@unique([executionId, unitReference])
   @@unique([executionId, selectionOrder])
   @@index([executionId, status, isReserve])
   @@index([executionId, stratum])
   @@index([executionId, cluster])
+  @@index([assignedToId, status, dueAt])
+  @@index([executionId, dueAt, escalationLevel])
+  @@index([replacementForId])
 }

@@ -1,5 +1,6 @@
 import {
   PermissionKey,
+  ResearchSampleUnitStatus,
   ResearchSamplingDesignStatus,
   ResearchSamplingExecutionStatus,
 } from "@prisma/client";
@@ -15,12 +16,37 @@ import {
   SamplingExecutionStatusControl,
 } from "@/features/research/sampling-execution-forms";
 import {
+  ActivateFieldworkControl,
+  CloseFieldworkControl,
+  ReserveReplacementControl,
+  SampleUnitAssignmentForm,
+  SampleUnitDispositionForm,
+} from "@/features/research/sampling-fieldwork-forms";
+import {
   getCurrentUserPermissions,
   requirePermission,
 } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
+import { summarizeFieldworkCounts } from "@/modules/research/research-fieldwork";
 export const dynamic = "force-dynamic";
+const operationalExecutions = new Set<ResearchSamplingExecutionStatus>([
+  ResearchSamplingExecutionStatus.ACTIVE,
+  ResearchSamplingExecutionStatus.CLOSED,
+]);
+const assignableUnits = new Set<ResearchSampleUnitStatus>([
+  ResearchSampleUnitStatus.SELECTED,
+]);
+const activeUnits = new Set<ResearchSampleUnitStatus>([
+  ResearchSampleUnitStatus.ASSIGNED,
+  ResearchSampleUnitStatus.CONTACTED,
+  ResearchSampleUnitStatus.PARTIAL,
+]);
+const replaceableUnits = new Set<ResearchSampleUnitStatus>([
+  ResearchSampleUnitStatus.INELIGIBLE,
+  ResearchSampleUnitStatus.REFUSED,
+  ResearchSampleUnitStatus.WITHDRAWN,
+]);
 export default async function SamplingDesignPage({
   params,
 }: {
@@ -32,41 +58,64 @@ export default async function SamplingDesignPage({
       getCurrentUserTenant(),
       getCurrentUserPermissions(),
     ]),
-    project = await prisma.researchProject.findFirst({
-      where: { id, organizationId },
-      include: {
-        samplingDesigns: {
-          include: {
-            createdBy: { select: { name: true } },
-            approvedBy: { select: { name: true } },
+    [project, researchers] = await Promise.all([
+      prisma.researchProject.findFirst({
+        where: { id, organizationId },
+        include: {
+          samplingDesigns: {
+            include: {
+              createdBy: { select: { name: true } },
+              approvedBy: { select: { name: true } },
+            },
+            orderBy: { version: "desc" },
           },
-          orderBy: { version: "desc" },
-        },
-        samplingFrames: {
-          include: {
-            samplingDesign: true,
-            createdBy: { select: { name: true } },
+          samplingFrames: {
+            include: {
+              samplingDesign: true,
+              createdBy: { select: { name: true } },
+            },
+            orderBy: { createdAt: "desc" },
           },
-          orderBy: { createdAt: "desc" },
-        },
-        samplingExecutions: {
-          include: {
-            samplingDesign: true,
-            samplingFrame: true,
-            generatedBy: { select: { name: true } },
-            approvedBy: { select: { name: true } },
-            _count: { select: { units: true } },
-            units: { orderBy: { selectionOrder: "asc" }, take: 20 },
+          samplingExecutions: {
+            include: {
+              samplingDesign: true,
+              samplingFrame: true,
+              generatedBy: { select: { name: true } },
+              approvedBy: { select: { name: true } },
+              _count: { select: { units: true } },
+              units: {
+                include: { assignedTo: { select: { name: true } } },
+                orderBy: { selectionOrder: "asc" },
+                take: 100,
+              },
+            },
+            orderBy: { generatedAt: "desc" },
           },
-          orderBy: { generatedAt: "desc" },
         },
-      },
-    });
+      }),
+      prisma.user.findMany({
+        where: { organizationId, isActive: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+    ]);
   if (!project) notFound();
+  const fieldworkGroups = project.samplingExecutions.length
+    ? await prisma.researchSampleUnit.groupBy({
+        by: ["executionId", "status", "isReserve"],
+        where: {
+          executionId: {
+            in: project.samplingExecutions.map((item) => item.id),
+          },
+        },
+        _count: { _all: true },
+      })
+    : [];
   const canManage = permissions.includes(
       PermissionKey.MANAGE_RESEARCH_PROJECTS,
     ),
-    canApprove = permissions.includes(PermissionKey.APPROVE_RESEARCH_OUTPUTS);
+    canApprove = permissions.includes(PermissionKey.APPROVE_RESEARCH_OUTPUTS),
+    canCollect = permissions.includes(PermissionKey.COLLECT_RESEARCH_DATA);
   return (
     <div>
       <Link href={`/research/projects/${id}`} className="text-sm text-cyan-300">
@@ -317,11 +366,18 @@ export default async function SamplingDesignPage({
                 {execution.status ===
                   ResearchSamplingExecutionStatus.APPROVED &&
                   canManage && (
-                    <SamplingExecutionStatusControl
-                      executionId={execution.id}
-                      target={ResearchSamplingExecutionStatus.ARCHIVED}
-                      label="Archive selection"
-                    />
+                    <>
+                      <ActivateFieldworkControl executionId={execution.id} />
+                      <SamplingExecutionStatusControl
+                        executionId={execution.id}
+                        target={ResearchSamplingExecutionStatus.ARCHIVED}
+                        label="Archive selection"
+                      />
+                    </>
+                  )}
+                {execution.status === ResearchSamplingExecutionStatus.ACTIVE &&
+                  canManage && (
+                    <CloseFieldworkControl executionId={execution.id} />
                   )}
               </div>
               {execution.approvedBy && (
@@ -329,6 +385,32 @@ export default async function SamplingDesignPage({
                   Approved independently by {execution.approvedBy.name}
                 </p>
               )}
+              {operationalExecutions.has(execution.status) &&
+                (() => {
+                  const summary = summarizeFieldworkCounts(
+                    fieldworkGroups
+                      .filter((group) => group.executionId === execution.id)
+                      .map((group) => ({
+                        status: group.status,
+                        isReserve: group.isReserve,
+                        count: group._count._all,
+                      })),
+                  );
+                  return (
+                    <div className="mt-5 grid gap-3 sm:grid-cols-4">
+                      <Metric label="Primary units" value={summary.primary} />
+                      <Metric
+                        label="Assigned"
+                        value={`${summary.assignmentRate.toFixed(1)}%`}
+                      />
+                      <Metric label="Completed" value={summary.completed} />
+                      <Metric
+                        label="Response rate"
+                        value={`${summary.responseRate.toFixed(1)}%`}
+                      />
+                    </div>
+                  );
+                })()}
               <div className="mt-5 overflow-x-auto">
                 <table className="w-full min-w-[680px] text-left text-xs">
                   <thead className="text-slate-500">
@@ -340,6 +422,8 @@ export default async function SamplingDesignPage({
                       <th className="pb-2">Probability</th>
                       <th className="pb-2">Weight</th>
                       <th className="pb-2">Role</th>
+                      <th className="pb-2">Status / owner</th>
+                      <th className="pb-2">Fieldwork action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -355,6 +439,41 @@ export default async function SamplingDesignPage({
                         </td>
                         <td>{unit.baseWeight?.toFixed(4) ?? "—"}</td>
                         <td>{unit.isReserve ? "Reserve" : "Primary"}</td>
+                        <td>
+                          <span>{unit.status.replaceAll("_", " ")}</span>
+                          <br />
+                          <span className="text-slate-500">
+                            {unit.assignedTo?.name ?? "Unassigned"}
+                            {unit.dueAt
+                              ? ` · ${unit.dueAt.toLocaleDateString()}`
+                              : ""}
+                          </span>
+                        </td>
+                        <td className="py-2">
+                          {execution.status ===
+                            ResearchSamplingExecutionStatus.ACTIVE &&
+                            canManage &&
+                            assignableUnits.has(unit.status) && (
+                              <SampleUnitAssignmentForm
+                                unitId={unit.id}
+                                researchers={researchers}
+                              />
+                            )}
+                          {execution.status ===
+                            ResearchSamplingExecutionStatus.ACTIVE &&
+                            canCollect &&
+                            unit.assignedToId === user.id &&
+                            activeUnits.has(unit.status) && (
+                              <SampleUnitDispositionForm unitId={unit.id} />
+                            )}
+                          {execution.status ===
+                            ResearchSamplingExecutionStatus.ACTIVE &&
+                            canManage &&
+                            !unit.isReserve &&
+                            replaceableUnits.has(unit.status) && (
+                              <ReserveReplacementControl unitId={unit.id} />
+                            )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
