@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { buildFieldworkAnalytics } from "@/modules/research/research-fieldwork-analytics";
+import { buildInterviewerQuality } from "@/modules/research/research-fieldwork-assurance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export async function GET(
         include: {
           assignedTo: { select: { name: true } },
           replacementFor: { select: { unitReference: true } },
+          fieldworkResponse: { include: { enumerator: { select: { name: true } } } },
         },
         orderBy: { selectionOrder: "asc" },
       },
@@ -39,6 +41,7 @@ export async function GET(
     return new Response("Sampling execution not found.", { status: 404 });
   const analytics = buildFieldworkAnalytics(execution.units),
     workbook = new ExcelJS.Workbook();
+  const interviewerQuality = buildInterviewerQuality(execution.units.flatMap((unit) => unit.fieldworkResponse ? [unit.fieldworkResponse] : []));
   const summary = workbook.addWorksheet("Fieldwork Summary");
   summary.addRows(
     [
@@ -63,6 +66,9 @@ export async function GET(
   addGrouped(workbook, "Strata Performance", analytics.strata);
   addGrouped(workbook, "Cluster Performance", analytics.clusters);
   addGrouped(workbook, "Dispositions", analytics.dispositions);
+  const quality = workbook.addWorksheet("Interviewer Quality");
+  quality.addRow(["Enumerator", "Interviews", "Median duration (minutes)", "Average sync delay (hours)", "Location coverage (%)", "Back-checks selected", "Back-checks verified", "Back-checks rejected", "Responses with review indicators"]);
+  interviewerQuality.forEach((item) => quality.addRow([safe(item.name), item.interviews, item.medianDurationMinutes, item.averageSyncDelayHours, item.locationCoverage, item.backchecksSelected, item.backchecksVerified, item.backchecksRejected, item.reviewPriority]));
   const register = workbook.addWorksheet("Fieldwork Register");
   register.addRow([
     "Order",

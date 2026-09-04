@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { buildFieldworkAnalytics } from "@/modules/research/research-fieldwork-analytics";
+import { buildInterviewerQuality } from "@/modules/research/research-fieldwork-assurance";
 import {
   chartElements,
   createResearchPresentation,
@@ -30,12 +31,13 @@ export async function GET(
       samplingFrame: true,
       generatedBy: { select: { name: true } },
       approvedBy: { select: { name: true } },
-      units: { include: { assignedTo: { select: { name: true } } } },
+      units: { include: { assignedTo: { select: { name: true } }, fieldworkResponse: { include: { enumerator: { select: { name: true } } } } } },
     },
   });
   if (!execution)
     return new Response("Sampling execution not found.", { status: 404 });
   const analytics = buildFieldworkAnalytics(execution.units);
+  const interviewerQuality = buildInterviewerQuality(execution.units.flatMap((unit) => unit.fieldworkResponse ? [unit.fieldworkResponse] : []));
   const slides: SlideElement[][] = [
     [
       item(
@@ -94,6 +96,11 @@ export async function GET(
     [
       item(0.7, 0.5, 11, 0.5, "Strata Completion Rates", 26, true),
       ...chartElements(analytics.strata),
+    ],
+    [
+      item(0.7, 0.5, 11, 0.5, "Interviewer Quality Review Indicators", 26, true),
+      item(0.7, 1.05, 11, 0.35, "Transparent response-level indicators for human review; not automated performance scores.", 11, false, "94A3B8"),
+      ...chartElements(interviewerQuality.map((entry) => ({ name: entry.name, value: entry.reviewPriority }))),
     ],
     [
       item(0.7, 0.5, 11, 0.5, "Governance Record", 26, true),

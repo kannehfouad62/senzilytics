@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { detectFieldworkLocationClusters, fieldworkIntegritySignals, selectDeterministicBackcheckSample, summarizeFieldworkAssurance } from "../src/modules/research/research-fieldwork-assurance";
+import { buildInterviewerQuality, detectFieldworkLocationClusters, fieldworkIntegritySignals, selectDeterministicBackcheckSample, summarizeFieldworkAssurance } from "../src/modules/research/research-fieldwork-assurance";
 
 const response = {
   id: "response-1", enumeratorId: "enumerator-1",
@@ -37,8 +37,17 @@ test("location proximity signals are deterministic and remain review indicators"
   assert.equal(result.pairs[0].sameEnumerator, true);
 });
 
+test("interviewer quality aggregates transparent response indicators", () => {
+  const rows = [{ ...response, enumerator: { name: "Enumerator One" } }, { ...response, id: "response-2", capturedAt: new Date("2026-09-01T10:09:00Z"), synchronizedAt: new Date("2026-09-01T11:09:00Z"), backcheckRequired: false, enumerator: { name: "Enumerator One" } }];
+  const [quality] = buildInterviewerQuality(rows, new Date("2026-09-04T00:00:00Z"));
+  assert.equal(quality.interviews, 2);
+  assert.equal(quality.medianDurationMinutes, 5);
+  assert.equal(quality.backchecksSelected, 1);
+  assert.equal(quality.reviewPriority, 2);
+});
+
 test("fieldwork assurance actions remain tenant scoped and independently reviewed", async () => {
-  const [actions, schema, migration, page, collectionActions, sync, sla, slaMigration] = await Promise.all([
+  const [actions, schema, migration, page, collectionActions, sync, sla, slaMigration, workbook, presentation] = await Promise.all([
     readFile(new URL("../src/features/research/sampling-fieldwork-actions.ts", import.meta.url), "utf8"),
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
     readFile(new URL("../prisma/migrations/20260908170000_research_fieldwork_assurance/migration.sql", import.meta.url), "utf8"),
@@ -47,6 +56,8 @@ test("fieldwork assurance actions remain tenant scoped and independently reviewe
     readFile(new URL("../src/modules/mobile/offline-sync.service.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/modules/research/research-fieldwork-sla.service.ts", import.meta.url), "utf8"),
     readFile(new URL("../prisma/migrations/20260909200000_research_backcheck_sla/migration.sql", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/research/sampling-executions/[executionId]/fieldwork-workbook/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/research/sampling-executions/[executionId]/fieldwork-presentation/route.ts", import.meta.url), "utf8"),
   ]);
   assert.match(actions, /requirePermission\(PermissionKey\.MANAGE_RESEARCH_DATASETS\)/);
   assert.match(actions, /organizationId/);
@@ -66,4 +77,7 @@ test("fieldwork assurance actions remain tenant scoped and independently reviewe
   assert.match(sla, /Research back-check seriously overdue/);
   assert.match(sla, /projectManager/);
   assert.match(slaMigration, /backcheckEscalationLevel/);
+  assert.match(page, /Interviewer monitoring/);
+  assert.match(workbook, /Interviewer Quality/);
+  assert.match(presentation, /not automated performance scores/);
 });

@@ -71,3 +71,27 @@ function haversineMetres(latitudeA: number, longitudeA: number, latitudeB: numbe
   const value = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(radians(latitudeA)) * Math.cos(radians(latitudeB)) * Math.sin(longitudeDelta / 2) ** 2;
   return 6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }
+
+export function buildInterviewerQuality<T extends FieldworkIntegrityResponse & { enumerator: { name: string } }>(responses: T[], now = new Date()) {
+  const groups = new Map<string, T[]>();
+  for (const response of responses) groups.set(response.enumeratorId, [...(groups.get(response.enumeratorId) ?? []), response]);
+  return [...groups.entries()].map(([enumeratorId, rows]) => {
+    const assessed = rows.map((response) => ({ response, integrity: fieldworkIntegritySignals(response, now) }));
+    const durations = assessed.map((item) => item.integrity.durationMinutes).sort((a, b) => a - b);
+    const middle = Math.floor(durations.length / 2);
+    const medianDurationMinutes = durations.length % 2 ? durations[middle] : (durations[middle - 1] + durations[middle]) / 2;
+    const selected = rows.filter((row) => row.backcheckRequired);
+    return {
+      enumeratorId,
+      name: rows[0].enumerator.name,
+      interviews: rows.length,
+      medianDurationMinutes: Number(medianDurationMinutes.toFixed(1)),
+      averageSyncDelayHours: Number((assessed.reduce((sum, item) => sum + item.integrity.syncDelayHours, 0) / rows.length).toFixed(1)),
+      locationCoverage: Number(((rows.filter((row) => row.latitude !== null && row.longitude !== null).length / rows.length) * 100).toFixed(1)),
+      backchecksSelected: selected.length,
+      backchecksVerified: selected.filter((row) => row.backcheckStatus === "APPROVED").length,
+      backchecksRejected: selected.filter((row) => row.backcheckStatus === "REJECTED").length,
+      reviewPriority: assessed.filter((item) => item.integrity.risk !== "LOW").length,
+    };
+  }).sort((a, b) => b.interviews - a.interviews || a.name.localeCompare(b.name));
+}
