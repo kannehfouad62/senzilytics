@@ -1,0 +1,7 @@
+import assert from "node:assert/strict";
+import{readFile}from"node:fs/promises";
+import test from"node:test";
+import{buildResearchQualityProfile}from"../src/modules/research/research-quality-profile";
+const variables=[{id:"a",key:"a",label:"A",type:"NUMBER",required:false},{id:"b",key:"b",label:"B",type:"TEXT",required:false}];
+test("research quality profiling detects missingness duplicates constants and outliers",()=>{const values=[1,2,3,4,100].map((a,index)=>({assignmentId:String(index),responseId:String(index),submittedAt:"2026-01-01",values:{a,b:index===0?null:"same"}})),rows=[...values,{...values[1]!,assignmentId:"duplicate",responseId:"duplicate"}],profile=buildResearchQualityProfile(rows,variables);assert.equal(profile.rowCount,6);assert.equal(profile.duplicateRows,1);assert.equal(profile.variables[1]?.missing,1);assert.equal(profile.variables[1]?.constant,true);assert.equal(profile.variables[0]?.outliers,1);assert.equal(profile.missingnessPairs.length,0);assert.ok(profile.readinessScore<100)});
+test("quality workbook remains permission protected tenant scoped and private",async()=>{const source=await readFile(new URL("../src/app/api/research/imports/versions/[versionId]/quality-workbook/route.ts",import.meta.url),"utf8");assert.match(source,/EXPORT_RESEARCH_OUTPUTS/);assert.match(source,/organizationId/);assert.match(source,/getImportedAnalysisDataset/);assert.match(source,/private, no-store/)});

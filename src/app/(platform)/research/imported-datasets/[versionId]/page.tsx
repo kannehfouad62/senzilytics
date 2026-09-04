@@ -4,12 +4,14 @@ import { notFound } from "next/navigation";
 import { AnalysisGovernanceControl } from "@/features/research/analysis-governance";
 import { ResearchAnalysisStudio } from "@/features/research/analysis-studio";
 import { ResearchModelingLab } from "@/features/research/research-modeling-lab";
+import { ResearchDataQualityWorkbench } from "@/features/research/research-data-quality-workbench";
 import {
   getCurrentUserPermissions,
   requirePermission,
 } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { getImportedAnalysisDataset } from "@/modules/research/imported-analysis-dataset.service";
+import { buildResearchQualityProfile } from "@/modules/research/research-quality-profile";
 
 export const dynamic = "force-dynamic";
 export default async function ImportedDatasetAnalysisPage({
@@ -29,6 +31,7 @@ export default async function ImportedDatasetAnalysisPage({
   const { version, variables, rows } = dataset,
     canManage = permissions.includes(PermissionKey.MANAGE_RESEARCH_DATASETS),
     canApprove = permissions.includes(PermissionKey.APPROVE_RESEARCH_OUTPUTS);
+  const qualityProfile=buildResearchQualityProfile(rows,variables);
   return (
     <div>
       <Link
@@ -50,6 +53,7 @@ export default async function ImportedDatasetAnalysisPage({
           {variables.length} variables
         </p>
       </div>
+      <ResearchDataQualityWorkbench profile={qualityProfile} versionId={version.id} canExport={permissions.includes(PermissionKey.EXPORT_RESEARCH_OUTPUTS)}/>
       <div className="mt-9">
         <ResearchAnalysisStudio
           variables={variables}
