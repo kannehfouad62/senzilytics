@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
   const [{ collectionId }, { organizationId }] = await Promise.all([params, getCurrentUserTenant()]);
   const dataset = await getResearchDataset(organizationId, collectionId);
   if (!dataset) return new Response("Dataset not found.", { status: 404 });
-  const { collection, variables, rows, analysisRows, qualityIssues } = dataset;
+  const { collection, variables, rows, analysisRows, responseRows, qualityIssues } = dataset;
   const url = new URL(request.url);
   const method = url.searchParams.get("mode") ?? "AUTO";
   const x = variables.find(item => item.key === url.searchParams.get("x")) ?? variables[0];
@@ -35,7 +35,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
   for (const variable of variables) dictionary.addRow([variable.key, variable.label, variable.type, variable.required ? "Yes" : "No"]);
   const quality = workbook.addWorksheet("Quality Review");
   quality.addRow(["Response code", "Disposition", "Automated signals", "Reviewer notes", "Reviewed by", "Reviewed at"]);
-  for (const assignment of collection.assignments) quality.addRow([assignment.id.slice(-8).toUpperCase(), assignment.disposition, (qualityIssues.get(assignment.id) ?? []).join(" | "), assignment.qualityNotes ?? "", assignment.reviewedBy?.name ?? "", assignment.reviewedAt?.toISOString() ?? ""]);
+  for (const item of responseRows) quality.addRow([item.response.id.slice(-8).toUpperCase(), item.response.disposition, (qualityIssues.get(item.response.id) ?? []).join(" | "), item.response.qualityNotes ?? "", item.response.reviewedBy?.name ?? "", item.response.reviewedAt?.toISOString() ?? ""]);
   const summary = workbook.addWorksheet("Statistics");
   summary.addRow(["Variable", "N", "Missing", "Unique", "Mean", "Median", "Std deviation", "Minimum", "Maximum"]);
   for (const variable of variables) { const stats = summarizeVariable(variable, analysisRows); summary.addRow([variable.label, stats.present, stats.missing, stats.unique, stats.mean, stats.median, stats.standardDeviation, stats.min, stats.max]); }

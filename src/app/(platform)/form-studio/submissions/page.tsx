@@ -59,8 +59,8 @@ export default async function FormSubmissionCenterPage({
           <h1 className="mt-2 text-4xl font-bold">Form Submission Center</h1>
           <p className="mt-2 max-w-3xl text-slate-400">
             Search organization-specific form records, inspect captured
-            responses and private attachments, and trace each submission back
-            to its operational source.
+            responses and private attachments, and trace each submission back to
+            its operational source.
           </p>
         </div>
         <a
@@ -207,8 +207,10 @@ export default async function FormSubmissionCenterPage({
                 {submission.definition.name}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                v{submission.version.version} · {submission.submittedBy.name} ·{" "}
-                {submission.submittedBy.email}
+                v{submission.version.version} ·{" "}
+                {submission.submittedBy?.name ?? "Public respondent"} ·{" "}
+                {submission.submittedBy?.email ??
+                  "External research collection"}
               </p>
             </div>
             <span className="text-sm text-cyan-200">

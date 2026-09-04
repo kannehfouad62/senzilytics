@@ -22,59 +22,61 @@ export async function getFormSubmissionRegister(input: {
   searchParams: FormSubmissionSearchParams;
 }) {
   const filters = parseFormSubmissionFilters(input.searchParams);
-  const filteredWhere = submissionWhere(
-    input.organizationId,
-    filters,
-    true,
-  );
+  const filteredWhere = submissionWhere(input.organizationId, filters, true);
   const statusWhere = submissionWhere(input.organizationId, filters, false);
 
-  const [submissions, total, submittedCount, draftCount, voidedCount, definitions] =
-    await prisma.$transaction([
-      prisma.configurableFormSubmission.findMany({
-        where: filteredWhere,
-        select: {
-          id: true,
-          entityType: true,
-          entityId: true,
-          status: true,
-          submittedAt: true,
-          definition: {
-            select: { id: true, name: true, isActive: true },
-          },
-          version: { select: { version: true } },
-          submittedBy: { select: { name: true, email: true } },
-          _count: { select: { answers: true, fileAnswers: true } },
+  const [
+    submissions,
+    total,
+    submittedCount,
+    draftCount,
+    voidedCount,
+    definitions,
+  ] = await prisma.$transaction([
+    prisma.configurableFormSubmission.findMany({
+      where: filteredWhere,
+      select: {
+        id: true,
+        entityType: true,
+        entityId: true,
+        status: true,
+        submittedAt: true,
+        definition: {
+          select: { id: true, name: true, isActive: true },
         },
-        orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
-        skip: (filters.page - 1) * PAGE_SIZE,
-        take: PAGE_SIZE,
-      }),
-      prisma.configurableFormSubmission.count({ where: filteredWhere }),
-      prisma.configurableFormSubmission.count({
-        where: {
-          ...statusWhere,
-          status: ConfigurableSubmissionStatus.SUBMITTED,
-        },
-      }),
-      prisma.configurableFormSubmission.count({
-        where: {
-          ...statusWhere,
-          status: ConfigurableSubmissionStatus.DRAFT,
-        },
-      }),
-      prisma.configurableFormSubmission.count({
-        where: {
-          ...statusWhere,
-          status: ConfigurableSubmissionStatus.VOIDED,
-        },
-      }),
-      prisma.configurableFormDefinition.findMany({
-        where: { organizationId: input.organizationId },
-        select: { id: true, name: true, module: true },
-        orderBy: [{ module: "asc" }, { name: "asc" }],
-      }),
-    ]);
+        version: { select: { version: true } },
+        submittedBy: { select: { name: true, email: true } },
+        _count: { select: { answers: true, fileAnswers: true } },
+      },
+      orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
+      skip: (filters.page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.configurableFormSubmission.count({ where: filteredWhere }),
+    prisma.configurableFormSubmission.count({
+      where: {
+        ...statusWhere,
+        status: ConfigurableSubmissionStatus.SUBMITTED,
+      },
+    }),
+    prisma.configurableFormSubmission.count({
+      where: {
+        ...statusWhere,
+        status: ConfigurableSubmissionStatus.DRAFT,
+      },
+    }),
+    prisma.configurableFormSubmission.count({
+      where: {
+        ...statusWhere,
+        status: ConfigurableSubmissionStatus.VOIDED,
+      },
+    }),
+    prisma.configurableFormDefinition.findMany({
+      where: { organizationId: input.organizationId },
+      select: { id: true, name: true, module: true },
+      orderBy: [{ module: "asc" }, { name: "asc" }],
+    }),
+  ]);
 
   const statusCounts: Record<ConfigurableSubmissionStatus, number> = {
     [ConfigurableSubmissionStatus.SUBMITTED]: submittedCount,
@@ -182,8 +184,8 @@ export async function exportFormSubmissionsCsv(input: {
       version: submission.version.version,
       status: submission.status,
       sourceEntityId: submission.entityId,
-      submittedBy: submission.submittedBy.name,
-      submittedByEmail: submission.submittedBy.email,
+      submittedBy: submission.submittedBy?.name ?? "Public respondent",
+      submittedByEmail: submission.submittedBy?.email ?? "",
       submittedAt: submission.submittedAt,
     };
     const answers: FormSubmissionCsvEntry[] = submission.answers.map(
@@ -273,10 +275,7 @@ async function resolveSubmissionSourceHref(input: {
   module: ConfigurableFormModule;
   entityId: string;
 }) {
-  const direct = formSubmissionDirectSourceHref(
-    input.module,
-    input.entityId,
-  );
+  const direct = formSubmissionDirectSourceHref(input.module, input.entityId);
   if (direct) return direct;
 
   if (input.module === ConfigurableFormModule.ASSET_SAFETY) {
@@ -287,7 +286,9 @@ async function resolveSubmissionSourceHref(input: {
       },
       select: { assetId: true },
     });
-    return inspection ? `/assets/${encodeURIComponent(inspection.assetId)}` : null;
+    return inspection
+      ? `/assets/${encodeURIComponent(inspection.assetId)}`
+      : null;
   }
 
   if (input.module === ConfigurableFormModule.SIF_ASSURANCE) {
@@ -300,6 +301,23 @@ async function resolveSubmissionSourceHref(input: {
     });
     return verification
       ? `/assurance/sif/controls/${encodeURIComponent(verification.controlId)}`
+      : null;
+  }
+
+  if (input.module === ConfigurableFormModule.RESEARCH) {
+    const [assignment, publicResponse] = await Promise.all([
+      prisma.researchQuestionnaireAssignment.findFirst({
+        where: { id: input.entityId, organizationId: input.organizationId },
+        select: { collectionId: true },
+      }),
+      prisma.researchPublicResponse.findFirst({
+        where: { id: input.entityId, organizationId: input.organizationId },
+        select: { collectionId: true },
+      }),
+    ]);
+    const collectionId = assignment?.collectionId ?? publicResponse?.collectionId;
+    return collectionId
+      ? `/research/datasets/${encodeURIComponent(collectionId)}`
       : null;
   }
 

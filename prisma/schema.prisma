@@ -321,6 +321,12 @@ enum ResearchCollectionStatus {
   CANCELLED
 }
 
+enum ResearchPublicLinkStatus {
+  ACTIVE
+  PAUSED
+  REVOKED
+}
+
 enum ResearchAssignmentStatus {
   ASSIGNED
   IN_PROGRESS
@@ -2128,12 +2134,14 @@ model Organization {
   researchQuestionnaires           ResearchQuestionnaire[]
   researchCollectionWaves          ResearchCollectionWave[]
   researchQuestionnaireAssignments ResearchQuestionnaireAssignment[]
-  researchAnalyses                  ResearchAnalysis[]
-  researchReports                   ResearchReport[]
-  researchImportedDatasets          ResearchImportedDataset[]
-  researchDataTransformations       ResearchDataTransformation[]
-  researchDatasetVersions           ResearchDatasetVersion[]
-  researchSamplingDesigns           ResearchSamplingDesign[]
+  researchAnalyses                 ResearchAnalysis[]
+  researchReports                  ResearchReport[]
+  researchImportedDatasets         ResearchImportedDataset[]
+  researchDataTransformations      ResearchDataTransformation[]
+  researchDatasetVersions          ResearchDatasetVersion[]
+  researchSamplingDesigns          ResearchSamplingDesign[]
+  researchPublicSurveyLinks        ResearchPublicSurveyLink[]
+  researchPublicResponses          ResearchPublicResponse[]
 }
 
 model PricingInquiry {
@@ -2458,24 +2466,26 @@ model User {
   createdResearchCollectionWaves      ResearchCollectionWave[]          @relation("ResearchCollectionCreatedBy")
   assignedResearchQuestionnaires      ResearchQuestionnaireAssignment[] @relation("ResearchAssignmentRespondent")
   issuedResearchAssignments           ResearchQuestionnaireAssignment[] @relation("ResearchAssignmentAssignedBy")
-  ownedResearchDatasets               ResearchCollectionWave[]           @relation("ResearchDatasetOwner")
-  lockedResearchDatasets              ResearchCollectionWave[]           @relation("ResearchDatasetLockedBy")
-  approvedResearchDatasets            ResearchCollectionWave[]           @relation("ResearchDatasetApprovedBy")
-  reviewedResearchResponses           ResearchQuestionnaireAssignment[]  @relation("ResearchResponseReviewedBy")
-  authoredResearchAnalyses            ResearchAnalysis[]                  @relation("ResearchAnalysisAnalyst")
-  reviewedResearchAnalyses            ResearchAnalysis[]                  @relation("ResearchAnalysisReviewer")
-  approvedResearchAnalyses            ResearchAnalysis[]                  @relation("ResearchAnalysisApprover")
-  authoredResearchReports              ResearchReport[]                    @relation("ResearchReportAuthor")
-  reviewedResearchReports              ResearchReport[]                    @relation("ResearchReportReviewer")
-  approvedResearchReports              ResearchReport[]                    @relation("ResearchReportApprover")
-  publishedResearchReports             ResearchReport[]                    @relation("ResearchReportPublisher")
-  importedResearchDatasets              ResearchImportedDataset[]            @relation("ResearchDatasetImporter")
-  createdResearchTransformations         ResearchDataTransformation[]          @relation("ResearchTransformationCreator")
-  createdResearchDatasetVersions          ResearchDatasetVersion[]              @relation("ResearchDatasetVersionCreator")
-  reviewedResearchDatasetVersions         ResearchDatasetVersion[]              @relation("ResearchDatasetVersionReviewer")
-  approvedResearchDatasetVersions         ResearchDatasetVersion[]              @relation("ResearchDatasetVersionApprover")
-  createdResearchSamplingDesigns          ResearchSamplingDesign[]              @relation("ResearchSamplingDesignCreator")
-  approvedResearchSamplingDesigns         ResearchSamplingDesign[]              @relation("ResearchSamplingDesignApprover")
+  ownedResearchDatasets               ResearchCollectionWave[]          @relation("ResearchDatasetOwner")
+  lockedResearchDatasets              ResearchCollectionWave[]          @relation("ResearchDatasetLockedBy")
+  approvedResearchDatasets            ResearchCollectionWave[]          @relation("ResearchDatasetApprovedBy")
+  reviewedResearchResponses           ResearchQuestionnaireAssignment[] @relation("ResearchResponseReviewedBy")
+  authoredResearchAnalyses            ResearchAnalysis[]                @relation("ResearchAnalysisAnalyst")
+  reviewedResearchAnalyses            ResearchAnalysis[]                @relation("ResearchAnalysisReviewer")
+  approvedResearchAnalyses            ResearchAnalysis[]                @relation("ResearchAnalysisApprover")
+  authoredResearchReports             ResearchReport[]                  @relation("ResearchReportAuthor")
+  reviewedResearchReports             ResearchReport[]                  @relation("ResearchReportReviewer")
+  approvedResearchReports             ResearchReport[]                  @relation("ResearchReportApprover")
+  publishedResearchReports            ResearchReport[]                  @relation("ResearchReportPublisher")
+  importedResearchDatasets            ResearchImportedDataset[]         @relation("ResearchDatasetImporter")
+  createdResearchTransformations      ResearchDataTransformation[]      @relation("ResearchTransformationCreator")
+  createdResearchDatasetVersions      ResearchDatasetVersion[]          @relation("ResearchDatasetVersionCreator")
+  reviewedResearchDatasetVersions     ResearchDatasetVersion[]          @relation("ResearchDatasetVersionReviewer")
+  approvedResearchDatasetVersions     ResearchDatasetVersion[]          @relation("ResearchDatasetVersionApprover")
+  createdResearchSamplingDesigns      ResearchSamplingDesign[]          @relation("ResearchSamplingDesignCreator")
+  approvedResearchSamplingDesigns     ResearchSamplingDesign[]          @relation("ResearchSamplingDesignApprover")
+  createdResearchPublicSurveyLinks    ResearchPublicSurveyLink[]        @relation("ResearchPublicSurveyLinkCreator")
+  reviewedResearchPublicResponses     ResearchPublicResponse[]          @relation("ResearchPublicResponseReviewer")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -6785,18 +6795,19 @@ model ConfigurableFormSubmission {
   entityType     ConfigurableFormModule
   entityId       String
   status         ConfigurableSubmissionStatus @default(SUBMITTED)
-  submittedById  String
+  submittedById  String?
   submittedAt    DateTime                     @default(now())
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
 
-  organization       Organization                     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  definition         ConfigurableFormDefinition       @relation(fields: [definitionId], references: [id], onDelete: Restrict)
-  version            ConfigurableFormVersion          @relation(fields: [versionId], references: [id], onDelete: Restrict)
-  submittedBy        User                             @relation("ConfigurableFormSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
-  answers            ConfigurableFormAnswer[]
-  fileAnswers        ConfigurableFormFileAnswer[]
-  researchAssignment ResearchQuestionnaireAssignment?
+  organization           Organization                     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  definition             ConfigurableFormDefinition       @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  version                ConfigurableFormVersion          @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  submittedBy            User?                            @relation("ConfigurableFormSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  answers                ConfigurableFormAnswer[]
+  fileAnswers            ConfigurableFormFileAnswer[]
+  researchAssignment     ResearchQuestionnaireAssignment?
+  researchPublicResponse ResearchPublicResponse?
 
   @@unique([definitionId, entityType, entityId])
   @@index([organizationId, entityType, entityId])
@@ -8054,12 +8065,12 @@ model ResearchProject {
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 
-  organization          Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client                ResearchClient?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  projectManager        User                     @relation("ResearchProjectManager", fields: [projectManagerId], references: [id], onDelete: Restrict)
-  principalInvestigator User?                    @relation("ResearchPrincipalInvestigator", fields: [principalInvestigatorId], references: [id], onDelete: SetNull)
-  createdBy             User                     @relation("ResearchProjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  approvedBy            User?                    @relation("ResearchProjectApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  organization          Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client                ResearchClient?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  projectManager        User                      @relation("ResearchProjectManager", fields: [projectManagerId], references: [id], onDelete: Restrict)
+  principalInvestigator User?                     @relation("ResearchPrincipalInvestigator", fields: [principalInvestigatorId], references: [id], onDelete: SetNull)
+  createdBy             User                      @relation("ResearchProjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy            User?                     @relation("ResearchProjectApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   teamMembers           ResearchTeamMember[]
   milestones            ResearchMilestone[]
   questionnaires        ResearchQuestionnaire[]
@@ -8157,7 +8168,7 @@ model ResearchCollectionWave {
   createdById         String
   activatedAt         DateTime?
   closedAt            DateTime?
-  datasetStatus       ResearchDatasetStatus      @default(OPEN)
+  datasetStatus       ResearchDatasetStatus    @default(OPEN)
   datasetOwnerId      String?
   datasetLockedById   String?
   datasetLockedAt     DateTime?
@@ -8166,16 +8177,18 @@ model ResearchCollectionWave {
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
 
-  organization  Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project       ResearchProject                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  questionnaire ResearchQuestionnaire             @relation(fields: [questionnaireId], references: [id], onDelete: Restrict)
-  formVersion   ConfigurableFormVersion           @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
-  createdBy     User                              @relation("ResearchCollectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  datasetOwner  User?                             @relation("ResearchDatasetOwner", fields: [datasetOwnerId], references: [id], onDelete: SetNull)
-  datasetLockedBy User?                           @relation("ResearchDatasetLockedBy", fields: [datasetLockedById], references: [id], onDelete: SetNull)
-  datasetApprovedBy User?                         @relation("ResearchDatasetApprovedBy", fields: [datasetApprovedById], references: [id], onDelete: SetNull)
-  assignments   ResearchQuestionnaireAssignment[]
-  analyses      ResearchAnalysis[]
+  organization      Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project           ResearchProject                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  questionnaire     ResearchQuestionnaire             @relation(fields: [questionnaireId], references: [id], onDelete: Restrict)
+  formVersion       ConfigurableFormVersion           @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
+  createdBy         User                              @relation("ResearchCollectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  datasetOwner      User?                             @relation("ResearchDatasetOwner", fields: [datasetOwnerId], references: [id], onDelete: SetNull)
+  datasetLockedBy   User?                             @relation("ResearchDatasetLockedBy", fields: [datasetLockedById], references: [id], onDelete: SetNull)
+  datasetApprovedBy User?                             @relation("ResearchDatasetApprovedBy", fields: [datasetApprovedById], references: [id], onDelete: SetNull)
+  assignments       ResearchQuestionnaireAssignment[]
+  publicLinks       ResearchPublicSurveyLink[]
+  publicResponses   ResearchPublicResponse[]
+  analyses          ResearchAnalysis[]
 
   @@unique([questionnaireId, name])
   @@index([organizationId, status, closesAt])
@@ -8185,24 +8198,75 @@ model ResearchCollectionWave {
   @@index([datasetOwnerId, datasetStatus])
 }
 
-model ResearchQuestionnaireAssignment {
+model ResearchPublicSurveyLink {
   id             String                   @id @default(cuid())
+  organizationId String
+  collectionId   String
+  token          String                   @unique
+  label          String
+  status         ResearchPublicLinkStatus @default(ACTIVE)
+  maxResponses   Int?
+  expiresAt      DateTime?
+  createdById    String
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  revokedAt      DateTime?
+
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  collection   ResearchCollectionWave   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  createdBy    User                     @relation("ResearchPublicSurveyLinkCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  responses    ResearchPublicResponse[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([collectionId, status])
+}
+
+model ResearchPublicResponse {
+  id                    String                      @id @default(cuid())
+  organizationId        String
+  collectionId          String
+  publicLinkId          String
+  submissionId          String?                     @unique
+  participantName       String?
+  participantEmail      String?
+  pseudonymousReference String?
+  consentedAt           DateTime?
+  disposition           ResearchResponseDisposition @default(INCLUDED)
+  qualityNotes          String?
+  reviewedById          String?
+  reviewedAt            DateTime?
+  submittedAt           DateTime                    @default(now())
+
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  collection   ResearchCollectionWave      @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  publicLink   ResearchPublicSurveyLink    @relation(fields: [publicLinkId], references: [id], onDelete: Restrict)
+  submission   ConfigurableFormSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  reviewedBy   User?                       @relation("ResearchPublicResponseReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, submittedAt])
+  @@index([collectionId, submittedAt])
+  @@index([publicLinkId, submittedAt])
+  @@index([reviewedById, reviewedAt])
+}
+
+model ResearchQuestionnaireAssignment {
+  id             String                      @id @default(cuid())
   organizationId String
   collectionId   String
   respondentId   String
   assignedById   String
-  status         ResearchAssignmentStatus @default(ASSIGNED)
+  status         ResearchAssignmentStatus    @default(ASSIGNED)
   dueAt          DateTime?
   startedAt      DateTime?
   completedAt    DateTime?
   revokedAt      DateTime?
-  submissionId   String?                  @unique
+  submissionId   String?                     @unique
   disposition    ResearchResponseDisposition @default(INCLUDED)
   qualityNotes   String?
   reviewedById   String?
   reviewedAt     DateTime?
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
 
   organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   collection   ResearchCollectionWave      @relation(fields: [collectionId], references: [id], onDelete: Cascade)
@@ -8219,83 +8283,83 @@ model ResearchQuestionnaireAssignment {
 }
 
 model ResearchAnalysis {
-  id                   String                 @id @default(cuid())
-  organizationId       String
-  collectionId         String?
-  datasetVersionId     String?
-  title                String
-  method               String
-  xVariableKey         String
-  yVariableKey         String?
-  variableKeys         String[]               @default([])
-  filterVariableKey    String?
-  filterValue          String?
-  weightVariableKey    String?
-  samplingDesignId      String?
+  id                     String                 @id @default(cuid())
+  organizationId         String
+  collectionId           String?
+  datasetVersionId       String?
+  title                  String
+  method                 String
+  xVariableKey           String
+  yVariableKey           String?
+  variableKeys           String[]               @default([])
+  filterVariableKey      String?
+  filterValue            String?
+  weightVariableKey      String?
+  samplingDesignId       String?
   samplingDesignSnapshot Json?
-  hypothesis           String?
-  methodologyNotes     String?
-  status               ResearchAnalysisStatus @default(DRAFT)
-  version              Int                    @default(1)
-  datasetResponseCount Int
-  resultSnapshot       Json
-  analystId            String
-  reviewerId           String?
-  submittedAt          DateTime?
-  reviewedAt           DateTime?
-  approvedById         String?
-  approvedAt           DateTime?
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
+  hypothesis             String?
+  methodologyNotes       String?
+  status                 ResearchAnalysisStatus @default(DRAFT)
+  version                Int                    @default(1)
+  datasetResponseCount   Int
+  resultSnapshot         Json
+  analystId              String
+  reviewerId             String?
+  submittedAt            DateTime?
+  reviewedAt             DateTime?
+  approvedById           String?
+  approvedAt             DateTime?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
-  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  collection   ResearchCollectionWave? @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  collection     ResearchCollectionWave? @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   datasetVersion ResearchDatasetVersion? @relation(fields: [datasetVersionId], references: [id], onDelete: Cascade)
   samplingDesign ResearchSamplingDesign? @relation(fields: [samplingDesignId], references: [id], onDelete: SetNull)
-  analyst      User                   @relation("ResearchAnalysisAnalyst", fields: [analystId], references: [id], onDelete: Restrict)
-  reviewer     User?                  @relation("ResearchAnalysisReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
-  approvedBy   User?                  @relation("ResearchAnalysisApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  analyst        User                    @relation("ResearchAnalysisAnalyst", fields: [analystId], references: [id], onDelete: Restrict)
+  reviewer       User?                   @relation("ResearchAnalysisReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  approvedBy     User?                   @relation("ResearchAnalysisApprover", fields: [approvedById], references: [id], onDelete: SetNull)
 
+  @@unique([collectionId, title, version])
+  @@unique([datasetVersionId, title, version])
   @@index([organizationId, status, updatedAt])
   @@index([collectionId, status, updatedAt])
   @@index([datasetVersionId, status, updatedAt])
   @@index([samplingDesignId])
   @@index([analystId, status])
   @@index([reviewerId, status])
-  @@unique([collectionId, title, version])
-  @@unique([datasetVersionId, title, version])
 }
 
 model ResearchReport {
-  id                   String               @id @default(cuid())
-  organizationId       String
-  projectId            String
-  reference            String
-  title                String
-  version              Int                  @default(1)
-  status               ResearchReportStatus @default(DRAFT)
-  executiveSummary     String
-  background           String?
-  methodology          String
-  findings             String
-  discussion           String?
-  conclusions          String
-  recommendations      String
-  limitations          String
-  analysisIds          String[]             @default([])
-  evidenceSnapshot     Json
-  snapshotGeneratedAt  DateTime             @default(now())
-  authorId             String
-  reviewerId           String?
-  approvedById         String?
-  publishedById        String?
-  submittedAt          DateTime?
-  reviewedAt           DateTime?
-  approvedAt           DateTime?
-  publishedAt          DateTime?
-  archivedAt           DateTime?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
+  id                  String               @id @default(cuid())
+  organizationId      String
+  projectId           String
+  reference           String
+  title               String
+  version             Int                  @default(1)
+  status              ResearchReportStatus @default(DRAFT)
+  executiveSummary    String
+  background          String?
+  methodology         String
+  findings            String
+  discussion          String?
+  conclusions         String
+  recommendations     String
+  limitations         String
+  analysisIds         String[]             @default([])
+  evidenceSnapshot    Json
+  snapshotGeneratedAt DateTime             @default(now())
+  authorId            String
+  reviewerId          String?
+  approvedById        String?
+  publishedById       String?
+  submittedAt         DateTime?
+  reviewedAt          DateTime?
+  approvedAt          DateTime?
+  publishedAt         DateTime?
+  archivedAt          DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project      ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -8311,29 +8375,29 @@ model ResearchReport {
 }
 
 model ResearchImportedDataset {
-  id                String               @id @default(cuid())
-  organizationId    String
-  projectId         String
-  name              String
-  status            ResearchImportStatus @default(UPLOADED)
-  sourceFileName    String
-  sourceBlobPath    String
-  mimeType          String
-  sizeBytes         Int
-  rowCount          Int                  @default(0)
-  columnCount       Int                  @default(0)
-  previewSnapshot   Json?
-  profileErrors     String[]             @default([])
-  importedById      String
-  importedAt        DateTime             @default(now())
-  profiledAt        DateTime?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  id              String               @id @default(cuid())
+  organizationId  String
+  projectId       String
+  name            String
+  status          ResearchImportStatus @default(UPLOADED)
+  sourceFileName  String
+  sourceBlobPath  String
+  mimeType        String
+  sizeBytes       Int
+  rowCount        Int                  @default(0)
+  columnCount     Int                  @default(0)
+  previewSnapshot Json?
+  profileErrors   String[]             @default([])
+  importedById    String
+  importedAt      DateTime             @default(now())
+  profiledAt      DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
-  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project      ResearchProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  importedBy   User                   @relation("ResearchDatasetImporter", fields: [importedById], references: [id], onDelete: Restrict)
-  variables    ResearchDataVariable[]
+  organization    Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project         ResearchProject              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  importedBy      User                         @relation("ResearchDatasetImporter", fields: [importedById], references: [id], onDelete: Restrict)
+  variables       ResearchDataVariable[]
   transformations ResearchDataTransformation[]
   versions        ResearchDatasetVersion[]
 
@@ -8418,35 +8482,35 @@ model ResearchDatasetVersion {
 }
 
 model ResearchSamplingDesign {
-  id                    String                       @id @default(cuid())
-  organizationId        String
-  projectId             String
-  version               Int
-  name                  String
-  type                  ResearchSamplingDesignType
-  status                ResearchSamplingDesignStatus @default(DRAFT)
-  populationSize        Int?
-  samplingFrameSize     Int?
-  targetSampleSize      Int
-  selectionInterval     Float?
-  strataVariableKey     String?
-  clusterVariableKey    String?
-  stages                Json?
-  finitePopulationCorrection Boolean                 @default(false)
-  weightMethod          String?
-  nonresponseAdjustment String?
-  calibrationMethod     String?
-  assumptions           String
-  createdById           String
-  approvedById          String?
-  createdAt             DateTime                     @default(now())
-  submittedAt           DateTime?
-  approvedAt            DateTime?
+  id                         String                       @id @default(cuid())
+  organizationId             String
+  projectId                  String
+  version                    Int
+  name                       String
+  type                       ResearchSamplingDesignType
+  status                     ResearchSamplingDesignStatus @default(DRAFT)
+  populationSize             Int?
+  samplingFrameSize          Int?
+  targetSampleSize           Int
+  selectionInterval          Float?
+  strataVariableKey          String?
+  clusterVariableKey         String?
+  stages                     Json?
+  finitePopulationCorrection Boolean                      @default(false)
+  weightMethod               String?
+  nonresponseAdjustment      String?
+  calibrationMethod          String?
+  assumptions                String
+  createdById                String
+  approvedById               String?
+  createdAt                  DateTime                     @default(now())
+  submittedAt                DateTime?
+  approvedAt                 DateTime?
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project      ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy    User            @relation("ResearchSamplingDesignCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  approvedBy   User?           @relation("ResearchSamplingDesignApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User               @relation("ResearchSamplingDesignCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy   User?              @relation("ResearchSamplingDesignApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   analyses     ResearchAnalysis[]
 
   @@unique([projectId, version])

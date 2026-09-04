@@ -23,7 +23,7 @@ test("field creation returns to the refreshed questionnaire editor",async()=>{
 });
 test("research responses remain tenant, assignment and immutable-version scoped",async()=>{
   const source=await readFile(new URL("../src/modules/research/research-collection.service.ts",import.meta.url),"utf8");
-  assert.match(source,/organizationId:input\.organizationId/);assert.match(source,/respondentId:input\.userId/);assert.match(source,/formVersionId/);assert.match(source,/status:ResearchAssignmentStatus\.COMPLETED/);
+  assert.match(source,/organizationId:\s*input\.organizationId/);assert.match(source,/respondentId:\s*input\.userId/);assert.match(source,/formVersionId/);assert.match(source,/status:\s*ResearchAssignmentStatus\.COMPLETED/);
 });
 test("research exports prevent spreadsheet formulas and honor identity modes",async()=>{
   const source=await readFile(new URL("../src/app/api/research/collections/[collectionId]/export/route.ts",import.meta.url),"utf8");

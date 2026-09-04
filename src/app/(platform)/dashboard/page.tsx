@@ -5,8 +5,12 @@ import {
 } from "@/core/analytics/executive-command-center.service";
 import { GlobalExecutivePortfolio } from "@/core/analytics/global-executive-portfolio";
 import { GenerateEnterpriseAiForm } from "@/features/intelligence/enterprise-ai-forms";
-import { getCurrentUserPermissions, requirePermission } from "@/lib/permissions";
+import {
+  getCurrentUserPermissions,
+  requirePermission,
+} from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
+import { getResearchExecutiveSummary } from "@/modules/research/research-executive-summary.service";
 import { PermissionKey } from "@prisma/client";
 import {
   AlertTriangle,
@@ -24,6 +28,7 @@ import {
   TimerReset,
   Presentation,
   MessageSquareText,
+  FlaskConical,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -73,6 +78,9 @@ export default async function DashboardPage({
     filters: parseExecutiveDashboardFilters(params),
   });
   const allowed = new Set(permissions);
+  const research = allowed.has(PermissionKey.VIEW_RESEARCH)
+    ? await getResearchExecutiveSummary(organizationId, dashboard.filters.days)
+    : null;
   const query = new URLSearchParams({
     days: String(dashboard.filters.days),
     ...(dashboard.scope.siteId ? { siteId: dashboard.scope.siteId } : {}),
@@ -259,6 +267,66 @@ export default async function DashboardPage({
         attentionCount={dashboard.portfolio.attentionCount}
       />
 
+      {research ? (
+        <section className="rounded-3xl border border-violet-400/15 bg-[linear-gradient(135deg,rgba(139,92,246,.08),rgba(34,211,238,.035))] p-6 shadow-xl">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-sm text-violet-300">
+                Research & Analytics intelligence
+              </p>
+              <h2 className="mt-1 text-2xl font-semibold text-white">
+                Enterprise research portfolio
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm text-slate-400">
+                Governed visibility across active studies, field collection,
+                analytical approvals, and client-ready evidence.
+              </p>
+            </div>
+            <Link
+              href="/research"
+              className="inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.08] px-4 py-2.5 text-sm font-semibold text-violet-100"
+            >
+              Open Research & Analytics <ArrowRight size={16} />
+            </Link>
+          </div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <ResearchMetric
+              label="Active projects"
+              value={research.activeProjects}
+              note={`${research.activeWaves} active collection waves`}
+            />
+            <ResearchMetric
+              label={`${dashboard.filters.days}-day responses`}
+              value={research.recentResponses}
+              note={`${research.activePublicLinks} active public survey links`}
+            />
+            <ResearchMetric
+              label="Active collection progress"
+              value={
+                research.completionRate === null
+                  ? "—"
+                  : `${research.completionRate}%`
+              }
+              note={
+                research.activeTarget
+                  ? `${research.activeResponses} of ${research.activeTarget} target responses`
+                  : `${research.activeResponses} responses · no aggregate target`
+              }
+            />
+            <ResearchMetric
+              label="Approved intelligence"
+              value={research.approvedAnalyses}
+              note={`${research.publishedReports} published reports · ${research.reviewQueue} analyses under review`}
+            />
+          </div>
+          <div className="mt-5 flex items-center gap-2 text-xs text-slate-500">
+            <FlaskConical size={15} className="text-violet-300" />
+            Research indicators respect tenant boundaries and Research &
+            Analytics permissions.
+          </div>
+        </section>
+      ) : null}
+
       <ExecutiveCommandCenterCharts
         trend={dashboard.trend}
         enabledSeries={dashboard.enabledTrendSeries}
@@ -391,7 +459,8 @@ export default async function DashboardPage({
                 Workflow speed, reliability, and bottlenecks
               </h2>
               <p className="mt-2 text-sm text-slate-400">
-                Enterprise-wide control-process evidence for the selected reporting window.
+                Enterprise-wide control-process evidence for the selected
+                reporting window.
               </p>
             </div>
             <Link
@@ -416,7 +485,9 @@ export default async function DashboardPage({
             />
             <MiniMetric
               label="Outcome success"
-              value={formatPercent(dashboard.workflow.summary.outcomeSuccessRate)}
+              value={formatPercent(
+                dashboard.workflow.summary.outcomeSuccessRate,
+              )}
             />
           </div>
           <div className="mt-5 grid gap-3 lg:grid-cols-2">
@@ -544,6 +615,27 @@ export default async function DashboardPage({
 
       {allowed.has(PermissionKey.USE_AI) ? <GenerateEnterpriseAiForm /> : null}
     </div>
+  );
+}
+
+function ResearchMetric({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string | number;
+  note: string;
+}) {
+  return (
+    <Link
+      href="/research"
+      className="rounded-2xl border border-white/10 bg-slate-950/35 p-5 transition hover:border-violet-400/30"
+    >
+      <p className="text-sm text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-white">{value}</p>
+      <p className="mt-2 text-xs leading-5 text-slate-500">{note}</p>
+    </Link>
   );
 }
 

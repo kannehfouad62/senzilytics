@@ -82,7 +82,7 @@ test("dataset mutations and reads remain tenant and permission scoped", async ()
   assert.match(actions, /Locked or approved datasets cannot be changed/);
   assert.match(actions, /Close the collection wave before locking its dataset/);
   assert.match(service, /organizationId/);
-  assert.match(service, /disposition===\"INCLUDED\"/);
+  assert.match(service, /disposition\s*===\s*"INCLUDED"/);
 });
 
 test("research exports use native Office formats and neutralize spreadsheet formulas", async () => {

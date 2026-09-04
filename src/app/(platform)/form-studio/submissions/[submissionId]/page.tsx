@@ -11,12 +11,7 @@ import {
   ConfigurableSubmissionStatus,
   PermissionKey,
 } from "@prisma/client";
-import {
-  ArrowLeft,
-  ExternalLink,
-  FileText,
-  Paperclip,
-} from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, Paperclip } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -70,8 +65,8 @@ export default async function FormSubmissionDetailPage({
             {submission.definition.name}
           </h1>
           <p className="mt-2 text-slate-400">
-            Submitted by {submission.submittedBy.name} on{" "}
-            {submission.submittedAt.toLocaleString()}
+            Submitted by {submission.submittedBy?.name ?? "Public respondent"}{" "}
+            on {submission.submittedAt.toLocaleString()}
           </p>
         </div>
         <StatusBadge status={submission.status} />
@@ -97,8 +92,8 @@ export default async function FormSubmissionDetailPage({
 
       {submission.status === ConfigurableSubmissionStatus.DRAFT && (
         <p className="mt-6 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-200">
-          This submission is awaiting one or more required private
-          attachments. Complete the upload from the linked source record.
+          This submission is awaiting one or more required private attachments.
+          Complete the upload from the linked source record.
         </p>
       )}
 
@@ -184,7 +179,11 @@ export default async function FormSubmissionDetailPage({
               />
               <Detail
                 label="Submitted by"
-                value={`${submission.submittedBy.name} · ${submission.submittedBy.email}`}
+                value={
+                  submission.submittedBy
+                    ? `${submission.submittedBy.name} · ${submission.submittedBy.email}`
+                    : "Public research respondent"
+                }
               />
               <Detail
                 label="Captured"
@@ -197,8 +196,8 @@ export default async function FormSubmissionDetailPage({
             </dl>
           </section>
           <section className="rounded-3xl border border-cyan-400/15 bg-cyan-400/[.04] p-5 text-xs text-slate-400">
-            Published form versions and submitted answers are retained even
-            when the form is later unassigned. This preserves the record as it
+            Published form versions and submitted answers are retained even when
+            the form is later unassigned. This preserves the record as it
             appeared at the time of capture.
           </section>
         </aside>

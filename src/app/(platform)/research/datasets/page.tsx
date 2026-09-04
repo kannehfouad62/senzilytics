@@ -1,2 +1,63 @@
-import { requirePermission } from "@/lib/permissions";import { getCurrentUserTenant } from "@/lib/tenant";import { listResearchDatasets } from "@/modules/research/research-dataset.service";import { PermissionKey } from "@prisma/client";import Link from "next/link";
-export default async function ResearchDatasetsPage(){await requirePermission(PermissionKey.RUN_RESEARCH_ANALYSIS);const{organizationId}=await getCurrentUserTenant(),datasets=await listResearchDatasets(organizationId);return <div><p className="text-sm text-cyan-300">Governed Research Intelligence</p><h1 className="mt-2 text-4xl font-bold">Research Datasets</h1><p className="mt-2 max-w-3xl text-slate-400">Review response quality, lock approved analytical populations and open the drag-and-drop Analysis Studio.</p><div className="mt-8 grid gap-5 xl:grid-cols-2">{datasets.map(dataset=><Link key={dataset.id} href={`/research/datasets/${dataset.id}`} className="rounded-3xl border border-white/10 bg-white/[.04] p-6 hover:border-cyan-300/30"><div className="flex justify-between gap-4"><div><p className="text-xs text-cyan-300">{dataset.project.reference} · {dataset.questionnaire.name}</p><h2 className="mt-2 text-xl font-semibold">{dataset.name}</h2><p className="mt-1 text-sm text-slate-400">{dataset.project.client?.name??"Internal research"}</p></div><span className="h-fit rounded-full bg-white/5 px-3 py-1 text-xs">{dataset.datasetStatus.replaceAll("_"," ")}</span></div><div className="mt-5 flex gap-5 text-sm"><span>{dataset._count.assignments} responses</span><span className={dataset.assignments.length?"text-amber-300":"text-emerald-300"}>{dataset.assignments.length} flagged</span></div></Link>)}{!datasets.length&&<p className="rounded-3xl border border-dashed border-white/10 p-12 text-center text-slate-500">No collection datasets are available.</p>}</div></div>}
+import { requirePermission } from "@/lib/permissions";
+import { getCurrentUserTenant } from "@/lib/tenant";
+import { listResearchDatasets } from "@/modules/research/research-dataset.service";
+import { PermissionKey } from "@prisma/client";
+import Link from "next/link";
+export default async function ResearchDatasetsPage() {
+  await requirePermission(PermissionKey.RUN_RESEARCH_ANALYSIS);
+  const { organizationId } = await getCurrentUserTenant(),
+    datasets = await listResearchDatasets(organizationId);
+  return (
+    <div>
+      <p className="text-sm text-cyan-300">Governed Research Intelligence</p>
+      <h1 className="mt-2 text-4xl font-bold">Research Datasets</h1>
+      <p className="mt-2 max-w-3xl text-slate-400">
+        Review response quality, lock approved analytical populations and open
+        the drag-and-drop Analysis Studio.
+      </p>
+      <div className="mt-8 grid gap-5 xl:grid-cols-2">
+        {datasets.map((dataset) => {
+          const responses =
+              dataset._count.assignments + dataset._count.publicResponses,
+            flagged =
+              dataset.assignments.length + dataset.publicResponses.length;
+          return (
+            <Link
+              key={dataset.id}
+              href={`/research/datasets/${dataset.id}`}
+              className="rounded-3xl border border-white/10 bg-white/[.04] p-6 hover:border-cyan-300/30"
+            >
+              <div className="flex justify-between gap-4">
+                <div>
+                  <p className="text-xs text-cyan-300">
+                    {dataset.project.reference} · {dataset.questionnaire.name}
+                  </p>
+                  <h2 className="mt-2 text-xl font-semibold">{dataset.name}</h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {dataset.project.client?.name ?? "Internal research"}
+                  </p>
+                </div>
+                <span className="h-fit rounded-full bg-white/5 px-3 py-1 text-xs">
+                  {dataset.datasetStatus.replaceAll("_", " ")}
+                </span>
+              </div>
+              <div className="mt-5 flex gap-5 text-sm">
+                <span>{responses} responses</span>
+                <span
+                  className={flagged ? "text-amber-300" : "text-emerald-300"}
+                >
+                  {flagged} flagged
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+        {!datasets.length && (
+          <p className="rounded-3xl border border-dashed border-white/10 p-12 text-center text-slate-500">
+            No collection datasets are available.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
