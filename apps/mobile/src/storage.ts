@@ -59,6 +59,7 @@ import type {
   RegulatoryImpactAssessmentPayload,
   RegulatoryImplementationPayload,
   RegulatorySourceReviewPayload,
+  ResearchFieldworkResponsePayload,
   RiskCapturePayload,
   RiskReviewPayload,
   SifSignalReviewPayload,
@@ -320,6 +321,13 @@ export async function queueJsaAcknowledgment(
   payload: JsaAcknowledgmentPayload
 ) {
   return queueOfflineItem(ownerKey, "JSA_ACKNOWLEDGMENT", payload);
+}
+
+export async function queueResearchFieldworkResponse(
+  ownerKey: string,
+  payload: ResearchFieldworkResponsePayload,
+) {
+  return queueOfflineItem(ownerKey, "RESEARCH_FIELDWORK_RESPONSE", payload);
 }
 
 export async function queueComplianceCompletion(

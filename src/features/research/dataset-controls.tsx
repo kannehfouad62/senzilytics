@@ -81,7 +81,7 @@ export function ResponseQualityControl({
   assignmentId: string;
   disposition: ResearchResponseDisposition;
   notes: string | null;
-  responseSource?: "ASSIGNED" | "PUBLIC";
+  responseSource?: "ASSIGNED" | "PUBLIC" | "FIELDWORK";
 }) {
   const [state, action, pending] = useActionState(
     reviewResearchResponse,

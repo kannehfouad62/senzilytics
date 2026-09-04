@@ -46,6 +46,15 @@ export async function getResearchDataset(
         orderBy: { submittedAt: "asc" },
         take: 5000,
       },
+      fieldworkResponses: {
+        include: {
+          enumerator: { select: { name: true, email: true } },
+          backcheckedBy: { select: { name: true } },
+          submission: { include: { answers: true } },
+        },
+        orderBy: { capturedAt: "asc" },
+        take: 5000,
+      },
     },
   });
   if (!collection) return null;
@@ -99,7 +108,22 @@ export async function getResearchDataset(
       response.submission?.answers ?? [],
     ),
   }));
-  const responseRows = [...assigned, ...external].sort((a, b) =>
+  const fieldwork = collection.fieldworkResponses.map((response) => ({
+    response: {
+      ...response,
+      qualityNotes: response.backcheckNotes,
+      reviewedBy: response.backcheckedBy,
+      reviewedAt: response.backcheckedAt,
+    },
+    source: "FIELDWORK" as const,
+    row: createRow(
+      response.sampleUnitId,
+      response.submissionId,
+      response.capturedAt,
+      response.submission.answers,
+    ),
+  }));
+  const responseRows = [...assigned, ...external, ...fieldwork].sort((a, b) =>
     a.row.submittedAt.localeCompare(b.row.submittedAt),
   );
   const rows = responseRows.map((item) => item.row);
@@ -126,6 +150,7 @@ export function listResearchDatasets(organizationId: string) {
         select: {
           assignments: { where: { status: "COMPLETED" } },
           publicResponses: true,
+          fieldworkResponses: true,
         },
       },
       assignments: {
@@ -133,6 +158,10 @@ export function listResearchDatasets(organizationId: string) {
         select: { id: true },
       },
       publicResponses: {
+        where: { disposition: "FLAGGED" },
+        select: { id: true },
+      },
+      fieldworkResponses: {
         where: { disposition: "FLAGGED" },
         select: { id: true },
       },

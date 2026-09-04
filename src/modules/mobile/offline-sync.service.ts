@@ -33,6 +33,9 @@ import {
   PermitGasTestResult,
   PermitToWorkStatus,
   RegulatoryImpactDecision,
+  ResearchCollectionStatus,
+  ResearchSampleUnitStatus,
+  ResearchSamplingExecutionStatus,
   RiskCategory,
   RiskControlEffectiveness,
   RiskImpact,
@@ -50,6 +53,7 @@ import {
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { normalizeResearchLocale } from "@/modules/research/research-localization";
 import { requireSubscriptionFeature } from "@/lib/subscription";
 import {
   recordAuditResponseService,
@@ -1026,6 +1030,23 @@ const regulatoryChangeCloseItemSchema = z.object({
   }),
 });
 
+const researchFieldworkResponseItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.literal("RESEARCH_FIELDWORK_RESPONSE"),
+  capturedAt: z.string().datetime(),
+  payload: z.object({
+    sampleUnitId: z.string().min(1).max(200),
+    collectionId: z.string().min(1).max(200),
+    locale: z.string().regex(/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/),
+    interviewStartedAt: z.string().datetime(),
+    consent: z.boolean(),
+    latitude: z.number().finite().min(-90).max(90).optional(),
+    longitude: z.number().finite().min(-180).max(180).optional(),
+    locationAccuracyM: z.number().finite().nonnegative().max(100_000).optional(),
+    form: capturedFormSchema,
+  }),
+});
+
 const offlineItemSchema = z.discriminatedUnion("type", [
   observationItemSchema,
   incidentItemSchema,
@@ -1084,6 +1105,7 @@ const offlineItemSchema = z.discriminatedUnion("type", [
   regulatoryAssessmentReviewItemSchema,
   regulatoryImplementationItemSchema,
   regulatoryChangeCloseItemSchema,
+  researchFieldworkResponseItemSchema,
 ]);
 
 export const offlineSyncRequestSchema = z.object({
@@ -1109,6 +1131,8 @@ export function requiredOfflinePermission(
     return PermissionKey.MANAGE_RISKS;
   }
   if (type === "JSA_ACKNOWLEDGMENT") return PermissionKey.VIEW_RISKS;
+  if (type === "RESEARCH_FIELDWORK_RESPONSE")
+    return PermissionKey.COLLECT_RESEARCH_DATA;
   if (type === "COMPLIANCE_COMPLETION") return PermissionKey.VIEW_COMPLIANCE;
   if (type === "COMPLIANCE_REVIEW") return PermissionKey.MANAGE_COMPLIANCE;
   if (type === "TRAINING_PROGRESS") return PermissionKey.VIEW_TRAINING;
@@ -1459,6 +1483,8 @@ export async function syncOfflineSubmissionsService(input: {
         results.push(await syncRegulatoryAssessmentReview(input, item, payloadHash));
       } else if (item.type === "REGULATORY_IMPLEMENTATION") {
         results.push(await syncRegulatoryImplementation(input, item, payloadHash));
+      } else if (item.type === "RESEARCH_FIELDWORK_RESPONSE") {
+        results.push(await syncResearchFieldworkResponse(input, item, payloadHash));
       } else {
         results.push(await syncRegulatoryChangeClose(input, item, payloadHash));
       }
@@ -1468,6 +1494,166 @@ export async function syncOfflineSubmissionsService(input: {
   }
 
   return { ok: true as const, status: 200, body: { results } };
+}
+
+async function syncResearchFieldworkResponse(
+  actor: { organizationId: string; userId: string },
+  item: z.infer<typeof researchFieldworkResponseItemSchema>,
+  payloadHash: string,
+): Promise<SyncResult> {
+  const capturedAt = new Date(item.capturedAt);
+  const interviewStartedAt = new Date(item.payload.interviewStartedAt);
+  if (interviewStartedAt > capturedAt)
+    throw new Error("Interview start time cannot be after capture time.");
+  const unit = await prisma.researchSampleUnit.findFirst({
+    where: {
+      id: item.payload.sampleUnitId,
+      assignedToId: actor.userId,
+      status: {
+        in: [
+          ResearchSampleUnitStatus.ASSIGNED,
+          ResearchSampleUnitStatus.CONTACTED,
+          ResearchSampleUnitStatus.PARTIAL,
+        ],
+      },
+      execution: {
+        organizationId: actor.organizationId,
+        status: ResearchSamplingExecutionStatus.ACTIVE,
+      },
+    },
+    include: { execution: true },
+  });
+  const collection = await prisma.researchCollectionWave.findFirst({
+    where: {
+      id: item.payload.collectionId,
+      organizationId: actor.organizationId,
+      status: ResearchCollectionStatus.ACTIVE,
+    },
+    include: {
+      questionnaire: true,
+      formVersion: {
+        include: {
+          researchQuestionnaireLocalizations: {
+            where: { status: "APPROVED" },
+            select: { locale: true },
+          },
+        },
+      },
+    },
+  });
+  if (!unit || !collection || unit.execution.projectId !== collection.projectId)
+    throw new Error("The assigned sample unit or collection is no longer available.");
+  if (collection.opensAt && collection.opensAt > capturedAt)
+    throw new Error("The collection was not open when this interview was captured.");
+  if (collection.closesAt && collection.closesAt < capturedAt)
+    throw new Error("The collection was closed when this interview was captured.");
+  if (collection.questionnaire.consentStatement && !item.payload.consent)
+    throw new Error("Participant consent is required.");
+  if (
+    item.payload.locale !== normalizeResearchLocale(collection.questionnaire.defaultLanguage) &&
+    !collection.formVersion.researchQuestionnaireLocalizations.some(
+      (localization) => localization.locale === item.payload.locale,
+    )
+  )
+    throw new Error("The captured questionnaire language is not approved.");
+  if (
+    item.payload.form.definitionId !== collection.questionnaire.formDefinitionId ||
+    item.payload.form.versionId !== collection.formVersionId
+  )
+    throw new Error("The captured questionnaire does not match this collection version.");
+  const [prepared] = await prepareCapturedFormSubmissions({
+    organizationId: actor.organizationId,
+    module: ConfigurableFormModule.RESEARCH,
+    capturedAt,
+    forms: [item.payload.form],
+  });
+  if (!prepared || prepared.status !== "SUBMITTED")
+    throw new Error("Complete all required questionnaire fields before synchronization.");
+  const response = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.researchSampleUnit.updateMany({
+      where: {
+        id: unit.id,
+        assignedToId: actor.userId,
+        status: {
+          in: [
+            ResearchSampleUnitStatus.ASSIGNED,
+            ResearchSampleUnitStatus.CONTACTED,
+            ResearchSampleUnitStatus.PARTIAL,
+          ],
+        },
+      },
+      data: {
+        status: ResearchSampleUnitStatus.COMPLETED,
+        completedAt: capturedAt,
+        lastContactedAt: capturedAt,
+        contactAttempts: { increment: 1 },
+      },
+    });
+    if (claimed.count !== 1)
+      throw new Error("This sample unit has already been completed or reassigned.");
+    const submission = await tx.configurableFormSubmission.create({
+      data: {
+        organizationId: actor.organizationId,
+        definitionId: prepared.definitionId,
+        versionId: prepared.versionId,
+        entityType: ConfigurableFormModule.RESEARCH,
+        entityId: unit.id,
+        submittedById: actor.userId,
+        status: prepared.status,
+        submittedAt: capturedAt,
+        answers: { create: prepared.answers },
+      },
+    });
+    const created = await tx.researchFieldworkResponse.create({
+      data: {
+        organizationId: actor.organizationId,
+        sampleUnitId: unit.id,
+        collectionId: collection.id,
+        submissionId: submission.id,
+        enumeratorId: actor.userId,
+        deviceSubmissionId: item.id,
+        locale: item.payload.locale,
+        interviewStartedAt,
+        capturedAt,
+        latitude: item.payload.latitude,
+        longitude: item.payload.longitude,
+        locationAccuracyM: item.payload.locationAccuracyM,
+      },
+    });
+    await tx.offlineSubmission.create({
+      data: {
+        id: item.id,
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        recordType: item.type,
+        recordId: created.id,
+        capturedAt,
+        payloadHash,
+      },
+    });
+    await tx.activityLog.create({
+      data: {
+        organizationId: actor.organizationId,
+        userId: actor.userId,
+        action: ActivityAction.CREATE,
+        entityType: "ResearchFieldworkResponse",
+        entityId: created.id,
+        title: "Offline research interview synchronized",
+        description: unit.unitReference,
+        metadata: {
+          sampleUnitId: unit.id,
+          collectionId: collection.id,
+          locale: item.payload.locale,
+          offlineSubmissionId: item.id,
+          locationCaptured:
+            item.payload.latitude !== undefined &&
+            item.payload.longitude !== undefined,
+        },
+      },
+    });
+    return created;
+  });
+  return { id: item.id, status: "synced", recordId: response.id };
 }
 
 async function syncObservation(

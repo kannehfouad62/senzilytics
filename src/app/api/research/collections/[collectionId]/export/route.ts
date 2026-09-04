@@ -41,6 +41,13 @@ export async function GET(
         include: { submission: { include: { answers: true } } },
         orderBy: { submittedAt: "asc" },
       },
+      fieldworkResponses: {
+        include: {
+          sampleUnit: { select: { unitReference: true } },
+          submission: { include: { answers: true } },
+        },
+        orderBy: { capturedAt: "asc" },
+      },
     },
   });
   if (!collection)
@@ -109,7 +116,26 @@ export async function GET(
       ),
     ];
   });
-  const csv = [headers, ...assigned, ...external]
+  const fieldwork = collection.fieldworkResponses.map((response) => {
+    const answers = new Map(
+      response.submission.answers.map((answer) => [
+        answer.fieldId,
+        answer.value,
+      ]),
+    );
+    return [
+      response.submissionId,
+      "FIELDWORK",
+      ...prefix,
+      response.sampleUnit.unitReference,
+      "",
+      response.capturedAt.toISOString(),
+      ...collection.formVersion.fields.map(
+        (field) => answers.get(field.id) ?? "",
+      ),
+    ];
+  });
+  const csv = [headers, ...assigned, ...external, ...fieldwork]
     .map((row) => row.map(cell).join(","))
     .join("\n");
   return new Response(`\uFEFF${csv}`, {

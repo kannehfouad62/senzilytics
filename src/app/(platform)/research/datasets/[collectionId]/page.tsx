@@ -210,7 +210,9 @@ export default async function ResearchDatasetPage({
                     <p className="text-xs text-slate-500">
                       {item.source === "PUBLIC"
                         ? "Public link"
-                        : "Assigned respondent"}{" "}
+                        : item.source === "FIELDWORK"
+                          ? "Offline fieldwork"
+                          : "Assigned respondent"}{" "}
                       · {new Date(item.row.submittedAt).toLocaleString()}
                     </p>
                   </div>

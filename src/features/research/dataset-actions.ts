@@ -36,8 +36,11 @@ export async function reviewResearchResponse(
   const { organizationId, user } = await getCurrentUserTenant();
   try {
     const responseId = text(data, "assignmentId");
+    const requestedSource = text(data, "responseSource");
     const responseSource =
-      text(data, "responseSource") === "PUBLIC" ? "PUBLIC" : "ASSIGNED";
+      requestedSource === "PUBLIC" || requestedSource === "FIELDWORK"
+        ? requestedSource
+        : "ASSIGNED";
     const raw = text(data, "disposition");
     if (
       !Object.values(ResearchResponseDisposition).includes(
@@ -57,7 +60,12 @@ export async function reviewResearchResponse(
             where: { id: responseId, organizationId },
             include: { collection: true },
           })
-        : await prisma.researchQuestionnaireAssignment.findFirst({
+        : responseSource === "FIELDWORK"
+          ? await prisma.researchFieldworkResponse.findFirst({
+              where: { id: responseId, organizationId },
+              include: { collection: true },
+            })
+          : await prisma.researchQuestionnaireAssignment.findFirst({
             where: { id: responseId, organizationId, status: "COMPLETED" },
             include: { collection: true },
           });
@@ -78,6 +86,22 @@ export async function reviewResearchResponse(
       await prisma.researchPublicResponse.update({
         where: { id: response.id },
         data: update,
+      });
+    else if (responseSource === "FIELDWORK")
+      await prisma.researchFieldworkResponse.update({
+        where: { id: response.id },
+        data: {
+          disposition: update.disposition,
+          backcheckNotes: update.qualityNotes,
+          backcheckedById: user.id,
+          backcheckedAt: update.reviewedAt,
+          backcheckStatus:
+            update.disposition === ResearchResponseDisposition.INCLUDED
+              ? "APPROVED"
+              : update.disposition === ResearchResponseDisposition.EXCLUDED
+                ? "REJECTED"
+                : "PENDING",
+        },
       });
     else
       await prisma.researchQuestionnaireAssignment.update({

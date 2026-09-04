@@ -530,6 +530,12 @@ enum ResearchSampleUnitStatus {
   WITHDRAWN
 }
 
+enum ResearchFieldworkBackcheckStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum EmergencyPlanType {
   ALL_HAZARDS
   FIRE
@@ -2268,6 +2274,7 @@ model Organization {
   researchPublicSurveySessions       ResearchPublicSurveySession[]
   researchScreeningRecords           ResearchSurveyScreeningRecord[]
   researchQuestionnaireLocalizations ResearchQuestionnaireLocalization[]
+  researchFieldworkResponses          ResearchFieldworkResponse[]
 }
 
 model PricingInquiry {
@@ -2623,6 +2630,8 @@ model User {
   createdResearchLongitudinalStudies         ResearchLongitudinalStudy[]         @relation("ResearchLongitudinalStudyCreator")
   createdResearchQuestionnaireLocalizations  ResearchQuestionnaireLocalization[] @relation("ResearchQuestionnaireLocalizationCreator")
   approvedResearchQuestionnaireLocalizations ResearchQuestionnaireLocalization[] @relation("ResearchQuestionnaireLocalizationApprover")
+  enumeratedResearchFieldworkResponses       ResearchFieldworkResponse[]          @relation("ResearchFieldworkEnumerator")
+  backcheckedResearchFieldworkResponses      ResearchFieldworkResponse[]          @relation("ResearchFieldworkBackchecker")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -6948,6 +6957,7 @@ model ConfigurableFormSubmission {
   fileAnswers            ConfigurableFormFileAnswer[]
   researchAssignment     ResearchQuestionnaireAssignment?
   researchPublicResponse ResearchPublicResponse?
+  researchFieldworkResponse ResearchFieldworkResponse?
 
   @@unique([definitionId, entityType, entityId])
   @@index([organizationId, entityType, entityId])
@@ -8366,6 +8376,7 @@ model ResearchCollectionWave {
   surveyCampaigns   ResearchSurveyCampaign[]
   analyses          ResearchAnalysis[]
   longitudinalWave  ResearchLongitudinalWave?
+  fieldworkResponses ResearchFieldworkResponse[]
 
   @@unique([questionnaireId, name])
   @@index([organizationId, status, closesAt])
@@ -9080,6 +9091,7 @@ model ResearchSampleUnit {
   assignedTo     User?                     @relation("ResearchSampleUnitAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   replacementFor ResearchSampleUnit?       @relation("ResearchSampleUnitReplacement", fields: [replacementForId], references: [id], onDelete: SetNull)
   replacedBy     ResearchSampleUnit[]      @relation("ResearchSampleUnitReplacement")
+  fieldworkResponse ResearchFieldworkResponse?
 
   @@unique([executionId, unitReference])
   @@unique([executionId, selectionOrder])
@@ -9089,4 +9101,39 @@ model ResearchSampleUnit {
   @@index([assignedToId, status, dueAt])
   @@index([executionId, dueAt, escalationLevel])
   @@index([replacementForId])
+}
+
+model ResearchFieldworkResponse {
+  id                 String                            @id @default(cuid())
+  organizationId     String
+  sampleUnitId       String                            @unique
+  collectionId       String
+  submissionId       String                            @unique
+  enumeratorId       String
+  deviceSubmissionId String                            @unique
+  locale             String
+  interviewStartedAt DateTime
+  capturedAt         DateTime
+  synchronizedAt     DateTime                          @default(now())
+  latitude           Float?
+  longitude          Float?
+  locationAccuracyM  Float?
+  disposition        ResearchResponseDisposition      @default(INCLUDED)
+  backcheckStatus    ResearchFieldworkBackcheckStatus @default(PENDING)
+  backcheckedById    String?
+  backcheckedAt      DateTime?
+  backcheckNotes     String?
+  createdAt          DateTime                          @default(now())
+  updatedAt          DateTime                          @updatedAt
+
+  organization  Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sampleUnit    ResearchSampleUnit          @relation(fields: [sampleUnitId], references: [id], onDelete: Restrict)
+  collection    ResearchCollectionWave      @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+  submission    ConfigurableFormSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  enumerator    User                       @relation("ResearchFieldworkEnumerator", fields: [enumeratorId], references: [id], onDelete: Restrict)
+  backcheckedBy User?                      @relation("ResearchFieldworkBackchecker", fields: [backcheckedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, backcheckStatus, capturedAt])
+  @@index([collectionId, capturedAt])
+  @@index([enumeratorId, capturedAt])
 }

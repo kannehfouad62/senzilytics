@@ -83,7 +83,7 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE" | "ORGANIZATION_ADMIN" | "USER_ADMIN" | "WORKFLOW_ADMIN" | "ACTIVITY_AUDIT" | "CONFIGURATION_HEALTH";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RESEARCH_FIELDWORK" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE" | "ORGANIZATION_ADMIN" | "USER_ADMIN" | "WORKFLOW_ADMIN" | "ACTIVITY_AUDIT" | "CONFIGURATION_HEALTH";
 };
 
 export type MobileDepartment = {
@@ -2025,11 +2025,53 @@ export type MobileBootstrap = {
   notifications: MobileNotification[];
   tasks: MobileTask[];
   modules: MobileModule[];
+  researchFieldworkCapabilities: { canCollect: boolean };
+  researchFieldworkAssignments: MobileResearchFieldworkAssignment[];
 } & MobileExecutiveWorkspace &
   MobileTenantAdministrationWorkspace;
 
 export type CapturedAnswer = { fieldId: string; value: string | number | boolean | string[] };
 export type CapturedForm = { definitionId: string; versionId: string; answers: CapturedAnswer[] };
+
+export type MobileResearchFieldworkAssignment = {
+  id: string;
+  unitReference: string;
+  status: string;
+  stratum: string | null;
+  cluster: string | null;
+  dueAt: string | null;
+  contactAttempts: number;
+  project: {
+    id: string;
+    reference: string;
+    title: string;
+    client: { id: string; name: string } | null;
+  };
+  collections: Array<{
+    id: string;
+    name: string;
+    instructions: string | null;
+    questionnaire: {
+      name: string;
+      purpose: string;
+      consentStatement: string | null;
+      defaultLanguage: string;
+    };
+    form: RuntimeForm;
+  }>;
+};
+
+export type ResearchFieldworkResponsePayload = {
+  sampleUnitId: string;
+  collectionId: string;
+  locale: string;
+  interviewStartedAt: string;
+  consent: boolean;
+  latitude?: number;
+  longitude?: number;
+  locationAccuracyM?: number;
+  form: CapturedForm;
+};
 
 export type ObservationPayload = {
   siteId: string;

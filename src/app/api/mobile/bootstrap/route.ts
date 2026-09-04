@@ -21,6 +21,7 @@ import { getMobileMocPermitWorkspace } from "@/modules/mobile/mobile-moc-permit.
 import { getMobileModuleCatalog } from "@/modules/mobile/mobile-module-catalog";
 import { getMobileRegulatoryIntelligenceWorkspace } from "@/modules/mobile/mobile-regulatory-intelligence.service";
 import { getMobileRiskField } from "@/modules/mobile/mobile-risk-field.service";
+import { getMobileResearchFieldwork } from "@/modules/mobile/mobile-research-fieldwork.service";
 import { mobileTenantAdministrationCapabilities } from "@/modules/mobile/mobile-tenant-administration.service";
 import {
   getMobileAssignedPermissions,
@@ -298,6 +299,11 @@ export async function GET(request: Request) {
         isPlatformAdmin: user.isPlatformAdmin,
       },
     });
+    const researchFieldwork = await getMobileResearchFieldwork({
+      organizationId: organization.id,
+      userId: user.id,
+      permissions: assigned,
+    });
     const inspections = inspectionRecords.map((inspection) => ({
       ...inspection,
       checklistItems: inspection.checklistItems.map((item) => ({
@@ -445,6 +451,8 @@ export async function GET(request: Request) {
       correctiveActions: actionCenter.correctiveActions,
       capaCapabilities: actionCenter.capabilities,
       modules,
+      researchFieldworkCapabilities: researchFieldwork.capabilities,
+      researchFieldworkAssignments: researchFieldwork.assignments,
     }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return mobileError(error, "Mobile workspace could not be loaded.");

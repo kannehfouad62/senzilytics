@@ -46,6 +46,7 @@ import type {
   RegulatoryImpactAssessmentPayload,
   RegulatoryImplementationPayload,
   RegulatorySourceReviewPayload,
+  ResearchFieldworkResponsePayload,
   RiskCapturePayload,
   RiskReviewPayload,
   SifSignalReviewPayload,
@@ -115,7 +116,8 @@ export type OfflineRecordType =
   | "REGULATORY_IMPACT_ASSESSMENT"
   | "REGULATORY_ASSESSMENT_REVIEW"
   | "REGULATORY_IMPLEMENTATION"
-  | "REGULATORY_CHANGE_CLOSE";
+  | "REGULATORY_CHANGE_CLOSE"
+  | "RESEARCH_FIELDWORK_RESPONSE";
 
 export type OfflineRecordPayload =
   | ObservationPayload
@@ -174,7 +176,8 @@ export type OfflineRecordPayload =
   | RegulatoryImpactAssessmentPayload
   | RegulatoryAssessmentReviewPayload
   | RegulatoryImplementationPayload
-  | RegulatoryChangeClosePayload;
+  | RegulatoryChangeClosePayload
+  | ResearchFieldworkResponsePayload;
 
 export type OfflineEnvelope = {
   type: OfflineRecordType;
@@ -239,6 +242,7 @@ const recordTypes = new Set<OfflineRecordType>([
   "REGULATORY_ASSESSMENT_REVIEW",
   "REGULATORY_IMPLEMENTATION",
   "REGULATORY_CHANGE_CLOSE",
+  "RESEARCH_FIELDWORK_RESPONSE",
 ]);
 
 export function decodeOfflineEnvelope(value: unknown): OfflineEnvelope {
