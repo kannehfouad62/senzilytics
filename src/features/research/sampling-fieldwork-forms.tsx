@@ -58,6 +58,7 @@ export function BackcheckReviewForm({ responseId }: { responseId: string }) {
         <option value="REJECTED">Rejected / flag response</option>
       </select>
       <input name="notes" minLength={10} maxLength={2000} required placeholder="Verification evidence" className={`${field} flex-1`} />
+      <input name="recontactDueAt" type="date" aria-label="Recontact due date" className={field} />
       <button disabled={pending} className={button}>{pending ? "Saving…" : "Record review"}</button>
     </div>
     <Feedback state={state} />

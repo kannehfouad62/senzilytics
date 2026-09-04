@@ -76,7 +76,7 @@ export async function selectResearchBackcheckSample(
     await prisma.$transaction([
       prisma.researchFieldworkResponse.updateMany({
         where: { organizationId, id: { in: selected.map((item) => item.id) }, backcheckRequired: false },
-        data: { backcheckRequired: true, backcheckSelectedAt: new Date(), backcheckDueAt: dueAt, backcheckAssignedToId: reviewer.id, backcheckStatus: ResearchFieldworkBackcheckStatus.PENDING },
+        data: { backcheckRequired: true, backcheckSelectedAt: new Date(), backcheckDueAt: dueAt, backcheckAssignedToId: reviewer.id, backcheckStatus: ResearchFieldworkBackcheckStatus.PENDING, backcheckEscalationLevel: 0, backcheckLastEscalatedAt: null },
       }),
       prisma.activityLog.create({
         data: { organizationId, userId: user.id, action: ActivityAction.CREATE, entityType: "ResearchFieldworkBackcheckSample", entityId: execution.id, title: "Fieldwork back-check sample selected", description: `${selected.length} of ${available.length} independently reviewable responses assigned to ${reviewer.name}`, metadata: { projectId: execution.projectId, percentage, reviewerId: reviewer.id, dueAt: dueAt.toISOString(), responseIds: selected.map((item) => item.id) } },
@@ -102,10 +102,14 @@ export async function reviewResearchFieldworkBackcheck(
     const responseId = value(data, "responseId", 100);
     const status = value(data, "status", 40) as ResearchFieldworkBackcheckStatus;
     const notes = value(data, "notes", 2000);
+    const recontactDueValue = value(data, "recontactDueAt", 40);
     const allowed = new Set<ResearchFieldworkBackcheckStatus>([ResearchFieldworkBackcheckStatus.APPROVED, ResearchFieldworkBackcheckStatus.REJECTED, ResearchFieldworkBackcheckStatus.RECONTACT_REQUIRED]);
     if (!allowed.has(status))
       throw new Error("Select a valid back-check decision.");
     if (notes.length < 10) throw new Error("Enter at least 10 characters of verification evidence.");
+    const recontactDueAt = recontactDueValue ? new Date(recontactDueValue) : null;
+    if (status === ResearchFieldworkBackcheckStatus.RECONTACT_REQUIRED && (!recontactDueAt || Number.isNaN(recontactDueAt.valueOf()) || recontactDueAt <= new Date()))
+      throw new Error("A future recontact due date is required.");
     const response = await prisma.researchFieldworkResponse.findFirst({
       where: { id: responseId, organizationId, backcheckRequired: true },
       include: { sampleUnit: { include: { execution: true } } },
@@ -118,10 +122,10 @@ export async function reviewResearchFieldworkBackcheck(
     await prisma.$transaction([
       prisma.researchFieldworkResponse.update({
         where: { id: response.id },
-        data: { backcheckStatus: status, backcheckedById: user.id, backcheckedAt: new Date(), backcheckNotes: notes, disposition: status === ResearchFieldworkBackcheckStatus.REJECTED ? ResearchResponseDisposition.FLAGGED : response.disposition },
+        data: { backcheckStatus: status, backcheckedById: user.id, backcheckedAt: new Date(), backcheckNotes: notes, backcheckDueAt: recontactDueAt ?? response.backcheckDueAt, backcheckEscalationLevel: status === ResearchFieldworkBackcheckStatus.RECONTACT_REQUIRED ? 0 : response.backcheckEscalationLevel, backcheckLastEscalatedAt: status === ResearchFieldworkBackcheckStatus.RECONTACT_REQUIRED ? null : response.backcheckLastEscalatedAt, disposition: status === ResearchFieldworkBackcheckStatus.REJECTED ? ResearchResponseDisposition.FLAGGED : response.disposition },
       }),
       prisma.activityLog.create({
-        data: { organizationId, userId: user.id, action: ActivityAction.UPDATE, entityType: "ResearchFieldworkResponse", entityId: response.id, title: "Fieldwork back-check reviewed", description: status, metadata: { projectId: response.sampleUnit.execution.projectId, sampleUnitId: response.sampleUnitId, notes } },
+        data: { organizationId, userId: user.id, action: ActivityAction.UPDATE, entityType: "ResearchFieldworkResponse", entityId: response.id, title: "Fieldwork back-check reviewed", description: status, metadata: { projectId: response.sampleUnit.execution.projectId, sampleUnitId: response.sampleUnitId, notes, recontactDueAt: recontactDueAt?.toISOString() ?? null } },
       }),
     ]);
     refresh(response.sampleUnit.execution.projectId);

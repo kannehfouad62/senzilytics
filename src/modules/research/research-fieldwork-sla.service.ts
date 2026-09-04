@@ -1,6 +1,7 @@
 import {
   ActivityAction,
   NotificationType,
+  ResearchFieldworkBackcheckStatus,
   ResearchSampleUnitStatus,
   ResearchSamplingExecutionStatus,
 } from "@prisma/client";
@@ -97,5 +98,38 @@ export async function processResearchFieldworkSla(now = new Date()) {
     ]);
     if (notification) notified += 1;
   }
-  return { examined: units.length, notified };
+  const backchecks = await prisma.researchFieldworkResponse.findMany({
+    where: {
+      backcheckRequired: true,
+      backcheckStatus: { in: [ResearchFieldworkBackcheckStatus.PENDING, ResearchFieldworkBackcheckStatus.RECONTACT_REQUIRED] },
+      backcheckDueAt: { lte: new Date(now.getTime() + 24 * 3_600_000) },
+      backcheckAssignedToId: { not: null },
+    },
+    include: {
+      backcheckAssignedTo: { select: { id: true, name: true, email: true } },
+      sampleUnit: { select: { unitReference: true, execution: { select: { project: { select: { id: true, projectManager: { select: { id: true, name: true, email: true } } } } } } } },
+    },
+    take: 200,
+  });
+  for (const response of backchecks) {
+    if (!response.backcheckDueAt || !response.backcheckAssignedTo) continue;
+    const level = fieldworkEscalationLevel(response.backcheckDueAt, now);
+    if (!level || level <= response.backcheckEscalationLevel) continue;
+    const overdue = level >= 2, severe = level === 3;
+    const project = response.sampleUnit.execution.project;
+    const link = `/research/projects/${project.id}/fieldwork`;
+    const title = severe ? "Research back-check seriously overdue" : overdue ? "Research back-check overdue" : "Research back-check due soon";
+    const timing = overdue ? `was due ${response.backcheckDueAt.toLocaleDateString("en-US")}` : `is due ${response.backcheckDueAt.toLocaleDateString("en-US")}`;
+    const recipients = [response.backcheckAssignedTo, ...(overdue && project.projectManager.id !== response.backcheckAssignedTo.id ? [project.projectManager] : [])];
+    for (const recipient of recipients) {
+      const notification = await createNotification({ organizationId: response.organizationId, userId: recipient.id, type: severe ? NotificationType.CRITICAL : overdue ? NotificationType.WARNING : NotificationType.DUE_DATE, title, message: `${response.sampleUnit.unitReference} ${timing}.`, link }).catch(() => null);
+      await sendTenantNotificationEmail({ to: recipient.email, subject: title, html: `<p>Hello ${recipient.name},</p><p>Back-check for ${response.sampleUnit.unitReference} ${timing}.</p><p><a href="${getApplicationUrl()}${link}">Open fieldwork assurance</a></p>`, text: `Research back-check for ${response.sampleUnit.unitReference} ${timing}.` }).catch(() => undefined);
+      if (notification) notified += 1;
+    }
+    await prisma.$transaction([
+      prisma.researchFieldworkResponse.update({ where: { id: response.id }, data: { backcheckEscalationLevel: level, backcheckLastEscalatedAt: now } }),
+      prisma.activityLog.create({ data: { organizationId: response.organizationId, action: ActivityAction.SYSTEM, entityType: "ResearchFieldworkResponse", entityId: response.id, title: "Research back-check SLA escalation processed", description: `${response.sampleUnit.unitReference} advanced to escalation level ${level}.`, metadata: { projectId: project.id, level, dueAt: response.backcheckDueAt.toISOString(), assignedReviewerId: response.backcheckAssignedTo.id, escalatedToProjectManager: overdue } } }),
+    ]);
+  }
+  return { examined: units.length + backchecks.length, fieldworkExamined: units.length, backchecksExamined: backchecks.length, notified };
 }

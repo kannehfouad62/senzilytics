@@ -38,13 +38,15 @@ test("location proximity signals are deterministic and remain review indicators"
 });
 
 test("fieldwork assurance actions remain tenant scoped and independently reviewed", async () => {
-  const [actions, schema, migration, page, collectionActions, sync] = await Promise.all([
+  const [actions, schema, migration, page, collectionActions, sync, sla, slaMigration] = await Promise.all([
     readFile(new URL("../src/features/research/sampling-fieldwork-actions.ts", import.meta.url), "utf8"),
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
     readFile(new URL("../prisma/migrations/20260908170000_research_fieldwork_assurance/migration.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/app/(platform)/research/projects/[id]/fieldwork/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/features/research/collection-actions.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/modules/mobile/offline-sync.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/research/research-fieldwork-sla.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../prisma/migrations/20260909200000_research_backcheck_sla/migration.sql", import.meta.url), "utf8"),
   ]);
   assert.match(actions, /requirePermission\(PermissionKey\.MANAGE_RESEARCH_DATASETS\)/);
   assert.match(actions, /organizationId/);
@@ -60,4 +62,8 @@ test("fieldwork assurance actions remain tenant scoped and independently reviewe
   assert.match(collectionActions, /ResearchCollectionLocationPolicy/);
   assert.match(sync, /Explicit location consent|Explicit location consent/i);
   assert.match(sync, /retainPreciseLocation/);
+  assert.match(actions, /recontactDueAt/);
+  assert.match(sla, /Research back-check seriously overdue/);
+  assert.match(sla, /projectManager/);
+  assert.match(slaMigration, /backcheckEscalationLevel/);
 });
