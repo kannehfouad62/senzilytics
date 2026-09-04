@@ -22,6 +22,10 @@ import {
   calculateResponseIntegrity,
   resumeCookieName,
 } from "@/modules/research/research-response-integrity";
+import {
+  evaluateScreeningAnswer,
+  screeningCookieName,
+} from "@/modules/research/research-screening";
 
 const value = (data: FormData, key: string, max = 300) =>
   String(data.get(key) ?? "")
@@ -30,6 +34,122 @@ const value = (data: FormData, key: string, max = 300) =>
 
 const tokenHash = (token: string) =>
   createHash("sha256").update(token).digest("hex");
+
+export async function submitPublicResearchScreening(
+  _state: FormActionState,
+  data: FormData,
+): Promise<FormActionState> {
+  try {
+    const token = value(data, "token", 100);
+    const invitationToken = value(data, "invitationToken", 100) || null;
+    const link = await prisma.researchPublicSurveyLink.findUnique({
+      where: { token },
+      include: {
+        collection: true,
+        screeningField: true,
+      },
+    });
+    if (
+      !link ||
+      link.status !== ResearchPublicLinkStatus.ACTIVE ||
+      link.collection.status !== ResearchCollectionStatus.ACTIVE ||
+      !link.screeningFieldId ||
+      !link.screeningField ||
+      link.screeningField.versionId !== link.collection.formVersionId
+    )
+      throw new Error("Screening is not available for this questionnaire.");
+    const invitation = invitationToken
+      ? await prisma.researchSurveyInvitation.findFirst({
+          where: {
+            token: invitationToken,
+            campaign: { publicLinkId: link.id, status: "ACTIVE" },
+            status: { in: ["SENT", "OPENED"] },
+          },
+        })
+      : null;
+    if (invitationToken && !invitation)
+      throw new Error("This invitation is no longer active.");
+    const supplied = data
+      .getAll("screeningAnswer")
+      .map((item) => String(item).trim().slice(0, 500))
+      .filter(Boolean);
+    if (!supplied.length) throw new Error("Answer the screening question.");
+    const answer = supplied.length === 1 ? supplied[0] : supplied;
+    const allowedValues = Array.isArray(link.screeningAllowedValues)
+      ? link.screeningAllowedValues.filter(
+          (item): item is string => typeof item === "string",
+        )
+      : [];
+    const eligible = evaluateScreeningAnswer(answer, allowedValues);
+    const accessToken = randomBytes(32).toString("base64url");
+    const expiresAt = new Date(
+      Math.min(
+        link.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY,
+        Date.now() + 24 * 60 * 60 * 1000,
+      ),
+    );
+    await prisma.$transaction(async (tx) => {
+      if (invitation) {
+        const prior = await tx.researchSurveyScreeningRecord.findUnique({
+          where: { invitationId: invitation.id },
+        });
+        if (prior)
+          throw new Error("This invitation has already been screened.");
+      }
+      await tx.researchSurveyScreeningRecord.create({
+        data: {
+          organizationId: link.organizationId,
+          publicLinkId: link.id,
+          invitationId: invitation?.id ?? null,
+          accessTokenHash: tokenHash(accessToken),
+          fieldId: link.screeningFieldId!,
+          answer,
+          outcome: eligible ? "ELIGIBLE" : "DISQUALIFIED",
+          expiresAt,
+        },
+      });
+      if (invitation && !eligible)
+        await tx.researchSurveyInvitation.update({
+          where: { id: invitation.id },
+          data: { status: "DISQUALIFIED" },
+        });
+    });
+    const jar = await cookies();
+    jar.set(screeningCookieName(token), accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: `/survey/${token}`,
+      expires: expiresAt,
+    });
+    await logActivity({
+      organizationId: link.organizationId,
+      userId: null,
+      action: ActivityAction.CREATE,
+      entityType: "ResearchSurveyScreeningRecord",
+      title: "Public research screening completed",
+      description: eligible
+        ? "Participant eligible"
+        : "Participant disqualified",
+      metadata: { publicLinkId: link.id, invitationId: invitation?.id ?? null },
+    });
+    return {
+      status: "SUCCESS",
+      message: eligible
+        ? "Screening complete. The questionnaire is ready."
+        : link.disqualificationMessage ||
+          "Thank you. You are not eligible for this questionnaire.",
+    };
+  } catch (error) {
+    return {
+      status: "ERROR",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Screening could not be completed.",
+    };
+  }
+}
 
 export async function savePublicResearchSurveyDraft(
   _state: FormActionState,
@@ -60,6 +180,22 @@ export async function savePublicResearchSurveyDraft(
       : null;
     if (invitationToken && !invitation)
       throw new Error("This invitation is no longer active.");
+    const jar = await cookies();
+    if (link.screeningFieldId) {
+      const screeningToken = jar.get(screeningCookieName(token))?.value;
+      const eligible = screeningToken
+        ? await prisma.researchSurveyScreeningRecord.findFirst({
+            where: {
+              accessTokenHash: tokenHash(screeningToken),
+              publicLinkId: link.id,
+              invitationId: invitation?.id ?? null,
+              outcome: "ELIGIBLE",
+              expiresAt: { gt: new Date() },
+            },
+          })
+        : null;
+      if (!eligible) throw new Error("Complete eligibility screening first.");
+    }
     const answers: Record<string, string | string[]> = {};
     for (const key of new Set(data.keys())) {
       if (!key.startsWith("custom_") || Object.keys(answers).length >= 200)
@@ -75,7 +211,6 @@ export async function savePublicResearchSurveyDraft(
         value(data, "participantEmail", 254).toLowerCase() || null,
       pseudonymousReference: value(data, "pseudonymousReference", 160) || null,
     };
-    const jar = await cookies();
     const cookieName = resumeCookieName(token);
     const existingToken = jar.get(cookieName)?.value;
     const existing = existingToken
@@ -177,6 +312,21 @@ export async function submitPublicResearchSurvey(
 
     const now = new Date();
     const jar = await cookies();
+    if (link.screeningFieldId) {
+      const screeningToken = jar.get(screeningCookieName(token))?.value;
+      const eligible = screeningToken
+        ? await prisma.researchSurveyScreeningRecord.findFirst({
+            where: {
+              accessTokenHash: tokenHash(screeningToken),
+              publicLinkId: link.id,
+              invitationId: invitation?.id ?? null,
+              outcome: "ELIGIBLE",
+              expiresAt: { gt: now },
+            },
+          })
+        : null;
+      if (!eligible) throw new Error("Complete eligibility screening first.");
+    }
     const resumeToken = jar.get(resumeCookieName(token))?.value;
     const resumedSession = resumeToken
       ? await prisma.researchPublicSurveySession.findFirst({

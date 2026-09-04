@@ -18,6 +18,7 @@ import {
 } from "@/features/research/public-survey-link-actions";
 import {
   savePublicResearchSurveyDraft,
+  submitPublicResearchScreening,
   submitPublicResearchSurvey,
 } from "@/features/research/public-survey-actions";
 import { useRefreshOnSuccess } from "@/features/research/use-refresh-on-success";
@@ -26,6 +27,90 @@ const input =
   "mt-2 w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white";
 const primary =
   "rounded-xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 disabled:opacity-50";
+
+export function PublicSurveyScreeningForm({
+  token,
+  invitationToken,
+  field,
+}: {
+  token: string;
+  invitationToken: string | null;
+  field: {
+    label: string;
+    description: string | null;
+    fieldType: string;
+    options: unknown;
+  };
+}) {
+  const [state, action, pending] = useActionState(
+    submitPublicResearchScreening,
+    initialFormActionState,
+  );
+  useRefreshOnSuccess(state);
+  const options = Array.isArray(field.options)
+    ? field.options.filter((item): item is string => typeof item === "string")
+    : field.fieldType === "BOOLEAN"
+      ? ["Yes", "No"]
+      : [];
+  return (
+    <form action={action} className="space-y-5">
+      <input type="hidden" name="token" value={token} />
+      {invitationToken && (
+        <input type="hidden" name="invitationToken" value={invitationToken} />
+      )}
+      <div>
+        <p className="text-sm font-semibold text-cyan-300">
+          Eligibility screening
+        </p>
+        <h2 className="mt-2 text-2xl font-semibold">Before you begin</h2>
+        <p className="mt-2 text-sm text-slate-400">
+          Your answer determines whether this questionnaire is appropriate for
+          you.
+        </p>
+      </div>
+      <label className="block text-sm text-slate-300">
+        <span>{field.label}</span>
+        {field.description && (
+          <span className="mt-1 block text-xs text-slate-500">
+            {field.description}
+          </span>
+        )}
+        {options.length ? (
+          <select
+            name="screeningAnswer"
+            required
+            defaultValue=""
+            className={input}
+            multiple={field.fieldType === "MULTI_SELECT"}
+          >
+            <option value="" disabled>
+              Select an answer
+            </option>
+            {options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            name="screeningAnswer"
+            required
+            maxLength={500}
+            className={input}
+          />
+        )}
+      </label>
+      <button disabled={pending} className={primary}>
+        {pending ? "Checking…" : "Continue"}
+      </button>
+      <Feedback state={state} />
+      <p className="text-xs text-slate-500">
+        Screening outcomes are recorded separately from research responses.
+      </p>
+    </form>
+  );
+}
 
 function Feedback({
   state,
@@ -52,8 +137,10 @@ function RefreshingFeedback({ state }: { state: FormActionState }) {
 
 export function PublicSurveyLinkForm({
   collectionId,
+  fields,
 }: {
   collectionId: string;
+  fields: Array<{ id: string; label: string }>;
 }) {
   const [state, action, pending] = useActionState(
     createPublicSurveyLink,
@@ -112,6 +199,41 @@ export function PublicSurveyLinkForm({
           <input name="randomizeQuestions" type="checkbox" />
           Deterministically randomize questions
         </label>
+      </div>
+      <div className="mt-5 rounded-2xl border border-white/10 p-4">
+        <h3 className="font-semibold">Optional eligibility screening</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Only participants matching one of the eligible values may open the
+          full questionnaire.
+        </p>
+        <div className="mt-3 grid gap-4 md:grid-cols-3">
+          <Label text="Screening question">
+            <select name="screeningFieldId" defaultValue="" className={input}>
+              <option value="">No screening</option>
+              {fields.map((field) => (
+                <option key={field.id} value={field.id}>
+                  {field.label}
+                </option>
+              ))}
+            </select>
+          </Label>
+          <Label text="Eligible values">
+            <textarea
+              name="screeningAllowedValues"
+              rows={3}
+              className={input}
+              placeholder={"Yes\nEligible\n18 or older"}
+            />
+          </Label>
+          <Label text="Disqualification message">
+            <textarea
+              name="disqualificationMessage"
+              rows={3}
+              className={input}
+              placeholder="Thank you for your interest. You do not meet this study's eligibility criteria."
+            />
+          </Label>
+        </div>
       </div>
       <button disabled={pending} className={`mt-5 ${primary}`}>
         {pending ? "Creating…" : "Create shareable link"}

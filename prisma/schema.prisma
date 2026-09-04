@@ -333,6 +333,11 @@ enum ResearchResponseIntegrityStatus {
   REJECTED
 }
 
+enum ResearchScreeningOutcome {
+  ELIGIBLE
+  DISQUALIFIED
+}
+
 enum ResearchSurveyCampaignStatus {
   DRAFT
   ACTIVE
@@ -348,6 +353,7 @@ enum ResearchSurveyInvitationStatus {
   COMPLETED
   FAILED
   REVOKED
+  DISQUALIFIED
 }
 
 enum ResearchPanelStatus {
@@ -2254,6 +2260,7 @@ model Organization {
   researchLongitudinalStudies      ResearchLongitudinalStudy[]
   researchLongitudinalParticipants ResearchLongitudinalParticipant[]
   researchPublicSurveySessions     ResearchPublicSurveySession[]
+  researchScreeningRecords         ResearchSurveyScreeningRecord[]
 }
 
 model PricingInquiry {
@@ -6900,9 +6907,10 @@ model ConfigurableFormField {
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  version     ConfigurableFormVersion      @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  answers     ConfigurableFormAnswer[]
-  fileAnswers ConfigurableFormFileAnswer[]
+  version                ConfigurableFormVersion      @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  answers                ConfigurableFormAnswer[]
+  fileAnswers            ConfigurableFormFileAnswer[]
+  researchScreeningLinks ResearchPublicSurveyLink[]   @relation("ResearchScreeningField")
 
   @@unique([versionId, key])
   @@unique([versionId, sequence])
@@ -8342,16 +8350,22 @@ model ResearchPublicSurveyLink {
   allowSaveResume          Boolean                  @default(true)
   randomizeQuestions       Boolean                  @default(false)
   minimumCompletionSeconds Int?
+  screeningFieldId         String?
+  screeningAllowedValues   Json?
+  disqualificationMessage  String?
 
-  organization Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  collection   ResearchCollectionWave        @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  createdBy    User                          @relation("ResearchPublicSurveyLinkCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  responses    ResearchPublicResponse[]
-  campaigns    ResearchSurveyCampaign[]
-  sessions     ResearchPublicSurveySession[]
+  organization     Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  collection       ResearchCollectionWave          @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  createdBy        User                            @relation("ResearchPublicSurveyLinkCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  responses        ResearchPublicResponse[]
+  campaigns        ResearchSurveyCampaign[]
+  sessions         ResearchPublicSurveySession[]
+  screeningField   ConfigurableFormField?          @relation("ResearchScreeningField", fields: [screeningFieldId], references: [id], onDelete: SetNull)
+  screeningRecords ResearchSurveyScreeningRecord[]
 
   @@index([organizationId, status, createdAt])
   @@index([collectionId, status])
+  @@index([screeningFieldId])
 }
 
 model ResearchPublicResponse {
@@ -8416,6 +8430,26 @@ model ResearchPublicSurveySession {
   @@index([invitationId])
 }
 
+model ResearchSurveyScreeningRecord {
+  id              String                   @id @default(cuid())
+  organizationId  String
+  publicLinkId    String
+  invitationId    String?                  @unique
+  accessTokenHash String                   @unique
+  fieldId         String
+  answer          Json
+  outcome         ResearchScreeningOutcome
+  screenedAt      DateTime                 @default(now())
+  expiresAt       DateTime
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  publicLink   ResearchPublicSurveyLink  @relation(fields: [publicLinkId], references: [id], onDelete: Cascade)
+  invitation   ResearchSurveyInvitation? @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, outcome, screenedAt])
+  @@index([publicLinkId, outcome, screenedAt])
+}
+
 model ResearchSurveyCampaign {
   id             String                       @id @default(cuid())
   organizationId String
@@ -8459,12 +8493,13 @@ model ResearchSurveyInvitation {
   createdAt        DateTime                       @default(now())
   updatedAt        DateTime                       @updatedAt
 
-  organization   Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  campaign       ResearchSurveyCampaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  panelMember    ResearchPanelMember?          @relation(fields: [panelMemberId], references: [id], onDelete: SetNull)
-  quota          ResearchCampaignQuota?        @relation(fields: [quotaId], references: [id], onDelete: SetNull)
-  response       ResearchPublicResponse?
-  surveySessions ResearchPublicSurveySession[]
+  organization    Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign        ResearchSurveyCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  panelMember     ResearchPanelMember?           @relation(fields: [panelMemberId], references: [id], onDelete: SetNull)
+  quota           ResearchCampaignQuota?         @relation(fields: [quotaId], references: [id], onDelete: SetNull)
+  response        ResearchPublicResponse?
+  surveySessions  ResearchPublicSurveySession[]
+  screeningRecord ResearchSurveyScreeningRecord?
 
   @@unique([campaignId, participantEmail])
   @@index([organizationId, status, createdAt])

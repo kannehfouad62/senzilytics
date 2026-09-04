@@ -48,6 +48,14 @@ export async function createPublicSurveyLink(
     const expiresAt = expiryRaw ? new Date(expiryRaw) : null;
     const minimumRaw = value(data, "minimumCompletionSeconds", 10);
     const minimumCompletionSeconds = minimumRaw ? Number(minimumRaw) : null;
+    const screeningFieldId = value(data, "screeningFieldId", 100) || null;
+    const screeningAllowedValues = value(data, "screeningAllowedValues", 3000)
+      .split(/\r?\n|,/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 100);
+    const disqualificationMessage =
+      value(data, "disqualificationMessage", 1000) || null;
 
     if (label.length < 3) throw new Error("Enter a descriptive link label.");
     if (
@@ -76,9 +84,28 @@ export async function createPublicSurveyLink(
         id: true,
         name: true,
         questionnaire: { select: { name: true } },
+        formVersion: {
+          select: {
+            fields: {
+              where: { fieldType: { not: "FILE" } },
+              select: { id: true },
+            },
+          },
+        },
       },
     });
     if (!collection) throw new Error("Research collection wave not found.");
+    if (
+      screeningFieldId &&
+      (!collection.formVersion.fields.some(
+        (field) => field.id === screeningFieldId,
+      ) ||
+        !screeningAllowedValues.length ||
+        !disqualificationMessage)
+    )
+      throw new Error(
+        "Screening requires a version field, eligible values and participant message.",
+      );
 
     const link = await prisma.researchPublicSurveyLink.create({
       data: {
@@ -91,6 +118,13 @@ export async function createPublicSurveyLink(
         allowSaveResume: data.get("allowSaveResume") === "on",
         randomizeQuestions: data.get("randomizeQuestions") === "on",
         minimumCompletionSeconds,
+        screeningFieldId,
+        screeningAllowedValues: screeningFieldId
+          ? screeningAllowedValues
+          : undefined,
+        disqualificationMessage: screeningFieldId
+          ? disqualificationMessage
+          : null,
         createdById: user.id,
       },
     });

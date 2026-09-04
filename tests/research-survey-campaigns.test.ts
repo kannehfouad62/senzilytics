@@ -41,7 +41,7 @@ test("survey campaigns use unique single-use recipient invitations", async () =>
   assert.match(actions, /reminderLimit/);
   assert.match(submission, /currentInvitation/);
   assert.match(submission, /status: "COMPLETED"/);
-  assert.match(page, /status: \{ in: \["SENT", "OPENED"\] \}/);
+  assert.match(page, /status: \{ in: \["SENT", "OPENED", "DISQUALIFIED"\] \}/);
 });
 
 test("campaign workspace exposes delivery funnel and completion timing", async () => {

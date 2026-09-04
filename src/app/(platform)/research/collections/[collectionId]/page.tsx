@@ -113,7 +113,12 @@ export default async function ResearchCollectionPage({
 
       {canManage && (
         <section className="mt-8 space-y-5">
-          <PublicSurveyLinkForm collectionId={collection.id} />
+          <PublicSurveyLinkForm
+            collectionId={collection.id}
+            fields={collection.formVersion.fields
+              .filter((field) => field.fieldType !== "FILE")
+              .map((field) => ({ id: field.id, label: field.label }))}
+          />
           <div>
             <div className="mb-4">
               <p className="text-sm text-cyan-300">External collection</p>

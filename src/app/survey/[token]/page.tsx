@@ -4,7 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 
-import { PublicResearchSurveyForm } from "@/features/research/public-survey-forms";
+import {
+  PublicResearchSurveyForm,
+  PublicSurveyScreeningForm,
+} from "@/features/research/public-survey-forms";
 import { prisma } from "@/lib/prisma";
 import {
   ResearchCollectionStatus,
@@ -14,6 +17,7 @@ import {
   deterministicFieldOrder,
   resumeCookieName,
 } from "@/modules/research/research-response-integrity";
+import { screeningCookieName } from "@/modules/research/research-screening";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -42,6 +46,7 @@ export default async function PublicSurveyPage({
         },
       },
       _count: { select: { responses: true } },
+      screeningField: true,
     },
   });
   const now = new Date();
@@ -73,7 +78,7 @@ export default async function PublicSurveyPage({
         where: {
           token: query.invite,
           campaign: { publicLinkId: link.id, status: "ACTIVE" },
-          status: { in: ["SENT", "OPENED"] },
+          status: { in: ["SENT", "OPENED", "DISQUALIFIED"] },
         },
       })
     : null;
@@ -88,13 +93,52 @@ export default async function PublicSurveyPage({
         </section>
       </SurveyShell>
     );
+  const jar = await cookies();
+  const screeningToken = jar.get(screeningCookieName(token))?.value;
+  const screeningRecord = screeningToken
+    ? await prisma.researchSurveyScreeningRecord.findFirst({
+        where: {
+          accessTokenHash: createHash("sha256")
+            .update(screeningToken)
+            .digest("hex"),
+          publicLinkId: link.id,
+          invitationId: invitation?.id ?? null,
+          expiresAt: { gt: now },
+        },
+      })
+    : null;
+  if (
+    link.screeningField &&
+    (invitation?.status === "DISQUALIFIED" ||
+      screeningRecord?.outcome === "DISQUALIFIED")
+  )
+    return (
+      <SurveyShell>
+        <section className="rounded-3xl border border-amber-400/20 bg-amber-400/[.05] p-8 text-center">
+          <h1 className="text-3xl font-bold">Thank you for your interest</h1>
+          <p className="mt-3 text-slate-300">
+            {link.disqualificationMessage ||
+              "You do not meet the eligibility criteria for this questionnaire."}
+          </p>
+        </section>
+      </SurveyShell>
+    );
+  if (link.screeningField && screeningRecord?.outcome !== "ELIGIBLE")
+    return (
+      <SurveyShell>
+        <PublicSurveyScreeningForm
+          token={token}
+          invitationToken={invitation?.token ?? null}
+          field={link.screeningField}
+        />
+      </SurveyShell>
+    );
   if (invitation?.status === "SENT")
     await prisma.researchSurveyInvitation.updateMany({
       where: { id: invitation.id, status: "SENT" },
       data: { status: "OPENED", openedAt: new Date() },
     });
 
-  const jar = await cookies();
   const resumeToken = jar.get(resumeCookieName(token))?.value;
   const savedSession = resumeToken
     ? await prisma.researchPublicSurveySession.findFirst({
