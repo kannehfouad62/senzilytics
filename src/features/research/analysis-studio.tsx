@@ -8,6 +8,7 @@ import { boxPlot, confidenceInterval, contingencyTable, histogram, interpretPVal
 import { initialFormActionState } from "@/core/actions/action-state";
 import { saveResearchAnalysis } from "@/features/research/analysis-actions";
 import { useRefreshOnSuccess } from "@/features/research/use-refresh-on-success";
+import { validateSurveyWeights,weightDiagnostics,weightedFrequencies,weightedMean } from "@/modules/research/research-survey-weighting";
 
 type AnalysisMode = "AUTO" | "DISTRIBUTION" | "BOX_PLOT" | "CROSSTAB" | "CORRELATION" | "GROUP_COMPARISON" | "REGRESSION";
 const modes: Array<{ value: AnalysisMode; label: string }> = [
@@ -31,6 +32,7 @@ export function ResearchAnalysisStudio({ variables, rows, collectionId, datasetV
   const [sortDirection, setSortDirection] = useState<"NONE" | "ASC" | "DESC">("NONE");
   const [search, setSearch] = useState("");
   const [bins, setBins] = useState(8);
+  const [weightKey,setWeightKey]=useState("");
   const [saveState, saveAction, savePending] = useActionState(saveResearchAnalysis, initialFormActionState);
   useRefreshOnSuccess(saveState);
   const filterVariable = variables.find(variable => variable.key === filterKey) ?? null;
@@ -45,6 +47,7 @@ export function ResearchAnalysisStudio({ variables, rows, collectionId, datasetV
   const xSummary = x ? summarizeVariable(x, filtered) : null;
   const ySummary = y ? summarizeVariable(y, filtered) : null;
   const query = new URLSearchParams({ x: x?.key ?? "", y: y?.key ?? "", mode: effectiveMode });
+  const weighting=useMemo(()=>{if(!weightKey||!x)return null;try{const diagnostics=weightDiagnostics(validateSurveyWeights(filtered,weightKey)),estimate=x.type==="NUMBER"?weightedMean(filtered,x.key,weightKey):weightedFrequencies(filtered,x.key,weightKey);return{diagnostics,estimate,error:null}}catch(cause){return{diagnostics:null,estimate:null,error:cause instanceof Error?cause.message:"Weights are invalid."}}},[filtered,weightKey,x]);
 
   return <div className="space-y-6">
     <section className={`${panel} p-5`}>
@@ -53,6 +56,7 @@ export function ResearchAnalysisStudio({ variables, rows, collectionId, datasetV
         <label className="grid gap-1 text-xs text-slate-400"><span>Filter variable</span><select value={filterKey} onChange={event => { setFilterKey(event.target.value); setFilterValue(""); }} className={input}><option value="">All responses</option>{variables.map(variable => <option key={variable.key} value={variable.key}>{variable.label}</option>)}</select></label>
         {filterVariable && <label className="grid gap-1 text-xs text-slate-400"><span>Filter value</span><select value={filterValue} onChange={event => setFilterValue(event.target.value)} className={input}><option value="">All values</option>{filterOptions.map(value => <option key={value}>{value}</option>)}</select></label>}
         <label className="grid gap-1 text-xs text-slate-400"><span>Sort X</span><select value={sortDirection} onChange={event => setSortDirection(event.target.value as typeof sortDirection)} className={input}><option value="NONE">Original order</option><option value="ASC">Ascending</option><option value="DESC">Descending</option></select></label>
+        <label className="grid gap-1 text-xs text-slate-400"><span>Survey weight</span><select value={weightKey} onChange={event=>setWeightKey(event.target.value)} className={input}><option value="">Unweighted</option>{variables.filter(variable=>variable.type==="NUMBER").map(variable=><option key={variable.key} value={variable.key}>{variable.label}</option>)}</select></label>
         {effectiveMode === "DISTRIBUTION" && <label className="grid gap-1 text-xs text-slate-400"><span>Histogram bins</span><input type="number" min={2} max={30} value={bins} onChange={event => setBins(Math.max(2, Math.min(30, Number(event.target.value) || 2)))} className={`${input} w-24`}/></label>}
         <button onClick={() => { setFilterKey(""); setFilterValue(""); setSortDirection("NONE"); }} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300">Reset filters</button>
       </div>
@@ -77,8 +81,9 @@ export function ResearchAnalysisStudio({ variables, rows, collectionId, datasetV
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric label="Included responses" value={rows.length}/><Metric label="Filtered responses" value={filtered.length}/><Metric label="X missing" value={xSummary?.missing ?? 0}/><Metric label="X unique" value={xSummary?.unique ?? 0}/><Metric label="Y mean" value={format(ySummary?.mean)}/></div>
     <StatisticalResults mode={effectiveMode} rows={filtered} x={x} y={y}/>
+    {weighting&&<section className={`${panel} border-violet-400/20 p-6`}><p className="text-xs font-semibold uppercase tracking-[.18em] text-violet-300">Survey-weighted estimate</p>{weighting.error?<p className="mt-3 text-sm text-red-300">{weighting.error}</p>:<><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Metric label="Sum of weights" value={format(weighting.diagnostics?.sumWeights)}/><Metric label="Effective N" value={format(weighting.diagnostics?.effectiveSampleSize)}/><Metric label="Design effect" value={format(weighting.diagnostics?.designEffect)}/><Metric label="Weight CV" value={format(weighting.diagnostics?.coefficientOfVariation)}/><Metric label="Weighted mean" value={format(weighting.estimate&&!Array.isArray(weighting.estimate)?weighting.estimate.mean:null)}/></div><p className="mt-4 text-xs text-slate-400">Weighting is explicit and does not replace the unweighted results above. Confirm the sampling design and weight construction before interpretation.</p></>}</section>}
     {x && <form action={saveAction} className={`${panel} p-6`}>
-      <input type="hidden" name="collectionId" value={collectionId??""}/><input type="hidden" name="datasetVersionId" value={datasetVersionId??""}/><input type="hidden" name="method" value={effectiveMode}/><input type="hidden" name="xVariableKey" value={x.key}/><input type="hidden" name="yVariableKey" value={y?.key ?? ""}/><input type="hidden" name="filterVariableKey" value={filterKey}/><input type="hidden" name="filterValue" value={filterValue}/>
+      <input type="hidden" name="collectionId" value={collectionId??""}/><input type="hidden" name="datasetVersionId" value={datasetVersionId??""}/><input type="hidden" name="weightVariableKey" value={weightKey}/><input type="hidden" name="method" value={effectiveMode}/><input type="hidden" name="xVariableKey" value={x.key}/><input type="hidden" name="yVariableKey" value={y?.key ?? ""}/><input type="hidden" name="filterVariableKey" value={filterKey}/><input type="hidden" name="filterValue" value={filterValue}/>
       <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-semibold">Save governed analysis</h2><p className="mt-1 text-sm text-slate-400">Freeze the current method, variables, filtered population and calculated results as a reviewable draft.</p></div><button disabled={savePending} className="rounded-xl bg-cyan-300 px-5 py-2.5 text-sm font-semibold text-slate-950 disabled:opacity-50">{savePending ? "Saving…" : "Save analysis draft"}</button></div>
       <div className="mt-5 grid gap-4 md:grid-cols-2"><label className="grid gap-1 text-xs text-slate-400"><span>Analysis title</span><input name="title" required maxLength={160} defaultValue={analysisTitle(effectiveMode, x, y)} className={input}/></label><label className="grid gap-1 text-xs text-slate-400"><span>Hypothesis</span><input name="hypothesis" maxLength={2000} placeholder="Optional null or research hypothesis" className={input}/></label></div>
       <label className="mt-4 grid gap-1 text-xs text-slate-400"><span>Methodology and assumption notes</span><textarea name="methodologyNotes" maxLength={4000} rows={3} placeholder="Record sampling assumptions, exclusions, transformations and analyst decisions." className={input}/></label>

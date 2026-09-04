@@ -44,6 +44,7 @@ export async function GET(
       ["Approved by", analysis.approvedBy?.name ?? ""],
       ["Analytical population", analysis.datasetResponseCount],
       ["Variables", analysis.variableKeys.join(", ")],
+      ["Weight variable",analysis.weightVariableKey??"Unweighted"],
     ].map((row) => row.map(safeSpreadsheetValue)),
   );
   results.addRow(["Result path", "Value"]);

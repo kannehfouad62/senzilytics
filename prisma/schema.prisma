@@ -8209,6 +8209,7 @@ model ResearchAnalysis {
   variableKeys         String[]               @default([])
   filterVariableKey    String?
   filterValue          String?
+  weightVariableKey    String?
   hypothesis           String?
   methodologyNotes     String?
   status               ResearchAnalysisStatus @default(DRAFT)

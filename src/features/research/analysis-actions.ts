@@ -12,6 +12,7 @@ import { getResearchDataset } from "@/modules/research/research-dataset.service"
 import { getImportedAnalysisDataset } from "@/modules/research/imported-analysis-dataset.service";
 import { buildAnalysisSnapshot } from "@/modules/research/research-statistics";
 import { cronbachAlpha, logisticRegression, multipleLinearRegression } from "@/modules/research/research-modeling";
+import { validateSurveyWeights, weightDiagnostics, weightedFrequencies, weightedMean } from "@/modules/research/research-survey-weighting";
 
 const methods = new Set(["AUTO", "DISTRIBUTION", "BOX_PLOT", "CROSSTAB", "CORRELATION", "GROUP_COMPARISON", "REGRESSION", "MULTIPLE_REGRESSION", "LOGISTIC_REGRESSION", "RELIABILITY"]);
 const text = (data: FormData, key: string, maximum = 2000) => String(data.get(key) ?? "").trim().slice(0, maximum);
@@ -32,6 +33,7 @@ export async function saveResearchAnalysis(_state: FormActionState, data: FormDa
     const variableKeys = [...new Set(text(data, "variableKeys", 4000).split(",").map(value => value.trim()).filter(Boolean))].slice(0, 30);
     const filterVariableKey = text(data, "filterVariableKey", 160) || null;
     const filterValue = text(data, "filterValue", 500) || null;
+    const weightVariableKey=text(data,"weightVariableKey",160)||null;
     if (!title) throw new Error("Give this analysis a title.");
     if (!methods.has(method)) throw new Error("Select a valid analytical method.");
     if(Boolean(collectionId)===Boolean(datasetVersionId))throw new Error("Select exactly one governed dataset source.");
@@ -44,10 +46,13 @@ export async function saveResearchAnalysis(_state: FormActionState, data: FormDa
     if (!x || (yVariableKey && !y)) throw new Error("The selected variables are not part of this questionnaire version.");
     if (filterVariableKey && !dataset.variables.some(variable => variable.key === filterVariableKey)) throw new Error("The selected filter is not part of this questionnaire version.");
     const rows = filterVariableKey && filterValue ? analysisRows.filter(row => categories(row.values[filterVariableKey]).includes(filterValue)) : analysisRows;
+    const weightVariable=weightVariableKey?dataset.variables.find(variable=>variable.key===weightVariableKey):null;
+    if(weightVariableKey&&weightVariable?.type!=="NUMBER")throw new Error("Select a numeric weight variable from this governed dataset.");
+    const weightResult=weightVariableKey?{diagnostics:weightDiagnostics(validateSurveyWeights(rows,weightVariableKey)),estimate:x.type==="NUMBER"?weightedMean(rows,x.key,weightVariableKey):weightedFrequencies(rows,x.key,weightVariableKey)}:null;
     if (selectedVariables.length !== variableKeys.length) throw new Error("One or more selected model variables are not part of this questionnaire version.");
     const modelResult = method === "MULTIPLE_REGRESSION" && y ? multipleLinearRegression(rows, selectedVariables, y) : method === "LOGISTIC_REGRESSION" && y ? logisticRegression(rows, selectedVariables, y) : method === "RELIABILITY" ? cronbachAlpha(rows, selectedVariables) : null;
     if (["MULTIPLE_REGRESSION", "LOGISTIC_REGRESSION", "RELIABILITY"].includes(method) && !modelResult) throw new Error("The selected variables do not provide enough complete, compatible observations for this model.");
-    const resultSnapshot = JSON.parse(JSON.stringify(modelResult ? { method, result: modelResult } : buildAnalysisSnapshot(method, rows, x, y)));
+    const resultSnapshot = JSON.parse(JSON.stringify(modelResult ? { method, result: modelResult,weighting:weightResult } : { ...buildAnalysisSnapshot(method, rows, x, y),weighting:weightResult }));
     const sourceWhere=collectionId?{collectionId}:{datasetVersionId};
     const previous = await prisma.researchAnalysis.aggregate({ where: { organizationId, ...sourceWhere, title }, _max: { version: true } });
     const analysis = await prisma.researchAnalysis.create({ data: {
@@ -61,6 +66,7 @@ export async function saveResearchAnalysis(_state: FormActionState, data: FormDa
       variableKeys,
       filterVariableKey,
       filterValue,
+      weightVariableKey,
       hypothesis: text(data, "hypothesis", 2000) || null,
       methodologyNotes: text(data, "methodologyNotes", 4000) || null,
       datasetResponseCount: rows.length,
