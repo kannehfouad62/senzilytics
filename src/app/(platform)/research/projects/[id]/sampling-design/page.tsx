@@ -129,6 +129,12 @@ export default async function SamplingDesignPage({
           selection procedure, weighting construction and design assumptions for{" "}
           {project.title}.
         </p>
+        <Link
+          href={`/research/projects/${id}/fieldwork`}
+          className="mt-4 inline-block rounded-xl border border-fuchsia-400/20 px-4 py-2 text-sm text-fuchsia-300"
+        >
+          Open Fieldwork Command Center →
+        </Link>
       </div>
       {canManage && (
         <div className="mt-8">
