@@ -13,6 +13,7 @@ import {
   CalendarClock,
   FlaskConical,
   Plus,
+  Repeat2,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -60,6 +61,13 @@ export default async function ResearchPortfolioPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <Link
+            href="/research/longitudinal"
+            className="inline-flex items-center gap-2 rounded-xl border border-violet-400/25 bg-violet-400/10 px-5 py-3 font-semibold text-violet-200"
+          >
+            <Repeat2 size={17} />
+            Longitudinal studies
+          </Link>
           <Link
             href="/research/panels"
             className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-5 py-3 font-semibold text-cyan-200"

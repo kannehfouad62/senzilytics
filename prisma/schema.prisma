@@ -370,6 +370,29 @@ enum ResearchCampaignQuotaStatus {
   CLOSED
 }
 
+enum ResearchLongitudinalStudyStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum ResearchLongitudinalWaveType {
+  BASELINE
+  MIDLINE
+  ENDLINE
+  FOLLOW_UP
+  CUSTOM
+}
+
+enum ResearchLongitudinalParticipantStatus {
+  ENROLLED
+  WITHDRAWN
+  COMPLETED
+  LOST_TO_FOLLOW_UP
+}
+
 enum ResearchAssignmentStatus {
   ASSIGNED
   IN_PROGRESS
@@ -2222,6 +2245,8 @@ model Organization {
   researchPanelMembers             ResearchPanelMember[]
   researchConsentEvents            ResearchPanelConsentEvent[]
   researchCampaignQuotas           ResearchCampaignQuota[]
+  researchLongitudinalStudies      ResearchLongitudinalStudy[]
+  researchLongitudinalParticipants ResearchLongitudinalParticipant[]
 }
 
 model PricingInquiry {
@@ -2574,6 +2599,7 @@ model User {
   createdResearchPanels               ResearchPanel[]                   @relation("ResearchPanelCreator")
   managedResearchPanelMembers         ResearchPanelMember[]             @relation("ResearchPanelMemberManager")
   recordedResearchConsentEvents       ResearchPanelConsentEvent[]       @relation("ResearchConsentRecorder")
+  createdResearchLongitudinalStudies  ResearchLongitudinalStudy[]       @relation("ResearchLongitudinalStudyCreator")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8168,6 +8194,7 @@ model ResearchProject {
   samplingDesigns       ResearchSamplingDesign[]
   samplingFrames        ResearchSamplingFrame[]
   samplingExecutions    ResearchSamplingExecution[]
+  longitudinalStudies   ResearchLongitudinalStudy[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
@@ -8232,10 +8259,11 @@ model ResearchQuestionnaire {
   createdAt        DateTime                     @default(now())
   updatedAt        DateTime                     @updatedAt
 
-  organization    Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project         ResearchProject            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  formDefinition  ConfigurableFormDefinition @relation(fields: [formDefinitionId], references: [id], onDelete: Restrict)
-  collectionWaves ResearchCollectionWave[]
+  organization        Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project             ResearchProject             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  formDefinition      ConfigurableFormDefinition  @relation(fields: [formDefinitionId], references: [id], onDelete: Restrict)
+  collectionWaves     ResearchCollectionWave[]
+  longitudinalStudies ResearchLongitudinalStudy[]
 
   @@unique([projectId, name])
   @@index([organizationId, isActive])
@@ -8280,6 +8308,7 @@ model ResearchCollectionWave {
   publicResponses   ResearchPublicResponse[]
   surveyCampaigns   ResearchSurveyCampaign[]
   analyses          ResearchAnalysis[]
+  longitudinalWave  ResearchLongitudinalWave?
 
   @@unique([questionnaireId, name])
   @@index([organizationId, status, closesAt])
@@ -8410,9 +8439,10 @@ model ResearchPanel {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
-  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User                  @relation("ResearchPanelCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  members      ResearchPanelMember[]
+  organization        Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy           User                        @relation("ResearchPanelCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members             ResearchPanelMember[]
+  longitudinalStudies ResearchLongitudinalStudy[]
 
   @@unique([organizationId, name])
   @@index([organizationId, status, createdAt])
@@ -8433,11 +8463,12 @@ model ResearchPanelMember {
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
 
-  organization  Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  panel         ResearchPanel               @relation(fields: [panelId], references: [id], onDelete: Cascade)
-  managedBy     User                        @relation("ResearchPanelMemberManager", fields: [managedById], references: [id], onDelete: Restrict)
-  consentEvents ResearchPanelConsentEvent[]
-  invitations   ResearchSurveyInvitation[]
+  organization            Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  panel                   ResearchPanel                     @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  managedBy               User                              @relation("ResearchPanelMemberManager", fields: [managedById], references: [id], onDelete: Restrict)
+  consentEvents           ResearchPanelConsentEvent[]
+  invitations             ResearchSurveyInvitation[]
+  longitudinalEnrollments ResearchLongitudinalParticipant[]
 
   @@unique([panelId, email])
   @@index([organizationId, status, consentExpiresAt])
@@ -8483,6 +8514,78 @@ model ResearchCampaignQuota {
   @@unique([campaignId, attributeKey, attributeValue])
   @@index([organizationId, status, createdAt])
   @@index([campaignId, status])
+}
+
+model ResearchLongitudinalStudy {
+  id                     String                          @id @default(cuid())
+  organizationId         String
+  projectId              String
+  questionnaireId        String
+  panelId                String
+  title                  String
+  purpose                String
+  recontactStatement     String
+  plannedWaveCount       Int
+  retentionTargetPercent Int                             @default(80)
+  status                 ResearchLongitudinalStudyStatus @default(DRAFT)
+  createdById            String
+  activatedAt            DateTime?
+  completedAt            DateTime?
+  createdAt              DateTime                        @default(now())
+  updatedAt              DateTime                        @updatedAt
+
+  organization  Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project       ResearchProject                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  questionnaire ResearchQuestionnaire             @relation(fields: [questionnaireId], references: [id], onDelete: Restrict)
+  panel         ResearchPanel                     @relation(fields: [panelId], references: [id], onDelete: Restrict)
+  createdBy     User                              @relation("ResearchLongitudinalStudyCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  waves         ResearchLongitudinalWave[]
+  participants  ResearchLongitudinalParticipant[]
+
+  @@unique([organizationId, title])
+  @@index([organizationId, status, createdAt])
+  @@index([projectId, status])
+  @@index([panelId, status])
+}
+
+model ResearchLongitudinalWave {
+  id           String                       @id @default(cuid())
+  studyId      String
+  collectionId String                       @unique
+  label        String
+  sequence     Int
+  type         ResearchLongitudinalWaveType
+  scheduledAt  DateTime?
+  createdAt    DateTime                     @default(now())
+
+  study      ResearchLongitudinalStudy @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  collection ResearchCollectionWave    @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+
+  @@unique([studyId, sequence])
+  @@index([studyId, scheduledAt])
+}
+
+model ResearchLongitudinalParticipant {
+  id              String                                @id @default(cuid())
+  organizationId  String
+  studyId         String
+  panelMemberId   String
+  subjectCode     String
+  status          ResearchLongitudinalParticipantStatus @default(ENROLLED)
+  enrolledAt      DateTime                              @default(now())
+  lastContactAt   DateTime?
+  completedAt     DateTime?
+  withdrawnAt     DateTime?
+  attritionReason String?
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  study        ResearchLongitudinalStudy @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  panelMember  ResearchPanelMember       @relation(fields: [panelMemberId], references: [id], onDelete: Restrict)
+
+  @@unique([studyId, panelMemberId])
+  @@unique([studyId, subjectCode])
+  @@index([organizationId, status, enrolledAt])
+  @@index([studyId, status])
 }
 
 model ResearchQuestionnaireAssignment {
