@@ -44,6 +44,10 @@ export default async function ResearchDatasetPage({
   const canApprove = permissions.includes(
     PermissionKey.APPROVE_RESEARCH_OUTPUTS,
   );
+  const integrityReviews = responseRows.filter(
+    (item) =>
+      item.source === "PUBLIC" && item.response.integrityStatus === "REVIEW",
+  ).length;
   return (
     <div>
       <Link href="/research/datasets" className="text-sm text-cyan-300">
@@ -69,7 +73,7 @@ export default async function ResearchDatasetPage({
           />
         )}
       </div>
-      <div className="mt-7 grid gap-4 sm:grid-cols-4">
+      <div className="mt-7 grid gap-4 sm:grid-cols-5">
         <Metric label="Dataset status" value={collection.datasetStatus} />
         <Metric label="Variables" value={variables.length} />
         <Metric
@@ -80,6 +84,7 @@ export default async function ResearchDatasetPage({
           )}
         />
         <Metric label="Saved analyses" value={collection.analyses.length} />
+        <Metric label="Integrity review" value={integrityReviews} />
       </div>
       <div className="mt-9">
         <ResearchAnalysisStudio
@@ -210,6 +215,20 @@ export default async function ResearchDatasetPage({
                     </p>
                   </div>
                   <div className="text-right text-xs text-amber-300">
+                    {item.source === "PUBLIC" &&
+                      item.response.integrityStatus === "REVIEW" && (
+                        <p>
+                          Integrity review ·{" "}
+                          {item.response.completionSeconds ?? "—"}s
+                        </p>
+                      )}
+                    {item.source === "PUBLIC" &&
+                      Array.isArray(item.response.integrityFlags) &&
+                      item.response.integrityFlags.map((flag) => (
+                        <p key={String(flag)}>
+                          {String(flag).replaceAll("_", " ")}
+                        </p>
+                      ))}
                     {(qualityIssues.get(item.response.id) ?? []).map(
                       (issue) => (
                         <p key={issue}>{issue}</p>

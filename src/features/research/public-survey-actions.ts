@@ -1,5 +1,7 @@
 "use server";
 
+import { createHash, randomBytes } from "node:crypto";
+
 import {
   ActivityAction,
   ConfigurableFormModule,
@@ -9,17 +11,124 @@ import {
   ResearchPublicLinkStatus,
   ResearchResponseIdentityMode,
 } from "@prisma/client";
+import { cookies } from "next/headers";
 
 import type { FormActionState } from "@/core/actions/action-state";
 import { logActivity } from "@/core/activity-log/activity-log.service";
 import { prisma } from "@/lib/prisma";
 import { preparePublishedFormVersionSubmission } from "@/modules/forms/runtime-form.service";
 import { isPanelMemberEligible } from "@/modules/research/research-panel-governance";
+import {
+  calculateResponseIntegrity,
+  resumeCookieName,
+} from "@/modules/research/research-response-integrity";
 
 const value = (data: FormData, key: string, max = 300) =>
   String(data.get(key) ?? "")
     .trim()
     .slice(0, max);
+
+const tokenHash = (token: string) =>
+  createHash("sha256").update(token).digest("hex");
+
+export async function savePublicResearchSurveyDraft(
+  _state: FormActionState,
+  data: FormData,
+): Promise<FormActionState> {
+  try {
+    const token = value(data, "token", 100);
+    const invitationToken = value(data, "invitationToken", 100) || null;
+    const link = await prisma.researchPublicSurveyLink.findUnique({
+      where: { token },
+      include: { collection: true },
+    });
+    if (
+      !link ||
+      !link.allowSaveResume ||
+      link.status !== ResearchPublicLinkStatus.ACTIVE ||
+      link.collection.status !== ResearchCollectionStatus.ACTIVE
+    )
+      throw new Error("Save and resume is not available for this survey.");
+    const invitation = invitationToken
+      ? await prisma.researchSurveyInvitation.findFirst({
+          where: {
+            token: invitationToken,
+            campaign: { publicLinkId: link.id, status: "ACTIVE" },
+            status: { in: ["SENT", "OPENED"] },
+          },
+        })
+      : null;
+    if (invitationToken && !invitation)
+      throw new Error("This invitation is no longer active.");
+    const answers: Record<string, string | string[]> = {};
+    for (const key of new Set(data.keys())) {
+      if (!key.startsWith("custom_") || Object.keys(answers).length >= 200)
+        continue;
+      const values = data
+        .getAll(key)
+        .map((item) => String(item).slice(0, 10_000));
+      answers[key] = values.length > 1 ? values : (values[0] ?? "");
+    }
+    const identity = {
+      participantName: value(data, "participantName", 160) || null,
+      participantEmail:
+        value(data, "participantEmail", 254).toLowerCase() || null,
+      pseudonymousReference: value(data, "pseudonymousReference", 160) || null,
+    };
+    const jar = await cookies();
+    const cookieName = resumeCookieName(token);
+    const existingToken = jar.get(cookieName)?.value;
+    const existing = existingToken
+      ? await prisma.researchPublicSurveySession.findFirst({
+          where: {
+            resumeTokenHash: tokenHash(existingToken),
+            publicLinkId: link.id,
+            invitationId: invitation?.id ?? null,
+            completedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+        })
+      : null;
+    const resumeToken = existingToken || randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    if (existing) {
+      await prisma.researchPublicSurveySession.update({
+        where: { id: existing.id },
+        data: { answers, identity, expiresAt },
+      });
+    } else {
+      await prisma.researchPublicSurveySession.create({
+        data: {
+          organizationId: link.organizationId,
+          publicLinkId: link.id,
+          invitationId: invitation?.id ?? null,
+          resumeTokenHash: tokenHash(resumeToken),
+          formVersionId: link.collection.formVersionId,
+          answers,
+          identity,
+          expiresAt,
+        },
+      });
+    }
+    jar.set(cookieName, resumeToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: `/survey/${token}`,
+      expires: expiresAt,
+    });
+    return {
+      status: "SUCCESS",
+      message: "Progress saved securely on this device for 30 days.",
+    };
+  } catch (error) {
+    return {
+      status: "ERROR",
+      message:
+        error instanceof Error ? error.message : "Progress was not saved.",
+    };
+  }
+}
 
 export async function submitPublicResearchSurvey(
   _state: FormActionState,
@@ -67,6 +176,20 @@ export async function submitPublicResearchSurvey(
       );
 
     const now = new Date();
+    const jar = await cookies();
+    const resumeToken = jar.get(resumeCookieName(token))?.value;
+    const resumedSession = resumeToken
+      ? await prisma.researchPublicSurveySession.findFirst({
+          where: {
+            resumeTokenHash: tokenHash(resumeToken),
+            publicLinkId: link.id,
+            invitationId: invitation?.id ?? null,
+            formVersionId: link.collection.formVersionId,
+            completedAt: null,
+            expiresAt: { gt: now },
+          },
+        })
+      : null;
     const collection = link.collection;
     if (collection.status !== ResearchCollectionStatus.ACTIVE) {
       throw new Error("This survey is not currently accepting responses.");
@@ -122,6 +245,12 @@ export async function submitPublicResearchSurvey(
         "Questionnaires with required file fields are not supported by public links.",
       );
     }
+    const integrity = calculateResponseIntegrity({
+      startedAt: resumedSession?.startedAt ?? invitation?.openedAt ?? now,
+      submittedAt: now,
+      minimumCompletionSeconds: link.minimumCompletionSeconds,
+      answerCount: prepared.answers.length,
+    });
 
     const response = await prisma.$transaction(
       async (tx) => {
@@ -214,6 +343,17 @@ export async function submitPublicResearchSurvey(
                 : null,
             consentedAt: collection.questionnaire.consentStatement ? now : null,
             invitationId: currentInvitation?.id ?? null,
+            completionSeconds:
+              resumedSession || invitation?.openedAt
+                ? integrity.completionSeconds
+                : null,
+            integrityStatus:
+              resumedSession || invitation?.openedAt
+                ? integrity.status
+                : "CLEAR",
+            integrityFlags:
+              resumedSession || invitation?.openedAt ? integrity.flags : [],
+            resumedSessionId: resumedSession?.id ?? null,
           },
         });
         const submission = await tx.configurableFormSubmission.create({
@@ -251,6 +391,11 @@ export async function submitPublicResearchSurvey(
             });
           }
         }
+        if (resumedSession)
+          await tx.researchPublicSurveySession.update({
+            where: { id: resumedSession.id },
+            data: { completedAt: now },
+          });
         return completed;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -269,8 +414,13 @@ export async function submitPublicResearchSurvey(
         publicLinkId: link.id,
         identityMode,
         invitationId: invitation?.id ?? null,
+        integrityStatus:
+          resumedSession || invitation?.openedAt ? integrity.status : "CLEAR",
+        integrityFlags:
+          resumedSession || invitation?.openedAt ? integrity.flags : [],
       },
     });
+    if (resumeToken) jar.delete(resumeCookieName(token));
     return {
       status: "SUCCESS",
       message: "Thank you. Your response has been securely submitted.",

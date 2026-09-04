@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { cookies } from "next/headers";
 
 import { PublicResearchSurveyForm } from "@/features/research/public-survey-forms";
 import { prisma } from "@/lib/prisma";
@@ -8,6 +10,10 @@ import {
   ResearchCollectionStatus,
   ResearchPublicLinkStatus,
 } from "@prisma/client";
+import {
+  deterministicFieldOrder,
+  resumeCookieName,
+} from "@/modules/research/research-response-integrity";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -88,13 +94,36 @@ export default async function PublicSurveyPage({
       data: { status: "OPENED", openedAt: new Date() },
     });
 
+  const jar = await cookies();
+  const resumeToken = jar.get(resumeCookieName(token))?.value;
+  const savedSession = resumeToken
+    ? await prisma.researchPublicSurveySession.findFirst({
+        where: {
+          resumeTokenHash: createHash("sha256")
+            .update(resumeToken)
+            .digest("hex"),
+          publicLinkId: link.id,
+          formVersionId: link.collection.formVersionId,
+          completedAt: null,
+          expiresAt: { gt: now },
+          invitationId: invitation?.id ?? null,
+        },
+      })
+    : null;
+
   const collection = link.collection;
+  const orderingSeed = invitation?.token ?? resumeToken ?? token;
+  const fields = link.randomizeQuestions
+    ? deterministicFieldOrder(collection.formVersion.fields, orderingSeed)
+    : collection.formVersion.fields;
   const form = {
     id: collection.questionnaire.formDefinitionId,
     name: collection.questionnaire.name,
     description: collection.questionnaire.purpose,
-    version: collection.formVersion,
+    version: { ...collection.formVersion, fields },
   };
+  const initialValues = jsonRecord(savedSession?.answers);
+  const initialIdentity = jsonRecord(savedSession?.identity);
   return (
     <SurveyShell>
       <header className="mb-8">
@@ -130,9 +159,28 @@ export default async function PublicSurveyPage({
         invitationToken={invitation?.token ?? null}
         invitedName={invitation?.participantName ?? null}
         invitedEmail={invitation?.participantEmail ?? null}
+        allowSaveResume={link.allowSaveResume}
+        initialValues={initialValues}
+        initialIdentity={{
+          participantName: stringOrNull(initialIdentity.participantName),
+          participantEmail: stringOrNull(initialIdentity.participantEmail),
+          pseudonymousReference: stringOrNull(
+            initialIdentity.pseudonymousReference,
+          ),
+        }}
       />
     </SurveyShell>
   );
+}
+
+function jsonRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, string | string[] | boolean>)
+    : {};
+}
+
+function stringOrNull(value: unknown) {
+  return typeof value === "string" ? value : null;
 }
 
 function SurveyShell({ children }: { children: React.ReactNode }) {

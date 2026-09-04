@@ -16,7 +16,10 @@ import {
   changePublicSurveyLinkStatus,
   createPublicSurveyLink,
 } from "@/features/research/public-survey-link-actions";
-import { submitPublicResearchSurvey } from "@/features/research/public-survey-actions";
+import {
+  savePublicResearchSurveyDraft,
+  submitPublicResearchSurvey,
+} from "@/features/research/public-survey-actions";
 import { useRefreshOnSuccess } from "@/features/research/use-refresh-on-success";
 
 const input =
@@ -89,6 +92,26 @@ export function PublicSurveyLinkForm({
         <Label text="Link expiry">
           <input name="expiresAt" type="datetime-local" className={input} />
         </Label>
+        <Label text="Speeding review threshold (seconds)">
+          <input
+            name="minimumCompletionSeconds"
+            type="number"
+            min={10}
+            max={86400}
+            placeholder="Optional"
+            className={input}
+          />
+        </Label>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-5 text-sm text-slate-300">
+        <label className="flex items-center gap-2">
+          <input name="allowSaveResume" type="checkbox" defaultChecked />
+          Allow secure save and resume
+        </label>
+        <label className="flex items-center gap-2">
+          <input name="randomizeQuestions" type="checkbox" />
+          Deterministically randomize questions
+        </label>
       </div>
       <button disabled={pending} className={`mt-5 ${primary}`}>
         {pending ? "Creating…" : "Create shareable link"}
@@ -197,6 +220,9 @@ export function PublicResearchSurveyForm({
   invitationToken,
   invitedName,
   invitedEmail,
+  allowSaveResume,
+  initialValues,
+  initialIdentity,
 }: {
   token: string;
   identityMode: ResearchResponseIdentityMode;
@@ -205,9 +231,20 @@ export function PublicResearchSurveyForm({
   invitationToken: string | null;
   invitedName: string | null;
   invitedEmail: string | null;
+  allowSaveResume: boolean;
+  initialValues: Record<string, string | string[] | boolean>;
+  initialIdentity: {
+    participantName?: string | null;
+    participantEmail?: string | null;
+    pseudonymousReference?: string | null;
+  };
 }) {
   const [state, action, pending] = useActionState(
     submitPublicResearchSurvey,
+    initialFormActionState,
+  );
+  const [saveState, saveAction, saving] = useActionState(
+    savePublicResearchSurveyDraft,
     initialFormActionState,
   );
   if (state.status === "SUCCESS")
@@ -244,7 +281,9 @@ export function PublicResearchSurveyForm({
               required
               maxLength={160}
               autoComplete="name"
-              defaultValue={invitedName ?? ""}
+              defaultValue={
+                invitedName ?? initialIdentity.participantName ?? ""
+              }
               className={input}
             />
           </Label>
@@ -255,7 +294,9 @@ export function PublicResearchSurveyForm({
               type="email"
               maxLength={254}
               autoComplete="email"
-              defaultValue={invitedEmail ?? ""}
+              defaultValue={
+                invitedEmail ?? initialIdentity.participantEmail ?? ""
+              }
               className={input}
             />
           </Label>
@@ -268,6 +309,7 @@ export function PublicResearchSurveyForm({
             required
             maxLength={160}
             autoComplete="off"
+            defaultValue={initialIdentity.pseudonymousReference ?? ""}
             className={input}
           />
           <span className="mt-1 block text-xs text-slate-500">
@@ -295,11 +337,25 @@ export function PublicResearchSurveyForm({
           </span>
         </label>
       )}
-      <RuntimeFormFields forms={[form]} />
+      <RuntimeFormFields forms={[form]} initialValues={initialValues} />
       <Feedback state={state} />
-      <button disabled={pending} className={primary}>
-        {pending ? "Submitting securely…" : "Submit response"}
-      </button>
+      <Feedback state={saveState} />
+      <div className="flex flex-wrap gap-3">
+        <button disabled={pending || saving} className={primary}>
+          {pending ? "Submitting securely…" : "Submit response"}
+        </button>
+        {allowSaveResume && (
+          <button
+            type="submit"
+            formAction={saveAction}
+            disabled={pending || saving}
+            formNoValidate
+            className="rounded-xl border border-cyan-400/25 px-5 py-3 text-sm font-semibold text-cyan-200 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save and continue later"}
+          </button>
+        )}
+      </div>
       <p className="text-xs text-slate-500">
         Each submission is recorded as a separate response against this governed
         questionnaire version.

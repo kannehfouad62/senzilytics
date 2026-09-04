@@ -46,6 +46,8 @@ export async function createPublicSurveyLink(
     const expiryRaw = value(data, "expiresAt", 40);
     const maxResponses = maxRaw ? Number(maxRaw) : null;
     const expiresAt = expiryRaw ? new Date(expiryRaw) : null;
+    const minimumRaw = value(data, "minimumCompletionSeconds", 10);
+    const minimumCompletionSeconds = minimumRaw ? Number(minimumRaw) : null;
 
     if (label.length < 3) throw new Error("Enter a descriptive link label.");
     if (
@@ -54,6 +56,13 @@ export async function createPublicSurveyLink(
     ) {
       throw new Error("Maximum responses must be a positive whole number.");
     }
+    if (
+      minimumCompletionSeconds !== null &&
+      (!Number.isInteger(minimumCompletionSeconds) ||
+        minimumCompletionSeconds < 10 ||
+        minimumCompletionSeconds > 86400)
+    )
+      throw new Error("Minimum completion time must be 10 to 86,400 seconds.");
     if (
       expiresAt &&
       (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date())
@@ -79,6 +88,9 @@ export async function createPublicSurveyLink(
         label,
         maxResponses,
         expiresAt,
+        allowSaveResume: data.get("allowSaveResume") === "on",
+        randomizeQuestions: data.get("randomizeQuestions") === "on",
+        minimumCompletionSeconds,
         createdById: user.id,
       },
     });
@@ -95,6 +107,7 @@ export async function createPublicSurveyLink(
         collectionId,
         maxResponses,
         expiresAt: expiresAt?.toISOString() ?? null,
+        minimumCompletionSeconds,
       },
     });
     refresh(collectionId);
