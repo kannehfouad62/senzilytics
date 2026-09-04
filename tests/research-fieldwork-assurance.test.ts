@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { fieldworkIntegritySignals, selectDeterministicBackcheckSample, summarizeFieldworkAssurance } from "../src/modules/research/research-fieldwork-assurance";
+import { detectFieldworkLocationClusters, fieldworkIntegritySignals, selectDeterministicBackcheckSample, summarizeFieldworkAssurance } from "../src/modules/research/research-fieldwork-assurance";
 
 const response = {
   id: "response-1", enumeratorId: "enumerator-1",
@@ -25,12 +25,26 @@ test("back-check sampling is deterministic and percentage bounded", () => {
   assert.throws(() => selectDeterministicBackcheckSample(rows, 0, "seed"));
 });
 
+test("location proximity signals are deterministic and remain review indicators", () => {
+  const points = [
+    { id: "a", latitude: 38.8977, longitude: -77.0365, capturedAt: new Date(), enumeratorId: "one" },
+    { id: "b", latitude: 38.89771, longitude: -77.03651, capturedAt: new Date(), enumeratorId: "one" },
+    { id: "c", latitude: 40.7128, longitude: -74.006, capturedAt: new Date(), enumeratorId: "two" },
+  ];
+  const result = detectFieldworkLocationClusters(points, 25);
+  assert.equal(result.pairs.length, 1);
+  assert.deepEqual(result.responseIds.sort(), ["a", "b"]);
+  assert.equal(result.pairs[0].sameEnumerator, true);
+});
+
 test("fieldwork assurance actions remain tenant scoped and independently reviewed", async () => {
-  const [actions, schema, migration, page] = await Promise.all([
+  const [actions, schema, migration, page, collectionActions, sync] = await Promise.all([
     readFile(new URL("../src/features/research/sampling-fieldwork-actions.ts", import.meta.url), "utf8"),
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
     readFile(new URL("../prisma/migrations/20260908170000_research_fieldwork_assurance/migration.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/app/(platform)/research/projects/[id]/fieldwork/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/features/research/collection-actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/mobile/offline-sync.service.ts", import.meta.url), "utf8"),
   ]);
   assert.match(actions, /requirePermission\(PermissionKey\.MANAGE_RESEARCH_DATASETS\)/);
   assert.match(actions, /organizationId/);
@@ -43,4 +57,7 @@ test("fieldwork assurance actions remain tenant scoped and independently reviewe
   assert.match(schema, /backcheckAssignedToId\s+String\?/);
   assert.match(migration, /backcheckDueAt/);
   assert.match(page, /Fieldwork assurance/);
+  assert.match(collectionActions, /ResearchCollectionLocationPolicy/);
+  assert.match(sync, /Explicit location consent|Explicit location consent/i);
+  assert.match(sync, /retainPreciseLocation/);
 });

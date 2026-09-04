@@ -1040,6 +1040,7 @@ const researchFieldworkResponseItemSchema = z.object({
     locale: z.string().regex(/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/),
     interviewStartedAt: z.string().datetime(),
     consent: z.boolean(),
+    locationConsent: z.boolean().optional(),
     latitude: z.number().finite().min(-90).max(90).optional(),
     longitude: z.number().finite().min(-180).max(180).optional(),
     locationAccuracyM: z.number().finite().nonnegative().max(100_000).optional(),
@@ -1549,6 +1550,18 @@ async function syncResearchFieldworkResponse(
     throw new Error("The collection was closed when this interview was captured.");
   if (collection.questionnaire.consentStatement && !item.payload.consent)
     throw new Error("Participant consent is required.");
+  const hasLatitude = item.payload.latitude !== undefined;
+  const hasLongitude = item.payload.longitude !== undefined;
+  if (hasLatitude !== hasLongitude)
+    throw new Error("Latitude and longitude must be captured together.");
+  if ((hasLatitude || hasLongitude) && !item.payload.locationConsent)
+    throw new Error("Explicit location consent is required before coordinates may be stored.");
+  if (collection.locationCapturePolicy === "DISABLED" && hasLatitude)
+    throw new Error("Location capture is disabled for this collection.");
+  if (collection.locationCapturePolicy === "REQUIRED" && !hasLatitude)
+    throw new Error("A consented location is required for this collection.");
+  if (item.payload.locationAccuracyM !== undefined && collection.maximumLocationAccuracyM !== null && item.payload.locationAccuracyM > collection.maximumLocationAccuracyM)
+    throw new Error(`Location accuracy must be within ${collection.maximumLocationAccuracyM} metres.`);
   if (
     item.payload.locale !== normalizeResearchLocale(collection.questionnaire.defaultLanguage) &&
     !collection.formVersion.researchQuestionnaireLocalizations.some(
@@ -1615,8 +1628,8 @@ async function syncResearchFieldworkResponse(
         locale: item.payload.locale,
         interviewStartedAt,
         capturedAt,
-        latitude: item.payload.latitude,
-        longitude: item.payload.longitude,
+        latitude: item.payload.latitude === undefined ? undefined : collection.retainPreciseLocation ? item.payload.latitude : Number(item.payload.latitude.toFixed(3)),
+        longitude: item.payload.longitude === undefined ? undefined : collection.retainPreciseLocation ? item.payload.longitude : Number(item.payload.longitude.toFixed(3)),
         locationAccuracyM: item.payload.locationAccuracyM,
       },
     });

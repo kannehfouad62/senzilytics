@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import {
   CollectionStatusForm,
+  CollectionLocationPolicyForm,
   RespondentAssignmentForm,
 } from "@/features/research/collection-forms";
 import {
@@ -118,6 +119,7 @@ export default async function ResearchCollectionPage({
           </section>
         </div>
       )}
+      {canManage && <div className="mt-8"><CollectionLocationPolicyForm collection={{ id: collection.id, locationCapturePolicy: collection.locationCapturePolicy, maximumLocationAccuracyM: collection.maximumLocationAccuracyM, retainPreciseLocation: collection.retainPreciseLocation }} /></div>}
 
       {canManage && (
         <section className="mt-8 space-y-5">

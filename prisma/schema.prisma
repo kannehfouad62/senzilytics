@@ -537,6 +537,12 @@ enum ResearchFieldworkBackcheckStatus {
   REJECTED
 }
 
+enum ResearchLocationCapturePolicy {
+  DISABLED
+  OPTIONAL
+  REQUIRED
+}
+
 enum EmergencyPlanType {
   ALL_HAZARDS
   FIRE
@@ -8352,6 +8358,9 @@ model ResearchCollectionWave {
   assignmentDueAt     DateTime?
   targetResponseCount Int?
   instructions        String?
+  locationCapturePolicy ResearchLocationCapturePolicy @default(OPTIONAL)
+  maximumLocationAccuracyM Float?                       @default(250)
+  retainPreciseLocation Boolean                         @default(false)
   createdById         String
   activatedAt         DateTime?
   closedAt            DateTime?

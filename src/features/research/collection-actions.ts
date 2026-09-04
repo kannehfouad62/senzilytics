@@ -2,9 +2,10 @@
 
 import type { FormActionState } from "@/core/actions/action-state";
 import { requirePermission } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { assignResearchRespondent, createResearchCollection, setResearchCollectionStatus, submitAssignedResearchQuestionnaire } from "@/modules/research/research-collection.service";
-import { PermissionKey, ResearchCollectionStatus } from "@prisma/client";
+import { ActivityAction, PermissionKey, ResearchCollectionStatus, ResearchLocationCapturePolicy } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -35,4 +36,27 @@ export async function submitResearchResponse(_state:FormActionState,data:FormDat
   await requirePermission(PermissionKey.COLLECT_RESEARCH_DATA);const{organizationId,user}=await getCurrentUserTenant();const assignmentId=required(data,"assignmentId");
   try{await submitAssignedResearchQuestionnaire({organizationId,userId:user.id,assignmentId,consent:data.get("participantConsent")==="on",data});refreshResearch()}catch(cause){return failure(cause,"Questionnaire response could not be submitted.")}
   redirect("/research/my-questionnaires?submitted=1");
+}
+
+export async function updateCollectionLocationPolicy(_state: FormActionState, data: FormData): Promise<FormActionState> {
+  await requirePermission(PermissionKey.MANAGE_RESEARCH_DATASETS);
+  const { organizationId, user } = await getCurrentUserTenant();
+  const collectionId = required(data, "collectionId");
+  try {
+    const policy = required(data, "locationCapturePolicy") as ResearchLocationCapturePolicy;
+    if (!Object.values(ResearchLocationCapturePolicy).includes(policy)) throw new Error("Select a valid location policy.");
+    if (policy === ResearchLocationCapturePolicy.REQUIRED) throw new Error("Required location capture can be enabled after the native GPS release is installed.");
+    const accuracyValue = text(data, "maximumLocationAccuracyM");
+    const maximumLocationAccuracyM = accuracyValue ? Number(accuracyValue) : null;
+    if (maximumLocationAccuracyM !== null && (!Number.isFinite(maximumLocationAccuracyM) || maximumLocationAccuracyM < 5 || maximumLocationAccuracyM > 10000)) throw new Error("Location accuracy must be between 5 and 10,000 metres.");
+    const collection = await prisma.researchCollectionWave.findFirst({ where: { id: collectionId, organizationId }, select: { id: true, projectId: true } });
+    if (!collection) throw new Error("Collection wave not found.");
+    const retainPreciseLocation = data.get("retainPreciseLocation") === "on";
+    await prisma.$transaction([
+      prisma.researchCollectionWave.update({ where: { id: collection.id }, data: { locationCapturePolicy: policy, maximumLocationAccuracyM, retainPreciseLocation } }),
+      prisma.activityLog.create({ data: { organizationId, userId: user.id, action: ActivityAction.UPDATE, entityType: "ResearchCollectionLocationPolicy", entityId: collection.id, title: "Research location policy updated", description: policy, metadata: { maximumLocationAccuracyM, retainPreciseLocation, projectId: collection.projectId } } }),
+    ]);
+    refreshResearch();
+    return { status: "SUCCESS", message: "Location governance policy updated." };
+  } catch (cause) { return failure(cause, "Location policy could not be updated."); }
 }

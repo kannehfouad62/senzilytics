@@ -80,6 +80,7 @@ export async function getMobileResearchFieldwork(input: {
         id: collection.id,
         name: collection.name,
         instructions: collection.instructions,
+        locationPolicy: { capture: collection.locationCapturePolicy, maximumAccuracyM: collection.maximumLocationAccuracyM, preciseRetention: collection.retainPreciseLocation },
         questionnaire: {
           name: collection.questionnaire.name,
           purpose: collection.questionnaire.purpose,

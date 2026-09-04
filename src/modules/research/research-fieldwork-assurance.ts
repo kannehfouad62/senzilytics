@@ -53,3 +53,21 @@ export function summarizeFieldworkAssurance<T extends FieldworkIntegrityResponse
     assessed,
   };
 }
+
+export function detectFieldworkLocationClusters<T extends { id: string; latitude: number | null; longitude: number | null; capturedAt: Date; enumeratorId: string }>(responses: T[], radiusM = 25) {
+  if (!Number.isFinite(radiusM) || radiusM < 1 || radiusM > 1000) throw new Error("Location-cluster radius must be between 1 and 1,000 metres.");
+  const located = responses.filter((item): item is T & { latitude: number; longitude: number } => item.latitude !== null && item.longitude !== null);
+  const pairs: Array<{ firstId: string; secondId: string; distanceM: number; sameEnumerator: boolean }> = [];
+  for (let first = 0; first < located.length; first += 1) for (let second = first + 1; second < located.length; second += 1) {
+    const distanceM = haversineMetres(located[first].latitude, located[first].longitude, located[second].latitude, located[second].longitude);
+    if (distanceM <= radiusM) pairs.push({ firstId: located[first].id, secondId: located[second].id, distanceM: Number(distanceM.toFixed(1)), sameEnumerator: located[first].enumeratorId === located[second].enumeratorId });
+  }
+  return { radiusM, pairs, responseIds: [...new Set(pairs.flatMap((pair) => [pair.firstId, pair.secondId]))] };
+}
+
+function haversineMetres(latitudeA: number, longitudeA: number, latitudeB: number, longitudeB: number) {
+  const radians = (degrees: number) => degrees * Math.PI / 180;
+  const latitudeDelta = radians(latitudeB - latitudeA), longitudeDelta = radians(longitudeB - longitudeA);
+  const value = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(radians(latitudeA)) * Math.cos(radians(latitudeB)) * Math.sin(longitudeDelta / 2) ** 2;
+  return 6_371_000 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}

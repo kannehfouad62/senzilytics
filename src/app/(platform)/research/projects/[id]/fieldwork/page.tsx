@@ -8,7 +8,7 @@ import { getCurrentUserPermissions, requirePermission } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { buildFieldworkAnalytics } from "@/modules/research/research-fieldwork-analytics";
-import { summarizeFieldworkAssurance } from "@/modules/research/research-fieldwork-assurance";
+import { detectFieldworkLocationClusters, summarizeFieldworkAssurance } from "@/modules/research/research-fieldwork-assurance";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +54,7 @@ export default async function ResearchFieldworkDashboard({
   const analytics = buildFieldworkAnalytics(execution.units);
   const responses = execution.units.flatMap((unit) => unit.fieldworkResponse ? [unit.fieldworkResponse] : []);
   const assurance = summarizeFieldworkAssurance(responses);
+  const locationClusters = detectFieldworkLocationClusters(responses);
   const canManage = permissions.includes(PermissionKey.MANAGE_RESEARCH_DATASETS);
   const reviewerRoles = canManage ? await prisma.rolePermission.findMany({ where: { permission: PermissionKey.MANAGE_RESEARCH_DATASETS }, select: { role: true } }) : [];
   const reviewers = canManage ? await prisma.user.findMany({ where: { organizationId, isActive: true, OR: [{ role: UserRole.SUPER_ADMIN }, { role: { in: reviewerRoles.map((item) => item.role) } }] }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : [];
@@ -136,6 +137,7 @@ export default async function ResearchFieldworkDashboard({
           <Metric label="High-risk signals" value={assurance.highRisk} alert={assurance.highRisk > 0} />
           <Metric label="Overdue reviews" value={assurance.overdue} alert={assurance.overdue > 0} />
           <Metric label="GPS captured" value={`${assurance.locationCaptured}/${assurance.total}`} />
+          <Metric label="Proximity signals" value={locationClusters.responseIds.length} alert={locationClusters.responseIds.length > 0} />
         </div>
         {canManage && assurance.total ? <BackcheckSampleForm executionId={execution.id} reviewers={reviewers} /> : null}
       </section>

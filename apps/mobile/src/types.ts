@@ -220,6 +220,7 @@ export type MobileComplianceOccurrence = {
     title: string;
     description: string | null;
     instructions: string | null;
+    locationPolicy: { capture: "DISABLED" | "OPTIONAL" | "REQUIRED"; maximumAccuracyM: number | null; preciseRetention: boolean };
     category: string;
     regulatoryReference: string | null;
     evidenceRequired: boolean;
@@ -2076,6 +2077,7 @@ export type ResearchInterviewDraft = {
   locale: string;
   interviewStartedAt: string;
   consent: boolean;
+  locationConsent?: boolean;
   answers: Record<string, string | boolean | string[]>;
   updatedAt: string;
 };
