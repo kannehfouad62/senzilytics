@@ -4,6 +4,7 @@ import {
   ActivityAction,
   ConfigurableFormModule,
   Prisma,
+  ResearchCampaignQuotaStatus,
   ResearchCollectionStatus,
   ResearchPublicLinkStatus,
   ResearchResponseIdentityMode,
@@ -13,6 +14,7 @@ import type { FormActionState } from "@/core/actions/action-state";
 import { logActivity } from "@/core/activity-log/activity-log.service";
 import { prisma } from "@/lib/prisma";
 import { preparePublishedFormVersionSubmission } from "@/modules/forms/runtime-form.service";
+import { isPanelMemberEligible } from "@/modules/research/research-panel-governance";
 
 const value = (data: FormData, key: string, max = 300) =>
   String(data.get(key) ?? "")
@@ -46,11 +48,22 @@ export async function submitPublicResearchSurvey(
             campaign: { publicLinkId: link.id, status: "ACTIVE" },
             status: { in: ["SENT", "OPENED"] },
           },
+          include: { panelMember: true },
         })
       : null;
     if (invitationToken && !invitation)
       throw new Error(
         "This invitation is invalid, completed, or no longer active.",
+      );
+    if (
+      invitation?.panelMember &&
+      !isPanelMemberEligible(
+        invitation.panelMember.status,
+        invitation.panelMember.consentExpiresAt,
+      )
+    )
+      throw new Error(
+        "This participant is no longer eligible for this questionnaire.",
       );
 
     const now = new Date();
@@ -141,10 +154,40 @@ export async function submitPublicResearchSurvey(
                 campaign: { publicLinkId: current.id, status: "ACTIVE" },
                 status: { in: ["SENT", "OPENED"] },
               },
+              include: {
+                panelMember: true,
+                quota: {
+                  include: {
+                    invitations: {
+                      where: { status: "COMPLETED" },
+                      select: { id: true },
+                    },
+                  },
+                },
+              },
             })
           : null;
         if (invitation && !currentInvitation)
           throw new Error("This invitation has already been used or revoked.");
+        if (
+          currentInvitation?.panelMember &&
+          !isPanelMemberEligible(
+            currentInvitation.panelMember.status,
+            currentInvitation.panelMember.consentExpiresAt,
+            now,
+          )
+        )
+          throw new Error(
+            "This participant is no longer eligible for this questionnaire.",
+          );
+        if (
+          currentInvitation?.quota &&
+          (currentInvitation.quota.status !==
+            ResearchCampaignQuotaStatus.OPEN ||
+            currentInvitation.quota.invitations.length >=
+              currentInvitation.quota.target)
+        )
+          throw new Error("This participant quota has already been filled.");
         if (
           current.maxResponses !== null &&
           current._count.responses >= current.maxResponses
@@ -189,11 +232,25 @@ export async function submitPublicResearchSurvey(
           where: { id: created.id },
           data: { submissionId: submission.id },
         });
-        if (currentInvitation)
+        if (currentInvitation) {
           await tx.researchSurveyInvitation.update({
             where: { id: currentInvitation.id },
             data: { status: "COMPLETED", completedAt: now },
           });
+          if (
+            currentInvitation.quota &&
+            currentInvitation.quota.invitations.length + 1 >=
+              currentInvitation.quota.target
+          ) {
+            await tx.researchCampaignQuota.update({
+              where: { id: currentInvitation.quota.id },
+              data: {
+                status: ResearchCampaignQuotaStatus.FILLED,
+                filledAt: now,
+              },
+            });
+          }
+        }
         return completed;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },

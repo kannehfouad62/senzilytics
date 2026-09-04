@@ -344,6 +344,32 @@ enum ResearchSurveyInvitationStatus {
   REVOKED
 }
 
+enum ResearchPanelStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum ResearchPanelMemberStatus {
+  ACTIVE
+  OPTED_OUT
+  SUPPRESSED
+  INACTIVE
+}
+
+enum ResearchConsentEventType {
+  GRANTED
+  RENEWED
+  WITHDRAWN
+  EXPIRED
+}
+
+enum ResearchCampaignQuotaStatus {
+  OPEN
+  FILLED
+  CLOSED
+}
+
 enum ResearchAssignmentStatus {
   ASSIGNED
   IN_PROGRESS
@@ -2192,6 +2218,10 @@ model Organization {
   researchSamplingExecutions       ResearchSamplingExecution[]
   researchSurveyCampaigns          ResearchSurveyCampaign[]
   researchSurveyInvitations        ResearchSurveyInvitation[]
+  researchPanels                   ResearchPanel[]
+  researchPanelMembers             ResearchPanelMember[]
+  researchConsentEvents            ResearchPanelConsentEvent[]
+  researchCampaignQuotas           ResearchCampaignQuota[]
 }
 
 model PricingInquiry {
@@ -2539,8 +2569,11 @@ model User {
   createdResearchSamplingFrames       ResearchSamplingFrame[]           @relation("ResearchSamplingFrameCreator")
   generatedResearchSamples            ResearchSamplingExecution[]       @relation("ResearchSamplingExecutionGenerator")
   approvedResearchSamplingExecutions  ResearchSamplingExecution[]       @relation("ResearchSamplingExecutionApprover")
-  assignedResearchSampleUnits         ResearchSampleUnit[]               @relation("ResearchSampleUnitAssignee")
-  createdResearchSurveyCampaigns      ResearchSurveyCampaign[]           @relation("ResearchSurveyCampaignCreator")
+  assignedResearchSampleUnits         ResearchSampleUnit[]              @relation("ResearchSampleUnitAssignee")
+  createdResearchSurveyCampaigns      ResearchSurveyCampaign[]          @relation("ResearchSurveyCampaignCreator")
+  createdResearchPanels               ResearchPanel[]                   @relation("ResearchPanelCreator")
+  managedResearchPanelMembers         ResearchPanelMember[]             @relation("ResearchPanelMemberManager")
+  recordedResearchConsentEvents       ResearchPanelConsentEvent[]       @relation("ResearchConsentRecorder")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8302,7 +8335,7 @@ model ResearchPublicResponse {
   publicLink   ResearchPublicSurveyLink    @relation(fields: [publicLinkId], references: [id], onDelete: Restrict)
   submission   ConfigurableFormSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
   reviewedBy   User?                       @relation("ResearchPublicResponseReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  invitation  ResearchSurveyInvitation?    @relation(fields: [invitationId], references: [id], onDelete: SetNull)
+  invitation   ResearchSurveyInvitation?   @relation(fields: [invitationId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, submittedAt])
   @@index([collectionId, submittedAt])
@@ -8329,32 +8362,125 @@ model ResearchSurveyCampaign {
   publicLink   ResearchPublicSurveyLink   @relation(fields: [publicLinkId], references: [id], onDelete: Restrict)
   createdBy    User                       @relation("ResearchSurveyCampaignCreator", fields: [createdById], references: [id], onDelete: Restrict)
   invitations  ResearchSurveyInvitation[]
+  quotas       ResearchCampaignQuota[]
 
   @@index([organizationId, status, createdAt])
   @@index([collectionId, status])
 }
 
 model ResearchSurveyInvitation {
-  id              String                         @id @default(cuid())
-  organizationId  String
-  campaignId      String
-  token           String                         @unique
-  participantName String?
+  id               String                         @id @default(cuid())
+  organizationId   String
+  campaignId       String
+  panelMemberId    String?
+  quotaId          String?
+  token            String                         @unique
+  participantName  String?
   participantEmail String
-  status          ResearchSurveyInvitationStatus @default(PENDING)
-  remindersSent   Int                            @default(0)
-  sentAt          DateTime?
-  openedAt        DateTime?
-  completedAt     DateTime?
-  lastReminderAt  DateTime?
-  createdAt       DateTime                       @default(now())
-  updatedAt       DateTime                       @updatedAt
+  status           ResearchSurveyInvitationStatus @default(PENDING)
+  remindersSent    Int                            @default(0)
+  sentAt           DateTime?
+  openedAt         DateTime?
+  completedAt      DateTime?
+  lastReminderAt   DateTime?
+  createdAt        DateTime                       @default(now())
+  updatedAt        DateTime                       @updatedAt
 
-  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  campaign     ResearchSurveyCampaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     ResearchSurveyCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  panelMember  ResearchPanelMember?    @relation(fields: [panelMemberId], references: [id], onDelete: SetNull)
+  quota        ResearchCampaignQuota?  @relation(fields: [quotaId], references: [id], onDelete: SetNull)
   response     ResearchPublicResponse?
 
   @@unique([campaignId, participantEmail])
+  @@index([organizationId, status, createdAt])
+  @@index([campaignId, status])
+  @@index([panelMemberId, status])
+  @@index([quotaId, status])
+}
+
+model ResearchPanel {
+  id             String              @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  lawfulPurpose  String
+  status         ResearchPanelStatus @default(ACTIVE)
+  createdById    String
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                  @relation("ResearchPanelCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members      ResearchPanelMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, status, createdAt])
+}
+
+model ResearchPanelMember {
+  id               String                    @id @default(cuid())
+  organizationId   String
+  panelId          String
+  email            String
+  name             String?
+  externalRef      String?
+  attributes       Json
+  status           ResearchPanelMemberStatus @default(ACTIVE)
+  consentExpiresAt DateTime?
+  qualityScore     Float                     @default(100)
+  managedById      String
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  organization  Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  panel         ResearchPanel               @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  managedBy     User                        @relation("ResearchPanelMemberManager", fields: [managedById], references: [id], onDelete: Restrict)
+  consentEvents ResearchPanelConsentEvent[]
+  invitations   ResearchSurveyInvitation[]
+
+  @@unique([panelId, email])
+  @@index([organizationId, status, consentExpiresAt])
+  @@index([panelId, status, qualityScore])
+}
+
+model ResearchPanelConsentEvent {
+  id             String                   @id @default(cuid())
+  organizationId String
+  panelMemberId  String
+  type           ResearchConsentEventType
+  statement      String
+  lawfulBasis    String
+  effectiveAt    DateTime                 @default(now())
+  expiresAt      DateTime?
+  recordedById   String
+  createdAt      DateTime                 @default(now())
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  panelMember  ResearchPanelMember @relation(fields: [panelMemberId], references: [id], onDelete: Cascade)
+  recordedBy   User                @relation("ResearchConsentRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, type, effectiveAt])
+  @@index([panelMemberId, effectiveAt])
+}
+
+model ResearchCampaignQuota {
+  id             String                      @id @default(cuid())
+  organizationId String
+  campaignId     String
+  name           String
+  attributeKey   String
+  attributeValue String
+  target         Int
+  status         ResearchCampaignQuotaStatus @default(OPEN)
+  createdAt      DateTime                    @default(now())
+  filledAt       DateTime?
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaign     ResearchSurveyCampaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  invitations  ResearchSurveyInvitation[]
+
+  @@unique([campaignId, attributeKey, attributeValue])
   @@index([organizationId, status, createdAt])
   @@index([campaignId, status])
 }
@@ -8725,10 +8851,10 @@ model ResearchSampleUnit {
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
 
-  execution     ResearchSamplingExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
-  assignedTo    User?                     @relation("ResearchSampleUnitAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  execution      ResearchSamplingExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  assignedTo     User?                     @relation("ResearchSampleUnitAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   replacementFor ResearchSampleUnit?       @relation("ResearchSampleUnitReplacement", fields: [replacementForId], references: [id], onDelete: SetNull)
-  replacedBy     ResearchSampleUnit[]       @relation("ResearchSampleUnitReplacement")
+  replacedBy     ResearchSampleUnit[]      @relation("ResearchSampleUnitReplacement")
 
   @@unique([executionId, unitReference])
   @@unique([executionId, selectionOrder])
