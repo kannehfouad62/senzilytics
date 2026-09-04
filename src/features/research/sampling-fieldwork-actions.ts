@@ -8,6 +8,7 @@ import {
   ResearchResponseDisposition,
   ResearchSampleUnitStatus,
   ResearchSamplingExecutionStatus,
+  UserRole,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
@@ -50,31 +51,41 @@ export async function selectResearchBackcheckSample(
   const { organizationId, user } = await getCurrentUserTenant();
   try {
     const executionId = value(data, "executionId", 100);
+    const reviewerId = value(data, "reviewerId", 100);
     const percentage = Number(value(data, "percentage", 3));
     const dueAt = new Date(value(data, "dueAt", 40));
     if (!Number.isInteger(percentage) || percentage < 1 || percentage > 100)
       throw new Error("Back-check percentage must be between 1 and 100.");
     if (Number.isNaN(dueAt.valueOf()) || dueAt <= new Date())
       throw new Error("A future back-check due date is required.");
-    const execution = await prisma.researchSamplingExecution.findFirst({
+    const [execution, reviewer] = await Promise.all([prisma.researchSamplingExecution.findFirst({
       where: { id: executionId, organizationId, status: { in: [ResearchSamplingExecutionStatus.ACTIVE, ResearchSamplingExecutionStatus.CLOSED] } },
       include: { units: { where: { fieldworkResponse: { isNot: null } }, include: { fieldworkResponse: true } } },
-    });
+    }), prisma.user.findFirst({ where: { id: reviewerId, organizationId, isActive: true }, select: { id: true, name: true, email: true, role: true } })]);
     if (!execution) throw new Error("An active or closed tenant sampling execution is required.");
+    if (!reviewer) throw new Error("Select an active tenant reviewer.");
+    const reviewerAuthorized = reviewer.role === UserRole.SUPER_ADMIN || Boolean(await prisma.rolePermission.findFirst({ where: { role: reviewer.role, permission: PermissionKey.MANAGE_RESEARCH_DATASETS } }));
+    if (!reviewerAuthorized) throw new Error("The selected reviewer does not have research dataset management permission.");
     const responses = execution.units.flatMap((unit) => unit.fieldworkResponse ? [unit.fieldworkResponse] : []);
     if (responses.some((response) => response.backcheckRequired))
       throw new Error("A governed back-check sample has already been established for this execution.");
-    const available = responses;
+    const available = responses.filter((response) => response.enumeratorId !== reviewer.id);
+    if (!available.length) throw new Error("No independently reviewable responses are available for this reviewer.");
     if (!available.length) throw new Error("No unselected fieldwork responses are available.");
     const selected = selectDeterministicBackcheckSample(available, percentage, `${execution.id}:${execution.version}`);
     await prisma.$transaction([
       prisma.researchFieldworkResponse.updateMany({
         where: { organizationId, id: { in: selected.map((item) => item.id) }, backcheckRequired: false },
-        data: { backcheckRequired: true, backcheckSelectedAt: new Date(), backcheckDueAt: dueAt, backcheckStatus: ResearchFieldworkBackcheckStatus.PENDING },
+        data: { backcheckRequired: true, backcheckSelectedAt: new Date(), backcheckDueAt: dueAt, backcheckAssignedToId: reviewer.id, backcheckStatus: ResearchFieldworkBackcheckStatus.PENDING },
       }),
       prisma.activityLog.create({
-        data: { organizationId, userId: user.id, action: ActivityAction.CREATE, entityType: "ResearchFieldworkBackcheckSample", entityId: execution.id, title: "Fieldwork back-check sample selected", description: `${selected.length} of ${available.length} available responses selected`, metadata: { projectId: execution.projectId, percentage, dueAt: dueAt.toISOString(), responseIds: selected.map((item) => item.id) } },
+        data: { organizationId, userId: user.id, action: ActivityAction.CREATE, entityType: "ResearchFieldworkBackcheckSample", entityId: execution.id, title: "Fieldwork back-check sample selected", description: `${selected.length} of ${available.length} independently reviewable responses assigned to ${reviewer.name}`, metadata: { projectId: execution.projectId, percentage, reviewerId: reviewer.id, dueAt: dueAt.toISOString(), responseIds: selected.map((item) => item.id) } },
       }),
+    ]);
+    const link = `/research/projects/${execution.projectId}/fieldwork`;
+    await Promise.allSettled([
+      createNotification({ organizationId, userId: reviewer.id, type: NotificationType.ASSIGNMENT, title: "Research back-check assigned", message: `${selected.length} field interview${selected.length === 1 ? "" : "s"} require independent verification by ${dueAt.toLocaleDateString("en-US")}.`, link }),
+      sendTenantNotificationEmail({ to: reviewer.email, subject: "Research back-check assignment", html: `<p>Hello ${reviewer.name},</p><p>${selected.length} field interview${selected.length === 1 ? "" : "s"} require independent verification by ${dueAt.toLocaleDateString("en-US")}.</p><p><a href="${getApplicationUrl()}${link}">Open fieldwork assurance</a></p>`, text: `${selected.length} research fieldwork back-checks are due ${dueAt.toLocaleDateString("en-US")}.` }),
     ]);
     refresh(execution.projectId);
     return { status: "SUCCESS", message: `${selected.length} response${selected.length === 1 ? "" : "s"} selected for back-check.` };
@@ -100,6 +111,7 @@ export async function reviewResearchFieldworkBackcheck(
       include: { sampleUnit: { include: { execution: true } } },
     });
     if (!response) throw new Error("Selected tenant fieldwork response not found.");
+    if (response.backcheckAssignedToId !== user.id) throw new Error("Only the assigned independent reviewer may record this back-check.");
     if (response.enumeratorId === user.id) throw new Error("Enumerators cannot back-check their own interviews.");
     if (response.backcheckStatus === ResearchFieldworkBackcheckStatus.APPROVED || response.backcheckStatus === ResearchFieldworkBackcheckStatus.REJECTED)
       throw new Error("This back-check has already received a final decision.");

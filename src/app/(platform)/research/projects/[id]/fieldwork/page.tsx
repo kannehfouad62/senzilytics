@@ -1,4 +1,4 @@
-import { PermissionKey, ResearchSamplingExecutionStatus } from "@prisma/client";
+import { PermissionKey, ResearchSamplingExecutionStatus, UserRole } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -43,7 +43,7 @@ export default async function ResearchFieldworkDashboard({
         include: {
           samplingDesign: true,
           samplingFrame: true,
-          units: { include: { assignedTo: { select: { name: true } }, fieldworkResponse: { include: { enumerator: { select: { name: true } }, backcheckedBy: { select: { name: true } }, collection: { select: { name: true } } } } } },
+          units: { include: { assignedTo: { select: { name: true } }, fieldworkResponse: { include: { enumerator: { select: { name: true } }, backcheckedBy: { select: { name: true } }, backcheckAssignedTo: { select: { name: true } }, collection: { select: { name: true } } } } } },
         },
       },
     },
@@ -55,6 +55,8 @@ export default async function ResearchFieldworkDashboard({
   const responses = execution.units.flatMap((unit) => unit.fieldworkResponse ? [unit.fieldworkResponse] : []);
   const assurance = summarizeFieldworkAssurance(responses);
   const canManage = permissions.includes(PermissionKey.MANAGE_RESEARCH_DATASETS);
+  const reviewerRoles = canManage ? await prisma.rolePermission.findMany({ where: { permission: PermissionKey.MANAGE_RESEARCH_DATASETS }, select: { role: true } }) : [];
+  const reviewers = canManage ? await prisma.user.findMany({ where: { organizationId, isActive: true, OR: [{ role: UserRole.SUPER_ADMIN }, { role: { in: reviewerRoles.map((item) => item.role) } }] }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : [];
   return (
     <div>
       <Link href={`/research/projects/${id}`} className="text-sm text-cyan-300">
@@ -135,11 +137,11 @@ export default async function ResearchFieldworkDashboard({
           <Metric label="Overdue reviews" value={assurance.overdue} alert={assurance.overdue > 0} />
           <Metric label="GPS captured" value={`${assurance.locationCaptured}/${assurance.total}`} />
         </div>
-        {canManage && assurance.total ? <BackcheckSampleForm executionId={execution.id} /> : null}
+        {canManage && assurance.total ? <BackcheckSampleForm executionId={execution.id} reviewers={reviewers} /> : null}
       </section>
       <section className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/[.035]">
         <div className="border-b border-white/10 p-6"><h2 className="text-xl font-semibold">Interview integrity register</h2><p className="mt-1 text-sm text-slate-400">Operational signals support review prioritization; they do not automatically invalidate a response.</p></div>
-        <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-white/[.03] text-xs text-slate-400"><tr><th className="px-4 py-3">Unit / enumerator</th><th className="px-4 py-3">Interview</th><th className="px-4 py-3">Integrity</th><th className="px-4 py-3">Back-check</th>{canManage ? <th className="px-4 py-3">Review</th> : null}</tr></thead><tbody className="divide-y divide-white/10">{assurance.assessed.map(({ response, integrity }) => <tr key={response.id} className="align-top"><td className="px-4 py-4"><p className="font-medium">{execution.units.find((unit) => unit.fieldworkResponse?.id === response.id)?.unitReference}</p><p className="text-xs text-slate-500">{response.enumerator.name} · {response.collection.name}</p></td><td className="px-4 py-4"><p>{integrity.durationMinutes.toFixed(1)} min</p><p className="text-xs text-slate-500">Sync delay {integrity.syncDelayHours.toFixed(1)}h</p></td><td className="px-4 py-4"><span className={`rounded-full px-2 py-1 text-xs ${integrity.risk === "HIGH" ? "bg-red-400/10 text-red-200" : integrity.risk === "MEDIUM" ? "bg-amber-400/10 text-amber-200" : "bg-emerald-400/10 text-emerald-200"}`}>{integrity.risk}</span><p className="mt-2 max-w-xs text-xs text-slate-500">{integrity.signals.length ? integrity.signals.map((item) => item.replaceAll("_", " ")).join(" · ") : "No automated signals"}</p></td><td className="px-4 py-4"><p>{response.backcheckRequired ? response.backcheckStatus.replaceAll("_", " ") : "NOT SELECTED"}</p><p className="text-xs text-slate-500">{response.backcheckedBy?.name ?? (response.backcheckDueAt ? `Due ${response.backcheckDueAt.toLocaleDateString("en-US")}` : "—")}</p></td>{canManage ? <td className="px-4 py-4">{response.backcheckRequired && (response.backcheckStatus === "PENDING" || response.backcheckStatus === "RECONTACT_REQUIRED") && response.enumeratorId !== user.id ? <BackcheckReviewForm responseId={response.id} /> : <span className="text-xs text-slate-500">{response.enumeratorId === user.id && response.backcheckRequired ? "Independent reviewer required" : "No action"}</span>}</td> : null}</tr>)}</tbody></table></div>
+        <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-white/[.03] text-xs text-slate-400"><tr><th className="px-4 py-3">Unit / enumerator</th><th className="px-4 py-3">Interview</th><th className="px-4 py-3">Integrity</th><th className="px-4 py-3">Back-check</th>{canManage ? <th className="px-4 py-3">Review</th> : null}</tr></thead><tbody className="divide-y divide-white/10">{assurance.assessed.map(({ response, integrity }) => <tr key={response.id} className="align-top"><td className="px-4 py-4"><p className="font-medium">{execution.units.find((unit) => unit.fieldworkResponse?.id === response.id)?.unitReference}</p><p className="text-xs text-slate-500">{response.enumerator.name} · {response.collection.name}</p></td><td className="px-4 py-4"><p>{integrity.durationMinutes.toFixed(1)} min</p><p className="text-xs text-slate-500">Sync delay {integrity.syncDelayHours.toFixed(1)}h</p></td><td className="px-4 py-4"><span className={`rounded-full px-2 py-1 text-xs ${integrity.risk === "HIGH" ? "bg-red-400/10 text-red-200" : integrity.risk === "MEDIUM" ? "bg-amber-400/10 text-amber-200" : "bg-emerald-400/10 text-emerald-200"}`}>{integrity.risk}</span><p className="mt-2 max-w-xs text-xs text-slate-500">{integrity.signals.length ? integrity.signals.map((item) => item.replaceAll("_", " ")).join(" · ") : "No automated signals"}</p></td><td className="px-4 py-4"><p>{response.backcheckRequired ? response.backcheckStatus.replaceAll("_", " ") : "NOT SELECTED"}</p><p className="text-xs text-slate-500">{response.backcheckAssignedTo?.name ?? "—"}{response.backcheckDueAt ? ` · Due ${response.backcheckDueAt.toLocaleDateString("en-US")}` : ""}</p></td>{canManage ? <td className="px-4 py-4">{response.backcheckRequired && response.backcheckAssignedToId === user.id && (response.backcheckStatus === "PENDING" || response.backcheckStatus === "RECONTACT_REQUIRED") && response.enumeratorId !== user.id ? <BackcheckReviewForm responseId={response.id} /> : <span className="text-xs text-slate-500">{response.backcheckRequired && response.backcheckAssignedToId !== user.id ? `Assigned to ${response.backcheckAssignedTo?.name ?? "another reviewer"}` : response.enumeratorId === user.id && response.backcheckRequired ? "Independent reviewer required" : "No action"}</span>}</td> : null}</tr>)}</tbody></table></div>
       </section>
       <section className="mt-6 rounded-3xl border border-white/10 bg-white/[.035] p-6">
         <h2 className="text-xl font-semibold">Governance and interpretation</h2>

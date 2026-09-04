@@ -34,14 +34,15 @@ function Feedback({ state }: { state: FormActionState }) {
   ) : null;
 }
 
-export function BackcheckSampleForm({ executionId }: { executionId: string }) {
+export function BackcheckSampleForm({ executionId, reviewers }: { executionId: string; reviewers: Array<{ id: string; name: string }> }) {
   const [state, action, pending] = useActionState(selectResearchBackcheckSample, initialFormActionState);
-  return <form action={action} className="mt-4 grid gap-3 sm:grid-cols-[120px_180px_auto]">
+  return <form action={action} className="mt-4 grid gap-3 sm:grid-cols-[120px_180px_200px_auto]">
     <input type="hidden" name="executionId" value={executionId} />
     <label className="text-xs text-slate-400">Sample %<input name="percentage" type="number" min="1" max="100" defaultValue="10" required className={`${field} mt-1 w-full`} /></label>
     <label className="text-xs text-slate-400">Due date<input name="dueAt" type="date" required className={`${field} mt-1 w-full`} /></label>
+    <label className="text-xs text-slate-400">Independent reviewer<select name="reviewerId" required defaultValue="" className={`${field} mt-1 w-full`}><option value="" disabled>Select reviewer</option>{reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.name}</option>)}</select></label>
     <div className="self-end"><button disabled={pending} className={button}>{pending ? "Selecting…" : "Select governed sample"}</button></div>
-    <div className="sm:col-span-3"><Feedback state={state} /></div>
+    <div className="sm:col-span-4"><Feedback state={state} /></div>
   </form>;
 }
 

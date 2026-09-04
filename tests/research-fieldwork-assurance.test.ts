@@ -35,8 +35,12 @@ test("fieldwork assurance actions remain tenant scoped and independently reviewe
   assert.match(actions, /requirePermission\(PermissionKey\.MANAGE_RESEARCH_DATASETS\)/);
   assert.match(actions, /organizationId/);
   assert.match(actions, /response\.enumeratorId === user\.id/);
+  assert.match(actions, /response\.backcheckAssignedToId !== user\.id/);
+  assert.match(actions, /Research back-check assigned/);
+  assert.match(actions, /MANAGE_RESEARCH_DATASETS/);
   assert.match(actions, /ResearchFieldworkBackcheckSample/);
   assert.match(schema, /backcheckRequired\s+Boolean/);
+  assert.match(schema, /backcheckAssignedToId\s+String\?/);
   assert.match(migration, /backcheckDueAt/);
   assert.match(page, /Fieldwork assurance/);
 });
