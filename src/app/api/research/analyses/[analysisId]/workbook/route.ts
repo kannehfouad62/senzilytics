@@ -45,6 +45,7 @@ export async function GET(
       ["Analytical population", analysis.datasetResponseCount],
       ["Variables", analysis.variableKeys.join(", ")],
       ["Weight variable",analysis.weightVariableKey??"Unweighted"],
+      ["Sampling design ID",analysis.samplingDesignId??"Not specified"],
     ].map((row) => row.map(safeSpreadsheetValue)),
   );
   results.addRow(["Result path", "Value"]);

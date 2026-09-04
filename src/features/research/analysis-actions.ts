@@ -40,6 +40,8 @@ export async function saveResearchAnalysis(_state: FormActionState, data: FormDa
     const dataset = collectionId ? await getResearchDataset(organizationId, collectionId) : await getImportedAnalysisDataset(organizationId, datasetVersionId);
     if (!dataset) throw new Error("Research dataset not found.");
     const analysisRows = "analysisRows" in dataset ? dataset.analysisRows : dataset.rows;
+    const projectId="collection" in dataset?dataset.collection.projectId:dataset.version.dataset.projectId;
+    const samplingDesign=await prisma.researchSamplingDesign.findFirst({where:{organizationId,projectId,status:"APPROVED"},orderBy:{version:"desc"}});
     const x = dataset.variables.find(variable => variable.key === xVariableKey);
     const y = yVariableKey ? dataset.variables.find(variable => variable.key === yVariableKey) : null;
     const selectedVariables = variableKeys.map(key => dataset.variables.find(variable => variable.key === key)).filter((variable): variable is NonNullable<typeof variable> => Boolean(variable));
@@ -67,6 +69,8 @@ export async function saveResearchAnalysis(_state: FormActionState, data: FormDa
       filterVariableKey,
       filterValue,
       weightVariableKey,
+      samplingDesignId:samplingDesign?.id??null,
+      samplingDesignSnapshot:samplingDesign?JSON.parse(JSON.stringify(samplingDesign)):undefined,
       hypothesis: text(data, "hypothesis", 2000) || null,
       methodologyNotes: text(data, "methodologyNotes", 4000) || null,
       datasetResponseCount: rows.length,
@@ -74,7 +78,7 @@ export async function saveResearchAnalysis(_state: FormActionState, data: FormDa
       resultSnapshot,
       analystId: user.id,
     } });
-    await logActivity({ organizationId, userId: user.id, action: ActivityAction.CREATE, entityType: "ResearchAnalysis", entityId: analysis.id, title: "Research analysis saved", description: title, metadata: { collectionId:collectionId||null,datasetVersionId:datasetVersionId||null, method, datasetResponseCount: rows.length } });
+    await logActivity({ organizationId, userId: user.id, action: ActivityAction.CREATE, entityType: "ResearchAnalysis", entityId: analysis.id, title: "Research analysis saved", description: title, metadata: { collectionId:collectionId||null,datasetVersionId:datasetVersionId||null,samplingDesignId:samplingDesign?.id??null, method, datasetResponseCount: rows.length } });
     refresh(collectionId,datasetVersionId);
     return { status: "SUCCESS", message: "Analysis saved as a governed draft." };
   } catch (cause) { return failure(cause); }

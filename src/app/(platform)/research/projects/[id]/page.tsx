@@ -301,6 +301,7 @@ export default async function ResearchProjectPage({
                 <span>Data Import & Dictionary</span>
                 <span>Open →</span>
               </Link>
+              <Link href={`/research/projects/${project.id}/sampling-design`} className="flex items-center justify-between rounded-xl border border-amber-300/15 bg-amber-300/[.05] p-4 text-sm font-semibold text-amber-200"><span>Sampling Design Register</span><span>Open →</span></Link>
               <p className="text-sm leading-6 text-slate-400">
                 Data management, statistical analysis, frozen evidence,
                 publication review, and controlled exports remain attached to

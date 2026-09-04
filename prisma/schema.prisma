@@ -394,6 +394,23 @@ enum ResearchDatasetVersionStatus {
   SUPERSEDED
 }
 
+enum ResearchSamplingDesignType {
+  SIMPLE_RANDOM
+  SYSTEMATIC
+  STRATIFIED
+  CLUSTER
+  MULTISTAGE
+  CENSUS
+  NON_PROBABILITY
+}
+
+enum ResearchSamplingDesignStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  ARCHIVED
+}
+
 enum EmergencyPlanType {
   ALL_HAZARDS
   FIRE
@@ -2116,6 +2133,7 @@ model Organization {
   researchImportedDatasets          ResearchImportedDataset[]
   researchDataTransformations       ResearchDataTransformation[]
   researchDatasetVersions           ResearchDatasetVersion[]
+  researchSamplingDesigns           ResearchSamplingDesign[]
 }
 
 model PricingInquiry {
@@ -2456,6 +2474,8 @@ model User {
   createdResearchDatasetVersions          ResearchDatasetVersion[]              @relation("ResearchDatasetVersionCreator")
   reviewedResearchDatasetVersions         ResearchDatasetVersion[]              @relation("ResearchDatasetVersionReviewer")
   approvedResearchDatasetVersions         ResearchDatasetVersion[]              @relation("ResearchDatasetVersionApprover")
+  createdResearchSamplingDesigns          ResearchSamplingDesign[]              @relation("ResearchSamplingDesignCreator")
+  approvedResearchSamplingDesigns         ResearchSamplingDesign[]              @relation("ResearchSamplingDesignApprover")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8046,6 +8066,7 @@ model ResearchProject {
   collectionWaves       ResearchCollectionWave[]
   reports               ResearchReport[]
   importedDatasets      ResearchImportedDataset[]
+  samplingDesigns       ResearchSamplingDesign[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
@@ -8210,6 +8231,8 @@ model ResearchAnalysis {
   filterVariableKey    String?
   filterValue          String?
   weightVariableKey    String?
+  samplingDesignId      String?
+  samplingDesignSnapshot Json?
   hypothesis           String?
   methodologyNotes     String?
   status               ResearchAnalysisStatus @default(DRAFT)
@@ -8228,6 +8251,7 @@ model ResearchAnalysis {
   organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   collection   ResearchCollectionWave? @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   datasetVersion ResearchDatasetVersion? @relation(fields: [datasetVersionId], references: [id], onDelete: Cascade)
+  samplingDesign ResearchSamplingDesign? @relation(fields: [samplingDesignId], references: [id], onDelete: SetNull)
   analyst      User                   @relation("ResearchAnalysisAnalyst", fields: [analystId], references: [id], onDelete: Restrict)
   reviewer     User?                  @relation("ResearchAnalysisReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
   approvedBy   User?                  @relation("ResearchAnalysisApprover", fields: [approvedById], references: [id], onDelete: SetNull)
@@ -8235,6 +8259,7 @@ model ResearchAnalysis {
   @@index([organizationId, status, updatedAt])
   @@index([collectionId, status, updatedAt])
   @@index([datasetVersionId, status, updatedAt])
+  @@index([samplingDesignId])
   @@index([analystId, status])
   @@index([reviewerId, status])
   @@unique([collectionId, title, version])
@@ -8390,4 +8415,41 @@ model ResearchDatasetVersion {
   @@unique([datasetId, version])
   @@index([organizationId, status, createdAt])
   @@index([datasetId, status, version])
+}
+
+model ResearchSamplingDesign {
+  id                    String                       @id @default(cuid())
+  organizationId        String
+  projectId             String
+  version               Int
+  name                  String
+  type                  ResearchSamplingDesignType
+  status                ResearchSamplingDesignStatus @default(DRAFT)
+  populationSize        Int?
+  samplingFrameSize     Int?
+  targetSampleSize      Int
+  selectionInterval     Float?
+  strataVariableKey     String?
+  clusterVariableKey    String?
+  stages                Json?
+  finitePopulationCorrection Boolean                 @default(false)
+  weightMethod          String?
+  nonresponseAdjustment String?
+  calibrationMethod     String?
+  assumptions           String
+  createdById           String
+  approvedById          String?
+  createdAt             DateTime                     @default(now())
+  submittedAt           DateTime?
+  approvedAt            DateTime?
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User            @relation("ResearchSamplingDesignCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy   User?           @relation("ResearchSamplingDesignApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  analyses     ResearchAnalysis[]
+
+  @@unique([projectId, version])
+  @@index([organizationId, status, createdAt])
+  @@index([projectId, status, version])
 }

@@ -1,0 +1,13 @@
+CREATE TYPE "ResearchSamplingDesignType" AS ENUM ('SIMPLE_RANDOM','SYSTEMATIC','STRATIFIED','CLUSTER','MULTISTAGE','CENSUS','NON_PROBABILITY');
+CREATE TYPE "ResearchSamplingDesignStatus" AS ENUM ('DRAFT','UNDER_REVIEW','APPROVED','ARCHIVED');
+CREATE TABLE "ResearchSamplingDesign" ("id" TEXT NOT NULL,"organizationId" TEXT NOT NULL,"projectId" TEXT NOT NULL,"version" INTEGER NOT NULL,"name" TEXT NOT NULL,"type" "ResearchSamplingDesignType" NOT NULL,"status" "ResearchSamplingDesignStatus" NOT NULL DEFAULT 'DRAFT',"populationSize" INTEGER,"samplingFrameSize" INTEGER,"targetSampleSize" INTEGER NOT NULL,"selectionInterval" DOUBLE PRECISION,"strataVariableKey" TEXT,"clusterVariableKey" TEXT,"stages" JSONB,"finitePopulationCorrection" BOOLEAN NOT NULL DEFAULT false,"weightMethod" TEXT,"nonresponseAdjustment" TEXT,"calibrationMethod" TEXT,"assumptions" TEXT NOT NULL,"createdById" TEXT NOT NULL,"approvedById" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"submittedAt" TIMESTAMP(3),"approvedAt" TIMESTAMP(3),CONSTRAINT "ResearchSamplingDesign_pkey" PRIMARY KEY ("id"));
+ALTER TABLE "ResearchAnalysis" ADD COLUMN "samplingDesignId" TEXT,ADD COLUMN "samplingDesignSnapshot" JSONB;
+CREATE UNIQUE INDEX "ResearchSamplingDesign_projectId_version_key" ON "ResearchSamplingDesign"("projectId","version");
+CREATE INDEX "ResearchSamplingDesign_organizationId_status_createdAt_idx" ON "ResearchSamplingDesign"("organizationId","status","createdAt");
+CREATE INDEX "ResearchSamplingDesign_projectId_status_version_idx" ON "ResearchSamplingDesign"("projectId","status","version");
+CREATE INDEX "ResearchAnalysis_samplingDesignId_idx" ON "ResearchAnalysis"("samplingDesignId");
+ALTER TABLE "ResearchSamplingDesign" ADD CONSTRAINT "ResearchSamplingDesign_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ResearchSamplingDesign" ADD CONSTRAINT "ResearchSamplingDesign_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "ResearchProject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ResearchSamplingDesign" ADD CONSTRAINT "ResearchSamplingDesign_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ResearchSamplingDesign" ADD CONSTRAINT "ResearchSamplingDesign_approvedById_fkey" FOREIGN KEY ("approvedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ResearchAnalysis" ADD CONSTRAINT "ResearchAnalysis_samplingDesignId_fkey" FOREIGN KEY ("samplingDesignId") REFERENCES "ResearchSamplingDesign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
