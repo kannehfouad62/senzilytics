@@ -417,6 +417,35 @@ enum ResearchSamplingDesignStatus {
   ARCHIVED
 }
 
+enum ResearchSamplingFrameStatus {
+  VALIDATED
+  ARCHIVED
+  REJECTED
+}
+
+enum ResearchSamplingExecutionStatus {
+  GENERATED
+  UNDER_REVIEW
+  APPROVED
+  ACTIVE
+  CLOSED
+  ARCHIVED
+  CANCELLED
+}
+
+enum ResearchSampleUnitStatus {
+  SELECTED
+  RESERVE
+  ASSIGNED
+  CONTACTED
+  INELIGIBLE
+  REFUSED
+  PARTIAL
+  COMPLETED
+  REPLACED
+  WITHDRAWN
+}
+
 enum EmergencyPlanType {
   ALL_HAZARDS
   FIRE
@@ -2142,6 +2171,8 @@ model Organization {
   researchSamplingDesigns          ResearchSamplingDesign[]
   researchPublicSurveyLinks        ResearchPublicSurveyLink[]
   researchPublicResponses          ResearchPublicResponse[]
+  researchSamplingFrames           ResearchSamplingFrame[]
+  researchSamplingExecutions       ResearchSamplingExecution[]
 }
 
 model PricingInquiry {
@@ -2486,6 +2517,9 @@ model User {
   approvedResearchSamplingDesigns     ResearchSamplingDesign[]          @relation("ResearchSamplingDesignApprover")
   createdResearchPublicSurveyLinks    ResearchPublicSurveyLink[]        @relation("ResearchPublicSurveyLinkCreator")
   reviewedResearchPublicResponses     ResearchPublicResponse[]          @relation("ResearchPublicResponseReviewer")
+  createdResearchSamplingFrames       ResearchSamplingFrame[]           @relation("ResearchSamplingFrameCreator")
+  generatedResearchSamples            ResearchSamplingExecution[]       @relation("ResearchSamplingExecutionGenerator")
+  approvedResearchSamplingExecutions  ResearchSamplingExecution[]       @relation("ResearchSamplingExecutionApprover")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8065,12 +8099,12 @@ model ResearchProject {
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 
-  organization          Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client                ResearchClient?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  projectManager        User                      @relation("ResearchProjectManager", fields: [projectManagerId], references: [id], onDelete: Restrict)
-  principalInvestigator User?                     @relation("ResearchPrincipalInvestigator", fields: [principalInvestigatorId], references: [id], onDelete: SetNull)
-  createdBy             User                      @relation("ResearchProjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  approvedBy            User?                     @relation("ResearchProjectApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  organization          Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client                ResearchClient?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  projectManager        User                        @relation("ResearchProjectManager", fields: [projectManagerId], references: [id], onDelete: Restrict)
+  principalInvestigator User?                       @relation("ResearchPrincipalInvestigator", fields: [principalInvestigatorId], references: [id], onDelete: SetNull)
+  createdBy             User                        @relation("ResearchProjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy            User?                       @relation("ResearchProjectApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   teamMembers           ResearchTeamMember[]
   milestones            ResearchMilestone[]
   questionnaires        ResearchQuestionnaire[]
@@ -8078,6 +8112,8 @@ model ResearchProject {
   reports               ResearchReport[]
   importedDatasets      ResearchImportedDataset[]
   samplingDesigns       ResearchSamplingDesign[]
+  samplingFrames        ResearchSamplingFrame[]
+  samplingExecutions    ResearchSamplingExecution[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
@@ -8507,13 +8543,109 @@ model ResearchSamplingDesign {
   submittedAt                DateTime?
   approvedAt                 DateTime?
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project      ResearchProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy    User               @relation("ResearchSamplingDesignCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  approvedBy   User?              @relation("ResearchSamplingDesignApprover", fields: [approvedById], references: [id], onDelete: SetNull)
-  analyses     ResearchAnalysis[]
+  organization       Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project            ResearchProject             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy          User                        @relation("ResearchSamplingDesignCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy         User?                       @relation("ResearchSamplingDesignApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  analyses           ResearchAnalysis[]
+  samplingFrames     ResearchSamplingFrame[]
+  samplingExecutions ResearchSamplingExecution[]
 
   @@unique([projectId, version])
   @@index([organizationId, status, createdAt])
   @@index([projectId, status, version])
+}
+
+model ResearchSamplingFrame {
+  id                 String                      @id @default(cuid())
+  organizationId     String
+  projectId          String
+  samplingDesignId   String
+  version            Int
+  name               String
+  status             ResearchSamplingFrameStatus @default(VALIDATED)
+  sourceFileName     String
+  sourceBlobPath     String
+  mimeType           String
+  sizeBytes          Int
+  rowCount           Int
+  identifierColumn   String
+  strataColumn       String?
+  clusterColumn      String?
+  headerSnapshot     Json
+  validationSnapshot Json
+  createdById        String
+  createdAt          DateTime                    @default(now())
+  archivedAt         DateTime?
+
+  organization   Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        ResearchProject             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  samplingDesign ResearchSamplingDesign      @relation(fields: [samplingDesignId], references: [id], onDelete: Restrict)
+  createdBy      User                        @relation("ResearchSamplingFrameCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  executions     ResearchSamplingExecution[]
+
+  @@unique([samplingDesignId, version])
+  @@index([organizationId, status, createdAt])
+  @@index([projectId, status, version])
+}
+
+model ResearchSamplingExecution {
+  id                 String                          @id @default(cuid())
+  organizationId     String
+  projectId          String
+  samplingDesignId   String
+  samplingFrameId    String
+  version            Int
+  status             ResearchSamplingExecutionStatus @default(GENERATED)
+  seed               String
+  targetSampleSize   Int
+  reserveSampleSize  Int                             @default(0)
+  selectedSampleSize Int
+  algorithmSnapshot  Json
+  designSnapshot     Json
+  generatedById      String
+  approvedById       String?
+  generatedAt        DateTime                        @default(now())
+  submittedAt        DateTime?
+  approvedAt         DateTime?
+  activatedAt        DateTime?
+  closedAt           DateTime?
+  archivedAt         DateTime?
+
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        ResearchProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  samplingDesign ResearchSamplingDesign @relation(fields: [samplingDesignId], references: [id], onDelete: Restrict)
+  samplingFrame  ResearchSamplingFrame  @relation(fields: [samplingFrameId], references: [id], onDelete: Restrict)
+  generatedBy    User                   @relation("ResearchSamplingExecutionGenerator", fields: [generatedById], references: [id], onDelete: Restrict)
+  approvedBy     User?                  @relation("ResearchSamplingExecutionApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  units          ResearchSampleUnit[]
+
+  @@unique([samplingDesignId, version])
+  @@index([organizationId, status, generatedAt])
+  @@index([projectId, status, version])
+  @@index([samplingFrameId, status])
+}
+
+model ResearchSampleUnit {
+  id                   String                   @id @default(cuid())
+  executionId          String
+  unitReference        String
+  frameRowNumber       Int
+  stratum              String?
+  cluster              String?
+  selectionOrder       Int
+  inclusionProbability Float?
+  baseWeight           Float?
+  isReserve            Boolean                  @default(false)
+  status               ResearchSampleUnitStatus @default(SELECTED)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  execution ResearchSamplingExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@unique([executionId, unitReference])
+  @@unique([executionId, selectionOrder])
+  @@index([executionId, status, isReserve])
+  @@index([executionId, stratum])
+  @@index([executionId, cluster])
 }
