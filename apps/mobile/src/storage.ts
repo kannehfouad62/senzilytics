@@ -60,6 +60,7 @@ import type {
   RegulatoryImplementationPayload,
   RegulatorySourceReviewPayload,
   ResearchFieldworkResponsePayload,
+  ResearchInterviewDraft,
   RiskCapturePayload,
   RiskReviewPayload,
   SifSignalReviewPayload,
@@ -1065,6 +1066,25 @@ export async function clearWorkspaceCache(ownerKey: string) {
       ownerKey
     );
   });
+}
+
+const researchDraftKey = (ownerKey: string, sampleUnitId: string) => `research-draft:${ownerKey}:${sampleUnitId}`;
+
+export async function saveResearchInterviewDraft(ownerKey: string, sampleUnitId: string, draft: ResearchInterviewDraft) {
+  const database = await db();
+  await database.runAsync("INSERT INTO mobile_cache (cache_key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(cache_key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", researchDraftKey(ownerKey, sampleUnitId), JSON.stringify(draft), draft.updatedAt);
+}
+
+export async function readResearchInterviewDraft(ownerKey: string, sampleUnitId: string) {
+  const database = await db();
+  const row = await database.getFirstAsync<{ value: string }>("SELECT value FROM mobile_cache WHERE cache_key = ?", researchDraftKey(ownerKey, sampleUnitId));
+  if (!row) return null;
+  try { return JSON.parse(row.value) as ResearchInterviewDraft; } catch { return null; }
+}
+
+export async function clearResearchInterviewDraft(ownerKey: string, sampleUnitId: string) {
+  const database = await db();
+  await database.runAsync("DELETE FROM mobile_cache WHERE cache_key = ?", researchDraftKey(ownerKey, sampleUnitId));
 }
 
 export async function cacheControlledDocument(

@@ -20,6 +20,7 @@ export type RuntimeField = {
   options: unknown;
   visibilityRule: unknown;
   sequence: number;
+  optionLabels?: Record<string, string>;
 };
 
 export type RuntimeForm = {
@@ -2058,7 +2059,25 @@ export type MobileResearchFieldworkAssignment = {
       defaultLanguage: string;
     };
     form: RuntimeForm;
+    localizations: Array<{
+      locale: string;
+      languageName: string;
+      questionnaireName: string;
+      purpose: string;
+      consentStatement: string | null;
+      instructions: string | null;
+      fieldTranslations: Record<string, { label?: string; description?: string; placeholder?: string; options?: Record<string, string> }>;
+    }>;
   }>;
+};
+
+export type ResearchInterviewDraft = {
+  collectionId: string;
+  locale: string;
+  interviewStartedAt: string;
+  consent: boolean;
+  answers: Record<string, string | boolean | string[]>;
+  updatedAt: string;
 };
 
 export type ResearchFieldworkResponsePayload = {

@@ -42,3 +42,20 @@ test("offline interviews preserve immutable lineage and idempotency", async () =
   assert.match(dataset, /source: "FIELDWORK"/);
   assert.match(exportRoute, /"FIELDWORK"/);
 });
+
+test("native fieldwork supports approved languages and encrypted draft recovery", async () => {
+  const [service, mobile, storage, types] = await Promise.all([
+    readFile(new URL("../src/modules/mobile/mobile-research-fieldwork.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../apps/mobile/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../apps/mobile/src/storage.ts", import.meta.url), "utf8"),
+    readFile(new URL("../apps/mobile/src/types.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(service, /researchQuestionnaireLocalizations/);
+  assert.match(service, /status: "APPROVED"/);
+  assert.match(mobile, /localizedMobileResearchCollection/);
+  assert.match(mobile, /optionLabels/);
+  assert.match(mobile, /saveResearchInterviewDraft/);
+  assert.match(storage, /research-draft:/);
+  assert.match(storage, /mobile_cache/);
+  assert.match(types, /ResearchInterviewDraft/);
+});

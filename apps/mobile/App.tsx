@@ -72,6 +72,7 @@ import { registerForMobilePush, subscribeToMobileNotificationResponses } from ".
 import { MOBILE_WORKSPACE_MAX_OFFLINE_AGE_MS } from "./src/session-lifecycle";
 import {
   cacheWorkspace,
+  clearResearchInterviewDraft,
   clearCachedControlledDocuments,
   clearWorkspaceCache,
   initializeOfflineStore,
@@ -83,6 +84,8 @@ import {
   queueObservation,
   queueResearchFieldworkResponse,
   readCachedWorkspace,
+  readResearchInterviewDraft,
+  saveResearchInterviewDraft,
   synchronizeOfflineItems,
 } from "./src/storage";
 import type {
@@ -574,22 +577,39 @@ function ResearchFieldworkScreen({ assignments, ownerKey, online, onBack, onQueu
 
 function ResearchInterviewEditor({ assignment, ownerKey, online, onBack, onQueued, onSync }: { assignment: MobileResearchFieldworkAssignment; ownerKey: string; online: boolean; onBack: () => void; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
   const [collectionId, setCollectionId] = useState(assignment.collections[0]?.id ?? "");
+  const [locale, setLocale] = useState(assignment.collections[0]?.questionnaire.defaultLanguage.trim().replaceAll("_", "-").toLowerCase() ?? "en");
   const [answers, setAnswers] = useState<Record<string, FieldValue>>({});
   const [consent, setConsent] = useState(false);
-  const [startedAt] = useState(() => new Date().toISOString());
+  const [startedAt, setStartedAt] = useState(() => new Date().toISOString());
+  const [draftReady, setDraftReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const collection = assignment.collections.find((item) => item.id === collectionId) ?? assignment.collections[0];
+  useEffect(() => {
+    let active = true;
+    void readResearchInterviewDraft(ownerKey, assignment.id).then((draft) => {
+      if (!active || !draft || !assignment.collections.some((item) => item.id === draft.collectionId)) return;
+      setCollectionId(draft.collectionId); setLocale(draft.locale); setStartedAt(draft.interviewStartedAt); setConsent(draft.consent); setAnswers(draft.answers);
+    }).finally(() => { if (active) setDraftReady(true); });
+    return () => { active = false; };
+  }, [assignment.id, assignment.collections, ownerKey]);
+  useEffect(() => {
+    if (!draftReady) return;
+    const timer = setTimeout(() => { void saveResearchInterviewDraft(ownerKey, assignment.id, { collectionId, locale, interviewStartedAt: startedAt, consent, answers, updatedAt: new Date().toISOString() }); }, 500);
+    return () => clearTimeout(timer);
+  }, [answers, assignment.id, collectionId, consent, draftReady, locale, ownerKey, startedAt]);
   if (!collection) return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><SecondaryButton label="← Assigned research fieldwork" onPress={onBack} /><EmptyState text="No active questionnaire is available for this sampled unit." /></ScrollView>;
+  const localized = localizedMobileResearchCollection(collection, locale);
   const save = async () => {
     setError("");
-    if (collection.questionnaire.consentStatement && !consent) { setError("Record participant consent before completing the interview."); return; }
+    if (localized.questionnaire.consentStatement && !consent) { setError("Record participant consent before completing the interview."); return; }
     let form: CapturedForm;
-    try { form = buildCapturedForms([collection.form], answers)[0]; }
+    try { form = buildCapturedForms([localized.form], answers)[0]; }
     catch (reason) { setError(messageOf(reason)); return; }
     setSaving(true);
     try {
-      await queueResearchFieldworkResponse(ownerKey, { sampleUnitId: assignment.id, collectionId: collection.id, locale: collection.questionnaire.defaultLanguage.trim().replaceAll("_", "-").toLowerCase(), interviewStartedAt: startedAt, consent, form });
+      await queueResearchFieldworkResponse(ownerKey, { sampleUnitId: assignment.id, collectionId: collection.id, locale, interviewStartedAt: startedAt, consent, form });
+      await clearResearchInterviewDraft(ownerKey, assignment.id);
       setAnswers({});
       await onQueued(online ? "Research interview queued. Synchronizing now…" : "Research interview encrypted and saved offline.");
       if (online) onSync();
@@ -597,7 +617,19 @@ function ResearchInterviewEditor({ assignment, ownerKey, online, onBack, onQueue
     } catch (reason) { setError(messageOf(reason)); }
     finally { setSaving(false); }
   };
-  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><SecondaryButton label="← Assigned research fieldwork" onPress={onBack} /><Text style={styles.eyebrow}>{online ? "GOVERNED INTERVIEW" : "ENCRYPTED OFFLINE INTERVIEW"}</Text><Text style={styles.pageTitle}>{assignment.unitReference}</Text><Text style={styles.muted}>{assignment.project.client?.name ?? assignment.project.title} · {assignment.project.reference}</Text>{assignment.collections.length > 1 ? <><FieldLabel text="Collection wave" /><ChipGroup values={assignment.collections.map((item) => ({ value: item.id, label: item.name }))} selected={collection.id} onSelect={(value) => { setCollectionId(value); setAnswers({}); setConsent(false); }} /></> : null}<Card accent><Text style={styles.cardTitle}>{collection.questionnaire.name}</Text><Text style={styles.muted}>{collection.questionnaire.purpose}</Text>{collection.instructions ? <Text style={styles.fieldHelp}>{collection.instructions}</Text> : null}</Card>{collection.questionnaire.consentStatement ? <Pressable style={styles.checkRow} onPress={() => setConsent((value) => !value)}><View style={[styles.checkbox, consent && styles.checkboxOn]}>{consent ? <Text style={styles.checkmark}>✓</Text> : null}</View><View style={styles.flex}><Text style={styles.checkLabel}>Participant consent recorded *</Text><Text style={styles.fieldHelp}>{collection.questionnaire.consentStatement}</Text></View></Pressable> : null}<DynamicForm form={collection.form} answers={answers} setAnswers={setAnswers} />{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Encrypting response…" : online ? "Complete and synchronize" : "Complete and save offline"} disabled={saving} onPress={save} /><Text style={styles.fieldHelp}>The response is bound to this sample unit and immutable questionnaire version. Synchronization is idempotent and requires your current tenant permission.</Text></ScrollView></KeyboardAvoidingView>;
+  const languages = [{ value: collection.questionnaire.defaultLanguage.trim().replaceAll("_", "-").toLowerCase(), label: "Default" }, ...collection.localizations.map((item) => ({ value: item.locale, label: item.languageName }))];
+  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><SecondaryButton label="← Assigned research fieldwork" onPress={onBack} /><Text style={styles.eyebrow}>{online ? "GOVERNED INTERVIEW" : "ENCRYPTED OFFLINE INTERVIEW"}</Text><Text style={styles.pageTitle}>{assignment.unitReference}</Text><Text style={styles.muted}>{assignment.project.client?.name ?? assignment.project.title} · {assignment.project.reference}</Text>{assignment.collections.length > 1 ? <><FieldLabel text="Collection wave" /><ChipGroup values={assignment.collections.map((item) => ({ value: item.id, label: item.name }))} selected={collection.id} onSelect={(value) => { const next = assignment.collections.find((item) => item.id === value); setCollectionId(value); setLocale(next?.questionnaire.defaultLanguage.trim().replaceAll("_", "-").toLowerCase() ?? "en"); setAnswers({}); setConsent(false); }} /></> : null}{languages.length > 1 ? <><FieldLabel text="Interview language" /><ChipGroup values={languages} selected={locale} onSelect={(value) => setLocale(value)} /></> : null}<Card accent><Text style={styles.cardTitle}>{localized.questionnaire.name}</Text><Text style={styles.muted}>{localized.questionnaire.purpose}</Text>{localized.instructions ? <Text style={styles.fieldHelp}>{localized.instructions}</Text> : null}</Card>{localized.questionnaire.consentStatement ? <Pressable style={styles.checkRow} onPress={() => setConsent((value) => !value)}><View style={[styles.checkbox, consent && styles.checkboxOn]}>{consent ? <Text style={styles.checkmark}>✓</Text> : null}</View><View style={styles.flex}><Text style={styles.checkLabel}>Participant consent recorded *</Text><Text style={styles.fieldHelp}>{localized.questionnaire.consentStatement}</Text></View></Pressable> : null}<DynamicForm form={localized.form} answers={answers} setAnswers={setAnswers} />{draftReady ? <Text style={styles.fieldHelp}>Draft answers are encrypted and recovered automatically on this device.</Text> : <Text style={styles.fieldHelp}>Recovering encrypted draft…</Text>}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Encrypting response…" : online ? "Complete and synchronize" : "Complete and save offline"} disabled={saving || !draftReady} onPress={save} /><Text style={styles.fieldHelp}>The response is bound to this sample unit and immutable questionnaire version. Synchronization is idempotent and requires your current tenant permission.</Text></ScrollView></KeyboardAvoidingView>;
+}
+
+function localizedMobileResearchCollection(collection: MobileResearchFieldworkAssignment["collections"][number], locale: string) {
+  const localization = collection.localizations.find((item) => item.locale === locale);
+  if (!localization) return collection;
+  return {
+    ...collection,
+    instructions: localization.instructions || collection.instructions,
+    questionnaire: { ...collection.questionnaire, name: localization.questionnaireName || collection.questionnaire.name, purpose: localization.purpose || collection.questionnaire.purpose, consentStatement: localization.consentStatement || collection.questionnaire.consentStatement },
+    form: { ...collection.form, name: localization.questionnaireName || collection.form.name, description: localization.purpose || collection.form.description, version: { ...collection.form.version, instructions: localization.instructions || collection.form.version.instructions, fields: collection.form.version.fields.map((field) => { const translated = localization.fieldTranslations[field.id]; return { ...field, label: translated?.label || field.label, description: translated?.description || field.description, placeholder: translated?.placeholder || field.placeholder, optionLabels: translated?.options }; }) } },
+  };
 }
 
 function CaptureScreen({ mode, onModeChange, ...props }: { mode: CaptureMode; onModeChange: (mode: CaptureMode) => void; workspace: MobileBootstrap; ownerKey: string; online: boolean; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
@@ -891,8 +923,8 @@ function DynamicField({ field, value, onChange }: { field: RuntimeField; value: 
   const options = Array.isArray(field.options) ? field.options.filter((item): item is string => typeof item === "string") : [];
   if (field.fieldType === "FILE") return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><Text style={styles.muted}>Files can be attached from the web workspace after this record synchronizes.</Text></View>;
   if (field.fieldType === "BOOLEAN") return <Pressable style={styles.checkRow} onPress={() => onChange(value !== true)}><View style={[styles.checkbox, value === true && styles.checkboxOn]}>{value === true ? <Text style={styles.checkmark}>✓</Text> : null}</View><Text style={styles.checkLabel}>{field.label}{field.isRequired ? " *" : ""}</Text></Pressable>;
-  if (field.fieldType === "SINGLE_SELECT") return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><ChipGroup values={options.map((option) => ({ value: option, label: option }))} selected={typeof value === "string" ? value : ""} onSelect={onChange} /></View>;
-  if (field.fieldType === "MULTI_SELECT") { const selected = Array.isArray(value) ? value : []; return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><View style={styles.chips}>{options.map((option) => <Pressable key={option} style={[styles.chip, selected.includes(option) && styles.chipOn]} onPress={() => onChange(selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option])}><Text style={[styles.chipText, selected.includes(option) && styles.chipTextOn]}>{option}</Text></Pressable>)}</View></View>; }
+  if (field.fieldType === "SINGLE_SELECT") return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><ChipGroup values={options.map((option) => ({ value: option, label: field.optionLabels?.[option] || option }))} selected={typeof value === "string" ? value : ""} onSelect={onChange} /></View>;
+  if (field.fieldType === "MULTI_SELECT") { const selected = Array.isArray(value) ? value : []; return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><View style={styles.chips}>{options.map((option) => <Pressable key={option} style={[styles.chip, selected.includes(option) && styles.chipOn]} onPress={() => onChange(selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option])}><Text style={[styles.chipText, selected.includes(option) && styles.chipTextOn]}>{field.optionLabels?.[option] || option}</Text></Pressable>)}</View></View>; }
   return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} />{field.description ? <Text style={styles.fieldHelp}>{field.description}</Text> : null}<Input value={typeof value === "string" ? value : ""} onChangeText={onChange} placeholder={field.placeholder || placeholderFor(field.fieldType)} multiline={field.fieldType === "LONG_TEXT"} keyboardType={field.fieldType === "NUMBER" ? "decimal-pad" : field.fieldType === "EMAIL" ? "email-address" : field.fieldType === "PHONE" ? "phone-pad" : "default"} /></View>;
 }
 

@@ -41,7 +41,13 @@ export async function getMobileResearchFieldwork(input: {
                 include: {
                   questionnaire: true,
                   formVersion: {
-                    include: { fields: { orderBy: { sequence: "asc" } } },
+                    include: {
+                      fields: { orderBy: { sequence: "asc" } },
+                      researchQuestionnaireLocalizations: {
+                        where: { status: "APPROVED" },
+                        orderBy: { languageName: "asc" },
+                      },
+                    },
                   },
                 },
                 orderBy: { createdAt: "desc" },
@@ -102,6 +108,15 @@ export async function getMobileResearchFieldwork(input: {
             })),
           },
         },
+        localizations: collection.formVersion.researchQuestionnaireLocalizations.map((localization) => ({
+          locale: localization.locale,
+          languageName: localization.languageName,
+          questionnaireName: localization.questionnaireName,
+          purpose: localization.purpose,
+          consentStatement: localization.consentStatement,
+          instructions: localization.instructions,
+          fieldTranslations: localization.fieldTranslations,
+        })),
       })),
     })),
   };
