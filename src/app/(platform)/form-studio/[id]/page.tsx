@@ -80,13 +80,13 @@ export default async function FormDetailPage({
         </div>
         <div className="flex gap-3">
           {draft ? (
-            <form action={publishConfigurableForm}>
+            <div className="flex flex-wrap gap-3"><Link href={`/form-studio/${form.id}/test`} className="rounded-xl border border-amber-300/30 px-4 py-2 font-semibold text-amber-200">Preview & test</Link><form action={publishConfigurableForm}>
               <input type="hidden" name="definitionId" value={form.id} />
               <input type="hidden" name="versionId" value={draft.id} />
               <button className="rounded-xl bg-emerald-300 px-4 py-2 font-semibold text-slate-950">
                 Publish v{draft.version}
               </button>
-            </form>
+            </form></div>
           ) : (
             <form action={reviseConfigurableForm}>
               <input type="hidden" name="definitionId" value={form.id} />

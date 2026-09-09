@@ -136,6 +136,16 @@ export async function preparePublishedFormVersionSubmission(input:{organizationI
   return {definitionId:input.definitionId,versionId:version.id,status:runtimeSubmissionStatus(version.fields,raw),answers} satisfies PreparedSubmission;
 }
 
+export async function prepareDraftResearchQuestionnaireTest(input:{organizationId:string;definitionId:string;versionId:string;data:FormData}){
+  const version=await prisma.configurableFormVersion.findFirst({where:{id:input.versionId,definitionId:input.definitionId,status:ConfigurableFormVersionStatus.DRAFT,definition:{organizationId:input.organizationId,module:ConfigurableFormModule.RESEARCH}},include:{fields:{orderBy:{sequence:"asc"}}}});
+  if(!version)throw new Error("The draft questionnaire is no longer available for testing.");
+  if(!version.fields.length)throw new Error("Add at least one question before running a test response.");
+  const raw=new Map<string,unknown>();for(const field of version.fields)raw.set(field.key,readValue(field,input.data));deriveCalculatedValues(version.fields,raw);
+  const answers:PreparedSubmission["answers"]=[];
+  for(const field of version.fields){if(!isRuntimeFieldVisible(field.visibilityRule,raw))continue;const value=validateValue(field,raw.get(field.key));if(value!==undefined)answers.push({fieldId:field.id,value})}
+  return {answerCount:answers.length,visibleFieldCount:version.fields.filter(field=>isRuntimeFieldVisible(field.visibilityRule,raw)).length,calculatedFieldCount:version.fields.filter(field=>field.fieldType===ConfigurableFieldType.CALCULATED&&raw.get(field.key)!==undefined).length,requiredFileCount:runtimeRequiredFileIds(version.fields,raw).length};
+}
+
 export async function prepareCapturedFormSubmissions(input:{organizationId:string;module:ConfigurableFormModule;capturedAt:Date;forms:CapturedRuntimeForm[]}){
   if(!input.forms.length)return [];
   if(new Set(input.forms.map(form=>form.definitionId)).size!==input.forms.length)throw new Error("A captured custom form is duplicated.");
