@@ -1,22 +1,29 @@
 import { requirePermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserTenant } from "@/lib/tenant";
-import { PermissionKey } from "@prisma/client";
+import { PermissionKey, Prisma } from "@prisma/client";
 import { ClipboardList, FileCog, Plus } from "lucide-react";
 import Link from "next/link";
 
 export default async function FormStudioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ message?: string }>;
+  searchParams: Promise<{ message?: string; search?: string; page?: string }>;
 }) {
   await requirePermission(PermissionKey.MANAGE_ORGANIZATION);
-  const [{ organizationId }, { message }] = await Promise.all([
+  const [{ organizationId }, params] = await Promise.all([
     getCurrentUserTenant(),
     searchParams,
   ]);
-  const forms = await prisma.configurableFormDefinition.findMany({
-    where: { organizationId },
+  const query = normalizeRegisterQuery(params);
+  const { message } = params;
+  const where: Prisma.ConfigurableFormDefinitionWhereInput = { organizationId, ...(query.search ? { OR: [
+    { name: { contains: query.search, mode: "insensitive" } },
+    { slug: { contains: query.search, mode: "insensitive" } },
+    { description: { contains: query.search, mode: "insensitive" } },
+  ] } : {}) };
+  const [forms, total] = await Promise.all([prisma.configurableFormDefinition.findMany({
+    where,
     include: {
       _count: { select: { submissions: true } },
       versions: {
@@ -29,7 +36,9 @@ export default async function FormStudioPage({
       },
     },
     orderBy: [{ isActive: "desc" }, { module: "asc" }, { name: "asc" }],
-  });
+    skip: query.skip,
+    take: query.take,
+  }), prisma.configurableFormDefinition.count({ where })]);
 
   return (
     <div>
@@ -73,7 +82,9 @@ export default async function FormStudioPage({
         </p>
       )}
 
-      <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-8"><RegisterSearch action="/form-studio" value={query.search} placeholder="Search form name, slug, or description"/><p className="mt-3 text-sm text-slate-500">{total} matching form{total === 1 ? "" : "s"}</p></div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {forms.map((form) => {
           const latest = form.versions[0];
           const published = form.versions.find(
@@ -137,6 +148,7 @@ export default async function FormStudioPage({
           No configurable forms yet. Create the first tenant form definition.
         </p>
       )}
+      <RegisterPagination action="/form-studio" search={query.search} page={query.page} pages={registerPageCount(total)}/>
     </div>
   );
 }
@@ -147,3 +159,6 @@ function pretty(value: string) {
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
+import { RegisterPagination } from "@/components/register/register-pagination";
+import { RegisterSearch } from "@/components/register/register-search";
+import { normalizeRegisterQuery, registerPageCount } from "@/core/register/register-query";

@@ -3,20 +3,26 @@ import { Users } from "lucide-react";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { requirePermission } from "@/lib/permissions";
 import { hasPermission } from "@/lib/permissions";
-import { PermissionKey } from "@prisma/client";
+import { PermissionKey, Prisma } from "@prisma/client";
 import { UserRole } from "@prisma/client";
 import { inviteTenantUser, setTenantUserActive } from "@/features/identity/tenant.actions";
 import { RevokeMobileDeviceForm } from "@/features/mobile/mobile-device-management";
 
 
-export default async function UsersPage() {
+export default async function UsersPage({ searchParams }: { searchParams: Promise<{ search?: string; page?: string }> }) {
   await requirePermission(PermissionKey.VIEW_USERS);
-  const { organizationId } = await getCurrentUserTenant();
+  const [{ organizationId }, params] = await Promise.all([getCurrentUserTenant(), searchParams]);
+  const query = normalizeRegisterQuery(params);
+  const where: Prisma.UserWhereInput = { organizationId, ...(query.search ? { OR: [
+    { name: { contains: query.search, mode: "insensitive" } },
+    { email: { contains: query.search, mode: "insensitive" } },
+    { jobTitle: { contains: query.search, mode: "insensitive" } },
+    { department: { name: { contains: query.search, mode: "insensitive" } } },
+    { department: { site: { name: { contains: query.search, mode: "insensitive" } } } },
+  ] } : {}) };
 
-  const [users, departments, mobileSessions, canManageUsers] = await Promise.all([prisma.user.findMany({
-  where: {
-    organizationId,
-  },
+  const [users, total, departments, mobileSessions, canManageUsers] = await Promise.all([prisma.user.findMany({
+  where,
   orderBy: { name: "asc" },
   include: {
     organization: true,
@@ -26,7 +32,8 @@ export default async function UsersPage() {
       },
     },
   },
-}), prisma.department.findMany({where:{site:{organizationId}},include:{site:true},orderBy:{name:"asc"}}), prisma.mobileSession.findMany({where:{organizationId,status:"ACTIVE",expiresAt:{gt:new Date()}},select:{id:true,deviceName:true,platform:true,lastUsedAt:true,expiresAt:true,user:{select:{name:true,email:true}},_count:{select:{pushTokens:{where:{enabled:true}}}}},orderBy:{lastUsedAt:"desc"}}), hasPermission(PermissionKey.MANAGE_USERS)]);
+  skip: query.skip, take: query.take,
+}), prisma.user.count({ where }), prisma.department.findMany({where:{site:{organizationId}},include:{site:true},orderBy:{name:"asc"}}), prisma.mobileSession.findMany({where:{organizationId,status:"ACTIVE",expiresAt:{gt:new Date()}},select:{id:true,deviceName:true,platform:true,lastUsedAt:true,expiresAt:true,user:{select:{name:true,email:true}},_count:{select:{pushTokens:{where:{enabled:true}}}}},orderBy:{lastUsedAt:"desc"},take:100}), hasPermission(PermissionKey.MANAGE_USERS)]);
 
   return (
     <div>
@@ -46,6 +53,8 @@ export default async function UsersPage() {
       <form action={inviteTenantUser} className="mb-8 grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 md:grid-cols-2 xl:grid-cols-5">
         <input name="name" required placeholder="Full name" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3"/><input name="email" type="email" required placeholder="Email" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3"/><select name="role" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3">{Object.values(UserRole).filter(x=>x!==UserRole.SUPER_ADMIN).map(x=><option key={x}>{x}</option>)}</select><select name="departmentId" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3"><option value="">No department</option>{departments.map(x=><option key={x.id} value={x.id}>{x.site.name} — {x.name}</option>)}</select><button className="rounded-xl bg-cyan-300 px-4 py-3 font-semibold text-slate-950">Invite User</button>
       </form>
+
+      <div className="mb-5"><RegisterSearch action="/users" value={query.search} placeholder="Search name, email, job title, department, or site"/><p className="mt-3 text-sm text-slate-500">{total} matching user{total === 1 ? "" : "s"}</p></div>
 
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
         <table className="w-full border-collapse text-left text-sm">
@@ -104,6 +113,7 @@ export default async function UsersPage() {
             No users found.
           </div>
         )}
+        <RegisterPagination action="/users" search={query.search} page={query.page} pages={registerPageCount(total)}/>
       </div>
 
       <div className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
@@ -114,3 +124,6 @@ export default async function UsersPage() {
     </div>
   );
 }
+import { RegisterPagination } from "@/components/register/register-pagination";
+import { RegisterSearch } from "@/components/register/register-search";
+import { normalizeRegisterQuery, registerPageCount } from "@/core/register/register-query";
