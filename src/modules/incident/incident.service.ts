@@ -305,6 +305,7 @@ export async function createIncidentService(input: {
   riskLevel: RiskLevel;
   siteId: string;
   location: string;
+  participantUserIds?: string[];
   occurredAt?: Date;
   customSubmissions?: PreparedSubmission[];
   offlineSubmission?: {
@@ -313,7 +314,8 @@ export async function createIncidentService(input: {
     payloadHash: string;
   };
 }) {
-  const site = await prisma.site.findFirst({
+  const participantUserIds = [...new Set(input.participantUserIds ?? [])];
+  const [site, participants] = await Promise.all([prisma.site.findFirst({
     where: {
       id: input.siteId,
       organizationId: input.organizationId,
@@ -323,13 +325,14 @@ export async function createIncidentService(input: {
       name: true,
       organizationId: true,
     },
-  });
+  }), participantUserIds.length ? prisma.user.findMany({ where: { id: { in: participantUserIds }, organizationId: input.organizationId, isActive: true }, select: { id: true } }) : Promise.resolve([])]);
 
   if (!site) {
     throw new Error(
       "Invalid site for this organization."
     );
   }
+  if (participants.length !== participantUserIds.length) throw new Error("Select only active employees from this tenant as incident participants.");
 
   const incident =
     await prisma.$transaction(
@@ -348,6 +351,8 @@ export async function createIncidentService(input: {
               siteId: input.siteId,
               reportedById:
                 input.userId,
+              organizationId: input.organizationId,
+              participantUserIds,
               occurredAt:
                 input.occurredAt,
             },
@@ -390,6 +395,7 @@ export async function createIncidentService(input: {
               customFormCount:
                 input.customSubmissions
                   ?.length ?? 0,
+              participantCount: participantUserIds.length,
             },
           },
         });

@@ -170,6 +170,7 @@ export async function createIncident(
             formData,
             "location"
           ) || "",
+        participantUserIds: formData.getAll("participantUserIds").map(value => String(value).trim()).filter(Boolean),
         customSubmissions,
       });
 

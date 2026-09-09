@@ -20,6 +20,7 @@ export async function findTenantIncidentById(
     include: {
       site: true,
       reportedBy: true,
+      participants: { include: { user: true }, orderBy: { user: { name: "asc" } } },
       investigation: {
         include: {
           assignedTo: true,
@@ -45,6 +46,8 @@ export async function createTenantIncident(input: {
   location: string;
   siteId: string;
   reportedById: string;
+  organizationId: string;
+  participantUserIds?: string[];
   occurredAt?: Date;
 },db:Pick<Prisma.TransactionClient,"incident">=prisma) {
   return db.incident.create({
@@ -58,6 +61,7 @@ export async function createTenantIncident(input: {
       occurredAt: input.occurredAt ?? new Date(),
       siteId: input.siteId,
       reportedById: input.reportedById,
+      participants: input.participantUserIds?.length ? { create: input.participantUserIds.map(userId => ({ organizationId: input.organizationId, userId })) } : undefined,
     },
   });
 }

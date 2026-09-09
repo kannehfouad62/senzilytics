@@ -73,6 +73,7 @@ export default async function IncidentDetailPage({
     include: {
       site: true,
       reportedBy: true,
+      participants: { include: { user: { select: { id: true, name: true, jobTitle: true, department: { select: { name: true } } } } }, orderBy: { user: { name: "asc" } } },
       investigation: true,
       actions: {
         include: {
@@ -291,6 +292,7 @@ export default async function IncidentDetailPage({
             value={incident.createdAt.toLocaleString()}
           />
         </div>
+        <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/30 p-5"><p className="text-xs uppercase tracking-wide text-slate-500">Employee(s) involved</p>{incident.participants.length ? <div className="mt-3 flex flex-wrap gap-2">{incident.participants.map(({ user }) => <span key={user.id} className="rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-2 text-sm text-cyan-100">{user.name}{user.jobTitle ? ` · ${user.jobTitle}` : ""}{user.department?.name ? ` · ${user.department.name}` : ""}</span>)}</div> : <p className="mt-2 text-sm text-slate-400">No involved employee was identified when this incident was reported.</p>}</div>
       </section>
 
       <EntityCustomFormSubmissions

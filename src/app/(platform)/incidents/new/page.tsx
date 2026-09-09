@@ -14,7 +14,7 @@ export default async function NewIncidentPage() {
   await requirePermission(PermissionKey.CREATE_INCIDENT);
   const { organizationId, user } = await getCurrentUserTenant();
 
-  const [sites, forms] =
+  const [sites, forms, users] =
     await Promise.all([
       prisma.site.findMany({
         where: {
@@ -26,6 +26,7 @@ export default async function NewIncidentPage() {
         organizationId,
         ConfigurableFormModule.INCIDENT
       ),
+      prisma.user.findMany({ where: { organizationId, isActive: true }, select: { id: true, name: true, jobTitle: true, department: { select: { name: true } } }, orderBy: { name: "asc" } }),
     ]);
 
   return (
@@ -140,6 +141,14 @@ export default async function NewIncidentPage() {
             placeholder="Example: Warehouse A, Loading Dock 2"
             className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-cyan-400"
           />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm text-slate-300">Employee(s) involved</label>
+          <select name="participantUserIds" multiple size={Math.min(8, Math.max(3, users.length))} className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-cyan-400">
+            {users.map(person => <option key={person.id} value={person.id}>{person.name}{person.jobTitle ? ` — ${person.jobTitle}` : ""}{person.department?.name ? ` · ${person.department.name}` : ""}</option>)}
+          </select>
+          <p className="mt-2 text-xs text-slate-500">Select all employees directly involved. On Mac, hold Command; on Windows, hold Ctrl to select more than one. This is separate from the person reporting the incident.</p>
         </div>
 
       </IncidentCreateForm>

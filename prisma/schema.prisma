@@ -2221,6 +2221,7 @@ model Organization {
   aiCopilotConversations             AiCopilotConversation[]
   aiCopilotMessages                  AiCopilotMessage[]
   aiCopilotCitations                 AiCopilotCitation[]
+  incidentParticipants              IncidentParticipant[]
   aiCopilotFeedback                  AiCopilotFeedback[]
   integrationApiCredentials          IntegrationApiCredential[]
   integrationApiRequestLogs          IntegrationApiRequestLog[]
@@ -2412,6 +2413,7 @@ model User {
   department   Department? @relation(fields: [departmentId], references: [id])
 
   reportedIncidents                Incident[]                     @relation("ReportedIncidents")
+  incidentParticipations           IncidentParticipant[]          @relation("IncidentParticipantUser")
   assignedInvestigations           Investigation[]                @relation("InvestigationAssignedUser")
   assignedActions                  CorrectiveAction[]
   leadAudits                       Audit[]                        @relation("AuditLeadAuditor")
@@ -2993,6 +2995,7 @@ model Incident {
 
   reportedById String
   reportedBy   User   @relation("ReportedIncidents", fields: [reportedById], references: [id])
+  participants IncidentParticipant[]
 
   investigation      Investigation?
   actions            CorrectiveAction[]
@@ -3000,6 +3003,23 @@ model Incident {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model IncidentParticipant {
+  id             String   @id @default(cuid())
+  organizationId String
+  incidentId     String
+  userId         String
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  incident     Incident     @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  user         User         @relation("IncidentParticipantUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([incidentId, userId])
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model SafetyObservation {
