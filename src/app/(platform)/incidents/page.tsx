@@ -4,6 +4,10 @@ import { AlertTriangle, Plus } from "lucide-react";
 import Link from "next/link";
 import { hasPermission, requirePermission } from "@/lib/permissions";
 import { PermissionKey } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { RegisterSearch } from "@/components/register/register-search";
+import { RegisterPagination } from "@/components/register/register-pagination";
+import { normalizeRegisterQuery, registerPageCount } from "@/core/register/register-query";
 
 function badgeClass(value: string) {
   switch (value) {
@@ -20,27 +24,27 @@ function badgeClass(value: string) {
   }
 }
 
-export default async function IncidentsPage() {
+export default async function IncidentsPage({ searchParams }: { searchParams: Promise<{ search?: string; page?: string }> }) {
   await requirePermission(PermissionKey.VIEW_INCIDENT);
   const [{ organizationId }, canCreate] = await Promise.all([
     getCurrentUserTenant(),
     hasPermission(PermissionKey.CREATE_INCIDENT),
   ]);
 
-  const incidents = await prisma.incident.findMany({
-    where: {
-      site: {
-        organizationId,
-      },
-    },
+  const query = normalizeRegisterQuery(await searchParams);
+  const where: Prisma.IncidentWhereInput = { site: { organizationId }, ...(query.search ? { OR: [{ title: { contains: query.search, mode: "insensitive" } }, { description: { contains: query.search, mode: "insensitive" } }, { location: { contains: query.search, mode: "insensitive" } }, { site: { organizationId, name: { contains: query.search, mode: "insensitive" } } }, { reportedBy: { name: { contains: query.search, mode: "insensitive" } } }] } : {}) };
+  const [incidents, total] = await Promise.all([prisma.incident.findMany({
+    where,
     orderBy: {
       createdAt: "desc",
     },
     include: {
       site: true,
       reportedBy: true,
+      participants: { select: { id: true } },
     },
-  });
+    skip: query.skip, take: query.take,
+  }), prisma.incident.count({ where })]);
 
   return (
     <div>
@@ -65,6 +69,8 @@ export default async function IncidentsPage() {
           New Incident
         </Link>}
       </div>
+
+      <div className="mb-5"><RegisterSearch action="/incidents" value={query.search} placeholder="Search title, description, location, site, or reporter"/><p className="mt-3 text-sm text-slate-500">{total} matching incident{total === 1 ? "" : "s"}</p></div>
 
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
         <table className="w-full border-collapse text-left text-sm">
@@ -95,7 +101,7 @@ export default async function IncidentsPage() {
                       {incident.title}
                     </Link>
                     <p className="mt-1 line-clamp-1 max-w-md text-xs text-slate-400">
-                      {incident.description}
+                      {incident.description}{incident.participants.length ? ` · ${incident.participants.length} involved` : ""}
                     </p>
                   </div>
                 </td>
@@ -135,6 +141,7 @@ export default async function IncidentsPage() {
             ))}
           </tbody>
         </table>
+        <RegisterPagination action="/incidents" search={query.search} page={query.page} pages={registerPageCount(total)}/>
 
         {incidents.length === 0 && (
           <div className="p-10 text-center text-slate-400">
