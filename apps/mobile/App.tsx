@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import * as Network from "expo-network";
+import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
 import { beginMobileSignIn, clearMobileSession, getStoredMobileOwnerKey, loadMobileWorkspace, logoutMobileSession, mobileApi, MobileApiError, mobileWebUrl, restoreMobileSession } from "./src/api";
 import {
@@ -102,6 +103,7 @@ import type {
   MobileInspection,
   MobileInspectionItem,
   MobileModule,
+  MobileRepeatingGroupRow,
   MobileResearchFieldworkAssignment,
   MobileTenantAdministrationWorkspace,
   ObservationPayload,
@@ -111,7 +113,7 @@ import type {
 
 type Tab = "home" | "workspace" | "capture" | "inspections" | "audits" | "research" | "risks" | "governance" | "complianceDocuments" | "controlledWork" | "assetContractors" | "hygieneHealth" | "chemicalEnvironmental" | "esg" | "behaviorAssurance" | "regulatory" | "executive" | "administration" | "actions" | "settings";
 type CaptureMode = "observation" | "incident";
-type FieldValue = string | boolean | string[];
+type FieldValue = string | boolean | string[] | MobileRepeatingGroupRow[];
 const observationTypes = ["UNSAFE_ACT", "UNSAFE_CONDITION", "POSITIVE_PRACTICE", "ENVIRONMENTAL", "QUALITY", "OTHER"] as const;
 const incidentTypes = ["INJURY", "NEAR_MISS", "PROPERTY_DAMAGE", "ENVIRONMENTAL", "VEHICLE", "SECURITY", "OTHER"] as const;
 const riskLevels = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
@@ -923,10 +925,11 @@ function DynamicField({ field, value, onChange }: { field: RuntimeField; value: 
   const options = Array.isArray(field.options) ? field.options.filter((item): item is string => typeof item === "string") : [];
   if (field.fieldType === "MATRIX") return <MobileMatrixField field={field} value={value} onChange={onChange} />;
   if (field.fieldType === "RANKING") return <MobileRankingField field={field} value={value} onChange={onChange} />;
+  if (field.fieldType === "REPEATING_GROUP") return <MobileRepeatingGroupField field={field} value={value} onChange={onChange} />;
   if (field.fieldType === "FILE") return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><Text style={styles.muted}>Files can be attached from the web workspace after this record synchronizes.</Text></View>;
   if (field.fieldType === "BOOLEAN") return <Pressable style={styles.checkRow} onPress={() => onChange(value !== true)}><View style={[styles.checkbox, value === true && styles.checkboxOn]}>{value === true ? <Text style={styles.checkmark}>✓</Text> : null}</View><Text style={styles.checkLabel}>{field.label}{field.isRequired ? " *" : ""}</Text></Pressable>;
   if (field.fieldType === "SINGLE_SELECT") return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><ChipGroup values={options.map((option) => ({ value: option, label: field.optionLabels?.[option] || option }))} selected={typeof value === "string" ? value : ""} onSelect={onChange} /></View>;
-  if (field.fieldType === "MULTI_SELECT") { const selected = Array.isArray(value) ? value : []; return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><View style={styles.chips}>{options.map((option) => <Pressable key={option} style={[styles.chip, selected.includes(option) && styles.chipOn]} onPress={() => onChange(selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option])}><Text style={[styles.chipText, selected.includes(option) && styles.chipTextOn]}>{field.optionLabels?.[option] || option}</Text></Pressable>)}</View></View>; }
+  if (field.fieldType === "MULTI_SELECT") { const selected = Array.isArray(value) ? value.filter((item):item is string=>typeof item==="string") : []; return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><View style={styles.chips}>{options.map((option) => <Pressable key={option} style={[styles.chip, selected.includes(option) && styles.chipOn]} onPress={() => onChange(selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option])}><Text style={[styles.chipText, selected.includes(option) && styles.chipTextOn]}>{field.optionLabels?.[option] || option}</Text></Pressable>)}</View></View>; }
   return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} />{field.description ? <Text style={styles.fieldHelp}>{field.description}</Text> : null}<Input value={typeof value === "string" ? value : ""} onChangeText={onChange} placeholder={field.placeholder || placeholderFor(field.fieldType)} multiline={field.fieldType === "LONG_TEXT"} keyboardType={field.fieldType === "NUMBER" ? "decimal-pad" : field.fieldType === "EMAIL" ? "email-address" : field.fieldType === "PHONE" ? "phone-pad" : "default"} /></View>;
 }
 
@@ -934,16 +937,37 @@ function MobileMatrixField({ field, value, onChange }: { field: RuntimeField; va
   const configured = field.options && !Array.isArray(field.options) && typeof field.options === "object" ? field.options as { rows?: unknown; columns?: unknown } : {};
   const rows = Array.isArray(configured.rows) ? configured.rows.filter((item): item is string => typeof item === "string") : [];
   const columns = Array.isArray(configured.columns) ? configured.columns.filter((item): item is string => typeof item === "string") : [];
-  const selected = new Map((Array.isArray(value) ? value : []).flatMap((encoded) => { try { const pair = JSON.parse(encoded) as unknown; return Array.isArray(pair) && pair.length === 2 && typeof pair[0] === "string" && typeof pair[1] === "string" ? [[pair[0], pair[1]] as const] : []; } catch { return []; } }));
+  const selected = new Map((Array.isArray(value) ? value.filter((item):item is string=>typeof item==="string") : []).flatMap((encoded) => { try { const pair = JSON.parse(encoded) as unknown; return Array.isArray(pair) && pair.length === 2 && typeof pair[0] === "string" && typeof pair[1] === "string" ? [[pair[0], pair[1]] as const] : []; } catch { return []; } }));
   const update = (row: string, column: string) => { selected.set(row, column); onChange(rows.flatMap((item) => selected.get(item) ? [JSON.stringify([item, selected.get(item)])] : [])); };
   return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} />{field.description ? <Text style={styles.fieldHelp}>{field.description}</Text> : null}{rows.map((row) => <View key={row} style={styles.fieldBlock}><Text style={styles.checkLabel}>{field.optionLabels?.[row] || row}</Text><ChipGroup values={columns.map((column) => ({ value: column, label: field.optionLabels?.[column] || column }))} selected={selected.get(row) ?? ""} onSelect={(column) => update(row, column)} /></View>)}</View>;
 }
 
 function MobileRankingField({ field, value, onChange }: { field: RuntimeField; value: FieldValue | undefined; onChange: (value: FieldValue) => void }) {
   const options = Array.isArray(field.options) ? field.options.filter((item): item is string => typeof item === "string") : [];
-  const order = Array.isArray(value) && value.length === options.length ? value : options;
+  const selectedOrder = Array.isArray(value) ? value.filter((item):item is string=>typeof item==="string") : [];
+  const order = selectedOrder.length === options.length ? selectedOrder : options;
   const move = (index: number, direction: -1 | 1) => { const target = index + direction; if (target < 0 || target >= order.length) return; const next = [...order]; [next[index], next[target]] = [next[target], next[index]]; onChange(next); };
   return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} />{field.description ? <Text style={styles.fieldHelp}>{field.description}</Text> : null}<Text style={styles.fieldHelp}>Arrange from highest to lowest priority.</Text>{order.map((option, index) => <View key={option} style={styles.checkRow}><Text style={[styles.checkLabel, styles.flex]}>{index + 1}. {field.optionLabels?.[option] || option}</Text><SecondaryButton label="↑" disabled={index === 0} onPress={() => move(index, -1)} /><SecondaryButton label="↓" disabled={index === order.length - 1} onPress={() => move(index, 1)} /></View>)}{!Array.isArray(value) || value.length !== options.length ? <SecondaryButton label="Confirm displayed ranking" onPress={() => onChange(options)} /> : null}</View>;
+}
+
+type MobileRosterColumn = { key: string; label: string; type: "SHORT_TEXT" | "LONG_TEXT" | "NUMBER" | "DATE" | "SINGLE_SELECT" | "BOOLEAN"; required: boolean; options: string[]; showWhen: { columnKey: string; value: string } | null };
+function mobileRosterConfig(value: unknown) {
+  if (!value || Array.isArray(value) || typeof value !== "object") return null;
+  const raw=value as {minRows?:unknown;maxRows?:unknown;columns?:unknown};
+  if(!Number.isInteger(raw.minRows)||!Number.isInteger(raw.maxRows)||!Array.isArray(raw.columns))return null;
+  const columns=raw.columns.filter((item):item is MobileRosterColumn=>Boolean(item)&&typeof item==="object"&&!Array.isArray(item)&&typeof (item as MobileRosterColumn).key==="string"&&typeof (item as MobileRosterColumn).label==="string");
+  const minRows=Number(raw.minRows),maxRows=Number(raw.maxRows);
+  return minRows>=0&&maxRows>=Math.max(1,minRows)&&maxRows<=50&&columns.length===raw.columns.length?{minRows,maxRows,columns}:null;
+}
+function isMobileRosterRows(value: FieldValue | undefined): value is MobileRepeatingGroupRow[] { return Array.isArray(value)&&value.every((item)=>Boolean(item)&&typeof item==="object"&&!Array.isArray(item)&&typeof (item as MobileRepeatingGroupRow).id==="string"); }
+
+function MobileRepeatingGroupField({field,value,onChange}:{field:RuntimeField;value:FieldValue|undefined;onChange:(value:FieldValue)=>void}){
+  const config=mobileRosterConfig(field.options);
+  const [seedRows]=useState<MobileRepeatingGroupRow[]>(()=>Array.from({length:config?.minRows??0},()=>({id:Crypto.randomUUID(),values:{}})));
+  if(!config)return <View style={styles.fieldBlock}><FieldLabel text={field.label}/><Text style={styles.error}>This roster configuration is invalid.</Text></View>;
+  const rows=isMobileRosterRows(value)?value:seedRows;
+  const updateValue=(rowId:string,key:string,next:string|number|boolean)=>onChange(rows.map((row)=>row.id===rowId?{...row,values:{...row.values,[key]:next}}:row));
+  return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired?" *":""}`}/>{field.description?<Text style={styles.fieldHelp}>{field.description}</Text>:null}{rows.map((row,rowIndex)=><View key={row.id} style={styles.evidencePanel}><View style={styles.row}><Text style={[styles.checkLabel,styles.flex]}>Row {rowIndex+1}</Text><SecondaryButton label="Remove" disabled={rows.length<=config.minRows} onPress={()=>onChange(rows.filter((item)=>item.id!==row.id))}/></View>{config.columns.filter((column)=>!column.showWhen||String(row.values[column.showWhen.columnKey]??"")===column.showWhen.value).map((column)=><View key={column.key} style={styles.fieldBlock}><FieldLabel text={`${column.label}${column.required?" *":""}`}/>{column.type==="SINGLE_SELECT"?<ChipGroup values={column.options.map((option)=>({value:option,label:option}))} selected={String(row.values[column.key]??"")} onSelect={(next)=>updateValue(row.id,column.key,next)}/>:column.type==="BOOLEAN"?<Pressable style={styles.checkRow} onPress={()=>updateValue(row.id,column.key,row.values[column.key]!==true)}><View style={[styles.checkbox,row.values[column.key]===true&&styles.checkboxOn]}>{row.values[column.key]===true?<Text style={styles.checkmark}>✓</Text>:null}</View><Text style={styles.checkLabel}>Yes</Text></Pressable>:<Input value={String(row.values[column.key]??"")} onChangeText={(next)=>updateValue(row.id,column.key,next)} multiline={column.type==="LONG_TEXT"} keyboardType={column.type==="NUMBER"?"decimal-pad":"default"} placeholder={column.type==="DATE"?"YYYY-MM-DD":"Enter response"}/>}</View>)}</View>)}<SecondaryButton label="Add row" disabled={rows.length>=config.maxRows} onPress={()=>onChange([...rows,{id:Crypto.randomUUID(),values:{}}])}/><Text style={styles.fieldHelp}>Minimum {config.minRows}; maximum {config.maxRows} rows. Draft rows remain encrypted on this device.</Text></View>;
 }
 
 function SettingsScreen({ workspace, pending, releaseStatus, systemHealth, verifiedAt, onRefreshDiagnostics, onEnablePush, onLogout }: { workspace: MobileBootstrap; pending: number; releaseStatus: MobileReleaseStatus | null; systemHealth: MobileSystemHealth | null; verifiedAt: number | null; onRefreshDiagnostics: () => void; onEnablePush: () => void; onLogout: () => void }) {
@@ -959,7 +983,8 @@ function buildCapturedForms(forms: RuntimeForm[], answers: Record<string, FieldV
       const empty = value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
       if (field.isRequired && (empty || (field.fieldType === "BOOLEAN" && value !== true))) throw new Error(`${field.label} is required.`);
       if (empty) continue;
-      if (field.fieldType === "NUMBER") { const number = Number(value); if (!Number.isFinite(number)) throw new Error(`${field.label} must be a valid number.`); captured.push({ fieldId: field.id, value: number }); }
+      if(field.fieldType==="REPEATING_GROUP") { const config=mobileRosterConfig(field.options); if(!config||!isMobileRosterRows(value)||value.length<config.minRows||value.length>config.maxRows)throw new Error(`${field.label} has invalid roster rows.`); const ids=new Set<string>(); value.forEach((row,index)=>{if(!/^[a-zA-Z0-9_-]{8,80}$/.test(row.id)||ids.has(row.id))throw new Error(`${field.label} row ${index+1} has an invalid identifier.`);ids.add(row.id);config.columns.forEach((column)=>{if(column.showWhen&&String(row.values[column.showWhen.columnKey]??"")!==column.showWhen.value)return;const answer=row.values[column.key];const missing=answer===undefined||answer===null||answer==="";if(column.required&&missing)throw new Error(`${field.label}, row ${index+1}: ${column.label} is required.`);if(missing)return;if(column.type==="NUMBER"&&!Number.isFinite(Number(answer)))throw new Error(`${field.label}, row ${index+1}: ${column.label} must be a number.`);if(column.type==="DATE"&&!/^\d{4}-\d{2}-\d{2}$/.test(String(answer)))throw new Error(`${field.label}, row ${index+1}: ${column.label} must be a valid date.`);if(column.type==="SINGLE_SELECT"&&!column.options.includes(String(answer)))throw new Error(`${field.label}, row ${index+1}: select a valid ${column.label}.`);});});captured.push({fieldId:field.id,value}); }
+      else if (field.fieldType === "NUMBER") { const number = Number(value); if (!Number.isFinite(number)) throw new Error(`${field.label} must be a valid number.`); captured.push({ fieldId: field.id, value: number }); }
       else captured.push({ fieldId: field.id, value });
     }
     return { definitionId: form.id, versionId: form.version.id, answers: captured };
@@ -973,7 +998,7 @@ function isVisible(field: RuntimeField, form: RuntimeForm, answers: Record<strin
   if (typeof value.fieldKey !== "string" || value.operator !== "EQUALS" || typeof value.value !== "string") return true;
   const controlling = form.version.fields.find((item) => item.key === value.fieldKey);
   const actual = controlling ? answers[controlling.id] : undefined;
-  return Array.isArray(actual) ? actual.includes(value.value) : String(actual ?? "") === value.value;
+  return Array.isArray(actual) ? actual.some((item)=>typeof item==="string"&&item===value.value) : String(actual ?? "") === value.value;
 }
 
 function Metric({ label, value }: { label: string; value: number }) { return <View style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>; }

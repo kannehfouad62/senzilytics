@@ -15,7 +15,7 @@ export type RuntimeField = {
   label: string;
   description: string | null;
   placeholder: string | null;
-  fieldType: "SHORT_TEXT" | "LONG_TEXT" | "NUMBER" | "DATE" | "DATETIME" | "BOOLEAN" | "SINGLE_SELECT" | "MULTI_SELECT" | "MATRIX" | "RANKING" | "EMAIL" | "PHONE" | "FILE" | "SIGNATURE";
+  fieldType: "SHORT_TEXT" | "LONG_TEXT" | "NUMBER" | "DATE" | "DATETIME" | "BOOLEAN" | "SINGLE_SELECT" | "MULTI_SELECT" | "MATRIX" | "RANKING" | "REPEATING_GROUP" | "EMAIL" | "PHONE" | "FILE" | "SIGNATURE";
   isRequired: boolean;
   options: unknown;
   visibilityRule: unknown;
@@ -2032,7 +2032,8 @@ export type MobileBootstrap = {
 } & MobileExecutiveWorkspace &
   MobileTenantAdministrationWorkspace;
 
-export type CapturedAnswer = { fieldId: string; value: string | number | boolean | string[] };
+export type MobileRepeatingGroupRow = { id: string; values: Record<string, string | number | boolean> };
+export type CapturedAnswer = { fieldId: string; value: string | number | boolean | string[] | MobileRepeatingGroupRow[] };
 export type CapturedForm = { definitionId: string; versionId: string; answers: CapturedAnswer[] };
 
 export type MobileResearchFieldworkAssignment = {
@@ -2078,7 +2079,7 @@ export type ResearchInterviewDraft = {
   interviewStartedAt: string;
   consent: boolean;
   locationConsent?: boolean;
-  answers: Record<string, string | boolean | string[]>;
+  answers: Record<string, string | boolean | string[] | MobileRepeatingGroupRow[]>;
   updatedAt: string;
 };
 
