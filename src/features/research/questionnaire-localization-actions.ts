@@ -54,9 +54,7 @@ export async function saveQuestionnaireLocalization(
 
     const fieldTranslations: ResearchFieldTranslations = {};
     for (const field of collection.formVersion.fields) {
-      const options = Array.isArray(field.options)
-        ? field.options.filter((item): item is string => typeof item === "string")
-        : [];
+      const options = translatableOptions(field.options);
       const optionTranslations = Object.fromEntries(
         options
           .map((option, index) => [option, text(data, `option_${field.id}_${index}`, 500)] as const)
@@ -124,6 +122,13 @@ export async function saveQuestionnaireLocalization(
   } catch (error) {
     return result(error);
   }
+}
+
+function translatableOptions(value: unknown) {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  if (!value || typeof value !== "object") return [];
+  const matrix = value as { rows?: unknown; columns?: unknown };
+  return [...new Set([...(Array.isArray(matrix.rows) ? matrix.rows : []), ...(Array.isArray(matrix.columns) ? matrix.columns : [])].filter((item): item is string => typeof item === "string"))];
 }
 
 export async function changeQuestionnaireLocalizationStatus(

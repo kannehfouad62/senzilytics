@@ -15,7 +15,7 @@ export type RuntimeField = {
   label: string;
   description: string | null;
   placeholder: string | null;
-  fieldType: "SHORT_TEXT" | "LONG_TEXT" | "NUMBER" | "DATE" | "DATETIME" | "BOOLEAN" | "SINGLE_SELECT" | "MULTI_SELECT" | "EMAIL" | "PHONE" | "FILE" | "SIGNATURE";
+  fieldType: "SHORT_TEXT" | "LONG_TEXT" | "NUMBER" | "DATE" | "DATETIME" | "BOOLEAN" | "SINGLE_SELECT" | "MULTI_SELECT" | "MATRIX" | "RANKING" | "EMAIL" | "PHONE" | "FILE" | "SIGNATURE";
   isRequired: boolean;
   options: unknown;
   visibilityRule: unknown;

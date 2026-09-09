@@ -999,6 +999,8 @@ enum ConfigurableFieldType {
   BOOLEAN
   SINGLE_SELECT
   MULTI_SELECT
+  MATRIX
+  RANKING
   EMAIL
   PHONE
   FILE

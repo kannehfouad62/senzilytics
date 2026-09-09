@@ -6,6 +6,13 @@ import type {
   ResearchVariable,
 } from "@/modules/research/research-analysis";
 
+type ResearchVariableSource = {
+  fieldId: string;
+  matrixRow: string | null;
+  rankingOption: string | null;
+  variable: ResearchVariable;
+};
+
 export async function getResearchDataset(
   organizationId: string,
   collectionId: string,
@@ -58,15 +65,14 @@ export async function getResearchDataset(
     },
   });
   if (!collection) return null;
-  const variables: ResearchVariable[] = collection.formVersion.fields
+  const variableSources = collection.formVersion.fields
     .filter((field) => field.fieldType !== "FILE")
-    .map((field) => ({
-      id: field.id,
-      key: field.key,
-      label: field.label,
-      type: field.fieldType,
-      required: field.isRequired,
-    }));
+    .flatMap<ResearchVariableSource>((field) => {
+      if (field.fieldType === "MATRIX") return matrixOptions(field.options).rows.map((row) => ({ fieldId: field.id, matrixRow: row, rankingOption: null, variable: { id: `${field.id}:${row}`, key: `${field.key}__${variableKey(row)}`, label: `${field.label} — ${row}`, type: "SINGLE_SELECT", required: field.isRequired } satisfies ResearchVariable }));
+      if (field.fieldType === "RANKING") return optionList(field.options).map((option) => ({ fieldId: field.id, matrixRow: null, rankingOption: option, variable: { id: `${field.id}:${option}`, key: `${field.key}__rank__${variableKey(option)}`, label: `${field.label} — rank: ${option}`, type: "NUMBER", required: field.isRequired } satisfies ResearchVariable }));
+      return [{ fieldId: field.id, matrixRow: null, rankingOption: null, variable: { id: field.id, key: field.key, label: field.label, type: field.fieldType, required: field.isRequired } satisfies ResearchVariable }];
+    });
+  const variables = variableSources.map((source) => source.variable);
   const createRow = (
     id: string,
     submissionId: string,
@@ -80,12 +86,12 @@ export async function getResearchDataset(
       assignmentId: id,
       responseId: submissionId,
       submittedAt: submittedAt.toISOString(),
-      values: Object.fromEntries(
-        variables.map((variable) => [
-          variable.key,
-          (byId.get(variable.id) ?? null) as ResearchValue,
-        ]),
-      ),
+      values: Object.fromEntries(variableSources.map((source) => {
+        const raw = byId.get(source.fieldId);
+        if (source.matrixRow) return [source.variable.key, matrixAnswer(raw, source.matrixRow)];
+        if (source.rankingOption) return [source.variable.key, rankingPosition(raw, source.rankingOption)];
+        return [source.variable.key, (raw ?? null) as ResearchValue];
+      })),
     };
   };
   const assigned = collection.assignments.map((response) => ({
@@ -139,6 +145,12 @@ export async function getResearchDataset(
     qualityIssues: detectQualityIssues(variables, rows),
   };
 }
+
+const optionList = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+function matrixOptions(value: unknown) { if (!value || Array.isArray(value) || typeof value !== "object") return { rows: [] as string[] }; const rows = (value as { rows?: unknown }).rows; return { rows: Array.isArray(rows) ? rows.filter((item): item is string => typeof item === "string") : [] }; }
+const variableKey = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 60) || "item";
+export function matrixAnswer(value: unknown, row: string): ResearchValue { if (!Array.isArray(value)) return null; for (const encoded of value) { if (typeof encoded !== "string") continue; try { const pair = JSON.parse(encoded) as unknown; if (Array.isArray(pair) && pair[0] === row && typeof pair[1] === "string") return pair[1]; } catch { continue; } } return null; }
+export function rankingPosition(value: unknown, option: string): ResearchValue { if (!Array.isArray(value)) return null; const index = value.indexOf(option); return index >= 0 ? index + 1 : null; }
 
 export function listResearchDatasets(organizationId: string) {
   return prisma.researchCollectionWave.findMany({

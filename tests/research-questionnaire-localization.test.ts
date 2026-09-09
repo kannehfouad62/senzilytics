@@ -31,10 +31,8 @@ test("localized option labels retain governed source values", () => {
     },
   );
   assert.equal(field.label, "Pays");
-  assert.deepEqual(field.options, [
-    { value: "Ghana", label: "Ghana" },
-    { value: "Liberia", label: "Libéria" },
-  ]);
+  assert.deepEqual(field.options, ["Ghana", "Liberia"]);
+  assert.deepEqual(field.optionLabels, { Ghana: "Ghana", Liberia: "Libéria" });
 });
 
 test("questionnaire localizations are version-bound, approved and tenant-scoped", async () => {

@@ -180,11 +180,7 @@ export default async function ResearchCollectionPage({
           label: field.label,
           description: field.description,
           placeholder: field.placeholder,
-          options: Array.isArray(field.options)
-            ? field.options.filter(
-                (item): item is string => typeof item === "string",
-              )
-            : [],
+          options: translatableOptions(field.options),
         }))}
         localizations={collection.formVersion.researchQuestionnaireLocalizations.map(
           (localization) => ({
@@ -351,6 +347,13 @@ export default async function ResearchCollectionPage({
       </section>
     </div>
   );
+}
+
+function translatableOptions(value: unknown) {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  if (!value || typeof value !== "object") return [];
+  const matrix = value as { rows?: unknown; columns?: unknown };
+  return [...new Set([...(Array.isArray(matrix.rows) ? matrix.rows : []), ...(Array.isArray(matrix.columns) ? matrix.columns : [])].filter((item): item is string => typeof item === "string"))];
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {

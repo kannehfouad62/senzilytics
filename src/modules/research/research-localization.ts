@@ -30,9 +30,6 @@ export function localizedResearchField<
   },
 >(field: T, translations: ResearchFieldTranslations) {
   const translation = translations[field.id];
-  const baseOptions = Array.isArray(field.options)
-    ? field.options.filter((item): item is string => typeof item === "string")
-    : [];
   return {
     ...field,
     label: translation?.label?.trim() || field.label,
@@ -40,9 +37,7 @@ export function localizedResearchField<
       translation?.description?.trim() || field.description,
     placeholder:
       translation?.placeholder?.trim() || field.placeholder,
-    options: baseOptions.map((option) => ({
-      value: option,
-      label: translation?.options?.[option]?.trim() || option,
-    })),
+    options: field.options,
+    optionLabels: translation?.options ?? {},
   };
 }

@@ -88,6 +88,8 @@ export async function addConfigurableField(data: FormData) {
       placeholder: text(data, "placeholder") || null,
       required: data.get("isRequired") === "on",
       options: parseOptionList(text(data, "options")),
+      matrixRows: parseOptionList(text(data, "matrixRows")),
+      matrixColumns: parseOptionList(text(data, "matrixColumns")),
       visibilityField: text(data, "visibilityField") || null,
       visibilityValue: text(data, "visibilityValue") || null,
     });

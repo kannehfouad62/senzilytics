@@ -12,6 +12,12 @@ const cell = (value: unknown) => {
   if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 };
+const displayAnswer = (field: { fieldType: string }, value: unknown) => {
+  if (!Array.isArray(value)) return value ?? "";
+  if (field.fieldType === "MATRIX") return value.flatMap((encoded) => { if (typeof encoded !== "string") return []; try { const pair = JSON.parse(encoded) as unknown; return Array.isArray(pair) && pair.length === 2 ? [`${String(pair[0])}: ${String(pair[1])}`] : []; } catch { return []; } }).join(" | ");
+  if (field.fieldType === "RANKING") return value.map((option, index) => `${index + 1}. ${String(option)}`).join(" | ");
+  return value;
+};
 
 export async function GET(
   _request: Request,
@@ -93,7 +99,7 @@ export async function GET(
       identified ? response.respondent.email : "",
       response.completedAt?.toISOString() ?? "",
       ...collection.formVersion.fields.map(
-        (field) => answers.get(field.id) ?? "",
+        (field) => displayAnswer(field, answers.get(field.id)),
       ),
     ];
   });
@@ -112,7 +118,7 @@ export async function GET(
       response.participantEmail ?? "",
       response.submittedAt.toISOString(),
       ...collection.formVersion.fields.map(
-        (field) => answers.get(field.id) ?? "",
+        (field) => displayAnswer(field, answers.get(field.id)),
       ),
     ];
   });
@@ -131,7 +137,7 @@ export async function GET(
       "",
       response.capturedAt.toISOString(),
       ...collection.formVersion.fields.map(
-        (field) => answers.get(field.id) ?? "",
+        (field) => displayAnswer(field, answers.get(field.id)),
       ),
     ];
   });

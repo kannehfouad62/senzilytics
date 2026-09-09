@@ -10,6 +10,7 @@ type Field = {
   isRequired: boolean;
   options: unknown;
   visibilityRule: unknown;
+  optionLabels?: Record<string, string>;
 };
 type Form = {
   id: string;
@@ -108,7 +109,7 @@ function RuntimeField({
     options = Array.isArray(field.options)
       ? field.options.flatMap((option) => {
           if (typeof option === "string")
-            return [{ value: option, label: option }];
+            return [{ value: option, label: field.optionLabels?.[option] || option }];
           if (
             option &&
             typeof option === "object" &&
@@ -136,6 +137,8 @@ function RuntimeField({
         )}
       </span>
     );
+  if (field.fieldType === "MATRIX") return <MatrixRuntimeField field={field} name={name} initialValue={initialValue} onChange={onChange} label={label} />;
+  if (field.fieldType === "RANKING") return <RankingRuntimeField field={field} name={name} initialValue={initialValue} onChange={onChange} label={label} />;
   if (field.fieldType === "FILE")
     return (
       <div>
@@ -245,4 +248,29 @@ function RuntimeField({
       />
     </label>
   );
+}
+
+function matrixOptions(value: unknown) {
+  if (!value || Array.isArray(value) || typeof value !== "object") return { rows: [] as string[], columns: [] as string[] };
+  const configured = value as { rows?: unknown; columns?: unknown };
+  return {
+    rows: Array.isArray(configured.rows) ? configured.rows.filter((item): item is string => typeof item === "string") : [],
+    columns: Array.isArray(configured.columns) ? configured.columns.filter((item): item is string => typeof item === "string") : [],
+  };
+}
+
+function MatrixRuntimeField({ field, name, initialValue, onChange, label }: { field: Field; name: string; initialValue?: string | string[] | boolean; onChange: (value: string | string[] | boolean) => void; label: React.ReactNode }) {
+  const matrix = matrixOptions(field.options);
+  const initial = new Map((Array.isArray(initialValue) ? initialValue : []).flatMap((encoded) => { try { const pair = JSON.parse(encoded) as unknown; return Array.isArray(pair) && pair.length === 2 && typeof pair[0] === "string" && typeof pair[1] === "string" ? [[pair[0], pair[1]] as const] : []; } catch { return []; } }));
+  const [answers, setAnswers] = useState<Record<string, string>>(() => Object.fromEntries(initial));
+  const update = (row: string, selected: string) => { const next = { ...answers, [row]: selected }; setAnswers(next); onChange(matrix.rows.flatMap((item) => next[item] ? [JSON.stringify([item, next[item]])] : [])); };
+  return <fieldset className="md:col-span-2"><legend>{label}</legend><div className="mt-2 overflow-x-auto rounded-2xl border border-white/10"><table className="min-w-full text-sm"><thead className="bg-white/[.03] text-xs text-slate-400"><tr><th className="p-3 text-left">Statement</th>{matrix.columns.map((column) => <th key={column} className="p-3 text-center">{field.optionLabels?.[column] || column}</th>)}</tr></thead><tbody className="divide-y divide-white/10">{matrix.rows.map((row, rowIndex) => <tr key={row}><th className="p-3 text-left font-normal text-slate-300">{field.optionLabels?.[row] || row}</th>{matrix.columns.map((column) => <td key={column} className="p-3 text-center"><input type="radio" name={`${name}_matrix_${rowIndex}`} value={column} required={field.isRequired} checked={answers[row] === column} onChange={() => update(row, column)} aria-label={`${row}: ${column}`} /></td>)}</tr>)}</tbody></table></div></fieldset>;
+}
+
+function RankingRuntimeField({ field, name, initialValue, onChange, label }: { field: Field; name: string; initialValue?: string | string[] | boolean; onChange: (value: string | string[] | boolean) => void; label: React.ReactNode }) {
+  const options = Array.isArray(field.options) ? field.options.filter((item): item is string => typeof item === "string") : [];
+  const initialOrder = Array.isArray(initialValue) && initialValue.length === options.length ? initialValue : [];
+  const [ranks, setRanks] = useState<Record<string, number>>(() => Object.fromEntries(initialOrder.map((option, index) => [option, index + 1])));
+  const update = (option: string, rank: number) => { const next = { ...ranks, [option]: rank }; setRanks(next); const ordered = options.filter((item) => next[item]).sort((a, b) => next[a] - next[b]); onChange(ordered); };
+  return <fieldset className="md:col-span-2"><legend>{label}</legend><div className="mt-2 space-y-2">{options.map((option, index) => <label key={option} className="flex items-center justify-between gap-4 rounded-xl border border-white/10 p-3 text-sm"><span>{field.optionLabels?.[option] || option}</span><select name={`${name}_rank_${index}`} value={ranks[option] ?? ""} required={field.isRequired} onChange={(event) => update(option, Number(event.target.value))} className="rounded-lg border border-white/10 bg-slate-950 px-3 py-2"><option value="">Rank</option>{options.map((_, position) => <option key={position + 1} value={position + 1}>{position + 1}</option>)}</select></label>)}</div><p className="mt-2 text-xs text-slate-500">Assign each item a unique position; 1 is highest priority.</p></fieldset>;
 }
