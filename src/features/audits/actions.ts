@@ -4,7 +4,10 @@ import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { createAuditService } from "@/modules/audit/audit.service";
 import { AuditType, PermissionKey } from "@prisma/client";
-import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { redirect as nextRedirect } from "next/navigation";
+
+function redirect(path: string): never { revalidatePath("/", "layout"); nextRedirect(path); }
 
 function required(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? "").trim();

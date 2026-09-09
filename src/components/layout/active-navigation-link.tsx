@@ -26,6 +26,7 @@ export function ActiveNavigationLink({
   return (
     <Link
       href={href}
+      prefetch={false}
       aria-current={active ? "page" : undefined}
       className={`${className} ${active ? activeClassName : inactiveClassName}`}
     >

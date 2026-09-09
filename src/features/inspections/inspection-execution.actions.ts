@@ -8,7 +8,10 @@ import {
   PermissionKey,
   RiskLevel,
 } from "@prisma/client";
-import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { redirect as nextRedirect } from "next/navigation";
+
+function redirect(path: string): never { revalidatePath("/", "layout"); nextRedirect(path); }
 
 function getRequiredString(
   formData: FormData,
