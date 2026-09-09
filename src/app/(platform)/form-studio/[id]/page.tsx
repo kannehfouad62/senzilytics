@@ -11,6 +11,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireFormDefinitionManagement } from "@/modules/forms/form-authorization";
 import { repeatingGroupConfig } from "@/modules/forms/repeating-group.service";
+import { calculatedFieldConfig } from "@/modules/forms/calculated-field.service";
 const input =
   "mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3";
 export default async function FormDetailPage({
@@ -263,6 +264,24 @@ export default async function FormDetailPage({
                   <label className="text-sm">Maximum rows<input name="rosterMaxRows" type="number" min="1" max="50" defaultValue="10" className={input}/></label>
                 </div>
               </div>
+              <div className="mt-5 rounded-2xl border border-emerald-400/15 bg-emerald-400/[.035] p-4">
+                <p className="text-sm font-semibold text-emerald-200">Calculated field and scoring configuration</p>
+                <p className="mt-1 text-xs text-slate-500">Used only for Calculated fields. Sources must be earlier Number or Calculated field keys. Results are recomputed securely during submission.</p>
+                <label className="mt-3 block text-sm">Operation
+                  <select name="calculationOperation" defaultValue="SUM" className={input}>
+                    <option value="SUM">Sum</option><option value="AVERAGE">Average</option><option value="WEIGHTED_SUM">Weighted sum</option>
+                  </select>
+                </label>
+                <label className="mt-3 block text-sm">Source fields and weights
+                  <textarea name="calculationSources" rows={4} placeholder={"quality_score | 1\ntimeliness_score | 1\nrisk_score | 0.5"} className={input}/>
+                </label>
+                <label className="mt-3 block text-sm">Decimal places
+                  <input name="calculationDecimals" type="number" min="0" max="6" defaultValue="2" className={input}/>
+                </label>
+                <label className="mt-3 block text-sm">Score bands (optional)
+                  <textarea name="scoreBands" rows={4} placeholder={"0 | 49.99 | Needs improvement\n50 | 79.99 | Satisfactory\n80 | 100 | Excellent"} className={input}/>
+                </label>
+              </div>
               <label className="mt-4 flex items-center gap-2">
                 <input type="checkbox" name="isRequired" />
                 Required
@@ -345,6 +364,7 @@ function FormPreview({
             : [];
           const matrix = matrixOptions(field.options);
           const roster = repeatingGroupConfig(field.options);
+          const calculated = calculatedFieldConfig(field.options);
           return (
             <div key={field.id} className="block">
               <span>
@@ -356,7 +376,13 @@ function FormPreview({
                   {field.description}
                 </span>
               )}
-              {field.fieldType === "MATRIX" ? (
+              {field.fieldType === "CALCULATED" && calculated ? (
+                <div className="mt-2 rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-100">
+                  <p>Automatic {calculated.operation.replaceAll("_", " ").toLowerCase()} · {calculated.decimalPlaces} decimal places</p>
+                  <p className="mt-1 text-xs text-slate-400">Sources: {calculated.sources.map((source) => `${source.fieldKey}${calculated.operation === "WEIGHTED_SUM" ? ` × ${source.weight}` : ""}`).join(" + ")}</p>
+                  {calculated.bands.length > 0 && <p className="mt-1 text-xs text-slate-400">Bands: {calculated.bands.map((band) => `${band.min}–${band.max} ${band.label}`).join(" · ")}</p>}
+                </div>
+              ) : field.fieldType === "MATRIX" ? (
                 <div className="mt-2 overflow-x-auto">
                   <table className="min-w-full text-xs">
                     <thead>

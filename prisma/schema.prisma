@@ -1002,6 +1002,7 @@ enum ConfigurableFieldType {
   MATRIX
   RANKING
   REPEATING_GROUP
+  CALCULATED
   EMAIL
   PHONE
   FILE

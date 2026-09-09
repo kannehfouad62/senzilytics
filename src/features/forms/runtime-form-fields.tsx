@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { repeatingGroupConfig, type RepeatingGroupRow } from "@/modules/forms/repeating-group.service";
-type WebFieldValue = string | string[] | boolean | RepeatingGroupRow[];
+import { calculatedFieldConfig, calculateConfiguredField } from "@/modules/forms/calculated-field.service";
+type WebFieldValue = string | string[] | boolean | number | RepeatingGroupRow[];
 type Field = {
   id: string;
   key: string;
@@ -64,7 +65,15 @@ export function RuntimeFormFields({
   };
   return (
     <div className="space-y-6">
-      {forms.map((form) => (
+      {forms.map((form) => {
+        const effective = new Map<string, unknown>();
+        for (const field of form.version.fields) {
+          if (field.fieldType === "CALCULATED") {
+            const config = calculatedFieldConfig(field.options);
+            effective.set(field.key, config ? calculateConfiguredField(config, effective)?.value : undefined);
+          } else effective.set(field.key, values[field.key]);
+        }
+        return (
         <section
           key={form.id}
           className="rounded-3xl border border-cyan-400/20 bg-cyan-400/5 p-6"
@@ -87,6 +96,7 @@ export function RuntimeFormFields({
                 key={field.id}
                 field={field}
                 initialValue={initialValues[`custom_${field.id}`]}
+                calculatedValue={field.fieldType === "CALCULATED" ? effective.get(field.key) : undefined}
                 onChange={(value) =>
                   setValues((current) => ({ ...current, [field.key]: value }))
                 }
@@ -94,7 +104,7 @@ export function RuntimeFormFields({
             ))}
           </div>
         </section>
-      ))}
+      )})}
     </div>
   );
 }
@@ -102,10 +112,12 @@ function RuntimeField({
   field,
   onChange,
   initialValue,
+  calculatedValue,
 }: {
   field: Field;
   onChange: (value: WebFieldValue) => void;
   initialValue?: WebFieldValue;
+  calculatedValue?: unknown;
 }) {
   const name = `custom_${field.id}`,
     options = Array.isArray(field.options)
@@ -139,6 +151,12 @@ function RuntimeField({
         )}
       </span>
     );
+  if (field.fieldType === "CALCULATED") {
+    const config = calculatedFieldConfig(field.options);
+    const numeric = typeof calculatedValue === "number" ? calculatedValue : null;
+    const band = config && numeric !== null ? config.bands.find((item) => numeric >= item.min && numeric <= item.max)?.label : null;
+    return <div className="md:col-span-2 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4">{label}<input type="hidden" name={name} value={numeric ?? ""}/><p className="mt-2 text-2xl font-semibold text-emerald-200">{numeric ?? "Waiting for source responses"}</p>{band && <p className="mt-1 text-sm text-emerald-300">{band}</p>}<p className="mt-2 text-xs text-slate-500">Automatically calculated; the server independently verifies this result.</p></div>;
+  }
   if (field.fieldType === "MATRIX") return <MatrixRuntimeField field={field} name={name} initialValue={initialValue} onChange={onChange} label={label} />;
   if (field.fieldType === "RANKING") return <RankingRuntimeField field={field} name={name} initialValue={initialValue} onChange={onChange} label={label} />;
   if (field.fieldType === "REPEATING_GROUP") return <RepeatingGroupRuntimeField field={field} name={name} initialValue={initialValue} onChange={onChange} label={label} />;

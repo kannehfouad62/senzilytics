@@ -918,14 +918,17 @@ function EvidenceAttachmentPicker({
 }
 
 function DynamicForm({ form, answers, setAnswers }: { form: RuntimeForm; answers: Record<string, FieldValue>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, FieldValue>>> }) {
-  return <Card><Text style={styles.cardTitle}>{form.name}</Text>{form.version.instructions ? <Text style={styles.muted}>{form.version.instructions}</Text> : null}{form.version.fields.filter((field) => isVisible(field, form, answers)).map((field) => <DynamicField key={field.id} field={field} value={answers[field.id]} onChange={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))} />)}</Card>;
+  const effective=new Map<string,unknown>();
+  form.version.fields.forEach((field)=>effective.set(field.key,field.fieldType==="CALCULATED"?mobileCalculatedValue(field.options,effective)?.value:answers[field.id]));
+  return <Card><Text style={styles.cardTitle}>{form.name}</Text>{form.version.instructions ? <Text style={styles.muted}>{form.version.instructions}</Text> : null}{form.version.fields.filter((field) => isVisible(field, form, answers)).map((field) => <DynamicField key={field.id} field={field} value={answers[field.id]} calculatedValue={field.fieldType==="CALCULATED"?effective.get(field.key):undefined} onChange={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))} />)}</Card>;
 }
 
-function DynamicField({ field, value, onChange }: { field: RuntimeField; value: FieldValue | undefined; onChange: (value: FieldValue) => void }) {
+function DynamicField({ field, value, calculatedValue, onChange }: { field: RuntimeField; value: FieldValue | undefined; calculatedValue?: unknown; onChange: (value: FieldValue) => void }) {
   const options = Array.isArray(field.options) ? field.options.filter((item): item is string => typeof item === "string") : [];
   if (field.fieldType === "MATRIX") return <MobileMatrixField field={field} value={value} onChange={onChange} />;
   if (field.fieldType === "RANKING") return <MobileRankingField field={field} value={value} onChange={onChange} />;
   if (field.fieldType === "REPEATING_GROUP") return <MobileRepeatingGroupField field={field} value={value} onChange={onChange} />;
+  if (field.fieldType === "CALCULATED") { const result=typeof calculatedValue==="number"?calculatedValue:null,config=mobileCalculationConfig(field.options),band=result===null?null:config?.bands.find((item)=>result>=item.min&&result<=item.max)?.label; return <View style={styles.evidencePanel}><FieldLabel text={field.label}/><Text style={styles.cardTitle}>{result??"Waiting for source responses"}</Text>{band?<Text style={styles.successText}>{band}</Text>:null}<Text style={styles.fieldHelp}>Automatically calculated and independently verified during synchronization.</Text></View>; }
   if (field.fieldType === "FILE") return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><Text style={styles.muted}>Files can be attached from the web workspace after this record synchronizes.</Text></View>;
   if (field.fieldType === "BOOLEAN") return <Pressable style={styles.checkRow} onPress={() => onChange(value !== true)}><View style={[styles.checkbox, value === true && styles.checkboxOn]}>{value === true ? <Text style={styles.checkmark}>✓</Text> : null}</View><Text style={styles.checkLabel}>{field.label}{field.isRequired ? " *" : ""}</Text></Pressable>;
   if (field.fieldType === "SINGLE_SELECT") return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><ChipGroup values={options.map((option) => ({ value: option, label: field.optionLabels?.[option] || option }))} selected={typeof value === "string" ? value : ""} onSelect={onChange} /></View>;
@@ -941,6 +944,10 @@ function MobileMatrixField({ field, value, onChange }: { field: RuntimeField; va
   const update = (row: string, column: string) => { selected.set(row, column); onChange(rows.flatMap((item) => selected.get(item) ? [JSON.stringify([item, selected.get(item)])] : [])); };
   return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} />{field.description ? <Text style={styles.fieldHelp}>{field.description}</Text> : null}{rows.map((row) => <View key={row} style={styles.fieldBlock}><Text style={styles.checkLabel}>{field.optionLabels?.[row] || row}</Text><ChipGroup values={columns.map((column) => ({ value: column, label: field.optionLabels?.[column] || column }))} selected={selected.get(row) ?? ""} onSelect={(column) => update(row, column)} /></View>)}</View>;
 }
+
+type MobileCalculationConfig={operation:"SUM"|"AVERAGE"|"WEIGHTED_SUM";sources:{fieldKey:string;weight:number}[];decimalPlaces:number;bands:{min:number;max:number;label:string}[]};
+function mobileCalculationConfig(value:unknown):MobileCalculationConfig|null{if(!value||Array.isArray(value)||typeof value!=="object")return null;const raw=value as MobileCalculationConfig;if(!["SUM","AVERAGE","WEIGHTED_SUM"].includes(raw.operation)||!Array.isArray(raw.sources)||!Number.isInteger(raw.decimalPlaces)||raw.decimalPlaces<0||raw.decimalPlaces>6||!Array.isArray(raw.bands))return null;return raw;}
+function mobileCalculatedValue(value:unknown,answers:ReadonlyMap<string,unknown>){const config=mobileCalculationConfig(value);if(!config)return null;const inputs=config.sources.map((source)=>{const answer=answers.get(source.fieldKey);return{value:answer===undefined||answer===null||answer===""?Number.NaN:Number(answer),weight:Number(source.weight)}});if(!inputs.length||inputs.some((input)=>!Number.isFinite(input.value)||!Number.isFinite(input.weight)))return null;const raw=config.operation==="AVERAGE"?inputs.reduce((sum,input)=>sum+input.value,0)/inputs.length:inputs.reduce((sum,input)=>sum+input.value*(config.operation==="WEIGHTED_SUM"?input.weight:1),0);const factor=10**config.decimalPlaces;return{value:Math.round((raw+Number.EPSILON)*factor)/factor};}
 
 function MobileRankingField({ field, value, onChange }: { field: RuntimeField; value: FieldValue | undefined; onChange: (value: FieldValue) => void }) {
   const options = Array.isArray(field.options) ? field.options.filter((item): item is string => typeof item === "string") : [];
@@ -978,7 +985,7 @@ function buildCapturedForms(forms: RuntimeForm[], answers: Record<string, FieldV
   return forms.map((form) => {
     const captured: CapturedAnswer[] = [];
     for (const field of form.version.fields) {
-      if (!isVisible(field, form, answers) || field.fieldType === "FILE") continue;
+      if (!isVisible(field, form, answers) || field.fieldType === "FILE" || field.fieldType === "CALCULATED") continue;
       const value = answers[field.id];
       const empty = value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
       if (field.isRequired && (empty || (field.fieldType === "BOOLEAN" && value !== true))) throw new Error(`${field.label} is required.`);

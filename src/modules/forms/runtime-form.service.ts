@@ -10,6 +10,7 @@ import {
   Prisma,
   WorkflowTriggerEvent,
 } from "@prisma/client";
+import { calculatedFieldConfig, calculateConfiguredField } from "@/modules/forms/calculated-field.service";
 import { repeatingGroupConfig, validateRepeatingGroup } from "@/modules/forms/repeating-group.service";
 
 type RuntimeRule={fieldKey:string;operator:"EQUALS";value:string};
@@ -85,6 +86,7 @@ function readValue(field:RuntimeField,data:FormData):unknown{
   if(field.fieldType===ConfigurableFieldType.RANKING){const options=optionsOf(field.options),ranked=options.flatMap((option,index)=>{const rank=Number(data.get(`${name}_rank_${index}`));return Number.isInteger(rank)&&rank>=1&&rank<=options.length?[{option,rank}]:[]});if(ranked.length&&new Set(ranked.map(item=>item.rank)).size!==ranked.length)return["__INVALID_RANKING__"];return ranked.sort((a,b)=>a.rank-b.rank).map(item=>item.option)}
   if(field.fieldType===ConfigurableFieldType.MULTI_SELECT)return data.getAll(name).map(String).map(x=>x.trim()).filter(Boolean);
   if(field.fieldType===ConfigurableFieldType.BOOLEAN)return data.get(name)==="on";
+  if(field.fieldType===ConfigurableFieldType.CALCULATED)return undefined;
   const entry=data.get(name);if(entry instanceof File)return entry.size?entry:null;
   return String(entry??"").trim();
 }
@@ -93,7 +95,7 @@ function validateValue(field:RuntimeField,value:unknown):Prisma.InputJsonValue|u
   if(field.fieldType===ConfigurableFieldType.FILE)return undefined;
   if(empty(value)){if(field.isRequired)throw new Error(`${field.label} is required.`);return undefined}
   if(field.fieldType===ConfigurableFieldType.BOOLEAN){if(field.isRequired&&value!==true)throw new Error(`${field.label} must be acknowledged.`);return Boolean(value)}
-  if(field.fieldType===ConfigurableFieldType.NUMBER){const number=Number(value);if(!Number.isFinite(number))throw new Error(`${field.label} must be a valid number.`);return number}
+  if(field.fieldType===ConfigurableFieldType.NUMBER||field.fieldType===ConfigurableFieldType.CALCULATED){const number=Number(value);if(!Number.isFinite(number))throw new Error(`${field.label} must be a valid number.`);return number}
   if(field.fieldType===ConfigurableFieldType.EMAIL&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value)))throw new Error(`${field.label} must be a valid email address.`);
   if(field.fieldType===ConfigurableFieldType.DATE&&!/^\d{4}-\d{2}-\d{2}$/.test(String(value)))throw new Error(`${field.label} must be a valid date.`);
   if(field.fieldType===ConfigurableFieldType.DATETIME&&Number.isNaN(new Date(String(value)).getTime()))throw new Error(`${field.label} must be a valid date and time.`);
@@ -105,6 +107,16 @@ function validateValue(field:RuntimeField,value:unknown):Prisma.InputJsonValue|u
   return String(value);
 }
 
+export function deriveCalculatedValues(fields:RuntimeField[],raw:Map<string,unknown>){
+  for(const field of fields){
+    if(field.fieldType!==ConfigurableFieldType.CALCULATED)continue;
+    const config=calculatedFieldConfig(field.options);
+    if(!config)throw new Error(`${field.label} has an invalid calculation configuration.`);
+    raw.set(field.key,calculateConfiguredField(config,raw)?.value);
+  }
+  return raw;
+}
+
 export async function getPublishedRuntimeForms(organizationId:string,module:ConfigurableFormModule):Promise<RuntimeForm[]>{
   const definitions=await prisma.configurableFormDefinition.findMany({where:{organizationId,module,isActive:true},include:{versions:{where:{status:ConfigurableFormVersionStatus.PUBLISHED},orderBy:{version:"desc"},take:1,include:{fields:{orderBy:{sequence:"asc"}}}}},orderBy:{name:"asc"}});
   return definitions.flatMap(definition=>definition.versions[0]?[{id:definition.id,name:definition.name,description:definition.description,version:definition.versions[0]}]:[]);
@@ -112,14 +124,14 @@ export async function getPublishedRuntimeForms(organizationId:string,module:Conf
 
 export async function preparePublishedFormSubmissions(input:{organizationId:string;module:ConfigurableFormModule;data:FormData}){
   const forms=await getPublishedRuntimeForms(input.organizationId,input.module);const prepared:PreparedSubmission[]=[];
-  for(const form of forms){const raw=new Map<string,unknown>();for(const field of form.version.fields)raw.set(field.key,readValue(field,input.data));const answers:PreparedSubmission["answers"]=[];for(const field of form.version.fields){if(!isRuntimeFieldVisible(field.visibilityRule,raw))continue;const value=validateValue(field,raw.get(field.key));if(value!==undefined)answers.push({fieldId:field.id,value})}prepared.push({definitionId:form.id,versionId:form.version.id,status:runtimeSubmissionStatus(form.version.fields,raw),answers})}
+  for(const form of forms){const raw=new Map<string,unknown>();for(const field of form.version.fields)raw.set(field.key,readValue(field,input.data));deriveCalculatedValues(form.version.fields,raw);const answers:PreparedSubmission["answers"]=[];for(const field of form.version.fields){if(!isRuntimeFieldVisible(field.visibilityRule,raw))continue;const value=validateValue(field,raw.get(field.key));if(value!==undefined)answers.push({fieldId:field.id,value})}prepared.push({definitionId:form.id,versionId:form.version.id,status:runtimeSubmissionStatus(form.version.fields,raw),answers})}
   return prepared;
 }
 
 export async function preparePublishedFormVersionSubmission(input:{organizationId:string;definitionId:string;versionId:string;module:ConfigurableFormModule;data:FormData}){
   const version=await prisma.configurableFormVersion.findFirst({where:{id:input.versionId,definitionId:input.definitionId,status:ConfigurableFormVersionStatus.PUBLISHED,definition:{organizationId:input.organizationId,module:input.module,isActive:true}},include:{fields:{orderBy:{sequence:"asc"}}}});
   if(!version)throw new Error("The assigned questionnaire version is not available.");
-  const raw=new Map<string,unknown>();for(const field of version.fields)raw.set(field.key,readValue(field,input.data));
+  const raw=new Map<string,unknown>();for(const field of version.fields)raw.set(field.key,readValue(field,input.data));deriveCalculatedValues(version.fields,raw);
   const answers:PreparedSubmission["answers"]=[];for(const field of version.fields){if(!isRuntimeFieldVisible(field.visibilityRule,raw))continue;const value=validateValue(field,raw.get(field.key));if(value!==undefined)answers.push({fieldId:field.id,value})}
   return {definitionId:input.definitionId,versionId:version.id,status:runtimeSubmissionStatus(version.fields,raw),answers} satisfies PreparedSubmission;
 }
@@ -130,7 +142,7 @@ export async function prepareCapturedFormSubmissions(input:{organizationId:strin
   const versions=await prisma.configurableFormVersion.findMany({where:{id:{in:input.forms.map(form=>form.versionId)},definition:{organizationId:input.organizationId,module:input.module},status:{in:[ConfigurableFormVersionStatus.PUBLISHED,ConfigurableFormVersionStatus.ARCHIVED]},publishedAt:{lte:input.capturedAt}},include:{definition:true,fields:{orderBy:{sequence:"asc"}}}});
   if(versions.length!==input.forms.length)throw new Error("One or more captured form versions are not valid for this tenant.");
   const prepared:PreparedSubmission[]=[];
-  for(const captured of input.forms){const version=versions.find(item=>item.id===captured.versionId&&item.definitionId===captured.definitionId);if(!version)throw new Error("A captured form does not match its published version.");const byId=new Map(captured.answers.map(answer=>[answer.fieldId,answer.value]));if(captured.answers.some(answer=>!version.fields.some(field=>field.id===answer.fieldId)))throw new Error("A captured answer does not belong to its form version.");const raw=new Map(version.fields.map(field=>[field.key,byId.get(field.id)]));const answers:PreparedSubmission["answers"]=[];for(const field of version.fields){if(!isRuntimeFieldVisible(field.visibilityRule,raw))continue;const value=validateValue(field,raw.get(field.key));if(value!==undefined)answers.push({fieldId:field.id,value})}prepared.push({definitionId:version.definitionId,versionId:version.id,status:runtimeSubmissionStatus(version.fields,raw),answers})}
+  for(const captured of input.forms){const version=versions.find(item=>item.id===captured.versionId&&item.definitionId===captured.definitionId);if(!version)throw new Error("A captured form does not match its published version.");const byId=new Map(captured.answers.map(answer=>[answer.fieldId,answer.value]));if(captured.answers.some(answer=>!version.fields.some(field=>field.id===answer.fieldId)))throw new Error("A captured answer does not belong to its form version.");const raw=new Map(version.fields.map(field=>[field.key,byId.get(field.id)]));deriveCalculatedValues(version.fields,raw);const answers:PreparedSubmission["answers"]=[];for(const field of version.fields){if(!isRuntimeFieldVisible(field.visibilityRule,raw))continue;const value=validateValue(field,raw.get(field.key));if(value!==undefined)answers.push({fieldId:field.id,value})}prepared.push({definitionId:version.definitionId,versionId:version.id,status:runtimeSubmissionStatus(version.fields,raw),answers})}
   return prepared;
 }
 

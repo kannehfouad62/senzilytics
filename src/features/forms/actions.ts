@@ -93,6 +93,10 @@ export async function addConfigurableField(data: FormData) {
       rosterColumns: text(data, "rosterColumns"),
       rosterMinRows: Number(text(data, "rosterMinRows") || "0"),
       rosterMaxRows: Number(text(data, "rosterMaxRows") || "10"),
+      calculationOperation: text(data, "calculationOperation"),
+      calculationSources: text(data, "calculationSources"),
+      calculationDecimals: Number(text(data, "calculationDecimals") || "2"),
+      scoreBands: text(data, "scoreBands"),
       visibilityField: text(data, "visibilityField") || null,
       visibilityValue: text(data, "visibilityValue") || null,
     });

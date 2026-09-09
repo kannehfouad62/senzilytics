@@ -3,6 +3,7 @@ import { configurableFormDeletionBlocker } from "@/modules/forms/form-definition
 import { ActivityAction, ConfigurableFieldType, ConfigurableFormModule, ConfigurableFormVersionStatus, Prisma } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
 import { parseRepeatingGroupColumns } from "@/modules/forms/repeating-group.service";
+import { CALCULATION_OPERATIONS, calculatedFieldConfig, parseCalculationSources, parseScoreBands, type CalculationOperation } from "@/modules/forms/calculated-field.service";
 
 export const slugifyFormName=(value:string)=>value.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,80);
 export const parseOptionList=(value:string)=>[...new Set(value.split(/\r?\n|,/).map(item=>item.trim()).filter(Boolean))];
@@ -14,7 +15,7 @@ export async function createFormDefinition(input:{organizationId:string;userId:s
   return prisma.configurableFormDefinition.create({data:{organizationId:input.organizationId,createdById:input.userId,name:input.name,slug,description:input.description,module:input.module,versions:{create:{version:1,createdById:input.userId}}},include:{versions:true}});
 }
 
-export async function addDraftField(input:{organizationId:string;versionId:string;label:string;key:string;fieldType:ConfigurableFieldType;description:string|null;placeholder:string|null;required:boolean;options:string[];matrixRows:string[];matrixColumns:string[];rosterColumns:string;rosterMinRows:number;rosterMaxRows:number;visibilityField:string|null;visibilityValue:string|null}){
+export async function addDraftField(input:{organizationId:string;versionId:string;label:string;key:string;fieldType:ConfigurableFieldType;description:string|null;placeholder:string|null;required:boolean;options:string[];matrixRows:string[];matrixColumns:string[];rosterColumns:string;rosterMinRows:number;rosterMaxRows:number;calculationOperation:string;calculationSources:string;calculationDecimals:number;scoreBands:string;visibilityField:string|null;visibilityValue:string|null}){
   const version=await prisma.configurableFormVersion.findFirst({where:{id:input.versionId,definition:{organizationId:input.organizationId}},include:{fields:{orderBy:{sequence:"desc"}}}});
   if(!version)throw new Error("Form version not found.");if(version.status!==ConfigurableFormVersionStatus.DRAFT)throw new Error("Published versions are immutable. Create a new draft revision first.");
   const key=slugifyFormName(input.key||input.label).replaceAll("-","_");if(!key)throw new Error("Enter a valid field key.");
@@ -23,8 +24,18 @@ export async function addDraftField(input:{organizationId:string;versionId:strin
   const rosterColumns=input.fieldType===ConfigurableFieldType.REPEATING_GROUP?parseRepeatingGroupColumns(input.rosterColumns):[];
   if(input.fieldType===ConfigurableFieldType.REPEATING_GROUP&&(!Number.isInteger(input.rosterMinRows)||!Number.isInteger(input.rosterMaxRows)||input.rosterMinRows<0||input.rosterMaxRows<Math.max(1,input.rosterMinRows)||input.rosterMaxRows>50))throw new Error("Roster row limits must allow between 1 and 50 rows.");
   if(input.visibilityField&&!version.fields.some(field=>field.key===input.visibilityField))throw new Error("The conditional field key must reference an existing field in this draft.");
+  const calculationOperation=input.calculationOperation.toUpperCase() as CalculationOperation;
+  const calculationSources=input.fieldType===ConfigurableFieldType.CALCULATED?parseCalculationSources(input.calculationSources):[];
+  const scoreBands=input.fieldType===ConfigurableFieldType.CALCULATED?parseScoreBands(input.scoreBands):[];
+  if(input.fieldType===ConfigurableFieldType.CALCULATED){
+    if(!CALCULATION_OPERATIONS.includes(calculationOperation))throw new Error("Select a valid calculation operation.");
+    if(!Number.isInteger(input.calculationDecimals)||input.calculationDecimals<0||input.calculationDecimals>6)throw new Error("Calculation decimal places must be between 0 and 6.");
+    const preceding=new Set(version.fields.filter(field=>field.fieldType===ConfigurableFieldType.NUMBER||field.fieldType===ConfigurableFieldType.CALCULATED).map(field=>field.key));
+    const missing=calculationSources.find(source=>!preceding.has(source.fieldKey));
+    if(missing)throw new Error(`Calculation source ${missing.fieldKey} must reference an earlier numeric or calculated field.`);
+  }
   const visibilityRule=input.visibilityField&&input.visibilityValue?{fieldKey:input.visibilityField,operator:"EQUALS",value:input.visibilityValue}:Prisma.JsonNull;
-  const options: Prisma.InputJsonValue | typeof Prisma.JsonNull = input.fieldType===ConfigurableFieldType.MATRIX?{rows:input.matrixRows,columns:input.matrixColumns}:input.fieldType===ConfigurableFieldType.REPEATING_GROUP?{minRows:input.rosterMinRows,maxRows:input.rosterMaxRows,columns:rosterColumns}:isOptionField(input.fieldType)?input.options:Prisma.JsonNull;
+  const options: Prisma.InputJsonValue | typeof Prisma.JsonNull = input.fieldType===ConfigurableFieldType.MATRIX?{rows:input.matrixRows,columns:input.matrixColumns}:input.fieldType===ConfigurableFieldType.REPEATING_GROUP?{minRows:input.rosterMinRows,maxRows:input.rosterMaxRows,columns:rosterColumns}:input.fieldType===ConfigurableFieldType.CALCULATED?{operation:calculationOperation,sources:calculationSources,decimalPlaces:input.calculationDecimals,bands:scoreBands}:isOptionField(input.fieldType)?input.options:Prisma.JsonNull;
   return prisma.configurableFormField.create({data:{versionId:version.id,label:input.label,key,fieldType:input.fieldType,description:input.description,placeholder:input.placeholder,isRequired:input.required,sequence:(version.fields[0]?.sequence??0)+1,options,visibilityRule}});
 }
 
@@ -39,6 +50,12 @@ export async function publishFormVersion(input:{organizationId:string;versionId:
   const version=await prisma.configurableFormVersion.findFirst({where:{id:input.versionId,definition:{organizationId:input.organizationId}},include:{fields:true,definition:{include:{organization:{select:{subscriptionPlan:true}}}}}});
   if(!version)throw new Error("Form version not found.");if(version.status!==ConfigurableFormVersionStatus.DRAFT)throw new Error("Only a draft can be published.");if(!version.fields.length)throw new Error("Add at least one field before publishing.");
   if(version.fields.some(field=>field.fieldType===ConfigurableFieldType.FILE)&&!planEntitlements[version.definition.organization.subscriptionPlan].DOCUMENT_UPLOAD)throw new Error("File fields require a subscription with document uploads.");
+  for(const field of version.fields.filter(field=>field.fieldType===ConfigurableFieldType.CALCULATED)){
+    const config=calculatedFieldConfig(field.options);
+    if(!config)throw new Error(`${field.label} has an invalid calculation configuration.`);
+    const preceding=new Set(version.fields.filter(candidate=>candidate.sequence<field.sequence&&(candidate.fieldType===ConfigurableFieldType.NUMBER||candidate.fieldType===ConfigurableFieldType.CALCULATED)).map(candidate=>candidate.key));
+    if(config.sources.some(source=>!preceding.has(source.fieldKey)))throw new Error(`${field.label} references a source that is missing or does not precede it.`);
+  }
   await prisma.$transaction([prisma.configurableFormVersion.updateMany({where:{definitionId:version.definitionId,status:ConfigurableFormVersionStatus.PUBLISHED},data:{status:ConfigurableFormVersionStatus.ARCHIVED}}),prisma.configurableFormVersion.update({where:{id:version.id},data:{status:ConfigurableFormVersionStatus.PUBLISHED,publishedAt:new Date(),publishedById:input.userId}})]);
   return version.definitionId;
 }

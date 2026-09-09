@@ -1,0 +1,1 @@
+ALTER TYPE "ConfigurableFieldType" ADD VALUE IF NOT EXISTS 'CALCULATED';
