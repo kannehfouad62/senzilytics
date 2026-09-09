@@ -5,11 +5,14 @@ import type {
   ResearchValue,
   ResearchVariable,
 } from "@/modules/research/research-analysis";
+import { repeatingGroupConfig } from "@/modules/forms/repeating-group.service";
 
 type ResearchVariableSource = {
   fieldId: string;
   matrixRow: string | null;
   rankingOption: string | null;
+  rosterRow?: number;
+  rosterColumn?: string;
   variable: ResearchVariable;
 };
 
@@ -70,6 +73,7 @@ export async function getResearchDataset(
     .flatMap<ResearchVariableSource>((field) => {
       if (field.fieldType === "MATRIX") return matrixOptions(field.options).rows.map((row) => ({ fieldId: field.id, matrixRow: row, rankingOption: null, variable: { id: `${field.id}:${row}`, key: `${field.key}__${variableKey(row)}`, label: `${field.label} — ${row}`, type: "SINGLE_SELECT", required: field.isRequired } satisfies ResearchVariable }));
       if (field.fieldType === "RANKING") return optionList(field.options).map((option) => ({ fieldId: field.id, matrixRow: null, rankingOption: option, variable: { id: `${field.id}:${option}`, key: `${field.key}__rank__${variableKey(option)}`, label: `${field.label} — rank: ${option}`, type: "NUMBER", required: field.isRequired } satisfies ResearchVariable }));
+      if (field.fieldType === "REPEATING_GROUP") { const roster=repeatingGroupConfig(field.options); return roster ? Array.from({length:roster.maxRows},(_,rowIndex)=>roster.columns.map((column)=>({fieldId:field.id,matrixRow:null,rankingOption:null,rosterRow:rowIndex,rosterColumn:column.key,variable:{id:`${field.id}:${rowIndex+1}:${column.key}`,key:`${field.key}__row_${rowIndex+1}__${variableKey(column.key)}`,label:`${field.label} — row ${rowIndex+1}: ${column.label}`,type:column.type,required:field.isRequired&&rowIndex<roster.minRows&&column.required}satisfies ResearchVariable}))).flat() : []; }
       return [{ fieldId: field.id, matrixRow: null, rankingOption: null, variable: { id: field.id, key: field.key, label: field.label, type: field.fieldType, required: field.isRequired } satisfies ResearchVariable }];
     });
   const variables = variableSources.map((source) => source.variable);
@@ -90,6 +94,7 @@ export async function getResearchDataset(
         const raw = byId.get(source.fieldId);
         if (source.matrixRow) return [source.variable.key, matrixAnswer(raw, source.matrixRow)];
         if (source.rankingOption) return [source.variable.key, rankingPosition(raw, source.rankingOption)];
+        if (source.rosterRow !== undefined && source.rosterColumn) return [source.variable.key, rosterValue(raw, source.rosterRow, source.rosterColumn)];
         return [source.variable.key, (raw ?? null) as ResearchValue];
       })),
     };
@@ -144,6 +149,16 @@ export async function getResearchDataset(
     responseRows,
     qualityIssues: detectQualityIssues(variables, rows),
   };
+}
+
+function rosterValue(value: unknown, rowIndex: number, columnKey: string): ResearchValue {
+  if (!Array.isArray(value)) return null;
+  const row=value[rowIndex];
+  if(!row||Array.isArray(row)||typeof row!=="object")return null;
+  const values=(row as {values?:unknown}).values;
+  if(!values||Array.isArray(values)||typeof values!=="object")return null;
+  const result=(values as Record<string,unknown>)[columnKey];
+  return typeof result==="string"||typeof result==="number"||typeof result==="boolean"?result:null;
 }
 
 const optionList = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];

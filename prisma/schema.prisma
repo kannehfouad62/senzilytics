@@ -1001,6 +1001,7 @@ enum ConfigurableFieldType {
   MULTI_SELECT
   MATRIX
   RANKING
+  REPEATING_GROUP
   EMAIL
   PHONE
   FILE

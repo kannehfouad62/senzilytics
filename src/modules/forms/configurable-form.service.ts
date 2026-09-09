@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { configurableFormDeletionBlocker } from "@/modules/forms/form-definition-lifecycle";
 import { ActivityAction, ConfigurableFieldType, ConfigurableFormModule, ConfigurableFormVersionStatus, Prisma } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
+import { parseRepeatingGroupColumns } from "@/modules/forms/repeating-group.service";
 
 export const slugifyFormName=(value:string)=>value.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,80);
 export const parseOptionList=(value:string)=>[...new Set(value.split(/\r?\n|,/).map(item=>item.trim()).filter(Boolean))];
@@ -13,15 +14,17 @@ export async function createFormDefinition(input:{organizationId:string;userId:s
   return prisma.configurableFormDefinition.create({data:{organizationId:input.organizationId,createdById:input.userId,name:input.name,slug,description:input.description,module:input.module,versions:{create:{version:1,createdById:input.userId}}},include:{versions:true}});
 }
 
-export async function addDraftField(input:{organizationId:string;versionId:string;label:string;key:string;fieldType:ConfigurableFieldType;description:string|null;placeholder:string|null;required:boolean;options:string[];matrixRows:string[];matrixColumns:string[];visibilityField:string|null;visibilityValue:string|null}){
+export async function addDraftField(input:{organizationId:string;versionId:string;label:string;key:string;fieldType:ConfigurableFieldType;description:string|null;placeholder:string|null;required:boolean;options:string[];matrixRows:string[];matrixColumns:string[];rosterColumns:string;rosterMinRows:number;rosterMaxRows:number;visibilityField:string|null;visibilityValue:string|null}){
   const version=await prisma.configurableFormVersion.findFirst({where:{id:input.versionId,definition:{organizationId:input.organizationId}},include:{fields:{orderBy:{sequence:"desc"}}}});
   if(!version)throw new Error("Form version not found.");if(version.status!==ConfigurableFormVersionStatus.DRAFT)throw new Error("Published versions are immutable. Create a new draft revision first.");
   const key=slugifyFormName(input.key||input.label).replaceAll("-","_");if(!key)throw new Error("Enter a valid field key.");
   if(isOptionField(input.fieldType)&&input.options.length<2)throw new Error("Select fields require at least two options.");
   if(input.fieldType===ConfigurableFieldType.MATRIX&&(input.matrixRows.length<2||input.matrixColumns.length<2))throw new Error("Matrix fields require at least two rows and two columns.");
+  const rosterColumns=input.fieldType===ConfigurableFieldType.REPEATING_GROUP?parseRepeatingGroupColumns(input.rosterColumns):[];
+  if(input.fieldType===ConfigurableFieldType.REPEATING_GROUP&&(!Number.isInteger(input.rosterMinRows)||!Number.isInteger(input.rosterMaxRows)||input.rosterMinRows<0||input.rosterMaxRows<Math.max(1,input.rosterMinRows)||input.rosterMaxRows>50))throw new Error("Roster row limits must allow between 1 and 50 rows.");
   if(input.visibilityField&&!version.fields.some(field=>field.key===input.visibilityField))throw new Error("The conditional field key must reference an existing field in this draft.");
   const visibilityRule=input.visibilityField&&input.visibilityValue?{fieldKey:input.visibilityField,operator:"EQUALS",value:input.visibilityValue}:Prisma.JsonNull;
-  const options: Prisma.InputJsonValue | typeof Prisma.JsonNull = input.fieldType===ConfigurableFieldType.MATRIX?{rows:input.matrixRows,columns:input.matrixColumns}:isOptionField(input.fieldType)?input.options:Prisma.JsonNull;
+  const options: Prisma.InputJsonValue | typeof Prisma.JsonNull = input.fieldType===ConfigurableFieldType.MATRIX?{rows:input.matrixRows,columns:input.matrixColumns}:input.fieldType===ConfigurableFieldType.REPEATING_GROUP?{minRows:input.rosterMinRows,maxRows:input.rosterMaxRows,columns:rosterColumns}:isOptionField(input.fieldType)?input.options:Prisma.JsonNull;
   return prisma.configurableFormField.create({data:{versionId:version.id,label:input.label,key,fieldType:input.fieldType,description:input.description,placeholder:input.placeholder,isRequired:input.required,sequence:(version.fields[0]?.sequence??0)+1,options,visibilityRule}});
 }
 

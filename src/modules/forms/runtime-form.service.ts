@@ -10,6 +10,7 @@ import {
   Prisma,
   WorkflowTriggerEvent,
 } from "@prisma/client";
+import { repeatingGroupConfig, validateRepeatingGroup } from "@/modules/forms/repeating-group.service";
 
 type RuntimeRule={fieldKey:string;operator:"EQUALS";value:string};
 type RuntimeField={id:string;key:string;label:string;fieldType:ConfigurableFieldType;isRequired:boolean;options:Prisma.JsonValue|null;visibilityRule:Prisma.JsonValue|null};
@@ -79,6 +80,7 @@ const empty=(value:unknown)=>value===null||value===undefined||value===""||(Array
 
 function readValue(field:RuntimeField,data:FormData):unknown{
   const name=fieldName(field.id);
+  if(field.fieldType===ConfigurableFieldType.REPEATING_GROUP){try{return JSON.parse(String(data.get(name)??"[]")) as unknown}catch{return "__INVALID_REPEATING_GROUP__"}}
   if(field.fieldType===ConfigurableFieldType.MATRIX){const matrix=matrixOf(field.options);return matrix.rows.flatMap((row,index)=>{const selected=String(data.get(`${name}_matrix_${index}`)??"");return selected?[JSON.stringify([row,selected])]:[]})}
   if(field.fieldType===ConfigurableFieldType.RANKING){const options=optionsOf(field.options),ranked=options.flatMap((option,index)=>{const rank=Number(data.get(`${name}_rank_${index}`));return Number.isInteger(rank)&&rank>=1&&rank<=options.length?[{option,rank}]:[]});if(ranked.length&&new Set(ranked.map(item=>item.rank)).size!==ranked.length)return["__INVALID_RANKING__"];return ranked.sort((a,b)=>a.rank-b.rank).map(item=>item.option)}
   if(field.fieldType===ConfigurableFieldType.MULTI_SELECT)return data.getAll(name).map(String).map(x=>x.trim()).filter(Boolean);
@@ -97,6 +99,7 @@ function validateValue(field:RuntimeField,value:unknown):Prisma.InputJsonValue|u
   if(field.fieldType===ConfigurableFieldType.DATETIME&&Number.isNaN(new Date(String(value)).getTime()))throw new Error(`${field.label} must be a valid date and time.`);
   if(field.fieldType===ConfigurableFieldType.MATRIX){const matrix=matrixOf(field.options),answers=Array.isArray(value)?value:[];if(answers.length!==matrix.rows.length)throw new Error(`${field.label} requires one answer for every row.`);const selected=new Map<string,string>();for(const encoded of answers){if(typeof encoded!=="string")throw new Error(`Select valid matrix answers for ${field.label}.`);let pair:unknown;try{pair=JSON.parse(encoded)}catch{throw new Error(`Select valid matrix answers for ${field.label}.`)}if(!Array.isArray(pair)||pair.length!==2||typeof pair[0]!=="string"||typeof pair[1]!=="string"||!matrix.rows.includes(pair[0])||!matrix.columns.includes(pair[1])||selected.has(pair[0]))throw new Error(`Select valid matrix answers for ${field.label}.`);selected.set(pair[0],pair[1])}return answers as string[]}
   if(field.fieldType===ConfigurableFieldType.RANKING){const selected=Array.isArray(value)?value.map(String):[],options=optionsOf(field.options);if(selected.length!==options.length||new Set(selected).size!==options.length||selected.some(item=>!options.includes(item)))throw new Error(`${field.label} requires each option to have a unique rank.`);return selected}
+  if(field.fieldType===ConfigurableFieldType.REPEATING_GROUP){const config=repeatingGroupConfig(field.options);if(!config)throw new Error(`${field.label} has an invalid roster configuration.`);return validateRepeatingGroup(value,config,field.label) as unknown as Prisma.InputJsonValue}
   if(field.fieldType===ConfigurableFieldType.SINGLE_SELECT&&!optionsOf(field.options).includes(String(value)))throw new Error(`Select a valid option for ${field.label}.`);
   if(field.fieldType===ConfigurableFieldType.MULTI_SELECT){const selected=value as string[],options=optionsOf(field.options);if(selected.some(item=>!options.includes(item)))throw new Error(`Select valid options for ${field.label}.`);return selected}
   return String(value);

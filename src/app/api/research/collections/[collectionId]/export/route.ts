@@ -14,6 +14,12 @@ const cell = (value: unknown) => {
 };
 const displayAnswer = (field: { fieldType: string }, value: unknown) => {
   if (!Array.isArray(value)) return value ?? "";
+  if (field.fieldType === "REPEATING_GROUP") return value.map((row, index) => {
+    if (!row || Array.isArray(row) || typeof row !== "object") return "";
+    const values = (row as { values?: unknown }).values;
+    if (!values || Array.isArray(values) || typeof values !== "object") return "";
+    return `Row ${index + 1}: ${Object.entries(values).map(([key, answer]) => `${key}=${String(answer)}`).join("; ")}`;
+  }).filter(Boolean).join(" | ");
   if (field.fieldType === "MATRIX") return value.flatMap((encoded) => { if (typeof encoded !== "string") return []; try { const pair = JSON.parse(encoded) as unknown; return Array.isArray(pair) && pair.length === 2 ? [`${String(pair[0])}: ${String(pair[1])}`] : []; } catch { return []; } }).join(" | ");
   if (field.fieldType === "RANKING") return value.map((option, index) => `${index + 1}. ${String(option)}`).join(" | ");
   return value;

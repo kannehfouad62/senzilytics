@@ -198,12 +198,15 @@ export async function savePublicResearchSurveyDraft(
       if (!eligible) throw new Error("Complete eligibility screening first.");
     }
     const answers: Record<string, string | string[]> = {};
+    let answerCharacters = 0;
     for (const key of new Set(data.keys())) {
       if (!key.startsWith("custom_") || Object.keys(answers).length >= 200)
         continue;
       const values = data
         .getAll(key)
-        .map((item) => String(item).slice(0, 10_000));
+        .map((item) => String(item).slice(0, 100_000));
+      answerCharacters += values.reduce((total, item) => total + item.length, 0);
+      if (answerCharacters > 500_000) throw new Error("This saved draft is too large. Reduce roster rows or long-text responses.");
       answers[key] = values.length > 1 ? values : (values[0] ?? "");
     }
     const identity = {

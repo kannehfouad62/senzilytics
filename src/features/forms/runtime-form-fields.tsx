@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { repeatingGroupConfig, type RepeatingGroupRow } from "@/modules/forms/repeating-group.service";
+type WebFieldValue = string | string[] | boolean | RepeatingGroupRow[];
 type Field = {
   id: string;
   key: string;
@@ -34,10 +36,10 @@ export function RuntimeFormFields({
   initialValues = {},
 }: {
   forms: Form[];
-  initialValues?: Record<string, string | string[] | boolean>;
+  initialValues?: Record<string, WebFieldValue>;
 }) {
   const [values, setValues] = useState<
-    Record<string, string | string[] | boolean>
+    Record<string, WebFieldValue>
   >(
     () =>
       Object.fromEntries(
@@ -49,7 +51,7 @@ export function RuntimeFormFields({
             )
             .filter((entry) => entry[1] !== undefined),
         ),
-      ) as Record<string, string | string[] | boolean>,
+      ) as Record<string, WebFieldValue>,
   );
   if (!forms.length) return null;
   const visible = (field: Field) => {
@@ -57,7 +59,7 @@ export function RuntimeFormFields({
     if (!rule?.fieldKey || rule.operator !== "EQUALS") return true;
     const actual = values[rule.fieldKey];
     return Array.isArray(actual)
-      ? actual.includes(rule.value || "")
+      ? actual.some((item) => typeof item === "string" && item === (rule.value || ""))
       : String(actual ?? "") === String(rule.value ?? "");
   };
   return (
@@ -102,8 +104,8 @@ function RuntimeField({
   initialValue,
 }: {
   field: Field;
-  onChange: (value: string | string[] | boolean) => void;
-  initialValue?: string | string[] | boolean;
+  onChange: (value: WebFieldValue) => void;
+  initialValue?: WebFieldValue;
 }) {
   const name = `custom_${field.id}`,
     options = Array.isArray(field.options)
@@ -139,6 +141,7 @@ function RuntimeField({
     );
   if (field.fieldType === "MATRIX") return <MatrixRuntimeField field={field} name={name} initialValue={initialValue} onChange={onChange} label={label} />;
   if (field.fieldType === "RANKING") return <RankingRuntimeField field={field} name={name} initialValue={initialValue} onChange={onChange} label={label} />;
+  if (field.fieldType === "REPEATING_GROUP") return <RepeatingGroupRuntimeField field={field} name={name} initialValue={initialValue} onChange={onChange} label={label} />;
   if (field.fieldType === "FILE")
     return (
       <div>
@@ -206,7 +209,7 @@ function RuntimeField({
           name={name}
           required={field.isRequired}
           multiple
-          defaultValue={Array.isArray(initialValue) ? initialValue : []}
+          defaultValue={Array.isArray(initialValue) ? initialValue.filter((item): item is string => typeof item === "string") : []}
           onChange={(event) =>
             onChange(
               [...event.target.selectedOptions].map((option) => option.value),
@@ -259,18 +262,31 @@ function matrixOptions(value: unknown) {
   };
 }
 
-function MatrixRuntimeField({ field, name, initialValue, onChange, label }: { field: Field; name: string; initialValue?: string | string[] | boolean; onChange: (value: string | string[] | boolean) => void; label: React.ReactNode }) {
+function MatrixRuntimeField({ field, name, initialValue, onChange, label }: { field: Field; name: string; initialValue?: WebFieldValue; onChange: (value: WebFieldValue) => void; label: React.ReactNode }) {
   const matrix = matrixOptions(field.options);
-  const initial = new Map((Array.isArray(initialValue) ? initialValue : []).flatMap((encoded) => { try { const pair = JSON.parse(encoded) as unknown; return Array.isArray(pair) && pair.length === 2 && typeof pair[0] === "string" && typeof pair[1] === "string" ? [[pair[0], pair[1]] as const] : []; } catch { return []; } }));
+  const initial = new Map((Array.isArray(initialValue) ? initialValue.filter((item): item is string => typeof item === "string") : []).flatMap((encoded) => { try { const pair = JSON.parse(encoded) as unknown; return Array.isArray(pair) && pair.length === 2 && typeof pair[0] === "string" && typeof pair[1] === "string" ? [[pair[0], pair[1]] as const] : []; } catch { return []; } }));
   const [answers, setAnswers] = useState<Record<string, string>>(() => Object.fromEntries(initial));
   const update = (row: string, selected: string) => { const next = { ...answers, [row]: selected }; setAnswers(next); onChange(matrix.rows.flatMap((item) => next[item] ? [JSON.stringify([item, next[item]])] : [])); };
   return <fieldset className="md:col-span-2"><legend>{label}</legend><div className="mt-2 overflow-x-auto rounded-2xl border border-white/10"><table className="min-w-full text-sm"><thead className="bg-white/[.03] text-xs text-slate-400"><tr><th className="p-3 text-left">Statement</th>{matrix.columns.map((column) => <th key={column} className="p-3 text-center">{field.optionLabels?.[column] || column}</th>)}</tr></thead><tbody className="divide-y divide-white/10">{matrix.rows.map((row, rowIndex) => <tr key={row}><th className="p-3 text-left font-normal text-slate-300">{field.optionLabels?.[row] || row}</th>{matrix.columns.map((column) => <td key={column} className="p-3 text-center"><input type="radio" name={`${name}_matrix_${rowIndex}`} value={column} required={field.isRequired} checked={answers[row] === column} onChange={() => update(row, column)} aria-label={`${row}: ${column}`} /></td>)}</tr>)}</tbody></table></div></fieldset>;
 }
 
-function RankingRuntimeField({ field, name, initialValue, onChange, label }: { field: Field; name: string; initialValue?: string | string[] | boolean; onChange: (value: string | string[] | boolean) => void; label: React.ReactNode }) {
+function RankingRuntimeField({ field, name, initialValue, onChange, label }: { field: Field; name: string; initialValue?: WebFieldValue; onChange: (value: WebFieldValue) => void; label: React.ReactNode }) {
   const options = Array.isArray(field.options) ? field.options.filter((item): item is string => typeof item === "string") : [];
-  const initialOrder = Array.isArray(initialValue) && initialValue.length === options.length ? initialValue : [];
+  const initialOrder = Array.isArray(initialValue) && initialValue.every((item): item is string => typeof item === "string") && initialValue.length === options.length ? initialValue : [];
   const [ranks, setRanks] = useState<Record<string, number>>(() => Object.fromEntries(initialOrder.map((option, index) => [option, index + 1])));
   const update = (option: string, rank: number) => { const next = { ...ranks, [option]: rank }; setRanks(next); const ordered = options.filter((item) => next[item]).sort((a, b) => next[a] - next[b]); onChange(ordered); };
   return <fieldset className="md:col-span-2"><legend>{label}</legend><div className="mt-2 space-y-2">{options.map((option, index) => <label key={option} className="flex items-center justify-between gap-4 rounded-xl border border-white/10 p-3 text-sm"><span>{field.optionLabels?.[option] || option}</span><select name={`${name}_rank_${index}`} value={ranks[option] ?? ""} required={field.isRequired} onChange={(event) => update(option, Number(event.target.value))} className="rounded-lg border border-white/10 bg-slate-950 px-3 py-2"><option value="">Rank</option>{options.map((_, position) => <option key={position + 1} value={position + 1}>{position + 1}</option>)}</select></label>)}</div><p className="mt-2 text-xs text-slate-500">Assign each item a unique position; 1 is highest priority.</p></fieldset>;
+}
+
+function RepeatingGroupRuntimeField({ field, name, initialValue, onChange, label }: { field: Field; name: string; initialValue?: WebFieldValue; onChange: (value: WebFieldValue) => void; label: React.ReactNode }) {
+  const config = repeatingGroupConfig(field.options);
+  const makeRow = (): RepeatingGroupRow => ({ id: globalThis.crypto?.randomUUID?.() ?? `row_${Date.now()}_${Math.random().toString(36).slice(2)}`, values: {} });
+  let restored: unknown = initialValue;
+  if (typeof initialValue === "string") { try { restored = JSON.parse(initialValue) as unknown; } catch { restored = []; } }
+  const initialRows = Array.isArray(restored) && restored.every((item) => item && typeof item === "object" && !Array.isArray(item)) ? restored as RepeatingGroupRow[] : [];
+  const [rows, setRows] = useState<RepeatingGroupRow[]>(() => config ? (initialRows.length ? initialRows : Array.from({ length: config.minRows }, makeRow)) : []);
+  if (!config) return <p className="text-sm text-red-300">{field.label} has an invalid roster configuration.</p>;
+  const update = (next: RepeatingGroupRow[]) => { setRows(next); onChange(next); };
+  const setValue = (rowId: string, key: string, value: string | number | boolean) => update(rows.map((row) => row.id === rowId ? { ...row, values: { ...row.values, [key]: value } } : row));
+  return <fieldset className="md:col-span-2"><legend>{label}</legend><input type="hidden" name={name} value={JSON.stringify(rows)}/><div className="mt-3 space-y-4">{rows.map((row, rowIndex) => <div key={row.id} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"><div className="flex items-center justify-between"><p className="text-sm font-semibold text-cyan-200">Row {rowIndex + 1}</p><button type="button" disabled={rows.length <= config.minRows} onClick={() => update(rows.filter((item) => item.id !== row.id))} className="text-xs text-red-300 disabled:opacity-30">Remove</button></div><div className="mt-3 grid gap-3 md:grid-cols-2">{config.columns.filter((column) => !column.showWhen || String(row.values[column.showWhen.columnKey] ?? "") === column.showWhen.value).map((column) => <label key={column.key} className="text-sm text-slate-300">{column.label}{column.required&&<span className="text-red-300"> *</span>}{column.type === "SINGLE_SELECT" ? <select value={String(row.values[column.key] ?? "")} onChange={(event) => setValue(row.id, column.key, event.target.value)} className={input}><option value="">Select</option>{column.options.map((option) => <option key={option}>{option}</option>)}</select> : column.type === "BOOLEAN" ? <input type="checkbox" checked={row.values[column.key] === true} onChange={(event) => setValue(row.id, column.key, event.target.checked)} className="ml-3"/> : column.type === "LONG_TEXT" ? <textarea rows={3} value={String(row.values[column.key] ?? "")} onChange={(event) => setValue(row.id, column.key, event.target.value)} className={input}/> : <input type={column.type === "NUMBER" ? "number" : column.type === "DATE" ? "date" : "text"} value={String(row.values[column.key] ?? "")} onChange={(event) => setValue(row.id, column.key, event.target.value)} className={input}/>}</label>)}</div></div>)}</div><button type="button" disabled={rows.length >= config.maxRows} onClick={() => update([...rows, makeRow()])} className="mt-4 rounded-xl border border-cyan-400/30 px-4 py-2 text-sm text-cyan-200 disabled:opacity-30">Add row</button><p className="mt-2 text-xs text-slate-500">Minimum {config.minRows}; maximum {config.maxRows} rows.</p></fieldset>;
 }

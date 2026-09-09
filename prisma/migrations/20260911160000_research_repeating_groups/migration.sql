@@ -1,0 +1,1 @@
+ALTER TYPE "ConfigurableFieldType" ADD VALUE 'REPEATING_GROUP';

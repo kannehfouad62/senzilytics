@@ -90,6 +90,9 @@ export async function addConfigurableField(data: FormData) {
       options: parseOptionList(text(data, "options")),
       matrixRows: parseOptionList(text(data, "matrixRows")),
       matrixColumns: parseOptionList(text(data, "matrixColumns")),
+      rosterColumns: text(data, "rosterColumns"),
+      rosterMinRows: Number(text(data, "rosterMinRows") || "0"),
+      rosterMaxRows: Number(text(data, "rosterMaxRows") || "10"),
       visibilityField: text(data, "visibilityField") || null,
       visibilityValue: text(data, "visibilityValue") || null,
     });
