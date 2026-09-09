@@ -123,6 +123,8 @@ async function main() {
       PermissionKey.VIEW_USERS,
       PermissionKey.VIEW_DASHBOARD,
       PermissionKey.VIEW_REPORTS,
+      PermissionKey.VIEW_MOC,
+      PermissionKey.MANAGE_MOC,
       PermissionKey.CREATE_INCIDENT,
       PermissionKey.VIEW_INCIDENT,
       PermissionKey.UPDATE_INCIDENT,
@@ -201,6 +203,8 @@ async function main() {
     EHS_MANAGER: [
       PermissionKey.VIEW_DASHBOARD,
       PermissionKey.VIEW_REPORTS,
+      PermissionKey.VIEW_MOC,
+      PermissionKey.MANAGE_MOC,
       PermissionKey.CREATE_INCIDENT,
       PermissionKey.VIEW_INCIDENT,
       PermissionKey.UPDATE_INCIDENT,
@@ -270,6 +274,7 @@ async function main() {
 
     SUPERVISOR: [
       PermissionKey.VIEW_DASHBOARD,
+      PermissionKey.VIEW_MOC,
       PermissionKey.CREATE_INCIDENT,
       PermissionKey.VIEW_INCIDENT,
       PermissionKey.UPDATE_INCIDENT,
@@ -331,6 +336,7 @@ async function main() {
 
     AUDITOR: [
       PermissionKey.VIEW_DASHBOARD,
+      PermissionKey.VIEW_MOC,
       PermissionKey.VIEW_INCIDENT,
       PermissionKey.VIEW_AUDITS,
       PermissionKey.MANAGE_AUDITS,

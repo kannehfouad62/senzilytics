@@ -23,6 +23,7 @@ import {
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/permissions";
 import { preparePublishedFormSubmissions } from "@/modules/forms/runtime-form.service";
+import { revalidatePath } from "next/cache";
 
 function getRequiredString(
   formData: FormData,
@@ -173,6 +174,11 @@ export async function createIncident(
       });
 
     incidentId = incident.id;
+    revalidatePath("/incidents", "layout");
+    revalidatePath("/dashboard");
+    revalidatePath("/reports");
+    revalidatePath("/activity");
+    revalidatePath("/notifications");
   } catch (error) {
     return {
       error:
