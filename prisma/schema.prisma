@@ -21,6 +21,19 @@ enum OrganizationStatus {
   SUSPENDED
 }
 
+enum IndustryCategory {
+  GENERAL
+  RESEARCH_AND_ANALYTICS
+  CONSTRUCTION_AND_ENGINEERING
+  MANUFACTURING
+  ENERGY_AND_MINING
+  HEALTHCARE
+  TRANSPORT_AND_LOGISTICS
+  PUBLIC_SECTOR_AND_EDUCATION
+  PROFESSIONAL_SERVICES
+  OTHER
+}
+
 enum SubscriptionPlan {
   ESSENTIAL
   ENTERPRISE
@@ -2132,6 +2145,7 @@ model Organization {
   id                    String             @id @default(cuid())
   name                  String
   industry              String?
+  industryCategory      IndustryCategory     @default(GENERAL)
   address               String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt

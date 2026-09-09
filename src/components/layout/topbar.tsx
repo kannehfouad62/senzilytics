@@ -21,11 +21,12 @@ import {
 } from "./sidebar";
 import { isApprovedPlatformAdministrator } from "@/lib/platform-admin";
 import { MobileNavigationMenu } from "./mobile-navigation-menu";
-import { PermissionKey, UserRole } from "@prisma/client";
+import { IndustryCategory, PermissionKey, UserRole } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
 import { getCurrentUserPermissions } from "@/lib/permissions";
 import { filterNavigationItems } from "@/core/permissions/navigation-access";
 import { ActiveNavigationLink } from "@/components/layout/active-navigation-link";
+import { filterIndustryRecommendedModules } from "@/core/navigation/industry-module-recommendations";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export async function Topbar() {
           isActive: true,
           isPlatformAdmin: true,
           organizationId: true,
-          organization: { select: { subscriptionPlan: true } },
+          organization: { select: { subscriptionPlan: true, industryCategory: true } },
         },
       })
     : null;
@@ -103,15 +104,18 @@ export async function Topbar() {
       })
     : 0;
 
-  const visiblePrimaryItems = filterNavigationItems(
+  const permittedPrimaryItems = filterNavigationItems(
     primaryNavItems,
     permissions,
   ).filter(
     (item) =>
       item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION,
   );
+  const platformAdministrator = Boolean(currentUser && isApprovedPlatformAdministrator(currentUser));
+  const recommend = <T extends NavigationItem>(items: T[]) => platformAdministrator ? items : filterIndustryRecommendedModules(currentUser?.organization?.industryCategory ?? IndustryCategory.GENERAL, items);
+  const visiblePrimaryItems = recommend(permittedPrimaryItems);
   const platformItems: NavigationItem[] =
-    currentUser && isApprovedPlatformAdministrator(currentUser)
+    platformAdministrator
       ? [
           ...visiblePrimaryItems,
           {
@@ -130,16 +134,16 @@ export async function Topbar() {
         : visiblePrimaryItems;
 
   const demoMode = currentUser?.role === UserRole.DEMO_VIEWER;
-  const visibleEhsItems = filterNavigationItems(ehsNavItems, permissions);
-  const visibleAuditItems = filterNavigationItems(auditNavItems, permissions);
-  const visibleInspectionItems = filterNavigationItems(
+  const visibleEhsItems = recommend(filterNavigationItems(ehsNavItems, permissions));
+  const visibleAuditItems = recommend(filterNavigationItems(auditNavItems, permissions));
+  const visibleInspectionItems = recommend(filterNavigationItems(
     inspectionNavItems,
     permissions,
-  );
-  const visibleResearchItems = filterNavigationItems(
+  ));
+  const visibleResearchItems = recommend(filterNavigationItems(
     researchNavItems,
     permissions,
-  );
+  ));
   const permittedGovernanceItems = filterNavigationItems(
     complianceNavItems,
     permissions,
@@ -153,7 +157,7 @@ export async function Topbar() {
     { label: "Inspections", items: visibleInspectionItems },
     {
       label: "Governance",
-      items: demoMode
+      items: recommend(demoMode
         ? permittedGovernanceItems.filter(
             (item) => item.href !== "/notifications",
           )
@@ -161,7 +165,7 @@ export async function Topbar() {
             (item) =>
               item.href !== "/notifications" ||
               entitlements.IN_APP_NOTIFICATIONS,
-          ),
+          )),
     },
   ].filter((section) => section.items.length > 0);
 

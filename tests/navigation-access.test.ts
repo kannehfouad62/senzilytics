@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PermissionKey } from "@prisma/client";
+import { IndustryCategory, PermissionKey } from "@prisma/client";
 import {
   canViewNavigationItem,
   filterNavigationItems,
   resolveActiveNavigationHref,
 } from "../src/core/permissions/navigation-access";
+import { filterIndustryRecommendedModules, isIndustryRecommendedModule } from "../src/core/navigation/industry-module-recommendations";
 
 test("navigation hides an item when its required permission is not granted", () => {
   assert.equal(
@@ -76,4 +77,11 @@ test("active navigation does not match unrelated route prefixes", () => {
     resolveActiveNavigationHref("/form-studio/new/", ["/form-studio"]),
     "/form-studio",
   );
+});
+
+test("industry profiles prioritize relevant modules without becoming authorization controls", () => {
+  const permitted = [{ href: "/research" }, { href: "/research/datasets" }, { href: "/assets" }, { href: "/dashboard" }, { href: "/modules" }];
+  assert.deepEqual(filterIndustryRecommendedModules(IndustryCategory.RESEARCH_AND_ANALYTICS, permitted).map(item => item.href), ["/research", "/research/datasets", "/dashboard", "/modules"]);
+  assert.equal(isIndustryRecommendedModule(IndustryCategory.MANUFACTURING, "/assets"), true);
+  assert.equal(isIndustryRecommendedModule(IndustryCategory.GENERAL, "/any-future-module"), true);
 });

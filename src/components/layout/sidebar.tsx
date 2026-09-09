@@ -3,10 +3,11 @@ import Image from "next/image";
 import { getPlatformAdministrator } from "@/lib/platform-admin";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { getCurrentUserPermissions } from "@/lib/permissions";
-import { PermissionKey, UserRole } from "@prisma/client";
+import { IndustryCategory, PermissionKey, UserRole } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
 import { filterNavigationItems } from "@/core/permissions/navigation-access";
 import { ActiveNavigationLink } from "@/components/layout/active-navigation-link";
+import { filterIndustryRecommendedModules } from "@/core/navigation/industry-module-recommendations";
 import {
   Activity,
   AlertTriangle,
@@ -51,6 +52,7 @@ import {
   TrendingUp,
   Presentation,
   MessageSquareText,
+  PanelsTopLeft,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -125,6 +127,11 @@ export const primaryNavItems: NavigationItem[] = [
     label: "My Tasks",
     href: "/tasks",
     icon: ClipboardList,
+  },
+  {
+    label: "All Modules",
+    href: "/modules",
+    icon: PanelsTopLeft,
   },
   {
     label: "Field Collection",
@@ -416,7 +423,9 @@ export async function Sidebar() {
   const [platformAdministrator, { user, organization }, permissions] = await Promise.all([getPlatformAdministrator(), getCurrentUserTenant(), getCurrentUserPermissions()]);
   const isDemo = user.role === UserRole.DEMO_VIEWER;
   const entitlements = organization ? planEntitlements[organization.subscriptionPlan] : planEntitlements.PREMIUM;
-  const entitledPrimaryItems = filterNavigationItems(primaryNavItems, permissions).filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION);
+  const permittedPrimaryItems = filterNavigationItems(primaryNavItems, permissions).filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION);
+  const recommend = <T extends NavigationItem>(items: T[]) => platformAdministrator ? items : filterIndustryRecommendedModules(organization?.industryCategory ?? IndustryCategory.GENERAL, items);
+  const entitledPrimaryItems = recommend(permittedPrimaryItems);
   const platformNavItems = platformAdministrator
     ? [
         ...entitledPrimaryItems,
@@ -440,13 +449,14 @@ export async function Sidebar() {
       ? entitledPrimaryItems.filter((item) => item.href === "/dashboard")
       : entitledPrimaryItems;
   const permittedGovernanceItems = filterNavigationItems(complianceNavItems, permissions);
-  const governanceItems = isDemo
+  const permittedGovernanceByPlan = isDemo
     ? permittedGovernanceItems.filter((item) => item.href !== "/notifications")
     : permittedGovernanceItems.filter(item => item.href !== "/notifications" || entitlements.IN_APP_NOTIFICATIONS);
-  const visibleEhsItems = filterNavigationItems(ehsNavItems, permissions);
-  const visibleAuditItems = filterNavigationItems(auditNavItems, permissions);
-  const visibleResearchItems = filterNavigationItems(researchNavItems, permissions);
-  const visibleInspectionItems = filterNavigationItems(inspectionNavItems, permissions);
+  const governanceItems = recommend(permittedGovernanceByPlan);
+  const visibleEhsItems = recommend(filterNavigationItems(ehsNavItems, permissions));
+  const visibleAuditItems = recommend(filterNavigationItems(auditNavItems, permissions));
+  const visibleResearchItems = recommend(filterNavigationItems(researchNavItems, permissions));
+  const visibleInspectionItems = recommend(filterNavigationItems(inspectionNavItems, permissions));
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:flex">
