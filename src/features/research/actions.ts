@@ -116,7 +116,7 @@ export async function createResearchQuestionnaire(_state: FormActionState, data:
   const projectId = required(data, "projectId");
   let definitionId = "";
   try {
-    const questionnaire = await createResearchQuestionnaireService({ organizationId, userId: user.id, projectId, name: required(data, "name"), purpose: required(data, "purpose"), targetAudience: text(data, "targetAudience") || null, identityMode: enumValue(data, "identityMode", ResearchResponseIdentityMode), defaultLanguage: text(data, "defaultLanguage") || "en", consentStatement: text(data, "consentStatement") || null });
+    const questionnaire = await createResearchQuestionnaireService({ organizationId, userId: user.id, projectId, name: required(data, "name"), purpose: required(data, "purpose"), targetAudience: text(data, "targetAudience") || null, identityMode: enumValue(data, "identityMode", ResearchResponseIdentityMode), defaultLanguage: text(data, "defaultLanguage") || "en", consentStatement: text(data, "consentStatement") || null, templateVersionId:text(data,"templateVersionId")||null });
     definitionId = questionnaire.formDefinitionId;
     refresh(projectId);
     revalidatePath(`/research/projects/${projectId}/questionnaires`);

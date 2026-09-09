@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import {
   addDraftField,
+  copyResearchLibraryField,
   createDraftRevision,
   createFormDefinition,
   deleteDraftField,
@@ -123,6 +124,16 @@ export async function removeConfigurableField(data: FormData) {
       `/form-studio/${definitionId}?error=${encodeURIComponent(message(cause))}`,
     );
   }
+}
+
+export async function copyResearchQuestionFromLibrary(data:FormData){
+  const definitionId=required(data,"definitionId");
+  const {organizationId,user}=await requireFormDefinitionManagement(definitionId);
+  try{
+    await copyResearchLibraryField({organizationId,userId:user.id,targetVersionId:required(data,"versionId"),sourceFieldId:required(data,"sourceFieldId")});
+    revalidateFormStudio(definitionId);
+  }catch(cause){redirect(`/form-studio/${definitionId}?error=${encodeURIComponent(message(cause))}`)}
+  redirect(`/form-studio/${definitionId}`);
 }
 
 export async function publishConfigurableForm(data: FormData) {

@@ -46,6 +46,21 @@ export async function deleteDraftField(input:{organizationId:string;fieldId:stri
   return field.version.definitionId;
 }
 
+export async function copyResearchLibraryField(input:{organizationId:string;userId:string;targetVersionId:string;sourceFieldId:string}){
+  const [target,source]=await Promise.all([
+    prisma.configurableFormVersion.findFirst({where:{id:input.targetVersionId,status:ConfigurableFormVersionStatus.DRAFT,definition:{organizationId:input.organizationId,module:ConfigurableFormModule.RESEARCH}},include:{fields:{orderBy:{sequence:"desc"}},definition:{select:{name:true}}}}),
+    prisma.configurableFormField.findFirst({where:{id:input.sourceFieldId,version:{status:ConfigurableFormVersionStatus.PUBLISHED,definition:{organizationId:input.organizationId,module:ConfigurableFormModule.RESEARCH}}},include:{version:{select:{definition:{select:{name:true}}}}}}),
+  ]);
+  if(!target)throw new Error("The destination research draft is unavailable.");
+  if(!source)throw new Error("The selected library question is unavailable for this organization.");
+  if(target.fields.some(field=>field.key===source.key))throw new Error(`The draft already contains the field key ${source.key}.`);
+  return prisma.$transaction(async tx=>{
+    const copied=await tx.configurableFormField.create({data:{versionId:target.id,key:source.key,label:source.label,description:source.description,placeholder:source.placeholder,fieldType:source.fieldType,sequence:(target.fields[0]?.sequence??0)+1,isRequired:source.isRequired,options:source.options??Prisma.JsonNull,validation:source.validation??Prisma.JsonNull,visibilityRule:Prisma.JsonNull}});
+    await tx.activityLog.create({data:{organizationId:input.organizationId,userId:input.userId,action:ActivityAction.CREATE,entityType:"ConfigurableFormField",entityId:copied.id,title:"Research library question copied",description:`${source.label} — ${target.definition.name}`,metadata:{sourceFieldId:source.id,sourceQuestionnaire:source.version.definition.name,targetVersionId:target.id}}});
+    return copied;
+  });
+}
+
 export async function publishFormVersion(input:{organizationId:string;versionId:string;userId:string}){
   const version=await prisma.configurableFormVersion.findFirst({where:{id:input.versionId,definition:{organizationId:input.organizationId}},include:{fields:true,definition:{include:{organization:{select:{subscriptionPlan:true}}}}}});
   if(!version)throw new Error("Form version not found.");if(version.status!==ConfigurableFormVersionStatus.DRAFT)throw new Error("Only a draft can be published.");if(!version.fields.length)throw new Error("Add at least one field before publishing.");

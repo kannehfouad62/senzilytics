@@ -1,5 +1,6 @@
 import {
   addConfigurableField,
+  copyResearchQuestionFromLibrary,
   publishConfigurableForm,
   removeConfigurableField,
   reviseConfigurableForm,
@@ -45,6 +46,7 @@ export default async function FormDetailPage({
   const draft = form.versions.find((v) => v.status === "DRAFT"),
     published = form.versions.find((v) => v.status === "PUBLISHED"),
     selected = draft ?? published ?? form.versions[0];
+  const libraryFields=form.module===ConfigurableFormModule.RESEARCH&&draft?await prisma.configurableFormField.findMany({where:{version:{status:"PUBLISHED",definition:{organizationId,module:ConfigurableFormModule.RESEARCH,id:{not:form.id}}}},select:{id:true,label:true,key:true,fieldType:true,version:{select:{version:true,definition:{select:{name:true}}}}},orderBy:{createdAt:"desc"},take:250}):[];
   const backHref =
     form.module === ConfigurableFormModule.RESEARCH &&
     form.researchQuestionnaire
@@ -181,6 +183,8 @@ export default async function FormDetailPage({
         </section>
         <section className="space-y-6">
           {draft && (
+            <>
+            {form.module===ConfigurableFormModule.RESEARCH&&<form action={copyResearchQuestionFromLibrary} className="rounded-3xl border border-amber-400/15 bg-amber-400/[.035] p-6"><input type="hidden" name="definitionId" value={form.id}/><input type="hidden" name="versionId" value={draft.id}/><h2 className="text-xl font-semibold">Reusable question library</h2><p className="mt-1 text-sm text-slate-400">Copy an individual question from another published questionnaire in this organization. The copied field becomes an independent draft snapshot.</p><label className="mt-4 block text-sm">Published question<select name="sourceFieldId" required defaultValue="" className={input}><option value="" disabled>Select a library question</option>{libraryFields.map(field=><option key={field.id} value={field.id}>{field.version.definition.name} v{field.version.version} · {field.label} ({field.fieldType.replaceAll("_"," ")})</option>)}</select></label><button disabled={!libraryFields.length} className="mt-4 rounded-xl bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40">Copy question into draft</button>{!libraryFields.length&&<p className="mt-3 text-xs text-slate-500">Publish another questionnaire to populate this tenant library.</p>}</form>}
             <form
               action={addConfigurableField}
               className="rounded-3xl border border-white/10 bg-white/5 p-6"
@@ -303,6 +307,7 @@ export default async function FormDetailPage({
                 Add Field
               </button>
             </form>
+            </>
           )}
           <FormPreview fields={selected.fields} />
           <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
