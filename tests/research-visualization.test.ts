@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 import type { ResearchDataRow, ResearchVariable } from "../src/modules/research/research-analysis";
-import { applyResearchFilters, buildFunnelData, buildHeatmapData, buildRadarData, buildSmallMultipleData, normalizeResearchFilters, researchFilterOptions } from "../src/modules/research/research-visualization";
+import { applyResearchFilters, buildFunnelData, buildGeographicPoints, buildHeatmapData, buildRadarData, buildSankeyData, buildSmallMultipleData, normalizeResearchFilters, researchFilterOptions } from "../src/modules/research/research-visualization";
 
 const variables: ResearchVariable[] = [
   { id:"department",key:"department",label:"Department",type:"SINGLE_SELECT",required:true },
@@ -52,6 +52,27 @@ test("heatmap counts categorical intersections without row duplication",()=>{
   const heatmap=buildHeatmapData(heatRows,variables[0],sentiment);
   assert.equal(heatmap.cells.flat().reduce((sum,value)=>sum+value,0),3);
   assert.equal(heatmap.maximum,1);
+});
+
+test("Sankey builder aggregates bounded source-to-target flows",()=>{
+  const target:ResearchVariable={id:"target",key:"target",label:"Outcome",type:"SINGLE_SELECT",required:false};
+  const flowRows=rows.map((row,index)=>({...row,values:{...row.values,target:index===2?"Escalated":"Completed"}}));
+  const result=buildSankeyData(flowRows,variables[0],target);
+  assert.equal(result.links.reduce((sum,link)=>sum+link.value,0),3);
+  assert.ok(result.nodes.some(node=>node.name==="Source · Research"));
+  assert.ok(result.nodes.some(node=>node.name==="Target · Completed"));
+  assert.ok(result.links.every(link=>link.source!==link.target));
+});
+
+test("geographic builder admits only finite coordinates inside world bounds",()=>{
+  const longitude:ResearchVariable={id:"longitude",key:"longitude",label:"Longitude",type:"NUMBER",required:false};
+  const latitude:ResearchVariable={id:"latitude",key:"latitude",label:"Latitude",type:"NUMBER",required:false};
+  const geoRows:ResearchDataRow[]=[
+    {assignmentId:"1",responseId:"point-one",submittedAt:"",values:{longitude:-87.2,latitude:30.4}},
+    {assignmentId:"2",responseId:"invalid",submittedAt:"",values:{longitude:240,latitude:30}},
+    {assignmentId:"3",responseId:"wrong-type",submittedAt:"",values:{longitude:"-10",latitude:20}},
+  ];
+  assert.deepEqual(buildGeographicPoints(geoRows,longitude,latitude),[{longitude:-87.2,latitude:30.4,response:"OINT-ONE"}]);
 });
 
 test("saved and exported visualization state is tenant-governed and migration-backed",async()=>{

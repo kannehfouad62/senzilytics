@@ -76,3 +76,25 @@ export function buildSmallMultipleData(rows: ResearchDataRow[], category: Resear
   }
   return [...groups].map(([name, observations]) => ({ name, observations, minimum: Math.min(...observations), maximum: Math.max(...observations), mean: observations.reduce((sum, value) => sum + value, 0) / observations.length })).sort((first, second) => first.name.localeCompare(second.name)).slice(0, 12);
 }
+
+export function buildSankeyData(rows: ResearchDataRow[], sourceVariable: ResearchVariable, targetVariable: ResearchVariable) {
+  const flows = new Map<string, { sourceName: string; targetName: string; value: number }>();
+  for (const row of rows) for (const source of values(row.values[sourceVariable.key]).slice(0, 10)) for (const target of values(row.values[targetVariable.key]).slice(0, 10)) {
+    const key = `${source}\u0000${target}`;
+    const current = flows.get(key);
+    flows.set(key, { sourceName: source, targetName: target, value: (current?.value ?? 0) + 1 });
+  }
+  const selected = [...flows.values()].sort((first, second) => second.value - first.value || first.sourceName.localeCompare(second.sourceName) || first.targetName.localeCompare(second.targetName)).slice(0, 40);
+  const names = [...new Set(selected.flatMap(flow => [`Source · ${flow.sourceName}`, `Target · ${flow.targetName}`]))];
+  const indexes = new Map(names.map((name, index) => [name, index]));
+  return { nodes: names.map(name => ({ name })), links: selected.map(flow => ({ source: indexes.get(`Source · ${flow.sourceName}`)!, target: indexes.get(`Target · ${flow.targetName}`)!, value: flow.value })) };
+}
+
+export function buildGeographicPoints(rows: ResearchDataRow[], longitudeVariable: ResearchVariable, latitudeVariable: ResearchVariable) {
+  return rows.flatMap(row => {
+    const longitude = row.values[longitudeVariable.key];
+    const latitude = row.values[latitudeVariable.key];
+    if (typeof longitude !== "number" || typeof latitude !== "number" || !Number.isFinite(longitude) || !Number.isFinite(latitude) || longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) return [];
+    return [{ longitude, latitude, response: row.responseId.slice(-8).toUpperCase() }];
+  }).slice(0, 2000);
+}
