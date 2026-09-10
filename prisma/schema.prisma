@@ -2317,7 +2317,6 @@ model Organization {
   researchQuestionnaireLocalizations ResearchQuestionnaireLocalization[]
   researchFieldworkResponses         ResearchFieldworkResponse[]
   researchClientPortalAccesses       ResearchClientPortalAccess[]
-  researchClientPortalProjectAccesses ResearchClientPortalProjectAccess[]
 }
 
 model PricingInquiry {
