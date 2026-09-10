@@ -1,8 +1,8 @@
 "use client";
 
 import { initialFormActionState, type FormActionState } from "@/core/actions/action-state";
-import { addResearchMilestone, assignResearchTeamMember, changeResearchProjectStatus, createResearchClient, createResearchProject, createResearchQuestionnaire } from "@/features/research/actions";
-import { ResearchDataClassification, ResearchMethodology, ResearchProjectStatus, ResearchResponseIdentityMode, ResearchTeamRole } from "@prisma/client";
+import { addResearchMilestone, assignResearchTeamMember, changeResearchClientPortalAccessStatus, changeResearchProjectStatus, createResearchClient, createResearchProject, createResearchQuestionnaire, grantResearchClientPortalAccess } from "@/features/research/actions";
+import { ResearchClientPortalAccessStatus, ResearchDataClassification, ResearchMethodology, ResearchProjectStatus, ResearchResponseIdentityMode, ResearchTeamRole } from "@prisma/client";
 import { useActionState } from "react";
 import { useRefreshOnSuccess } from "@/features/research/use-refresh-on-success";
 
@@ -33,6 +33,28 @@ export function ResearchClientForm() {
     <Field label="Contractual and data-use notes"><textarea name="contractualNotes" rows={4} maxLength={4000} className={field}/></Field>
     <button disabled={pending} className={`mt-5 ${button}`}>{pending ? "Saving…" : "Create governed client"}</button><Feedback state={state}/>
   </form>;
+}
+
+export function ResearchClientPortalAccessForm({users, clients}:{users:Array<{id:string;name:string;email:string}>;clients:Array<{id:string;name:string;projects:Array<{id:string;reference:string;title:string}>}>}) {
+  const [state, action, pending] = useActionState(grantResearchClientPortalAccess, initialFormActionState);
+  useRefreshOnSuccess(state);
+  return <form action={action} className="rounded-3xl border border-cyan-300/15 bg-cyan-300/[.035] p-6">
+    <h2 className="text-xl font-semibold">Grant controlled client portal access</h2>
+    <p className="mt-1 text-sm text-slate-400">Only explicitly selected projects become visible. Re-saving a client/user pair replaces its project scope.</p>
+    <div className="mt-5 grid gap-5 md:grid-cols-2">
+      <Field label="Client"><select name="clientId" required defaultValue="" className={field}><option value="" disabled>Select client</option>{clients.map(client=><option key={client.id} value={client.id}>{client.name}</option>)}</select></Field>
+      <Field label="Portal user"><select name="userId" required defaultValue="" className={field}><option value="" disabled>Select tenant user</option>{users.map(user=><option key={user.id} value={user.id}>{user.name} — {user.email}</option>)}</select></Field>
+      <Field label="Access expiry (optional)"><input name="expiresAt" type="date" className={field}/></Field>
+      <Field label="Assigned client projects"><select name="projectIds" required multiple size={Math.min(8,Math.max(3,clients.reduce((count,client)=>count+client.projects.length,0)))} className={field}>{clients.map(client=><optgroup key={client.id} label={client.name}>{client.projects.map(project=><option key={project.id} value={project.id}>{project.reference} — {project.title}</option>)}</optgroup>)}</select><span className="mt-2 block text-xs text-slate-500">Use Command/Ctrl to select multiple projects. Projects must belong to the selected client.</span></Field>
+    </div>
+    <button disabled={pending} className={`mt-5 ${button}`}>{pending?"Saving…":"Save portal access"}</button><Feedback state={state}/>
+  </form>;
+}
+
+export function ResearchClientPortalStatusForm({accessId,currentStatus}:{accessId:string;currentStatus:ResearchClientPortalAccessStatus}) {
+  const [state, action, pending] = useActionState(changeResearchClientPortalAccessStatus, initialFormActionState);
+  useRefreshOnSuccess(state);
+  return <form action={action} className="flex flex-wrap items-end gap-2"><input type="hidden" name="accessId" value={accessId}/><select name="status" defaultValue={currentStatus} aria-label="Portal access status" className="rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-xs">{Object.values(ResearchClientPortalAccessStatus).map(status=><option key={status} value={status}>{pretty(status)}</option>)}</select><button disabled={pending} className="rounded-lg border border-cyan-300/20 px-3 py-2 text-xs text-cyan-200">{pending?"Updating…":"Update"}</button><Feedback state={state}/></form>;
 }
 
 export function ResearchProjectForm({users, clients}:{users:UserOption[];clients:ClientOption[]}) {

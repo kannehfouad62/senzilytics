@@ -268,6 +268,13 @@ enum ResearchClientStatus {
   ARCHIVED
 }
 
+enum ResearchClientPortalAccessStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
 enum ResearchProjectStatus {
   DRAFT
   PLANNING
@@ -2309,6 +2316,8 @@ model Organization {
   researchScreeningRecords           ResearchSurveyScreeningRecord[]
   researchQuestionnaireLocalizations ResearchQuestionnaireLocalization[]
   researchFieldworkResponses         ResearchFieldworkResponse[]
+  researchClientPortalAccesses       ResearchClientPortalAccess[]
+  researchClientPortalProjectAccesses ResearchClientPortalProjectAccess[]
 }
 
 model PricingInquiry {
@@ -2670,6 +2679,9 @@ model User {
   enumeratedResearchFieldworkResponses       ResearchFieldworkResponse[]         @relation("ResearchFieldworkEnumerator")
   backcheckedResearchFieldworkResponses      ResearchFieldworkResponse[]         @relation("ResearchFieldworkBackchecker")
   assignedResearchFieldworkBackchecks        ResearchFieldworkResponse[]         @relation("ResearchFieldworkBackcheckAssignee")
+  researchClientPortalAccesses                ResearchClientPortalAccess[]        @relation("ResearchClientPortalUser")
+  grantedResearchClientPortalAccesses         ResearchClientPortalAccess[]        @relation("ResearchClientPortalGrantedBy")
+  grantedResearchClientPortalProjects         ResearchClientPortalProjectAccess[] @relation("ResearchClientPortalProjectGrantedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8227,6 +8239,7 @@ model ResearchClient {
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy    User              @relation("ResearchClientCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   projects     ResearchProject[]
+  portalAccesses ResearchClientPortalAccess[]
 
   @@unique([organizationId, name])
   @@unique([organizationId, code])
@@ -8288,12 +8301,53 @@ model ResearchProject {
   samplingExecutions    ResearchSamplingExecution[]
   longitudinalStudies   ResearchLongitudinalStudy[]
   visualizationDashboards ResearchVisualizationDashboard[]
+  clientPortalProjectAccesses ResearchClientPortalProjectAccess[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
   @@index([organizationId, clientId])
   @@index([projectManagerId, status])
   @@index([principalInvestigatorId])
+}
+
+model ResearchClientPortalAccess {
+  id             String                           @id @default(cuid())
+  organizationId String
+  clientId       String
+  userId         String
+  status         ResearchClientPortalAccessStatus @default(ACTIVE)
+  grantedById    String
+  expiresAt      DateTime?
+  lastAccessedAt DateTime?
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+
+  organization Organization                        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       ResearchClient                      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user         User                                @relation("ResearchClientPortalUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy    User                                @relation("ResearchClientPortalGrantedBy", fields: [grantedById], references: [id], onDelete: Restrict)
+  projects     ResearchClientPortalProjectAccess[]
+
+  @@unique([clientId, userId])
+  @@index([organizationId, status])
+  @@index([userId, status])
+  @@index([grantedById])
+}
+
+model ResearchClientPortalProjectAccess {
+  id          String   @id @default(cuid())
+  accessId    String
+  projectId   String
+  grantedById String
+  createdAt   DateTime @default(now())
+
+  access    ResearchClientPortalAccess @relation(fields: [accessId], references: [id], onDelete: Cascade)
+  project   ResearchProject            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  grantedBy User                       @relation("ResearchClientPortalProjectGrantedBy", fields: [grantedById], references: [id], onDelete: Restrict)
+
+  @@unique([accessId, projectId])
+  @@index([projectId])
+  @@index([grantedById])
 }
 
 model ResearchTeamMember {

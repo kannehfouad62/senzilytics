@@ -4,11 +4,12 @@ import type { FormActionState } from "@/core/actions/action-state";
 import { getCurrentUserPermissions, requirePermission } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { addResearchMilestoneService, assignResearchTeamMemberService, changeResearchProjectStatusService, createResearchClientService, createResearchProjectService } from "@/modules/research/research.service";
-import { PermissionKey, ResearchDataClassification, ResearchMethodology, ResearchProjectStatus, ResearchTeamRole } from "@prisma/client";
+import { PermissionKey, ResearchClientPortalAccessStatus, ResearchDataClassification, ResearchMethodology, ResearchProjectStatus, ResearchTeamRole } from "@prisma/client";
 import { ResearchResponseIdentityMode } from "@prisma/client";
 import { createResearchQuestionnaireService } from "@/modules/research/research-questionnaire.service";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { changeResearchClientPortalAccessStatusService, grantResearchClientPortalAccessService } from "@/modules/research/research-client-portal.service";
 
 const text = (data: FormData, key: string) => String(data.get(key) ?? "").trim();
 const required = (data: FormData, key: string) => {
@@ -46,7 +47,30 @@ function refresh(projectId?: string) {
   revalidatePath("/tasks");
   revalidatePath("/notifications");
   revalidatePath("/activity");
+  revalidatePath("/research/client-portal");
   if (projectId) revalidatePath(`/research/projects/${projectId}`);
+}
+
+export async function grantResearchClientPortalAccess(_state: FormActionState, data: FormData): Promise<FormActionState> {
+  void _state;
+  await requirePermission(PermissionKey.MANAGE_RESEARCH_CLIENTS);
+  const { organizationId, user } = await getCurrentUserTenant();
+  try {
+    await grantResearchClientPortalAccessService({ organizationId, actorId: user.id, clientId: required(data, "clientId"), userId: required(data, "userId"), projectIds: data.getAll("projectIds").map(String).filter(Boolean), expiresAt: optionalDate(data, "expiresAt") });
+    refresh();
+    return success("Client portal access saved with project-level visibility.");
+  } catch (cause) { return failure(cause, "Client portal access could not be saved."); }
+}
+
+export async function changeResearchClientPortalAccessStatus(_state: FormActionState, data: FormData): Promise<FormActionState> {
+  void _state;
+  await requirePermission(PermissionKey.MANAGE_RESEARCH_CLIENTS);
+  const { organizationId, user } = await getCurrentUserTenant();
+  try {
+    await changeResearchClientPortalAccessStatusService({ organizationId, actorId: user.id, accessId: required(data, "accessId"), status: enumValue(data, "status", ResearchClientPortalAccessStatus) });
+    refresh();
+    return success("Client portal access status updated.");
+  } catch (cause) { return failure(cause, "Client portal access status could not be updated."); }
 }
 
 export async function createResearchClient(_state: FormActionState, data: FormData): Promise<FormActionState> {

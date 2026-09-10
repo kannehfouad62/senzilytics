@@ -326,6 +326,11 @@ export const auditNavItems: NavigationItem[] = [
 
 export const researchNavItems: NavigationItem[] = [
   {
+    label: "Client Portal",
+    href: "/research/client-portal",
+    icon: PanelsTopLeft,
+  },
+  {
     label: "My Questionnaires",
     href: "/research/my-questionnaires",
     icon: ClipboardCheck,
