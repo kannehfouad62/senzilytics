@@ -452,6 +452,13 @@ enum ResearchAnalysisStatus {
   ARCHIVED
 }
 
+enum ResearchDashboardStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  ARCHIVED
+}
+
 enum ResearchReportStatus {
   DRAFT
   UNDER_REVIEW
@@ -2280,6 +2287,7 @@ model Organization {
   researchCollectionWaves            ResearchCollectionWave[]
   researchQuestionnaireAssignments   ResearchQuestionnaireAssignment[]
   researchAnalyses                   ResearchAnalysis[]
+  researchDashboards                 ResearchVisualizationDashboard[]
   researchReports                    ResearchReport[]
   researchImportedDatasets           ResearchImportedDataset[]
   researchDataTransformations        ResearchDataTransformation[]
@@ -2631,6 +2639,8 @@ model User {
   approvedResearchDatasets                   ResearchCollectionWave[]            @relation("ResearchDatasetApprovedBy")
   reviewedResearchResponses                  ResearchQuestionnaireAssignment[]   @relation("ResearchResponseReviewedBy")
   authoredResearchAnalyses                   ResearchAnalysis[]                  @relation("ResearchAnalysisAnalyst")
+  createdResearchDashboards                  ResearchVisualizationDashboard[]    @relation("ResearchDashboardCreator")
+  approvedResearchDashboards                 ResearchVisualizationDashboard[]    @relation("ResearchDashboardApprover")
   reviewedResearchAnalyses                   ResearchAnalysis[]                  @relation("ResearchAnalysisReviewer")
   approvedResearchAnalyses                   ResearchAnalysis[]                  @relation("ResearchAnalysisApprover")
   authoredResearchReports                    ResearchReport[]                    @relation("ResearchReportAuthor")
@@ -8277,6 +8287,7 @@ model ResearchProject {
   samplingFrames        ResearchSamplingFrame[]
   samplingExecutions    ResearchSamplingExecution[]
   longitudinalStudies   ResearchLongitudinalStudy[]
+  visualizationDashboards ResearchVisualizationDashboard[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
@@ -8851,6 +8862,32 @@ model ResearchAnalysis {
   @@index([samplingDesignId])
   @@index([analystId, status])
   @@index([reviewerId, status])
+}
+
+model ResearchVisualizationDashboard {
+  id               String                  @id @default(cuid())
+  organizationId   String
+  projectId        String
+  title            String
+  description      String?
+  status           ResearchDashboardStatus @default(DRAFT)
+  layoutDefinition Json
+  branding         Json
+  createdById      String
+  approvedById     String?
+  approvedAt       DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User            @relation("ResearchDashboardCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy   User?           @relation("ResearchDashboardApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, title])
+  @@index([organizationId, status, updatedAt])
+  @@index([projectId, status])
+  @@index([createdById])
 }
 
 model ResearchReport {

@@ -295,6 +295,13 @@ export default async function ResearchProjectPage({
                 <span>Open →</span>
               </Link>
               <Link
+                href={`/research/projects/${project.id}/dashboards`}
+                className="flex items-center justify-between rounded-xl border border-fuchsia-300/15 bg-fuchsia-300/[.05] p-4 text-sm font-semibold text-fuchsia-200"
+              >
+                <span>Visualization Dashboards</span>
+                <span>Open →</span>
+              </Link>
+              <Link
                 href={`/research/projects/${project.id}/imports`}
                 className="flex items-center justify-between rounded-xl border border-emerald-300/15 bg-emerald-300/[.05] p-4 text-sm font-semibold text-emerald-200"
               >
