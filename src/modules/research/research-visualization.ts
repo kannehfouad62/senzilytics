@@ -42,3 +42,37 @@ export function applyResearchFilters(rows: ResearchDataRow[], definition: Resear
 export function researchFilterOptions(rows: ResearchDataRow[], variableKey: string) {
   return [...new Set(rows.flatMap(row => values(row.values[variableKey])))].sort((first, second) => first.localeCompare(second));
 }
+
+export function buildFunnelData(rows: ResearchDataRow[], variable: ResearchVariable) {
+  const counts = new Map<string, number>();
+  for (const row of rows) for (const value of values(row.values[variable.key])) counts.set(value, (counts.get(value) ?? 0) + 1);
+  return [...counts].map(([name, value]) => ({ name, value })).sort((first, second) => second.value - first.value || first.name.localeCompare(second.name)).slice(0, 20);
+}
+
+export function buildRadarData(rows: ResearchDataRow[], category: ResearchVariable, outcome?: ResearchVariable | null) {
+  if (!outcome || outcome.type !== "NUMBER") return buildFunnelData(rows, category).slice(0, 12);
+  const groups = new Map<string, number[]>();
+  for (const row of rows) {
+    const current = row.values[outcome.key];
+    if (typeof current !== "number" || !Number.isFinite(current)) continue;
+    for (const name of values(row.values[category.key])) groups.set(name, [...(groups.get(name) ?? []), current]);
+  }
+  return [...groups].map(([name, observations]) => ({ name, value: observations.reduce((sum, value) => sum + value, 0) / observations.length, count: observations.length })).sort((first, second) => second.value - first.value).slice(0, 12);
+}
+
+export function buildHeatmapData(rows: ResearchDataRow[], rowVariable: ResearchVariable, columnVariable: ResearchVariable) {
+  const rowLabels = researchFilterOptions(rows, rowVariable.key).slice(0, 20);
+  const columnLabels = researchFilterOptions(rows, columnVariable.key).slice(0, 20);
+  const cells = rowLabels.map(rowLabel => columnLabels.map(columnLabel => rows.reduce((count, row) => count + (values(row.values[rowVariable.key]).includes(rowLabel) && values(row.values[columnVariable.key]).includes(columnLabel) ? 1 : 0), 0)));
+  return { rowLabels, columnLabels, cells, maximum: Math.max(1, ...cells.flat()) };
+}
+
+export function buildSmallMultipleData(rows: ResearchDataRow[], category: ResearchVariable, outcome: ResearchVariable) {
+  const groups = new Map<string, number[]>();
+  for (const row of rows) {
+    const current = row.values[outcome.key];
+    if (typeof current !== "number" || !Number.isFinite(current)) continue;
+    for (const name of values(row.values[category.key])) groups.set(name, [...(groups.get(name) ?? []), current]);
+  }
+  return [...groups].map(([name, observations]) => ({ name, observations, minimum: Math.min(...observations), maximum: Math.max(...observations), mean: observations.reduce((sum, value) => sum + value, 0) / observations.length })).sort((first, second) => first.name.localeCompare(second.name)).slice(0, 12);
+}

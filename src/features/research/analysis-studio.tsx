@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Funnel, FunnelChart, LabelList, Line, LineChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts";
 
 import { buildChartData, summarizeVariable, type ResearchDataRow, type ResearchVariable, type ResearchValue } from "@/modules/research/research-analysis";
 import { assumptionDiagnostics, boxPlot, confidenceInterval, contingencyTable, histogram, interpretPValue, kruskalWallisTest, linearRegression, mannWhitneyUTest, oneWayAnova, pearsonCorrelation, spearmanCorrelation, welchTTest, wilcoxonSignedRankTest } from "@/modules/research/research-statistics";
@@ -9,9 +9,10 @@ import { initialFormActionState } from "@/core/actions/action-state";
 import { saveResearchAnalysis } from "@/features/research/analysis-actions";
 import { useRefreshOnSuccess } from "@/features/research/use-refresh-on-success";
 import { validateSurveyWeights,weightDiagnostics,weightedFrequencies,weightedMean } from "@/modules/research/research-survey-weighting";
-import { applyResearchFilters, researchFilterOptions, type ResearchFilterClause, type ResearchFilterDefinition, type ResearchFilterOperator } from "@/modules/research/research-visualization";
+import { applyResearchFilters, buildFunnelData, buildHeatmapData, buildRadarData, buildSmallMultipleData, researchFilterOptions, type ResearchFilterClause, type ResearchFilterDefinition, type ResearchFilterOperator } from "@/modules/research/research-visualization";
 
 type AnalysisMode = "AUTO" | "DISTRIBUTION" | "BOX_PLOT" | "CROSSTAB" | "CORRELATION" | "GROUP_COMPARISON" | "REGRESSION" | "NON_PARAMETRIC" | "ASSUMPTIONS";
+type VisualizationType="AUTO"|"BAR"|"LINE"|"FUNNEL"|"RADAR"|"HEATMAP"|"SMALL_MULTIPLES";
 const modes: Array<{ value: AnalysisMode; label: string }> = [
   { value: "AUTO", label: "Automatic" },
   { value: "DISTRIBUTION", label: "Histogram" },
@@ -38,6 +39,7 @@ export function ResearchAnalysisStudio({ variables, rows, collectionId, datasetV
   const [weightKey,setWeightKey]=useState("");
   const [canvasHeight,setCanvasHeight]=useState<"STANDARD"|"EXPANDED">("STANDARD");
   const [showGrid,setShowGrid]=useState(true);
+  const [visualizationType,setVisualizationType]=useState<VisualizationType>("AUTO");
   const [saveState, saveAction, savePending] = useActionState(saveResearchAnalysis, initialFormActionState);
   useRefreshOnSuccess(saveState);
   const filterDefinition = useMemo<ResearchFilterDefinition>(() => ({ logic: filterLogic, clauses: filters }), [filterLogic, filters]);
@@ -51,6 +53,7 @@ export function ResearchAnalysisStudio({ variables, rows, collectionId, datasetV
   const xSummary = x ? summarizeVariable(x, filtered) : null;
   const ySummary = y ? summarizeVariable(y, filtered) : null;
   const query = new URLSearchParams({ x: x?.key ?? "", y: y?.key ?? "", mode: effectiveMode });
+  query.set("visualization",visualizationType);
   if(filters.length)query.set("filters",JSON.stringify(filterDefinition));
   const weighting=useMemo(()=>{if(!weightKey||!x)return null;try{const diagnostics=weightDiagnostics(validateSurveyWeights(filtered,weightKey)),estimate=x.type==="NUMBER"?weightedMean(filtered,x.key,weightKey):weightedFrequencies(filtered,x.key,weightKey);return{diagnostics,estimate,error:null}}catch(cause){return{diagnostics:null,estimate:null,error:cause instanceof Error?cause.message:"Weights are invalid."}}},[filtered,weightKey,x]);
 
@@ -61,6 +64,7 @@ export function ResearchAnalysisStudio({ variables, rows, collectionId, datasetV
         <label className="grid gap-1 text-xs text-slate-400"><span>Sort X</span><select value={sortDirection} onChange={event => setSortDirection(event.target.value as typeof sortDirection)} className={input}><option value="NONE">Original order</option><option value="ASC">Ascending</option><option value="DESC">Descending</option></select></label>
         <label className="grid gap-1 text-xs text-slate-400"><span>Survey weight</span><select value={weightKey} onChange={event=>setWeightKey(event.target.value)} className={input}><option value="">Unweighted</option>{variables.filter(variable=>variable.type==="NUMBER").map(variable=><option key={variable.key} value={variable.key}>{variable.label}</option>)}</select></label>
         <label className="grid gap-1 text-xs text-slate-400"><span>Canvas size</span><select value={canvasHeight} onChange={event=>setCanvasHeight(event.target.value as typeof canvasHeight)} className={input}><option value="STANDARD">Standard</option><option value="EXPANDED">Expanded</option></select></label>
+        <label className="grid gap-1 text-xs text-slate-400"><span>Visualization</span><select value={visualizationType} onChange={event=>setVisualizationType(event.target.value as VisualizationType)} className={input}><option value="AUTO">Automatic</option><option value="BAR">Bar chart</option><option value="LINE">Line chart</option><option value="FUNNEL">Funnel</option><option value="RADAR">Radar</option><option value="HEATMAP">Heatmap</option><option value="SMALL_MULTIPLES">Small multiples</option></select></label>
         <label className="flex items-center gap-2 pb-2 text-sm text-slate-300"><input type="checkbox" checked={showGrid} onChange={event=>setShowGrid(event.target.checked)} className="accent-cyan-300"/>Grid lines</label>
         {effectiveMode === "DISTRIBUTION" && <label className="grid gap-1 text-xs text-slate-400"><span>Histogram bins</span><input type="number" min={2} max={30} value={bins} onChange={event => setBins(Math.max(2, Math.min(30, Number(event.target.value) || 2)))} className={`${input} w-24`}/></label>}
         <button onClick={() => { setFilters([]); setSortDirection("NONE"); }} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300">Reset canvas</button>
@@ -81,7 +85,7 @@ export function ResearchAnalysisStudio({ variables, rows, collectionId, datasetV
         <div className="grid gap-4 md:grid-cols-2"><DropSlot title="Group, category or X variable" variable={x} variables={variables} onDrop={setX}/><DropSlot title="Outcome or Y variable" variable={y} variables={variables} onDrop={setY} clear/></div>
         <section className={`${panel} p-6`}>
           <div className="flex flex-wrap justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-cyan-300">{modes.find(item => item.value === effectiveMode)?.label}</p><h2 className="mt-1 text-xl font-semibold">{analysisTitle(effectiveMode, x, y)}</h2><p className="mt-1 text-sm text-slate-400">{methodRequirement(effectiveMode)}</p></div>{collectionId&&<div className="flex gap-2"><a href={`/api/research/collections/${collectionId}/workbook?${query}`} className="rounded-xl border border-emerald-400/25 px-4 py-2 text-sm text-emerald-300">Excel workbook</a><a href={`/api/research/collections/${collectionId}/presentation?${query}`} className="rounded-xl border border-violet-400/25 px-4 py-2 text-sm text-violet-300">PowerPoint</a></div>}</div>
-          <div className={`mt-6 ${canvasHeight==="EXPANDED"?"min-h-[36rem]":"min-h-96"}`}><AnalysisVisualization mode={effectiveMode} rows={filtered} x={x} y={y} bins={bins} showGrid={showGrid} expanded={canvasHeight==="EXPANDED"}/></div>
+          <div className={`mt-6 ${canvasHeight==="EXPANDED"?"min-h-[36rem]":"min-h-96"}`}><AnalysisVisualization mode={effectiveMode} visualizationType={visualizationType} rows={filtered} x={x} y={y} bins={bins} showGrid={showGrid} expanded={canvasHeight==="EXPANDED"}/></div>
         </section>
       </div>
     </div>
@@ -90,7 +94,7 @@ export function ResearchAnalysisStudio({ variables, rows, collectionId, datasetV
     <StatisticalResults mode={effectiveMode} rows={filtered} x={x} y={y}/>
     {weighting&&<section className={`${panel} border-violet-400/20 p-6`}><p className="text-xs font-semibold uppercase tracking-[.18em] text-violet-300">Survey-weighted estimate</p>{weighting.error?<p className="mt-3 text-sm text-red-300">{weighting.error}</p>:<><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Metric label="Sum of weights" value={format(weighting.diagnostics?.sumWeights)}/><Metric label="Effective N" value={format(weighting.diagnostics?.effectiveSampleSize)}/><Metric label="Design effect" value={format(weighting.diagnostics?.designEffect)}/><Metric label="Weight CV" value={format(weighting.diagnostics?.coefficientOfVariation)}/><Metric label="Weighted mean" value={format(weighting.estimate&&!Array.isArray(weighting.estimate)?weighting.estimate.mean:null)}/></div><p className="mt-4 text-xs text-slate-400">Weighting is explicit and does not replace the unweighted results above. Confirm the sampling design and weight construction before interpretation.</p></>}</section>}
     {x && <form action={saveAction} className={`${panel} p-6`}>
-      <input type="hidden" name="collectionId" value={collectionId??""}/><input type="hidden" name="datasetVersionId" value={datasetVersionId??""}/><input type="hidden" name="weightVariableKey" value={weightKey}/><input type="hidden" name="method" value={effectiveMode}/><input type="hidden" name="xVariableKey" value={x.key}/><input type="hidden" name="yVariableKey" value={y?.key ?? ""}/><input type="hidden" name="filterDefinition" value={JSON.stringify(filterDefinition)}/><input type="hidden" name="visualizationConfig" value={JSON.stringify({canvasHeight,showGrid,bins,sortDirection})}/>
+      <input type="hidden" name="collectionId" value={collectionId??""}/><input type="hidden" name="datasetVersionId" value={datasetVersionId??""}/><input type="hidden" name="weightVariableKey" value={weightKey}/><input type="hidden" name="method" value={effectiveMode}/><input type="hidden" name="xVariableKey" value={x.key}/><input type="hidden" name="yVariableKey" value={y?.key ?? ""}/><input type="hidden" name="filterDefinition" value={JSON.stringify(filterDefinition)}/><input type="hidden" name="visualizationConfig" value={JSON.stringify({visualizationType,canvasHeight,showGrid,bins,sortDirection})}/>
       <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-semibold">Save governed analysis</h2><p className="mt-1 text-sm text-slate-400">Freeze the current method, variables, filtered population and calculated results as a reviewable draft.</p></div><button disabled={savePending} className="rounded-xl bg-cyan-300 px-5 py-2.5 text-sm font-semibold text-slate-950 disabled:opacity-50">{savePending ? "Saving…" : "Save analysis draft"}</button></div>
       <div className="mt-5 grid gap-4 md:grid-cols-2"><label className="grid gap-1 text-xs text-slate-400"><span>Analysis title</span><input name="title" required maxLength={160} defaultValue={analysisTitle(effectiveMode, x, y)} className={input}/></label><label className="grid gap-1 text-xs text-slate-400"><span>Hypothesis</span><input name="hypothesis" maxLength={2000} placeholder="Optional null or research hypothesis" className={input}/></label></div>
       <label className="mt-4 grid gap-1 text-xs text-slate-400"><span>Methodology and assumption notes</span><textarea name="methodologyNotes" maxLength={4000} rows={3} placeholder="Record sampling assumptions, exclusions, transformations and analyst decisions." className={input}/></label>
@@ -100,8 +104,9 @@ export function ResearchAnalysisStudio({ variables, rows, collectionId, datasetV
   </div>;
 }
 
-function AnalysisVisualization({ mode, rows, x, y, bins, showGrid, expanded }: { mode: AnalysisMode; rows: ResearchDataRow[]; x: ResearchVariable | null; y: ResearchVariable | null; bins: number; showGrid: boolean; expanded: boolean }) {
+function AnalysisVisualization({ mode, visualizationType, rows, x, y, bins, showGrid, expanded }: { mode: AnalysisMode; visualizationType:VisualizationType; rows: ResearchDataRow[]; x: ResearchVariable | null; y: ResearchVariable | null; bins: number; showGrid: boolean; expanded: boolean }) {
   if (!x) return <Empty text="Select or drag an X variable to begin."/>;
+  if(visualizationType!=="AUTO")return <AdvancedVisualization type={visualizationType} rows={rows} x={x} y={y} showGrid={showGrid} expanded={expanded}/>;
   if (mode === "DISTRIBUTION") {
     if (x.type !== "NUMBER") return <Empty text="Histogram requires a numeric X variable."/>;
     return <Bars data={histogram(rows, x, bins)} showGrid={showGrid} expanded={expanded}/>;
@@ -132,6 +137,21 @@ function AnalysisVisualization({ mode, rows, x, y, bins, showGrid, expanded }: {
   const data = buildChartData(rows, x, y) as Array<Record<string, string | number>>;
   return <Bars data={data} showGrid={showGrid} expanded={expanded}/>;
 }
+
+function AdvancedVisualization({type,rows,x,y,showGrid,expanded}:{type:Exclude<VisualizationType,"AUTO">;rows:ResearchDataRow[];x:ResearchVariable;y:ResearchVariable|null;showGrid:boolean;expanded:boolean}){
+  const height=expanded?"h-[36rem]":"h-96";
+  if(type==="HEATMAP"){if(!y||x.type==="NUMBER"||y.type==="NUMBER")return <Empty text="Heatmap requires categorical X and Y variables."/>;return <HeatmapGraphic data={buildHeatmapData(rows,x,y)}/>}
+  if(type==="SMALL_MULTIPLES"){if(x.type==="NUMBER"||y?.type!=="NUMBER")return <Empty text="Small multiples require categorical X and numeric Y variables."/>;return <SmallMultiplesGraphic data={buildSmallMultipleData(rows,x,y)} outcome={y.label}/>}
+  if(type==="FUNNEL"){if(x.type==="NUMBER")return <Empty text="Funnel requires a categorical X variable."/>;const data=buildFunnelData(rows,x);return data.length?<div className={height}><ResponsiveContainer width="100%" height="100%"><FunnelChart><Tooltip/><Funnel data={data} dataKey="value" nameKey="name" fill="#22d3ee" stroke="#07111f"><LabelList position="right" fill="#cbd5e1" dataKey="name"/></Funnel></FunnelChart></ResponsiveContainer></div>:<Empty text="No funnel categories are available."/>}
+  if(type==="RADAR"){if(x.type==="NUMBER")return <Empty text="Radar requires a categorical X variable."/>;const data=buildRadarData(rows,x,y);return data.length>=3?<div className={height}><ResponsiveContainer width="100%" height="100%"><RadarChart data={data}><PolarGrid stroke="#334155"/><PolarAngleAxis dataKey="name" stroke="#94a3b8"/><PolarRadiusAxis stroke="#64748b"/><Tooltip/><Radar dataKey="value" stroke="#67e8f9" fill="#22d3ee" fillOpacity={.35}/></RadarChart></ResponsiveContainer></div>:<Empty text="Radar requires at least three populated categories."/>}
+  const data=buildChartData(rows,x,y) as Array<Record<string,string|number>>;
+  if(type==="LINE"){const numeric=x.type==="NUMBER"&&y?.type==="NUMBER",lineData=numeric?[...data].sort((first,second)=>Number(first.x)-Number(second.x)):data;return <div className={height}><ResponsiveContainer width="100%" height="100%"><LineChart data={lineData}>{showGrid&&<CartesianGrid stroke="#1e293b"/>}<XAxis dataKey={numeric?"x":"name"} stroke="#94a3b8"/><YAxis stroke="#94a3b8"/><Tooltip/><Line type="monotone" dataKey={numeric?"y":"value"} stroke="#67e8f9" strokeWidth={3}/></LineChart></ResponsiveContainer></div>}
+  return <Bars data={data} showGrid={showGrid} expanded={expanded}/>;
+}
+
+function HeatmapGraphic({data}:{data:ReturnType<typeof buildHeatmapData>}){if(!data.rowLabels.length||!data.columnLabels.length)return <Empty text="No categorical combinations are available."/>;return <div className="overflow-x-auto"><table className="w-full border-separate border-spacing-1 text-sm"><thead><tr><th className="p-3 text-left text-slate-500">Category</th>{data.columnLabels.map(label=><th key={label} className="p-3 text-center text-slate-300">{label}</th>)}</tr></thead><tbody>{data.rowLabels.map((label,row)=><tr key={label}><th className="p-3 text-left">{label}</th>{data.cells[row].map((value,column)=><td key={data.columnLabels[column]} title={`${label} × ${data.columnLabels[column]}: ${value}`} className="rounded-lg p-4 text-center font-semibold" style={{backgroundColor:`rgba(167,139,250,${.06+.82*value/data.maximum})`}}>{value}</td>)}</tr>)}</tbody></table></div>}
+
+function SmallMultiplesGraphic({data,outcome}:{data:ReturnType<typeof buildSmallMultipleData>;outcome:string}){if(!data.length)return <Empty text="No compatible grouped observations are available."/>;const globalMinimum=Math.min(...data.map(item=>item.minimum)),globalMaximum=Math.max(...data.map(item=>item.maximum)),range=Math.max(globalMaximum-globalMinimum,1);return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{data.map(item=><div key={item.name} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"><div className="flex justify-between gap-3"><p className="font-semibold">{item.name}</p><span className="text-xs text-slate-500">n={item.observations.length}</span></div><div className="mt-5 h-3 rounded-full bg-slate-800"><div className="h-3 rounded-full bg-gradient-to-r from-cyan-400 to-violet-400" style={{width:`${Math.max(3,100*(item.mean-globalMinimum)/range)}%`}}/></div><div className="mt-3 flex justify-between text-xs text-slate-400"><span>{outcome} mean</span><strong className="text-cyan-200">{format(item.mean)}</strong></div><p className="mt-1 text-[11px] text-slate-500">Range {format(item.minimum)}–{format(item.maximum)}</p></div>)}</div>}
 
 function StatisticalResults({ mode, rows, x, y }: { mode: AnalysisMode; rows: ResearchDataRow[]; x: ResearchVariable | null; y: ResearchVariable | null }) {
   if (!x) return null;

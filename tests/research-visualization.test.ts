@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 import type { ResearchDataRow, ResearchVariable } from "../src/modules/research/research-analysis";
-import { applyResearchFilters, normalizeResearchFilters, researchFilterOptions } from "../src/modules/research/research-visualization";
+import { applyResearchFilters, buildFunnelData, buildHeatmapData, buildRadarData, buildSmallMultipleData, normalizeResearchFilters, researchFilterOptions } from "../src/modules/research/research-visualization";
 
 const variables: ResearchVariable[] = [
   { id:"department",key:"department",label:"Department",type:"SINGLE_SELECT",required:true },
@@ -33,6 +33,25 @@ test("server normalization rejects unknown fields and caps filter complexity",()
   assert.equal(normalized.logic,"ANY");
   assert.equal(normalized.clauses.length,8);
   assert.ok(normalized.clauses.every(clause=>clause.variableKey==="score"));
+});
+
+test("advanced chart builders produce bounded deterministic series",()=>{
+  const funnel=buildFunnelData(rows,variables[0]);
+  assert.deepEqual(funnel,[{name:"Research",value:2},{name:"Operations",value:1}]);
+  const radar=buildRadarData(rows,variables[0],variables[1]);
+  assert.equal(radar[0].name,"Operations");
+  assert.equal(radar[0].value,91);
+  const small=buildSmallMultipleData(rows,variables[0],variables[1]);
+  assert.deepEqual(small.map(item=>item.name),["Operations","Research"]);
+  assert.equal(small[1].mean,68);
+});
+
+test("heatmap counts categorical intersections without row duplication",()=>{
+  const sentiment:ResearchVariable={id:"sentiment",key:"sentiment",label:"Sentiment",type:"SINGLE_SELECT",required:false};
+  const heatRows=rows.map((row,index)=>({...row,values:{...row.values,sentiment:index===0?"Positive":"Neutral"}}));
+  const heatmap=buildHeatmapData(heatRows,variables[0],sentiment);
+  assert.equal(heatmap.cells.flat().reduce((sum,value)=>sum+value,0),3);
+  assert.equal(heatmap.maximum,1);
 });
 
 test("saved and exported visualization state is tenant-governed and migration-backed",async()=>{
