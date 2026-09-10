@@ -14,7 +14,7 @@ import { buildAnalysisSnapshot } from "@/modules/research/research-statistics";
 import { cronbachAlpha, logisticRegression, multipleLinearRegression } from "@/modules/research/research-modeling";
 import { validateSurveyWeights, weightDiagnostics, weightedFrequencies, weightedMean } from "@/modules/research/research-survey-weighting";
 
-const methods = new Set(["AUTO", "DISTRIBUTION", "BOX_PLOT", "CROSSTAB", "CORRELATION", "GROUP_COMPARISON", "REGRESSION", "MULTIPLE_REGRESSION", "LOGISTIC_REGRESSION", "RELIABILITY"]);
+const methods = new Set(["AUTO", "DISTRIBUTION", "BOX_PLOT", "CROSSTAB", "CORRELATION", "GROUP_COMPARISON", "REGRESSION", "NON_PARAMETRIC", "ASSUMPTIONS", "MULTIPLE_REGRESSION", "LOGISTIC_REGRESSION", "RELIABILITY"]);
 const text = (data: FormData, key: string, maximum = 2000) => String(data.get(key) ?? "").trim().slice(0, maximum);
 const failure = (cause: unknown): FormActionState => ({ status: "ERROR", message: cause instanceof Error ? cause.message : "The analysis could not be updated." });
 const refresh = (collectionId?: string|null,datasetVersionId?: string|null) => { revalidatePath("/research", "layout"); if(collectionId)revalidatePath(`/research/datasets/${collectionId}`);if(datasetVersionId)revalidatePath(`/research/imported-datasets/${datasetVersionId}`); };

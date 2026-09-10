@@ -8,6 +8,8 @@ const numericValues = (rows: ResearchDataRow[], variable: ResearchVariable) => r
 const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
 const sampleVariance = (values: number[]) => values.length > 1 ? values.reduce((sum, value) => sum + (value - mean(values)) ** 2, 0) / (values.length - 1) : 0;
 const clampProbability = (value: number) => Math.max(0, Math.min(1, value));
+const normalCdf=(value:number)=>{const sign=value<0?-1:1,x=Math.abs(value)/Math.sqrt(2),t=1/(1+.3275911*x),erf=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-x*x);return .5*(1+sign*erf)};
+const normalTwoSided=(z:number)=>clampProbability(2*(1-normalCdf(Math.abs(z))));
 
 function logGamma(value: number): number {
   const coefficients = [676.5203681218851, -1259.1392167224028, 771.3234287776531, -176.6150291621406, 12.507343278686905, -.13857109526572012, 9.984369578019572e-6, 1.5056327351493116e-7];
@@ -124,6 +126,52 @@ function ranks(values: number[]) {
   return result;
 }
 
+const tieAdjustment=(values:number[])=>{const counts=new Map<number,number>();values.forEach(value=>counts.set(value,(counts.get(value)??0)+1));return[...counts.values()].reduce((sum,count)=>sum+(count**3-count),0)};
+
+export function mannWhitneyUTest(rows:ResearchDataRow[],groupVariable:ResearchVariable,outcomeVariable:ResearchVariable){
+  const groups=groupNumeric(rows,groupVariable,outcomeVariable);
+  if(groups.length!==2||groups.some(group=>!group.values.length))return null;
+  const combined=groups.flatMap((group,groupIndex)=>group.values.map(value=>({value,groupIndex}))),ranked=ranks(combined.map(item=>item.value));
+  const n1=groups[0].values.length,n2=groups[1].values.length,total=n1+n2,u1=ranked.reduce((sum,rank,index)=>sum+(combined[index].groupIndex===0?rank:0),0)-n1*(n1+1)/2,u2=n1*n2-u1,u=Math.min(u1,u2);
+  const variance=n1*n2/12*((total+1)-tieAdjustment(combined.map(item=>item.value))/(total*(total-1)));
+  const z=variance>0?(u-n1*n2/2+.5)/Math.sqrt(variance):0;
+  return{groups:groups.map(group=>group.name),counts:[n1,n2],u,u1,u2,z,pValue:variance>0?normalTwoSided(z):1,rankBiserial:n1*n2?2*u1/(n1*n2)-1:null};
+}
+
+export function kruskalWallisTest(rows:ResearchDataRow[],groupVariable:ResearchVariable,outcomeVariable:ResearchVariable){
+  const groups=groupNumeric(rows,groupVariable,outcomeVariable).filter(group=>group.values.length);
+  const combined=groups.flatMap((group,groupIndex)=>group.values.map(value=>({value,groupIndex}))),total=combined.length;
+  if(groups.length<2||total<=groups.length)return null;
+  const ranked=ranks(combined.map(item=>item.value)),rankSums=groups.map((_,groupIndex)=>ranked.reduce((sum,rank,index)=>sum+(combined[index].groupIndex===groupIndex?rank:0),0));
+  const raw=12/(total*(total+1))*rankSums.reduce((sum,rankSum,index)=>sum+rankSum**2/groups[index].values.length,0)-3*(total+1),correction=1-tieAdjustment(combined.map(item=>item.value))/(total**3-total),statistic=correction>0?raw/correction:0,degreesOfFreedom=groups.length-1;
+  return{groups:groups.map((group,index)=>({name:group.name,n:group.values.length,meanRank:rankSums[index]/group.values.length})),statistic,degreesOfFreedom,pValue:regularizedGammaQ(degreesOfFreedom/2,statistic/2),epsilonSquared:Math.max(0,Math.min(1,(statistic-groups.length+1)/(total-groups.length)))};
+}
+
+export function wilcoxonSignedRankTest(rows:ResearchDataRow[],firstVariable:ResearchVariable,secondVariable:ResearchVariable){
+  const differences=rows.flatMap(row=>{const first=row.values[firstVariable.key],second=row.values[secondVariable.key];if(typeof first!=="number"||typeof second!=="number"||!Number.isFinite(first)||!Number.isFinite(second))return[];const difference=second-first;return difference===0?[]:[difference]});
+  if(differences.length<3)return null;
+  const absolute=differences.map(Math.abs),ranked=ranks(absolute),wPlus=ranked.reduce((sum,rank,index)=>sum+(differences[index]>0?rank:0),0),wMinus=ranked.reduce((sum,rank,index)=>sum+(differences[index]<0?rank:0),0),n=differences.length,variance=n*(n+1)*(2*n+1)/24-tieAdjustment(absolute)/48,z=variance>0?(wPlus-n*(n+1)/4)/Math.sqrt(variance):0,total=wPlus+wMinus;
+  return{n,wPlus,wMinus,statistic:Math.min(wPlus,wMinus),z,pValue:variance>0?normalTwoSided(z):1,rankBiserial:total?(wPlus-wMinus)/total:null};
+}
+
+export function normalityDiagnostics(rows:ResearchDataRow[],variable:ResearchVariable){
+  const values=numericValues(rows,variable),n=values.length;if(n<8)return null;const average=mean(values),moments=[2,3,4].map(power=>values.reduce((sum,value)=>sum+(value-average)**power,0)/n),variance=moments[0];if(variance<=0)return null;const skewness=moments[1]/variance**1.5,excessKurtosis=moments[2]/variance**2-3,statistic=n/6*(skewness**2+excessKurtosis**2/4),pValue=Math.exp(-statistic/2);return{n,skewness,excessKurtosis,statistic,pValue,meetsNormalityAt05:pValue>=.05};
+}
+
+export function brownForsytheTest(rows:ResearchDataRow[],groupVariable:ResearchVariable,outcomeVariable:ResearchVariable){
+  const groups=groupNumeric(rows,groupVariable,outcomeVariable);if(groups.length<2||groups.some(group=>group.values.length<2))return null;
+  const deviationRows:ResearchDataRow[]=groups.flatMap((group,groupIndex)=>{const sorted=[...group.values].sort((a,b)=>a-b),middle=Math.floor(sorted.length/2),median=sorted.length%2?sorted[middle]:(sorted[middle-1]+sorted[middle])/2;return group.values.map((value,index)=>({assignmentId:`${groupIndex}-${index}`,responseId:`${groupIndex}-${index}`,submittedAt:"",values:{group:group.name,deviation:Math.abs(value-median)}}))});
+  const result=oneWayAnova(deviationRows,{id:"group",key:"group",label:groupVariable.label,type:"SINGLE_SELECT",required:true},{id:"deviation",key:"deviation",label:"Absolute deviation",type:"NUMBER",required:true});
+  return result?{statistic:result.statistic,numeratorDf:result.numeratorDf,denominatorDf:result.denominatorDf,pValue:result.pValue,homogeneousAt05:result.pValue>=.05}:null;
+}
+
+export function assumptionDiagnostics(rows:ResearchDataRow[],x:ResearchVariable,y?:ResearchVariable|null){
+  const xNormality=x.type==="NUMBER"?normalityDiagnostics(rows,x):null,yNormality=y?.type==="NUMBER"?normalityDiagnostics(rows,y):null,homogeneity=y?.type==="NUMBER"&&x.type!=="NUMBER"?brownForsytheTest(rows,x,y):null;
+  let residualNormality:null|ReturnType<typeof normalityDiagnostics>=null;
+  if(x.type==="NUMBER"&&y?.type==="NUMBER"){const regression=linearRegression(rows,x,y);if(regression){const residualRows=rows.flatMap((row,index)=>{const xv=row.values[x.key],yv=row.values[y.key];return typeof xv==="number"&&typeof yv==="number"?[{assignmentId:String(index),responseId:String(index),submittedAt:"",values:{residual:yv-(regression.intercept+regression.slope*xv)}}]:[]});residualNormality=normalityDiagnostics(residualRows,{id:"residual",key:"residual",label:"Regression residual",type:"NUMBER",required:true})}}
+  return{xNormality,yNormality,homogeneity,residualNormality};
+}
+
 export function spearmanCorrelation(rows: ResearchDataRow[], x: ResearchVariable, y: ResearchVariable) {
   const pairs = rows.flatMap(row => {
     const first = row.values[x.key];
@@ -212,7 +260,7 @@ export function oneWayAnova(rows: ResearchDataRow[], groupVariable: ResearchVari
   const within = groups.reduce((sum, group) => sum + group.values.reduce((groupSum, value) => groupSum + (value - mean(group.values)) ** 2, 0), 0);
   const numeratorDf = groups.length - 1;
   const denominatorDf = all.length - groups.length;
-  const statistic = within ? (between / numeratorDf) / (within / denominatorDf) : Infinity;
+  const statistic = within ? (between / numeratorDf) / (within / denominatorDf) : between ? Infinity : 0;
   return { groups: groups.map(group => ({ name: group.name, n: group.values.length, mean: mean(group.values) })), statistic, numeratorDf, denominatorDf, pValue: Number.isFinite(statistic) ? fUpperTail(statistic, numeratorDf, denominatorDf) : 0, etaSquared: between + within ? between / (between + within) : null };
 }
 
@@ -248,6 +296,8 @@ export function buildAnalysisSnapshot(method: string, rows: ResearchDataRow[], x
   if (method === "CORRELATION" && y) return { method, pearson: pearsonCorrelation(rows, x, y), spearman: spearmanCorrelation(rows, x, y) };
   if (method === "GROUP_COMPARISON" && y) return { method, welch: welchTTest(rows, x, y), anova: oneWayAnova(rows, x, y) };
   if (method === "REGRESSION" && y) return { method, result: linearRegression(rows, x, y) };
+  if(method==="NON_PARAMETRIC"&&y)return x.type==="NUMBER"&&y.type==="NUMBER"?{method,test:"WILCOXON_SIGNED_RANK",result:wilcoxonSignedRankTest(rows,x,y)}:(()=>{const groups=groupNumeric(rows,x,y);return groups.length===2?{method,test:"MANN_WHITNEY_U",result:mannWhitneyUTest(rows,x,y)}:{method,test:"KRUSKAL_WALLIS",result:kruskalWallisTest(rows,x,y)}})();
+  if(method==="ASSUMPTIONS")return{method,result:assumptionDiagnostics(rows,x,y)};
   return { method: "DESCRIPTIVE", summary: { x: confidenceInterval(rows, x), y: y ? confidenceInterval(rows, y) : null } };
 }
 

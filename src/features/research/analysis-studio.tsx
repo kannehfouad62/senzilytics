@@ -4,13 +4,13 @@ import { useActionState, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from "recharts";
 
 import { buildChartData, summarizeVariable, type ResearchDataRow, type ResearchVariable, type ResearchValue } from "@/modules/research/research-analysis";
-import { boxPlot, confidenceInterval, contingencyTable, histogram, interpretPValue, linearRegression, oneWayAnova, pearsonCorrelation, spearmanCorrelation, welchTTest } from "@/modules/research/research-statistics";
+import { assumptionDiagnostics, boxPlot, confidenceInterval, contingencyTable, histogram, interpretPValue, kruskalWallisTest, linearRegression, mannWhitneyUTest, oneWayAnova, pearsonCorrelation, spearmanCorrelation, welchTTest, wilcoxonSignedRankTest } from "@/modules/research/research-statistics";
 import { initialFormActionState } from "@/core/actions/action-state";
 import { saveResearchAnalysis } from "@/features/research/analysis-actions";
 import { useRefreshOnSuccess } from "@/features/research/use-refresh-on-success";
 import { validateSurveyWeights,weightDiagnostics,weightedFrequencies,weightedMean } from "@/modules/research/research-survey-weighting";
 
-type AnalysisMode = "AUTO" | "DISTRIBUTION" | "BOX_PLOT" | "CROSSTAB" | "CORRELATION" | "GROUP_COMPARISON" | "REGRESSION";
+type AnalysisMode = "AUTO" | "DISTRIBUTION" | "BOX_PLOT" | "CROSSTAB" | "CORRELATION" | "GROUP_COMPARISON" | "REGRESSION" | "NON_PARAMETRIC" | "ASSUMPTIONS";
 const modes: Array<{ value: AnalysisMode; label: string }> = [
   { value: "AUTO", label: "Automatic" },
   { value: "DISTRIBUTION", label: "Histogram" },
@@ -19,6 +19,8 @@ const modes: Array<{ value: AnalysisMode; label: string }> = [
   { value: "CORRELATION", label: "Correlation" },
   { value: "GROUP_COMPARISON", label: "Group comparison" },
   { value: "REGRESSION", label: "Regression" },
+  { value: "NON_PARAMETRIC", label: "Non-parametric tests" },
+  { value: "ASSUMPTIONS", label: "Assumption diagnostics" },
 ];
 const panel = "rounded-3xl border border-white/10 bg-white/[.04]";
 const input = "rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-sm";
@@ -104,6 +106,10 @@ function AnalysisVisualization({ mode, rows, x, y, bins }: { mode: AnalysisMode;
     const result = boxPlot(rows, x);
     return result ? <BoxPlotGraphic result={result}/> : <Empty text="No numeric observations are available."/>;
   }
+  if((mode==="NON_PARAMETRIC"||mode==="ASSUMPTIONS")&&x.type==="NUMBER"){
+    if(!y)return <Bars data={histogram(rows,x,bins)}/>;
+    if(y.type==="NUMBER"){const points=buildChartData(rows,x,y).filter((point):point is{x:number;y:number}=>"x" in point&&"y" in point);return <div className="h-96"><ResponsiveContainer width="100%" height="100%"><ScatterChart><CartesianGrid stroke="#1e293b"/><XAxis dataKey="x" name={x.label} stroke="#94a3b8"/><YAxis dataKey="y" name={y.label} stroke="#94a3b8"/><Tooltip/><Scatter data={points} fill="#fbbf24"/></ScatterChart></ResponsiveContainer></div>}
+  }
   if (mode === "CROSSTAB") {
     if (!y) return <Empty text="Crosstab requires a second categorical variable."/>;
     return <CrosstabGraphic table={contingencyTable(rows, x, y)}/>;
@@ -153,6 +159,11 @@ function StatisticalResults({ mode, rows, x, y }: { mode: AnalysisMode; rows: Re
     const result = linearRegression(rows, x, y);
     metrics = [{ label: "Slope", value: format(result?.slope) }, { label: "Intercept", value: format(result?.intercept) }, { label: "R²", value: format(result?.rSquared) }, { label: "p-value", value: formatP(result?.pValue) }];
     interpretation = result ? `${y.label} changes by approximately ${format(result.slope)} units for each one-unit increase in ${x.label}. ${interpretPValue(result.pValue)}` : "At least three paired observations with varying X values are required.";
+  }else if(mode==="NON_PARAMETRIC"&&y){
+    if(x.type==="NUMBER"&&y.type==="NUMBER"){const result=wilcoxonSignedRankTest(rows,x,y);title="Wilcoxon signed-rank test";metrics=[{label:"Paired N",value:result?.n??"—"},{label:"W",value:format(result?.statistic)},{label:"p-value",value:formatP(result?.pValue)},{label:"Rank-biserial",value:format(result?.rankBiserial)}];interpretation=result?interpretPValue(result.pValue):"At least three non-zero paired differences are required."}
+    else if(y.type==="NUMBER"){const mann=mannWhitneyUTest(rows,x,y),kruskal=mann?null:kruskalWallisTest(rows,x,y);title=mann?"Mann–Whitney U test":"Kruskal–Wallis rank test";metrics=mann?[{label:"U",value:format(mann.u)},{label:"z",value:format(mann.z)},{label:"p-value",value:formatP(mann.pValue)},{label:"Rank-biserial",value:format(mann.rankBiserial)}]:[{label:"H",value:format(kruskal?.statistic)},{label:"Degrees of freedom",value:kruskal?.degreesOfFreedom??"—"},{label:"p-value",value:formatP(kruskal?.pValue)},{label:"Epsilon squared",value:format(kruskal?.epsilonSquared)}];interpretation=interpretPValue(mann?.pValue??kruskal?.pValue)}
+  }else if(mode==="ASSUMPTIONS"){
+    title="Statistical assumption diagnostics";const result=assumptionDiagnostics(rows,x,y),normal=result.residualNormality??result.yNormality??result.xNormality;metrics=[{label:"Normality statistic",value:format(normal?.statistic)},{label:"Normality p",value:formatP(normal?.pValue)},{label:"Skewness",value:format(normal?.skewness)},{label:"Excess kurtosis",value:format(normal?.excessKurtosis)},{label:"Brown–Forsythe F",value:format(result.homogeneity?.statistic)},{label:"Variance p",value:formatP(result.homogeneity?.pValue)}];interpretation=normal?`${normal.meetsNormalityAt05?"The diagnostic did not detect a material departure from normality.":"The diagnostic detected evidence of non-normality."}${result.homogeneity?` ${result.homogeneity.homogeneousAt05?"Variance homogeneity was not rejected.":"Variance homogeneity was rejected."}`:""}`:"At least eight numeric observations are required for normality diagnostics.";
   }
   return <section className={`${panel} p-6`}><h2 className="text-xl font-semibold">{title}</h2><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(metric => <Metric key={metric.label} {...metric}/>)}</div><p className="mt-4 rounded-xl border border-cyan-300/10 bg-cyan-300/[.04] p-4 text-sm text-slate-300">{interpretation} Results require appropriate sampling, independence and model assumptions; qualified analysts must verify those assumptions before decisions.</p></section>;
 }
@@ -168,5 +179,5 @@ const formatP = (value: number | null | undefined) => value === null || value ==
 const categories = (value: ResearchValue) => value === null || value === "" ? [] : Array.isArray(value) ? value.map(String) : [String(value)];
 const compare = (first: ResearchValue, second: ResearchValue) => typeof first === "number" && typeof second === "number" ? first - second : String(first ?? "").localeCompare(String(second ?? ""));
 function resolveMode(mode: AnalysisMode, x: ResearchVariable | null, y: ResearchVariable | null): AnalysisMode { if (mode !== "AUTO") return mode; if (x?.type === "NUMBER" && y?.type === "NUMBER") return "CORRELATION"; if (y?.type === "NUMBER") return "GROUP_COMPARISON"; if (x?.type === "NUMBER") return "DISTRIBUTION"; if (y) return "CROSSTAB"; return "AUTO"; }
-function analysisTitle(mode: AnalysisMode, x: ResearchVariable | null, y: ResearchVariable | null) { if (!x) return "Select variables"; if (mode === "DISTRIBUTION") return `Distribution of ${x.label}`; if (mode === "BOX_PLOT") return `Box plot of ${x.label}`; if (mode === "CROSSTAB") return `${x.label} by ${y?.label ?? "second variable"}`; if (mode === "CORRELATION") return `${x.label} and ${y?.label ?? "Y variable"}`; if (mode === "GROUP_COMPARISON") return `${y?.label ?? "Outcome"} across ${x.label}`; if (mode === "REGRESSION") return `${y?.label ?? "Outcome"} predicted by ${x.label}`; return `Frequency distribution for ${x.label}`; }
-function methodRequirement(mode: AnalysisMode) { if (mode === "CROSSTAB") return "Two categorical variables; reports χ² and Cramér’s V."; if (mode === "CORRELATION") return "Two numeric variables; reports Pearson r and Spearman ρ."; if (mode === "GROUP_COMPARISON") return "Categorical X and numeric Y; automatically selects Welch t-test or one-way ANOVA."; if (mode === "REGRESSION") return "Numeric X and Y; reports equation, R² and slope significance."; if (mode === "BOX_PLOT") return "Numeric variable with IQR-based potential outlier display."; if (mode === "DISTRIBUTION") return "Numeric variable with adjustable histogram bins and 95% mean confidence interval."; return "Variable-aware automatic analysis."; }
+function analysisTitle(mode: AnalysisMode, x: ResearchVariable | null, y: ResearchVariable | null) { if (!x) return "Select variables"; if (mode === "DISTRIBUTION") return `Distribution of ${x.label}`; if (mode === "BOX_PLOT") return `Box plot of ${x.label}`; if (mode === "CROSSTAB") return `${x.label} by ${y?.label ?? "second variable"}`; if (mode === "CORRELATION") return `${x.label} and ${y?.label ?? "Y variable"}`; if (mode === "GROUP_COMPARISON") return `${y?.label ?? "Outcome"} across ${x.label}`; if (mode === "REGRESSION") return `${y?.label ?? "Outcome"} predicted by ${x.label}`;if(mode==="NON_PARAMETRIC")return`Rank-based comparison: ${x.label}${y?` and ${y.label}`:""}`;if(mode==="ASSUMPTIONS")return`Assumption diagnostics: ${x.label}${y?` and ${y.label}`:""}`; return `Frequency distribution for ${x.label}`; }
+function methodRequirement(mode: AnalysisMode) { if (mode === "CROSSTAB") return "Two categorical variables; reports χ² and Cramér’s V."; if (mode === "CORRELATION") return "Two numeric variables; reports Pearson r and Spearman ρ."; if (mode === "GROUP_COMPARISON") return "Categorical X and numeric Y; automatically selects Welch t-test or one-way ANOVA."; if (mode === "REGRESSION") return "Numeric X and Y; reports equation, R² and slope significance.";if(mode==="NON_PARAMETRIC")return"Categorical X with numeric Y runs Mann–Whitney or Kruskal–Wallis; two numeric variables run paired Wilcoxon.";if(mode==="ASSUMPTIONS")return"Reports Jarque–Bera normality, skewness, kurtosis, residual normality and Brown–Forsythe variance diagnostics where applicable."; if (mode === "BOX_PLOT") return "Numeric variable with IQR-based potential outlier display."; if (mode === "DISTRIBUTION") return "Numeric variable with adjustable histogram bins and 95% mean confidence interval."; return "Variable-aware automatic analysis."; }

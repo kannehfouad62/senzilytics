@@ -22,6 +22,12 @@ import {
   spearmanCorrelation,
   welchTTest,
   buildAnalysisSnapshot,
+  assumptionDiagnostics,
+  brownForsytheTest,
+  kruskalWallisTest,
+  mannWhitneyUTest,
+  normalityDiagnostics,
+  wilcoxonSignedRankTest,
 } from "../src/modules/research/research-statistics";
 
 const score: ResearchVariable = {
@@ -142,6 +148,33 @@ test("group comparisons provide Welch t tests and one-way ANOVA effect sizes", (
   assert.ok(tTest && tTest.pValue < .05 && Math.abs((tTest.cohensD ?? 0) + 3) < .00001);
   assert.ok(anova && Math.abs(anova.statistic - 13.5) < .00001);
   assert.ok(anova && anova.pValue < .05 && (anova.etaSquared ?? 0) > .7);
+});
+
+test("rank-based tests cover independent two-group and multi-group comparisons",()=>{
+  const twoGroups=[...Array.from({length:5},(_,index)=>({assignmentId:`a${index}`,responseId:`a${index}`,submittedAt:"",values:{department:"A",score:index+1}})),...Array.from({length:5},(_,index)=>({assignmentId:`b${index}`,responseId:`b${index}`,submittedAt:"",values:{department:"B",score:index+11}}))];
+  const mann=mannWhitneyUTest(twoGroups,department,score);assert.equal(mann?.u,0);assert.ok((mann?.pValue??1)<.05);assert.equal(Math.abs(mann?.rankBiserial??0),1);
+  const threeGroups=["A","B","C"].flatMap((group,groupIndex)=>Array.from({length:5},(_,index)=>({assignmentId:`${group}${index}`,responseId:`${group}${index}`,submittedAt:"",values:{department:group,score:groupIndex*10+index+1}})));
+  const kruskal=kruskalWallisTest(threeGroups,department,score);assert.equal(kruskal?.degreesOfFreedom,2);assert.ok((kruskal?.pValue??1)<.01);assert.ok((kruskal?.epsilonSquared??0)>.7);
+});
+
+test("Wilcoxon signed-rank detects consistent paired change",()=>{
+  const before={...score,key:"before"},after={...score,key:"after"};
+  const paired=Array.from({length:10},(_,index)=>({assignmentId:String(index),responseId:String(index),submittedAt:"",values:{before:index+1,after:index+3}}));
+  const result=wilcoxonSignedRankTest(paired,before,after);assert.equal(result?.statistic,0);assert.equal(result?.rankBiserial,1);assert.ok((result?.pValue??1)<.01);
+});
+
+test("assumption diagnostics report distribution shape, residuals, and robust variance",()=>{
+  const normalRows=[-2,-1.5,-1,-.5,0,.5,1,1.5,2].map((value,index)=>({assignmentId:String(index),responseId:String(index),submittedAt:"",values:{score:value,department:index<4?"A":"B"}}));
+  const normality=normalityDiagnostics(normalRows,score);assert.ok(normality&&Math.abs(normality.skewness)<1e-12);assert.equal(normality?.meetsNormalityAt05,true);
+  const unequal=[1,2,3,4,5,20,40,60,80,100].map((value,index)=>({assignmentId:String(index),responseId:String(index),submittedAt:"",values:{score:value,department:index<5?"A":"B"}}));
+  const variance=brownForsytheTest(unequal,department,score);assert.ok(variance);assert.ok((variance?.pValue??1)<.05);
+  const x={...score,key:"x"},y={...score,key:"y"},regressionRows=Array.from({length:12},(_,index)=>({assignmentId:String(index),responseId:String(index),submittedAt:"",values:{x:index+1,y:2*(index+1)+(index%2?1:-1)}}));
+  assert.ok(assumptionDiagnostics(regressionRows,x,y).residualNormality);
+});
+
+test("governed snapshots retain non-parametric and assumption results",()=>{
+  const snapshot=buildAnalysisSnapshot("NON_PARAMETRIC",rows,department,score);assert.equal(snapshot.method,"NON_PARAMETRIC");assert.ok("test" in snapshot);
+  const assumptions=buildAnalysisSnapshot("ASSUMPTIONS",rows,score);assert.equal(assumptions.method,"ASSUMPTIONS");assert.ok("result" in assumptions);
 });
 
 test("simple linear regression reports slope, intercept, fit and significance", () => {
