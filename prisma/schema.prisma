@@ -8815,6 +8815,8 @@ model ResearchAnalysis {
   variableKeys           String[]               @default([])
   filterVariableKey      String?
   filterValue            String?
+  filterDefinition       Json?
+  visualizationConfig    Json?
   weightVariableKey      String?
   samplingDesignId       String?
   samplingDesignSnapshot Json?

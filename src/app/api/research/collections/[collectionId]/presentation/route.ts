@@ -5,6 +5,7 @@ import { buildChartData, summarizeVariable } from "@/modules/research/research-a
 import { getResearchDataset } from "@/modules/research/research-dataset.service";
 import { chartElements, createResearchPresentation, type SlideElement } from "@/modules/research/research-presentation";
 import { buildAnalysisSnapshot, histogram } from "@/modules/research/research-statistics";
+import { applyResearchFilters, normalizeResearchFilters } from "@/modules/research/research-visualization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,8 +20,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
   const x = variables.find(item => item.key === url.searchParams.get("x")) ?? variables[0];
   const y = variables.find(item => item.key === url.searchParams.get("y")) ?? null;
   const method = url.searchParams.get("mode") ?? "AUTO";
-  const stats = x ? summarizeVariable(x, analysisRows) : null;
-  const chartSource = x && method === "DISTRIBUTION" ? histogram(analysisRows, x) : x ? buildChartData(analysisRows, x, y) : [];
+  let requestedFilters:unknown={};
+  try{requestedFilters=JSON.parse(url.searchParams.get("filters")??"{}")}catch{return new Response("Invalid dashboard filters.",{status:400})}
+  const filterDefinition=normalizeResearchFilters(requestedFilters,variables);
+  const filteredRows=applyResearchFilters(analysisRows,filterDefinition);
+  const stats = x ? summarizeVariable(x, filteredRows) : null;
+  const chartSource = x && method === "DISTRIBUTION" ? histogram(filteredRows, x) : x ? buildChartData(filteredRows, x, y) : [];
   const chart = chartSource.map((item, index) => ({
     name: "name" in item ? String(item.name) : `Observation ${index + 1}`,
     value: Number("value" in item ? item.value : "y" in item ? item.y : 0),
@@ -30,12 +35,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
     { x: .7, y: 1.35, w: 11.8, h: .8, text: collection.project.title, size: 30, bold: true },
     { x: .7, y: 2.35, w: 10, h: .4, text: `${collection.project.reference} · ${collection.name}`, size: 16, color: "94A3B8" },
     { x: .7, y: 3.25, w: 5.6, h: .45, text: `Client: ${collection.project.client?.name ?? "Internal research"}`, size: 16, color: "CBD5E1" },
-    { x: .7, y: 3.8, w: 5.6, h: .45, text: `Included responses: ${analysisRows.length}`, size: 16, color: "CBD5E1" },
+    { x: .7, y: 3.8, w: 5.6, h: .45, text: `Included responses: ${filteredRows.length} of ${analysisRows.length}`, size: 16, color: "CBD5E1" },
     { x: .7, y: 4.35, w: 5.6, h: .45, text: `Dataset status: ${collection.datasetStatus}`, size: 16, color: "CBD5E1" },
     { x: 6.9, y: 3.25, w: 5.6, h: .45, text: `Method: ${method.replaceAll("_", " ")}`, size: 16, color: "CBD5E1" },
     { x: .7, y: 5.45, w: 11.7, h: .55, text: collection.questionnaire.purpose, size: 13, color: "94A3B8" },
   ];
-  const snapshot = x ? buildAnalysisSnapshot(method, analysisRows, x, y) : null;
+  const snapshot = x ? buildAnalysisSnapshot(method, filteredRows, x, y) : null;
   const inference: SlideElement[] = [
     { x: .7, y: .5, w: 11, h: .6, text: "Statistical Results", size: 26, bold: true },
     { x: .8, y: 1.2, w: 11, h: .4, text: `${method.replaceAll("_", " ")} · ${x?.label ?? ""}${y ? ` · ${y.label}` : ""}`, size: 14, color: "67E8F9", bold: true },
