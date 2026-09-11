@@ -324,6 +324,7 @@ export default async function ResearchProjectPage({
               </Link>
               {project.clientId&&canManage?<Link href={`/research/projects/${project.id}/client-review`} className="flex items-center justify-between rounded-xl border border-cyan-300/15 bg-cyan-300/[.05] p-4 text-sm font-semibold text-cyan-200"><span>Client Review & Sign-off</span><span>Open →</span></Link>:null}
               {canManage?<Link href={`/research/projects/${project.id}/governance`} className="flex items-center justify-between rounded-xl border border-amber-300/15 bg-amber-300/[.05] p-4 text-sm font-semibold text-amber-200"><span>Research Governance Register</span><span>Open →</span></Link>:null}
+              <Link href={`/research/projects/${project.id}/data-governance`} className="flex items-center justify-between rounded-xl border border-violet-300/15 bg-violet-300/[.05] p-4 text-sm font-semibold text-violet-200"><span>Data Governance & Access</span><span>Open →</span></Link>
               <p className="text-sm leading-6 text-slate-400">
                 Data management, statistical analysis, frozen evidence,
                 publication review, and controlled exports remain attached to

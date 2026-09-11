@@ -319,6 +319,55 @@ enum ResearchGovernanceRecordStatus {
   SUPERSEDED
 }
 
+enum ResearchDataLifecycleStatus {
+  DRAFT
+  ACTIVE
+  LEGAL_HOLD
+  DISPOSAL_DUE
+  DISPOSED
+}
+
+enum ResearchDataDisposalMethod {
+  SECURE_DELETION
+  ANONYMIZED_ARCHIVE
+  RETURN_TO_OWNER
+  CONTRACTUAL_TRANSFER
+}
+
+enum ResearchPrivacyReviewType {
+  DEIDENTIFICATION
+  DISCLOSURE_RISK
+}
+
+enum ResearchPrivacyReviewStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum ResearchDisclosureRisk {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ResearchDatasetAccessLevel {
+  METADATA_ONLY
+  DEIDENTIFIED
+  ROW_LEVEL
+  IDENTIFIABLE
+}
+
+enum ResearchDatasetAccessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVOKED
+  EXPIRED
+}
+
 enum ResearchProjectStatus {
   DRAFT
   PLANNING
@@ -2366,6 +2415,9 @@ model Organization {
   researchClientDeliveries           ResearchClientDelivery[]
   researchClientDeliveryEvents       ResearchClientDeliveryEvent[]
   researchGovernanceRecords          ResearchGovernanceRecord[]
+  researchDataLifecyclePlans         ResearchDataLifecyclePlan[]
+  researchPrivacyReviews             ResearchPrivacyReview[]
+  researchDatasetAccessRequests      ResearchDatasetAccessRequest[]
 }
 
 model PricingInquiry {
@@ -2738,6 +2790,13 @@ model User {
   ownedResearchGovernanceRecords             ResearchGovernanceRecord[]          @relation("ResearchGovernanceRecordOwner")
   createdResearchGovernanceRecords           ResearchGovernanceRecord[]          @relation("ResearchGovernanceRecordCreatedBy")
   approvedResearchGovernanceRecords          ResearchGovernanceRecord[]          @relation("ResearchGovernanceRecordApprovedBy")
+  ownedResearchDataLifecyclePlans            ResearchDataLifecyclePlan[]         @relation("ResearchDataLifecycleOwner")
+  approvedResearchDataLifecyclePlans         ResearchDataLifecyclePlan[]         @relation("ResearchDataLifecycleApprover")
+  disposedResearchDataLifecyclePlans         ResearchDataLifecyclePlan[]         @relation("ResearchDataLifecycleDisposedBy")
+  createdResearchPrivacyReviews              ResearchPrivacyReview[]             @relation("ResearchPrivacyReviewCreator")
+  reviewedResearchPrivacyReviews             ResearchPrivacyReview[]             @relation("ResearchPrivacyReviewReviewer")
+  requestedResearchDatasetAccess             ResearchDatasetAccessRequest[]      @relation("ResearchDatasetAccessRequester")
+  decidedResearchDatasetAccess               ResearchDatasetAccessRequest[]      @relation("ResearchDatasetAccessDecider")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8361,6 +8420,9 @@ model ResearchProject {
   clientReviewRequests        ResearchClientReviewRequest[]
   clientDeliveries            ResearchClientDelivery[]
   governanceRecords           ResearchGovernanceRecord[]
+  dataLifecyclePlan           ResearchDataLifecyclePlan?
+  privacyReviews              ResearchPrivacyReview[]
+  datasetAccessRequests       ResearchDatasetAccessRequest[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
@@ -8536,6 +8598,98 @@ model ResearchGovernanceRecord {
   @@index([projectId, type, status])
   @@index([ownerId, status])
   @@index([approvedById])
+}
+
+model ResearchDataLifecyclePlan {
+  id                  String                      @id @default(cuid())
+  organizationId      String
+  projectId           String                      @unique
+  status              ResearchDataLifecycleStatus @default(DRAFT)
+  retentionBasis      String
+  retentionDays       Int
+  disposalMethod      ResearchDataDisposalMethod
+  scheduledDisposalAt DateTime
+  ownerId             String
+  approvedById        String?
+  approvedAt          DateTime?
+  legalHoldReason     String?
+  legalHoldAt         DateTime?
+  disposalEvidence    String?
+  disposedById        String?
+  disposedAt          DateTime?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner        User            @relation("ResearchDataLifecycleOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  approvedBy   User?           @relation("ResearchDataLifecycleApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  disposedBy   User?           @relation("ResearchDataLifecycleDisposedBy", fields: [disposedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, scheduledDisposalAt])
+  @@index([ownerId, status])
+}
+
+model ResearchPrivacyReview {
+  id                       String                      @id @default(cuid())
+  organizationId           String
+  projectId                String
+  datasetReference         String
+  type                     ResearchPrivacyReviewType
+  version                  Int                         @default(1)
+  status                   ResearchPrivacyReviewStatus @default(DRAFT)
+  method                   String
+  directIdentifiersRemoved Boolean                     @default(false)
+  quasiIdentifierControls  String?
+  residualRisk             ResearchDisclosureRisk
+  findings                 String
+  mitigation               String?
+  evidenceReference        String
+  createdById              String
+  reviewedById             String?
+  submittedAt              DateTime?
+  reviewedAt               DateTime?
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User            @relation("ResearchPrivacyReviewCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  reviewedBy   User?           @relation("ResearchPrivacyReviewReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, datasetReference, type, version])
+  @@index([organizationId, status, residualRisk])
+  @@index([projectId, type, status])
+}
+
+model ResearchDatasetAccessRequest {
+  id               String                      @id @default(cuid())
+  organizationId   String
+  projectId        String
+  datasetReference String
+  accessLevel      ResearchDatasetAccessLevel
+  purpose          String
+  scope            String
+  safeguards       String
+  requestedById    String
+  status           ResearchDatasetAccessStatus @default(PENDING)
+  decidedById      String?
+  decisionReason   String?
+  accessStartsAt   DateTime?
+  accessExpiresAt  DateTime?
+  decidedAt        DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy  User            @relation("ResearchDatasetAccessRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  decidedBy    User?           @relation("ResearchDatasetAccessDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, accessExpiresAt])
+  @@index([projectId, datasetReference, status])
+  @@index([requestedById, status])
 }
 
 model ResearchTeamMember {
