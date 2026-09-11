@@ -290,6 +290,18 @@ enum ResearchClientReviewStatus {
   WITHDRAWN
 }
 
+enum ResearchClientDeliveryFormat {
+  DASHBOARD_SVG
+  DASHBOARD_PNG
+  DASHBOARD_PDF
+  REPORT_POWERPOINT
+}
+
+enum ResearchClientDeliveryStatus {
+  AVAILABLE
+  WITHDRAWN
+}
+
 enum ResearchProjectStatus {
   DRAFT
   PLANNING
@@ -2334,6 +2346,8 @@ model Organization {
   researchClientPortalAccesses       ResearchClientPortalAccess[]
   researchClientReviewRequests       ResearchClientReviewRequest[]
   researchClientReviewComments       ResearchClientReviewComment[]
+  researchClientDeliveries           ResearchClientDelivery[]
+  researchClientDeliveryEvents       ResearchClientDeliveryEvent[]
 }
 
 model PricingInquiry {
@@ -2701,6 +2715,8 @@ model User {
   requestedResearchClientReviews               ResearchClientReviewRequest[]       @relation("ResearchClientReviewRequestedBy")
   decidedResearchClientReviews                 ResearchClientReviewRequest[]       @relation("ResearchClientReviewDecidedBy")
   researchClientReviewComments                 ResearchClientReviewComment[]
+  publishedResearchClientDeliveries            ResearchClientDelivery[]      @relation("ResearchClientDeliveryPublishedBy")
+  researchClientDeliveryEvents                 ResearchClientDeliveryEvent[]
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8322,6 +8338,7 @@ model ResearchProject {
   visualizationDashboards ResearchVisualizationDashboard[]
   clientPortalProjectAccesses ResearchClientPortalProjectAccess[]
   clientReviewRequests ResearchClientReviewRequest[]
+  clientDeliveries ResearchClientDelivery[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
@@ -8393,6 +8410,7 @@ model ResearchClientReviewRequest {
   requestedBy  User                         @relation("ResearchClientReviewRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
   decidedBy    User?                        @relation("ResearchClientReviewDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
   comments     ResearchClientReviewComment[]
+  deliveries   ResearchClientDelivery[]
 
   @@unique([projectId, artifactType, artifactId])
   @@index([organizationId, status, dueAt])
@@ -8415,6 +8433,49 @@ model ResearchClientReviewComment {
 
   @@index([organizationId, createdAt])
   @@index([requestId, createdAt])
+  @@index([userId])
+}
+
+model ResearchClientDelivery {
+  id             String                       @id @default(cuid())
+  organizationId String
+  projectId      String
+  reviewId       String
+  format         ResearchClientDeliveryFormat
+  status         ResearchClientDeliveryStatus @default(AVAILABLE)
+  title          String
+  releaseNotes   String?
+  publishedById  String
+  publishedAt    DateTime                     @default(now())
+  withdrawnAt    DateTime?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  review       ResearchClientReviewRequest @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  publishedBy  User                        @relation("ResearchClientDeliveryPublishedBy", fields: [publishedById], references: [id], onDelete: Restrict)
+  events       ResearchClientDeliveryEvent[]
+
+  @@unique([reviewId, format])
+  @@index([organizationId, status, publishedAt])
+  @@index([projectId, status])
+  @@index([publishedById])
+}
+
+model ResearchClientDeliveryEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  deliveryId     String
+  userId         String
+  downloadedAt   DateTime @default(now())
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  delivery     ResearchClientDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, downloadedAt])
+  @@index([deliveryId, downloadedAt])
   @@index([userId])
 }
 

@@ -1,0 +1,18 @@
+CREATE TYPE "ResearchClientDeliveryFormat" AS ENUM ('DASHBOARD_SVG','DASHBOARD_PNG','DASHBOARD_PDF','REPORT_POWERPOINT');
+CREATE TYPE "ResearchClientDeliveryStatus" AS ENUM ('AVAILABLE','WITHDRAWN');
+CREATE TABLE "ResearchClientDelivery" ("id" TEXT NOT NULL,"organizationId" TEXT NOT NULL,"projectId" TEXT NOT NULL,"reviewId" TEXT NOT NULL,"format" "ResearchClientDeliveryFormat" NOT NULL,"status" "ResearchClientDeliveryStatus" NOT NULL DEFAULT 'AVAILABLE',"title" TEXT NOT NULL,"releaseNotes" TEXT,"publishedById" TEXT NOT NULL,"publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"withdrawnAt" TIMESTAMP(3),"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "ResearchClientDelivery_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "ResearchClientDeliveryEvent" ("id" TEXT NOT NULL,"organizationId" TEXT NOT NULL,"deliveryId" TEXT NOT NULL,"userId" TEXT NOT NULL,"downloadedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "ResearchClientDeliveryEvent_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "ResearchClientDelivery_reviewId_format_key" ON "ResearchClientDelivery"("reviewId","format");
+CREATE INDEX "ResearchClientDelivery_organizationId_status_publishedAt_idx" ON "ResearchClientDelivery"("organizationId","status","publishedAt");
+CREATE INDEX "ResearchClientDelivery_projectId_status_idx" ON "ResearchClientDelivery"("projectId","status");
+CREATE INDEX "ResearchClientDelivery_publishedById_idx" ON "ResearchClientDelivery"("publishedById");
+CREATE INDEX "ResearchClientDeliveryEvent_organizationId_downloadedAt_idx" ON "ResearchClientDeliveryEvent"("organizationId","downloadedAt");
+CREATE INDEX "ResearchClientDeliveryEvent_deliveryId_downloadedAt_idx" ON "ResearchClientDeliveryEvent"("deliveryId","downloadedAt");
+CREATE INDEX "ResearchClientDeliveryEvent_userId_idx" ON "ResearchClientDeliveryEvent"("userId");
+ALTER TABLE "ResearchClientDelivery" ADD CONSTRAINT "ResearchClientDelivery_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ResearchClientDelivery" ADD CONSTRAINT "ResearchClientDelivery_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "ResearchProject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ResearchClientDelivery" ADD CONSTRAINT "ResearchClientDelivery_reviewId_fkey" FOREIGN KEY ("reviewId") REFERENCES "ResearchClientReviewRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ResearchClientDelivery" ADD CONSTRAINT "ResearchClientDelivery_publishedById_fkey" FOREIGN KEY ("publishedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ResearchClientDeliveryEvent" ADD CONSTRAINT "ResearchClientDeliveryEvent_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ResearchClientDeliveryEvent" ADD CONSTRAINT "ResearchClientDeliveryEvent_deliveryId_fkey" FOREIGN KEY ("deliveryId") REFERENCES "ResearchClientDelivery"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ResearchClientDeliveryEvent" ADD CONSTRAINT "ResearchClientDeliveryEvent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
