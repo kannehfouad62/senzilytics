@@ -302,6 +302,23 @@ enum ResearchClientDeliveryStatus {
   WITHDRAWN
 }
 
+enum ResearchGovernanceRecordType {
+  PROTOCOL
+  ETHICS_REVIEW
+  DATA_MANAGEMENT_PLAN
+  DATA_SHARING_AGREEMENT
+  CONFLICT_OF_INTEREST
+}
+
+enum ResearchGovernanceRecordStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+  SUPERSEDED
+}
+
 enum ResearchProjectStatus {
   DRAFT
   PLANNING
@@ -2190,7 +2207,7 @@ model Organization {
   id                    String             @id @default(cuid())
   name                  String
   industry              String?
-  industryCategory      IndustryCategory     @default(GENERAL)
+  industryCategory      IndustryCategory   @default(GENERAL)
   address               String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
@@ -2280,7 +2297,7 @@ model Organization {
   aiCopilotConversations             AiCopilotConversation[]
   aiCopilotMessages                  AiCopilotMessage[]
   aiCopilotCitations                 AiCopilotCitation[]
-  incidentParticipants              IncidentParticipant[]
+  incidentParticipants               IncidentParticipant[]
   aiCopilotFeedback                  AiCopilotFeedback[]
   integrationApiCredentials          IntegrationApiCredential[]
   integrationApiRequestLogs          IntegrationApiRequestLog[]
@@ -2348,6 +2365,7 @@ model Organization {
   researchClientReviewComments       ResearchClientReviewComment[]
   researchClientDeliveries           ResearchClientDelivery[]
   researchClientDeliveryEvents       ResearchClientDeliveryEvent[]
+  researchGovernanceRecords          ResearchGovernanceRecord[]
 }
 
 model PricingInquiry {
@@ -2709,14 +2727,17 @@ model User {
   enumeratedResearchFieldworkResponses       ResearchFieldworkResponse[]         @relation("ResearchFieldworkEnumerator")
   backcheckedResearchFieldworkResponses      ResearchFieldworkResponse[]         @relation("ResearchFieldworkBackchecker")
   assignedResearchFieldworkBackchecks        ResearchFieldworkResponse[]         @relation("ResearchFieldworkBackcheckAssignee")
-  researchClientPortalAccesses                ResearchClientPortalAccess[]        @relation("ResearchClientPortalUser")
-  grantedResearchClientPortalAccesses         ResearchClientPortalAccess[]        @relation("ResearchClientPortalGrantedBy")
-  grantedResearchClientPortalProjects         ResearchClientPortalProjectAccess[] @relation("ResearchClientPortalProjectGrantedBy")
-  requestedResearchClientReviews               ResearchClientReviewRequest[]       @relation("ResearchClientReviewRequestedBy")
-  decidedResearchClientReviews                 ResearchClientReviewRequest[]       @relation("ResearchClientReviewDecidedBy")
-  researchClientReviewComments                 ResearchClientReviewComment[]
-  publishedResearchClientDeliveries            ResearchClientDelivery[]      @relation("ResearchClientDeliveryPublishedBy")
-  researchClientDeliveryEvents                 ResearchClientDeliveryEvent[]
+  researchClientPortalAccesses               ResearchClientPortalAccess[]        @relation("ResearchClientPortalUser")
+  grantedResearchClientPortalAccesses        ResearchClientPortalAccess[]        @relation("ResearchClientPortalGrantedBy")
+  grantedResearchClientPortalProjects        ResearchClientPortalProjectAccess[] @relation("ResearchClientPortalProjectGrantedBy")
+  requestedResearchClientReviews             ResearchClientReviewRequest[]       @relation("ResearchClientReviewRequestedBy")
+  decidedResearchClientReviews               ResearchClientReviewRequest[]       @relation("ResearchClientReviewDecidedBy")
+  researchClientReviewComments               ResearchClientReviewComment[]
+  publishedResearchClientDeliveries          ResearchClientDelivery[]            @relation("ResearchClientDeliveryPublishedBy")
+  researchClientDeliveryEvents               ResearchClientDeliveryEvent[]
+  ownedResearchGovernanceRecords             ResearchGovernanceRecord[]          @relation("ResearchGovernanceRecordOwner")
+  createdResearchGovernanceRecords           ResearchGovernanceRecord[]          @relation("ResearchGovernanceRecordCreatedBy")
+  approvedResearchGovernanceRecords          ResearchGovernanceRecord[]          @relation("ResearchGovernanceRecordApprovedBy")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -3069,7 +3090,7 @@ model Incident {
   site   Site   @relation(fields: [siteId], references: [id])
 
   reportedById String
-  reportedBy   User   @relation("ReportedIncidents", fields: [reportedById], references: [id])
+  reportedBy   User                  @relation("ReportedIncidents", fields: [reportedById], references: [id])
   participants IncidentParticipant[]
 
   investigation      Investigation?
@@ -8271,9 +8292,9 @@ model ResearchClient {
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User              @relation("ResearchClientCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  projects     ResearchProject[]
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User                         @relation("ResearchClientCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  projects       ResearchProject[]
   portalAccesses ResearchClientPortalAccess[]
 
   @@unique([organizationId, name])
@@ -8319,26 +8340,27 @@ model ResearchProject {
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 
-  organization          Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client                ResearchClient?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  projectManager        User                        @relation("ResearchProjectManager", fields: [projectManagerId], references: [id], onDelete: Restrict)
-  principalInvestigator User?                       @relation("ResearchPrincipalInvestigator", fields: [principalInvestigatorId], references: [id], onDelete: SetNull)
-  createdBy             User                        @relation("ResearchProjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  approvedBy            User?                       @relation("ResearchProjectApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
-  teamMembers           ResearchTeamMember[]
-  milestones            ResearchMilestone[]
-  questionnaires        ResearchQuestionnaire[]
-  collectionWaves       ResearchCollectionWave[]
-  reports               ResearchReport[]
-  importedDatasets      ResearchImportedDataset[]
-  samplingDesigns       ResearchSamplingDesign[]
-  samplingFrames        ResearchSamplingFrame[]
-  samplingExecutions    ResearchSamplingExecution[]
-  longitudinalStudies   ResearchLongitudinalStudy[]
-  visualizationDashboards ResearchVisualizationDashboard[]
+  organization                Organization                        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client                      ResearchClient?                     @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  projectManager              User                                @relation("ResearchProjectManager", fields: [projectManagerId], references: [id], onDelete: Restrict)
+  principalInvestigator       User?                               @relation("ResearchPrincipalInvestigator", fields: [principalInvestigatorId], references: [id], onDelete: SetNull)
+  createdBy                   User                                @relation("ResearchProjectCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy                  User?                               @relation("ResearchProjectApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  teamMembers                 ResearchTeamMember[]
+  milestones                  ResearchMilestone[]
+  questionnaires              ResearchQuestionnaire[]
+  collectionWaves             ResearchCollectionWave[]
+  reports                     ResearchReport[]
+  importedDatasets            ResearchImportedDataset[]
+  samplingDesigns             ResearchSamplingDesign[]
+  samplingFrames              ResearchSamplingFrame[]
+  samplingExecutions          ResearchSamplingExecution[]
+  longitudinalStudies         ResearchLongitudinalStudy[]
+  visualizationDashboards     ResearchVisualizationDashboard[]
   clientPortalProjectAccesses ResearchClientPortalProjectAccess[]
-  clientReviewRequests ResearchClientReviewRequest[]
-  clientDeliveries ResearchClientDelivery[]
+  clientReviewRequests        ResearchClientReviewRequest[]
+  clientDeliveries            ResearchClientDelivery[]
+  governanceRecords           ResearchGovernanceRecord[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
@@ -8405,10 +8427,10 @@ model ResearchClientReviewRequest {
   createdAt      DateTime                         @default(now())
   updatedAt      DateTime                         @updatedAt
 
-  organization Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project      ResearchProject              @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  requestedBy  User                         @relation("ResearchClientReviewRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
-  decidedBy    User?                        @relation("ResearchClientReviewDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  organization Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy  User                          @relation("ResearchClientReviewRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  decidedBy    User?                         @relation("ResearchClientReviewDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
   comments     ResearchClientReviewComment[]
   deliveries   ResearchClientDelivery[]
 
@@ -8451,10 +8473,10 @@ model ResearchClientDelivery {
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
 
-  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project      ResearchProject             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  review       ResearchClientReviewRequest @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  publishedBy  User                        @relation("ResearchClientDeliveryPublishedBy", fields: [publishedById], references: [id], onDelete: Restrict)
+  organization Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  review       ResearchClientReviewRequest   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  publishedBy  User                          @relation("ResearchClientDeliveryPublishedBy", fields: [publishedById], references: [id], onDelete: Restrict)
   events       ResearchClientDeliveryEvent[]
 
   @@unique([reviewId, format])
@@ -8477,6 +8499,43 @@ model ResearchClientDeliveryEvent {
   @@index([organizationId, downloadedAt])
   @@index([deliveryId, downloadedAt])
   @@index([userId])
+}
+
+model ResearchGovernanceRecord {
+  id                String                         @id @default(cuid())
+  organizationId    String
+  projectId         String
+  type              ResearchGovernanceRecordType
+  reference         String
+  title             String
+  version           Int                            @default(1)
+  status            ResearchGovernanceRecordStatus @default(DRAFT)
+  scope             String
+  requirements      String
+  conditions        String?
+  authorityName     String?
+  evidenceReference String?
+  ownerId           String
+  createdById       String
+  approvedById      String?
+  effectiveAt       DateTime?
+  expiresAt         DateTime?
+  submittedAt       DateTime?
+  approvedAt        DateTime?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner        User            @relation("ResearchGovernanceRecordOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdBy    User            @relation("ResearchGovernanceRecordCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy   User?           @relation("ResearchGovernanceRecordApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, type, reference, version])
+  @@index([organizationId, status, expiresAt])
+  @@index([projectId, type, status])
+  @@index([ownerId, status])
+  @@index([approvedById])
 }
 
 model ResearchTeamMember {

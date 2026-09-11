@@ -1,0 +1,13 @@
+CREATE TYPE "ResearchGovernanceRecordType" AS ENUM ('PROTOCOL','ETHICS_REVIEW','DATA_MANAGEMENT_PLAN','DATA_SHARING_AGREEMENT','CONFLICT_OF_INTEREST');
+CREATE TYPE "ResearchGovernanceRecordStatus" AS ENUM ('DRAFT','UNDER_REVIEW','APPROVED','REJECTED','EXPIRED','SUPERSEDED');
+CREATE TABLE "ResearchGovernanceRecord" ("id" TEXT NOT NULL,"organizationId" TEXT NOT NULL,"projectId" TEXT NOT NULL,"type" "ResearchGovernanceRecordType" NOT NULL,"reference" TEXT NOT NULL,"title" TEXT NOT NULL,"version" INTEGER NOT NULL DEFAULT 1,"status" "ResearchGovernanceRecordStatus" NOT NULL DEFAULT 'DRAFT',"scope" TEXT NOT NULL,"requirements" TEXT NOT NULL,"conditions" TEXT,"authorityName" TEXT,"evidenceReference" TEXT,"ownerId" TEXT NOT NULL,"createdById" TEXT NOT NULL,"approvedById" TEXT,"effectiveAt" TIMESTAMP(3),"expiresAt" TIMESTAMP(3),"submittedAt" TIMESTAMP(3),"approvedAt" TIMESTAMP(3),"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "ResearchGovernanceRecord_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "ResearchGovernanceRecord_projectId_type_reference_version_key" ON "ResearchGovernanceRecord"("projectId","type","reference","version");
+CREATE INDEX "ResearchGovernanceRecord_organizationId_status_expiresAt_idx" ON "ResearchGovernanceRecord"("organizationId","status","expiresAt");
+CREATE INDEX "ResearchGovernanceRecord_projectId_type_status_idx" ON "ResearchGovernanceRecord"("projectId","type","status");
+CREATE INDEX "ResearchGovernanceRecord_ownerId_status_idx" ON "ResearchGovernanceRecord"("ownerId","status");
+CREATE INDEX "ResearchGovernanceRecord_approvedById_idx" ON "ResearchGovernanceRecord"("approvedById");
+ALTER TABLE "ResearchGovernanceRecord" ADD CONSTRAINT "ResearchGovernanceRecord_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ResearchGovernanceRecord" ADD CONSTRAINT "ResearchGovernanceRecord_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "ResearchProject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ResearchGovernanceRecord" ADD CONSTRAINT "ResearchGovernanceRecord_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ResearchGovernanceRecord" ADD CONSTRAINT "ResearchGovernanceRecord_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ResearchGovernanceRecord" ADD CONSTRAINT "ResearchGovernanceRecord_approvedById_fkey" FOREIGN KEY ("approvedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
