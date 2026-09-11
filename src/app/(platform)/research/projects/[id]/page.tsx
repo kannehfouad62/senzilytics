@@ -322,6 +322,7 @@ export default async function ResearchProjectPage({
                 <span>Fieldwork Command Center</span>
                 <span>Open →</span>
               </Link>
+              {project.clientId&&canManage?<Link href={`/research/projects/${project.id}/client-review`} className="flex items-center justify-between rounded-xl border border-cyan-300/15 bg-cyan-300/[.05] p-4 text-sm font-semibold text-cyan-200"><span>Client Review & Sign-off</span><span>Open →</span></Link>:null}
               <p className="text-sm leading-6 text-slate-400">
                 Data management, statistical analysis, frozen evidence,
                 publication review, and controlled exports remain attached to

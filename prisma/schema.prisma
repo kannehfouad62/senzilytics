@@ -275,6 +275,21 @@ enum ResearchClientPortalAccessStatus {
   REVOKED
 }
 
+enum ResearchClientReviewArtifactType {
+  QUESTIONNAIRE
+  SAMPLING_DESIGN
+  DASHBOARD
+  REPORT
+}
+
+enum ResearchClientReviewStatus {
+  PENDING_REVIEW
+  REVISION_REQUESTED
+  APPROVED
+  ACCEPTED
+  WITHDRAWN
+}
+
 enum ResearchProjectStatus {
   DRAFT
   PLANNING
@@ -2317,6 +2332,8 @@ model Organization {
   researchQuestionnaireLocalizations ResearchQuestionnaireLocalization[]
   researchFieldworkResponses         ResearchFieldworkResponse[]
   researchClientPortalAccesses       ResearchClientPortalAccess[]
+  researchClientReviewRequests       ResearchClientReviewRequest[]
+  researchClientReviewComments       ResearchClientReviewComment[]
 }
 
 model PricingInquiry {
@@ -2681,6 +2698,9 @@ model User {
   researchClientPortalAccesses                ResearchClientPortalAccess[]        @relation("ResearchClientPortalUser")
   grantedResearchClientPortalAccesses         ResearchClientPortalAccess[]        @relation("ResearchClientPortalGrantedBy")
   grantedResearchClientPortalProjects         ResearchClientPortalProjectAccess[] @relation("ResearchClientPortalProjectGrantedBy")
+  requestedResearchClientReviews               ResearchClientReviewRequest[]       @relation("ResearchClientReviewRequestedBy")
+  decidedResearchClientReviews                 ResearchClientReviewRequest[]       @relation("ResearchClientReviewDecidedBy")
+  researchClientReviewComments                 ResearchClientReviewComment[]
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8301,6 +8321,7 @@ model ResearchProject {
   longitudinalStudies   ResearchLongitudinalStudy[]
   visualizationDashboards ResearchVisualizationDashboard[]
   clientPortalProjectAccesses ResearchClientPortalProjectAccess[]
+  clientReviewRequests ResearchClientReviewRequest[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status, dueDate])
@@ -8347,6 +8368,54 @@ model ResearchClientPortalProjectAccess {
   @@unique([accessId, projectId])
   @@index([projectId])
   @@index([grantedById])
+}
+
+model ResearchClientReviewRequest {
+  id             String                           @id @default(cuid())
+  organizationId String
+  projectId      String
+  artifactType   ResearchClientReviewArtifactType
+  artifactId     String
+  artifactTitle  String
+  status         ResearchClientReviewStatus       @default(PENDING_REVIEW)
+  instructions   String?
+  requestedById  String
+  decidedById    String?
+  dueAt          DateTime?
+  submittedAt    DateTime                         @default(now())
+  decidedAt      DateTime?
+  acceptedAt     DateTime?
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+
+  organization Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      ResearchProject              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy  User                         @relation("ResearchClientReviewRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  decidedBy    User?                        @relation("ResearchClientReviewDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  comments     ResearchClientReviewComment[]
+
+  @@unique([projectId, artifactType, artifactId])
+  @@index([organizationId, status, dueAt])
+  @@index([projectId, status])
+  @@index([requestedById])
+  @@index([decidedById])
+}
+
+model ResearchClientReviewComment {
+  id             String   @id @default(cuid())
+  organizationId String
+  requestId      String
+  userId         String
+  body           String
+  createdAt      DateTime @default(now())
+
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  request      ResearchClientReviewRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user         User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([requestId, createdAt])
+  @@index([userId])
 }
 
 model ResearchTeamMember {

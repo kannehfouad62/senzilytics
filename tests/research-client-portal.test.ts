@@ -29,7 +29,7 @@ test("client-facing project reads independently enforce active, unexpired access
   assert.match(service, /ResearchReportStatus\.APPROVED/);
   assert.match(service, /ResearchReportStatus\.PUBLISHED/);
   assert.match(service, /ConfigurableFormVersionStatus\.PUBLISHED/);
-  assert.match(page, /if\(!assignment\) notFound\(\)/);
+  assert.match(page, /if\(!assignment\)\s*notFound\(\)/);
 });
 
 test("client portal access mutations require client-management permission and are audited", async () => {
