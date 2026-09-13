@@ -1641,6 +1641,36 @@ enum AuditType {
   OTHER
 }
 
+enum AuditServiceClientStatus {
+  ACTIVE
+  ON_HOLD
+  ARCHIVED
+}
+
+enum AuditServiceEngagementKind {
+  INTERNAL
+  EXTERNAL
+}
+
+enum AuditServiceEngagementStatus {
+  DRAFT
+  PLANNING
+  READY
+  IN_PROGRESS
+  UNDER_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum AuditServiceEngagementTeamRole {
+  ENGAGEMENT_MANAGER
+  LEAD_AUDITOR
+  AUDITOR
+  TECHNICAL_EXPERT
+  INDEPENDENT_REVIEWER
+  OBSERVER
+}
+
 enum AuditTeamRole {
   LEAD_AUDITOR
   AUDITOR
@@ -2293,6 +2323,9 @@ model Organization {
 
   auditProgramsV2 AuditProgram[] @relation("AuditProgramOrganization")
 
+  auditServiceClients     AuditServiceClient[]
+  auditServiceEngagements AuditServiceEngagement[]
+
   auditSchedulesV2 AuditSchedule[] @relation("AuditScheduleOrganization")
 
   auditProtocolsV2 AuditProtocol[] @relation("AuditProtocolOrganization")
@@ -2832,13 +2865,21 @@ model User {
   assignedMocTasks MocTask[]            @relation("MocTaskAssignee")
   verifiedMocTasks MocTask[]            @relation("MocTaskVerifiedBy")
 
-  ownedAuditProgramsV2       AuditProgram[]            @relation("AuditProgramOwner")
-  ledAuditSchedulesV2        AuditSchedule[]           @relation("AuditScheduleLeadAuditor")
-  auditScheduleMembershipsV2 AuditScheduleTeamMember[] @relation("AuditScheduleTeamMemberUser")
-  createdAuditSchedulesV2    AuditSchedule[]           @relation("AuditScheduleCreatedBy")
-  updatedAuditSchedulesV2    AuditSchedule[]           @relation("AuditScheduleUpdatedBy")
-  createdAuditProtocolsV2    AuditProtocol[]           @relation("AuditProtocolCreatedBy")
-  updatedAuditProtocolsV2    AuditProtocol[]           @relation("AuditProtocolUpdatedBy")
+  ownedAuditProgramsV2              AuditProgram[]                     @relation("AuditProgramOwner")
+  createdAuditServiceClients        AuditServiceClient[]               @relation("AuditServiceClientCreatedBy")
+  updatedAuditServiceClients        AuditServiceClient[]               @relation("AuditServiceClientUpdatedBy")
+  ownedAuditServiceEngagements      AuditServiceEngagement[]           @relation("AuditServiceEngagementOwner")
+  managedAuditServiceEngagements    AuditServiceEngagement[]           @relation("AuditServiceEngagementManager")
+  ledAuditServiceEngagements        AuditServiceEngagement[]           @relation("AuditServiceEngagementLeadAuditor")
+  createdAuditServiceEngagements    AuditServiceEngagement[]           @relation("AuditServiceEngagementCreatedBy")
+  updatedAuditServiceEngagements    AuditServiceEngagement[]           @relation("AuditServiceEngagementUpdatedBy")
+  auditServiceEngagementMemberships AuditServiceEngagementTeamMember[] @relation("AuditServiceEngagementTeamMemberUser")
+  ledAuditSchedulesV2               AuditSchedule[]                    @relation("AuditScheduleLeadAuditor")
+  auditScheduleMembershipsV2        AuditScheduleTeamMember[]          @relation("AuditScheduleTeamMemberUser")
+  createdAuditSchedulesV2           AuditSchedule[]                    @relation("AuditScheduleCreatedBy")
+  updatedAuditSchedulesV2           AuditSchedule[]                    @relation("AuditScheduleUpdatedBy")
+  createdAuditProtocolsV2           AuditProtocol[]                    @relation("AuditProtocolCreatedBy")
+  updatedAuditProtocolsV2           AuditProtocol[]                    @relation("AuditProtocolUpdatedBy")
 
   ledEnterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditLeadAuditor")
 
@@ -3486,6 +3527,135 @@ model AuditFinding {
 // AUDIT MANAGEMENT 2.0 — PLANNING, SCHEDULING, AND PROTOCOLS
 // ============================================================
 
+model AuditServiceClient {
+  id             String @id @default(cuid())
+  organizationId String
+
+  reference String
+  name      String
+  legalName String?
+  industry  String?
+  country   String?
+  address   String?
+  website   String?
+  notes     String?
+
+  status AuditServiceClientStatus @default(ACTIVE)
+
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("AuditServiceClientCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?        @relation("AuditServiceClientUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  contacts    AuditServiceClientContact[]
+  engagements AuditServiceEngagement[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status, name])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model AuditServiceClientContact {
+  id       String @id @default(cuid())
+  clientId String
+
+  name     String
+  email    String
+  jobTitle String?
+  phone    String?
+
+  isPrimary                  Boolean @default(false)
+  isAuthorizedRepresentative Boolean @default(false)
+  isActive                   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client AuditServiceClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, email])
+  @@index([clientId, isActive])
+  @@index([clientId, isAuthorizedRepresentative])
+}
+
+model AuditServiceEngagement {
+  id             String  @id @default(cuid())
+  organizationId String
+  clientId       String?
+
+  reference String
+  title     String
+  kind      AuditServiceEngagementKind
+  status    AuditServiceEngagementStatus @default(DRAFT)
+
+  purpose    String
+  scope      String
+  objectives String?
+  criteria   String?
+
+  externalContractReference String?
+
+  ownerId       String?
+  managerId     String?
+  leadAuditorId String?
+
+  plannedStartDate   DateTime?
+  plannedEndDate     DateTime?
+  dueDate            DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       AuditServiceClient? @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  owner        User?               @relation("AuditServiceEngagementOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  manager      User?               @relation("AuditServiceEngagementManager", fields: [managerId], references: [id], onDelete: SetNull)
+  leadAuditor  User?               @relation("AuditServiceEngagementLeadAuditor", fields: [leadAuditorId], references: [id], onDelete: SetNull)
+  createdBy    User?               @relation("AuditServiceEngagementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?               @relation("AuditServiceEngagementUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  teamMembers AuditServiceEngagementTeamMember[]
+  audits      EnterpriseAudit[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, kind, status])
+  @@index([clientId, status])
+  @@index([ownerId])
+  @@index([managerId])
+  @@index([leadAuditorId])
+  @@index([dueDate, status])
+}
+
+model AuditServiceEngagementTeamMember {
+  id           String @id @default(cuid())
+  engagementId String
+  userId       String
+
+  role       AuditServiceEngagementTeamRole @default(AUDITOR)
+  isRequired Boolean                        @default(true)
+  assignedAt DateTime                       @default(now())
+  acceptedAt DateTime?
+  declinedAt DateTime?
+
+  engagement AuditServiceEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  user       User                   @relation("AuditServiceEngagementTeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([engagementId, userId])
+  @@index([userId])
+  @@index([engagementId, role])
+}
+
 model AuditProgram {
   id             String @id @default(cuid())
   organizationId String
@@ -3874,9 +4044,10 @@ model EnterpriseAudit {
 
   auditType AuditType @default(INTERNAL)
 
-  programId  String?
-  scheduleId String?
-  protocolId String?
+  programId    String?
+  scheduleId   String?
+  protocolId   String?
+  engagementId String?
 
   siteId       String
   departmentId String?
@@ -3935,6 +4106,8 @@ model EnterpriseAudit {
 
   protocol AuditProtocol? @relation("EnterpriseAuditProtocol", fields: [protocolId], references: [id], onDelete: SetNull)
 
+  engagement AuditServiceEngagement? @relation(fields: [engagementId], references: [id], onDelete: SetNull)
+
   site Site @relation("EnterpriseAuditSite", fields: [siteId], references: [id], onDelete: Restrict)
 
   department Department? @relation("EnterpriseAuditDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
@@ -3962,6 +4135,7 @@ model EnterpriseAudit {
   @@index([programId])
   @@index([scheduleId])
   @@index([protocolId])
+  @@index([engagementId])
   @@index([siteId, status])
   @@index([departmentId, status])
   @@index([leadAuditorId])

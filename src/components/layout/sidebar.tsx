@@ -54,6 +54,7 @@ import {
   Presentation,
   MessageSquareText,
   PanelsTopLeft,
+  BriefcaseBusiness,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -311,6 +312,12 @@ export const inspectionNavItems: NavigationItem[] = [
 ];
 
 export const auditNavItems: NavigationItem[] = [
+  {
+    label: "Audit Services",
+    href: "/audit-services",
+    icon: BriefcaseBusiness,
+    permission: PermissionKey.VIEW_AUDITS,
+  },
   {
     label: "Audit Workspace",
     href: "/audits",
