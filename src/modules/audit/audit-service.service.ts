@@ -234,6 +234,10 @@ export async function changeAuditServiceEngagementStatus(input: {
   if (!engagement) throw new Error("Audit engagement not found.");
   assertAuditServiceEngagementTransition(engagement.status, input.status);
   if (input.status === AuditServiceEngagementStatus.READY) {
+    if (engagement.planningStatus !== "APPROVED")
+      throw new Error(
+        "Approve the governed audit plan before engagement readiness.",
+      );
     if (
       !engagement.managerId ||
       !engagement.leadAuditorId ||
@@ -534,6 +538,13 @@ export function findAuditServiceEngagement(
       audits: {
         include: { site: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
+      },
+      independenceDeclarations: {
+        include: {
+          user: { select: { name: true, email: true } },
+          reviewedBy: { select: { name: true } },
+        },
+        orderBy: { declaredAt: "desc" },
       },
     },
   });

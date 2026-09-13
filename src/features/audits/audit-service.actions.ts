@@ -20,6 +20,16 @@ import {
   PermissionKey,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import {
+  declareAuditServiceIndependence,
+  reviewAuditServiceIndependence,
+  reviewAuditServicePlan,
+  submitAuditServicePlan,
+} from "@/modules/audit/audit-service-planning.service";
+import {
+  AuditIndependenceDecision,
+  AuditServiceRiskRating,
+} from "@prisma/client";
 
 const value = (data: FormData, key: string) =>
   String(data.get(key) ?? "").trim();
@@ -161,4 +171,72 @@ export async function linkAuditServiceEngagementAudit(data: FormData) {
   revalidatePath("/audit-services");
   revalidatePath(`/audit-services/engagements/${engagementId}`);
   revalidatePath("/audits");
+}
+
+export async function declareEngagementIndependence(data: FormData) {
+  const { organizationId, user } = await auditServiceContext();
+  await declareAuditServiceIndependence({
+    organizationId,
+    actorId: user.id,
+    engagementId: required(data, "engagementId"),
+    userId: user.id,
+    conflictDeclared: data.get("conflictDeclared") === "on",
+    declaration: required(data, "declaration"),
+    safeguards: value(data, "safeguards"),
+  });
+  revalidatePath(
+    `/audit-services/engagements/${required(data, "engagementId")}`,
+  );
+}
+
+export async function reviewEngagementIndependence(data: FormData) {
+  const { organizationId, user } = await auditServiceContext();
+  const decision = required(data, "decision") as AuditIndependenceDecision;
+  if (!Object.values(AuditIndependenceDecision).includes(decision))
+    throw new Error("Select a valid independence decision.");
+  await reviewAuditServiceIndependence({
+    organizationId,
+    reviewerId: user.id,
+    declarationId: required(data, "declarationId"),
+    decision,
+    notes: value(data, "notes"),
+  });
+  revalidatePath(
+    `/audit-services/engagements/${required(data, "engagementId")}`,
+  );
+}
+
+export async function submitEngagementPlan(data: FormData) {
+  const { organizationId, user } = await auditServiceContext();
+  const riskRating = required(data, "riskRating") as AuditServiceRiskRating;
+  if (!Object.values(AuditServiceRiskRating).includes(riskRating))
+    throw new Error("Select a valid risk rating.");
+  await submitAuditServicePlan({
+    organizationId,
+    userId: user.id,
+    engagementId: required(data, "engagementId"),
+    riskRating,
+    riskRationale: required(data, "riskRationale"),
+    planningNotes: value(data, "planningNotes"),
+  });
+  revalidatePath(
+    `/audit-services/engagements/${required(data, "engagementId")}`,
+  );
+}
+
+export async function reviewEngagementPlan(data: FormData) {
+  const { organizationId, user } = await auditServiceContext();
+  const decision = required(data, "decision");
+  if (decision !== "APPROVED" && decision !== "CHANGES_REQUESTED")
+    throw new Error("Select a valid planning decision.");
+  await reviewAuditServicePlan({
+    organizationId,
+    reviewerId: user.id,
+    engagementId: required(data, "engagementId"),
+    decision,
+    notes: value(data, "notes"),
+  });
+  revalidatePath(
+    `/audit-services/engagements/${required(data, "engagementId")}`,
+  );
 }

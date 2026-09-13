@@ -1671,6 +1671,27 @@ enum AuditServiceEngagementTeamRole {
   OBSERVER
 }
 
+enum AuditServicePlanningStatus {
+  DRAFT
+  SUBMITTED
+  CHANGES_REQUESTED
+  APPROVED
+}
+
+enum AuditServiceRiskRating {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AuditIndependenceDecision {
+  PENDING
+  CLEARED
+  MITIGATED
+  REJECTED
+}
+
 enum AuditTeamRole {
   LEAD_AUDITOR
   AUDITOR
@@ -2323,8 +2344,9 @@ model Organization {
 
   auditProgramsV2 AuditProgram[] @relation("AuditProgramOrganization")
 
-  auditServiceClients     AuditServiceClient[]
-  auditServiceEngagements AuditServiceEngagement[]
+  auditServiceClients                  AuditServiceClient[]
+  auditServiceEngagements              AuditServiceEngagement[]
+  auditServiceIndependenceDeclarations AuditServiceIndependenceDeclaration[]
 
   auditSchedulesV2 AuditSchedule[] @relation("AuditScheduleOrganization")
 
@@ -2865,21 +2887,25 @@ model User {
   assignedMocTasks MocTask[]            @relation("MocTaskAssignee")
   verifiedMocTasks MocTask[]            @relation("MocTaskVerifiedBy")
 
-  ownedAuditProgramsV2              AuditProgram[]                     @relation("AuditProgramOwner")
-  createdAuditServiceClients        AuditServiceClient[]               @relation("AuditServiceClientCreatedBy")
-  updatedAuditServiceClients        AuditServiceClient[]               @relation("AuditServiceClientUpdatedBy")
-  ownedAuditServiceEngagements      AuditServiceEngagement[]           @relation("AuditServiceEngagementOwner")
-  managedAuditServiceEngagements    AuditServiceEngagement[]           @relation("AuditServiceEngagementManager")
-  ledAuditServiceEngagements        AuditServiceEngagement[]           @relation("AuditServiceEngagementLeadAuditor")
-  createdAuditServiceEngagements    AuditServiceEngagement[]           @relation("AuditServiceEngagementCreatedBy")
-  updatedAuditServiceEngagements    AuditServiceEngagement[]           @relation("AuditServiceEngagementUpdatedBy")
-  auditServiceEngagementMemberships AuditServiceEngagementTeamMember[] @relation("AuditServiceEngagementTeamMemberUser")
-  ledAuditSchedulesV2               AuditSchedule[]                    @relation("AuditScheduleLeadAuditor")
-  auditScheduleMembershipsV2        AuditScheduleTeamMember[]          @relation("AuditScheduleTeamMemberUser")
-  createdAuditSchedulesV2           AuditSchedule[]                    @relation("AuditScheduleCreatedBy")
-  updatedAuditSchedulesV2           AuditSchedule[]                    @relation("AuditScheduleUpdatedBy")
-  createdAuditProtocolsV2           AuditProtocol[]                    @relation("AuditProtocolCreatedBy")
-  updatedAuditProtocolsV2           AuditProtocol[]                    @relation("AuditProtocolUpdatedBy")
+  ownedAuditProgramsV2                         AuditProgram[]                        @relation("AuditProgramOwner")
+  createdAuditServiceClients                   AuditServiceClient[]                  @relation("AuditServiceClientCreatedBy")
+  updatedAuditServiceClients                   AuditServiceClient[]                  @relation("AuditServiceClientUpdatedBy")
+  ownedAuditServiceEngagements                 AuditServiceEngagement[]              @relation("AuditServiceEngagementOwner")
+  managedAuditServiceEngagements               AuditServiceEngagement[]              @relation("AuditServiceEngagementManager")
+  ledAuditServiceEngagements                   AuditServiceEngagement[]              @relation("AuditServiceEngagementLeadAuditor")
+  createdAuditServiceEngagements               AuditServiceEngagement[]              @relation("AuditServiceEngagementCreatedBy")
+  updatedAuditServiceEngagements               AuditServiceEngagement[]              @relation("AuditServiceEngagementUpdatedBy")
+  auditServiceEngagementMemberships            AuditServiceEngagementTeamMember[]    @relation("AuditServiceEngagementTeamMemberUser")
+  submittedAuditServicePlans                   AuditServiceEngagement[]              @relation("AuditServicePlanningSubmittedBy")
+  reviewedAuditServicePlans                    AuditServiceEngagement[]              @relation("AuditServicePlanningReviewedBy")
+  auditServiceIndependenceDeclarations         AuditServiceIndependenceDeclaration[] @relation("AuditServiceIndependenceDeclarant")
+  reviewedAuditServiceIndependenceDeclarations AuditServiceIndependenceDeclaration[] @relation("AuditServiceIndependenceReviewer")
+  ledAuditSchedulesV2                          AuditSchedule[]                       @relation("AuditScheduleLeadAuditor")
+  auditScheduleMembershipsV2                   AuditScheduleTeamMember[]             @relation("AuditScheduleTeamMemberUser")
+  createdAuditSchedulesV2                      AuditSchedule[]                       @relation("AuditScheduleCreatedBy")
+  updatedAuditSchedulesV2                      AuditSchedule[]                       @relation("AuditScheduleUpdatedBy")
+  createdAuditProtocolsV2                      AuditProtocol[]                       @relation("AuditProtocolCreatedBy")
+  updatedAuditProtocolsV2                      AuditProtocol[]                       @relation("AuditProtocolUpdatedBy")
 
   ledEnterpriseAuditsV2 EnterpriseAudit[] @relation("EnterpriseAuditLeadAuditor")
 
@@ -3600,6 +3626,16 @@ model AuditServiceEngagement {
 
   externalContractReference String?
 
+  planningStatus        AuditServicePlanningStatus @default(DRAFT)
+  riskRating            AuditServiceRiskRating     @default(MEDIUM)
+  riskRationale         String?
+  planningNotes         String?
+  planningSubmittedById String?
+  planningSubmittedAt   DateTime?
+  planningReviewedById  String?
+  planningReviewedAt    DateTime?
+  planningReviewNotes   String?
+
   ownerId       String?
   managerId     String?
   leadAuditorId String?
@@ -3617,16 +3653,19 @@ model AuditServiceEngagement {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client       AuditServiceClient? @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  owner        User?               @relation("AuditServiceEngagementOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  manager      User?               @relation("AuditServiceEngagementManager", fields: [managerId], references: [id], onDelete: SetNull)
-  leadAuditor  User?               @relation("AuditServiceEngagementLeadAuditor", fields: [leadAuditorId], references: [id], onDelete: SetNull)
-  createdBy    User?               @relation("AuditServiceEngagementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy    User?               @relation("AuditServiceEngagementUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client              AuditServiceClient? @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  owner               User?               @relation("AuditServiceEngagementOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  manager             User?               @relation("AuditServiceEngagementManager", fields: [managerId], references: [id], onDelete: SetNull)
+  leadAuditor         User?               @relation("AuditServiceEngagementLeadAuditor", fields: [leadAuditorId], references: [id], onDelete: SetNull)
+  createdBy           User?               @relation("AuditServiceEngagementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy           User?               @relation("AuditServiceEngagementUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  planningSubmittedBy User?               @relation("AuditServicePlanningSubmittedBy", fields: [planningSubmittedById], references: [id], onDelete: SetNull)
+  planningReviewedBy  User?               @relation("AuditServicePlanningReviewedBy", fields: [planningReviewedById], references: [id], onDelete: SetNull)
 
-  teamMembers AuditServiceEngagementTeamMember[]
-  audits      EnterpriseAudit[]
+  teamMembers              AuditServiceEngagementTeamMember[]
+  audits                   EnterpriseAudit[]
+  independenceDeclarations AuditServiceIndependenceDeclaration[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, kind, status])
@@ -3635,6 +3674,33 @@ model AuditServiceEngagement {
   @@index([managerId])
   @@index([leadAuditorId])
   @@index([dueDate, status])
+}
+
+model AuditServiceIndependenceDeclaration {
+  id             String  @id @default(cuid())
+  organizationId String
+  engagementId   String
+  userId         String
+  reviewedById   String?
+
+  conflictDeclared Boolean                   @default(false)
+  declaration      String
+  safeguards       String?
+  decision         AuditIndependenceDecision @default(PENDING)
+  reviewNotes      String?
+  declaredAt       DateTime                  @default(now())
+  reviewedAt       DateTime?
+  updatedAt        DateTime                  @updatedAt
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  engagement   AuditServiceEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  user         User                   @relation("AuditServiceIndependenceDeclarant", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy   User?                  @relation("AuditServiceIndependenceReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([engagementId, userId])
+  @@index([organizationId, decision])
+  @@index([userId])
+  @@index([reviewedById])
 }
 
 model AuditServiceEngagementTeamMember {

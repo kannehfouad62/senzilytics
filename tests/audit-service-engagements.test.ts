@@ -133,3 +133,42 @@ test("audit client and engagement operations preserve tenant ownership and exist
   assert.match(engagementPage, /engagementId: null/);
   assert.match(engagementPage, /href=\{`\/audits\/\$\{audit\.id\}`\}/);
 });
+
+test("audit planning requires independent conflict review and approval", async () => {
+  const [planning, service, schema, migration] = await Promise.all([
+    readFile(
+      new URL(
+        "../src/modules/audit/audit-service-planning.service.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/modules/audit/audit-service.service.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../prisma/migrations/20260921120000_audit_service_planning_governance/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+  assert.match(
+    planning,
+    /A declarant cannot review their own independence declaration/,
+  );
+  assert.match(planning, /The plan submitter cannot approve their own plan/);
+  assert.match(planning, /auditPlanningReadiness/);
+  assert.match(
+    service,
+    /Approve the governed audit plan before engagement readiness/,
+  );
+  assert.match(schema, /model AuditServiceIndependenceDeclaration/);
+  assert.match(
+    migration,
+    /AuditServiceIndependenceDeclaration_engagementId_userId_key/,
+  );
+});

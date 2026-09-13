@@ -1,0 +1,15 @@
+CREATE TYPE "AuditServicePlanningStatus" AS ENUM ('DRAFT','SUBMITTED','CHANGES_REQUESTED','APPROVED');
+CREATE TYPE "AuditServiceRiskRating" AS ENUM ('LOW','MEDIUM','HIGH','CRITICAL');
+CREATE TYPE "AuditIndependenceDecision" AS ENUM ('PENDING','CLEARED','MITIGATED','REJECTED');
+ALTER TABLE "AuditServiceEngagement" ADD COLUMN "planningStatus" "AuditServicePlanningStatus" NOT NULL DEFAULT 'DRAFT', ADD COLUMN "riskRating" "AuditServiceRiskRating" NOT NULL DEFAULT 'MEDIUM', ADD COLUMN "riskRationale" TEXT, ADD COLUMN "planningNotes" TEXT, ADD COLUMN "planningSubmittedById" TEXT, ADD COLUMN "planningSubmittedAt" TIMESTAMP(3), ADD COLUMN "planningReviewedById" TEXT, ADD COLUMN "planningReviewedAt" TIMESTAMP(3), ADD COLUMN "planningReviewNotes" TEXT;
+CREATE TABLE "AuditServiceIndependenceDeclaration" ("id" TEXT NOT NULL,"organizationId" TEXT NOT NULL,"engagementId" TEXT NOT NULL,"userId" TEXT NOT NULL,"reviewedById" TEXT,"conflictDeclared" BOOLEAN NOT NULL DEFAULT false,"declaration" TEXT NOT NULL,"safeguards" TEXT,"decision" "AuditIndependenceDecision" NOT NULL DEFAULT 'PENDING',"reviewNotes" TEXT,"declaredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"reviewedAt" TIMESTAMP(3),"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "AuditServiceIndependenceDeclaration_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "AuditServiceIndependenceDeclaration_engagementId_userId_key" ON "AuditServiceIndependenceDeclaration"("engagementId","userId");
+CREATE INDEX "AuditServiceIndependenceDeclaration_organizationId_decision_idx" ON "AuditServiceIndependenceDeclaration"("organizationId","decision");
+CREATE INDEX "AuditServiceIndependenceDeclaration_userId_idx" ON "AuditServiceIndependenceDeclaration"("userId");
+CREATE INDEX "AuditServiceIndependenceDeclaration_reviewedById_idx" ON "AuditServiceIndependenceDeclaration"("reviewedById");
+ALTER TABLE "AuditServiceEngagement" ADD CONSTRAINT "AuditServiceEngagement_planningSubmittedById_fkey" FOREIGN KEY ("planningSubmittedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "AuditServiceEngagement" ADD CONSTRAINT "AuditServiceEngagement_planningReviewedById_fkey" FOREIGN KEY ("planningReviewedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "AuditServiceIndependenceDeclaration" ADD CONSTRAINT "AuditServiceIndependenceDeclaration_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AuditServiceIndependenceDeclaration" ADD CONSTRAINT "AuditServiceIndependenceDeclaration_engagementId_fkey" FOREIGN KEY ("engagementId") REFERENCES "AuditServiceEngagement"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AuditServiceIndependenceDeclaration" ADD CONSTRAINT "AuditServiceIndependenceDeclaration_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AuditServiceIndependenceDeclaration" ADD CONSTRAINT "AuditServiceIndependenceDeclaration_reviewedById_fkey" FOREIGN KEY ("reviewedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
