@@ -4,6 +4,7 @@ import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { processIntegrationWebhookDeliveries } from "@/modules/integrations/webhook-delivery.service";
 import { processMobilePushDeliveries } from "@/modules/mobile/mobile-push.service";
 import { processResearchFieldworkSla } from "@/modules/research/research-fieldwork-sla.service";
+import { processResearchGovernanceMonitoring } from "@/modules/research/research-governance-monitor.service";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -36,12 +37,14 @@ export async function GET(request: NextRequest) {
       integrationResult,
       mobilePushResult,
       researchFieldworkResult,
+      researchGovernanceResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
       processMocSlaNotifications(),
       processIntegrationWebhookDeliveries(),
       processMobilePushDeliveries(),
       processResearchFieldworkSla(),
+      processResearchGovernanceMonitoring(),
     ]);
 
     return NextResponse.json({
@@ -57,6 +60,8 @@ export async function GET(request: NextRequest) {
       mobilePush: mobilePushResult,
 
       researchFieldwork: researchFieldworkResult,
+
+      researchGovernance: researchGovernanceResult,
     });
   } catch (error) {
     console.error(

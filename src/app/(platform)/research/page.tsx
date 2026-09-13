@@ -29,6 +29,7 @@ export default async function ResearchPortfolioPage() {
   ]);
   const portfolio = await listResearchPortfolio(organizationId);
   const canCreate = permissions.includes(PermissionKey.CREATE_RESEARCH_PROJECT);
+  const canManageGovernance = permissions.includes(PermissionKey.MANAGE_RESEARCH_DATASETS);
   const statusData = groupCounts(
     portfolio.projects.map((project) => pretty(project.status)),
   );
@@ -61,6 +62,15 @@ export default async function ResearchPortfolioPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
+          {canManageGovernance ? (
+            <Link
+              href="/research/governance"
+              className="inline-flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 px-5 py-3 font-semibold text-amber-200"
+            >
+              <ShieldCheck size={17} />
+              Governance monitoring
+            </Link>
+          ) : null}
           <Link
             href="/research/longitudinal"
             className="inline-flex items-center gap-2 rounded-xl border border-violet-400/25 bg-violet-400/10 px-5 py-3 font-semibold text-violet-200"

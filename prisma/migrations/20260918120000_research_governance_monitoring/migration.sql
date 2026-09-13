@@ -1,0 +1,6 @@
+CREATE TABLE "ResearchGovernanceReminder" ("id" TEXT NOT NULL,"organizationId" TEXT NOT NULL,"recipientId" TEXT NOT NULL,"targetType" TEXT NOT NULL,"targetId" TEXT NOT NULL,"reminderKind" TEXT NOT NULL,"dueAt" TIMESTAMP(3) NOT NULL,"sentAt" TIMESTAMP(3),"emailSent" BOOLEAN NOT NULL DEFAULT false,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "ResearchGovernanceReminder_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "ResearchGovernanceReminder_organizationId_recipientId_targetType_targetId_reminderKind_dueAt_key" ON "ResearchGovernanceReminder"("organizationId","recipientId","targetType","targetId","reminderKind","dueAt");
+CREATE INDEX "ResearchGovernanceReminder_organizationId_sentAt_dueAt_idx" ON "ResearchGovernanceReminder"("organizationId","sentAt","dueAt");
+CREATE INDEX "ResearchGovernanceReminder_recipientId_sentAt_idx" ON "ResearchGovernanceReminder"("recipientId","sentAt");
+ALTER TABLE "ResearchGovernanceReminder" ADD CONSTRAINT "ResearchGovernanceReminder_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ResearchGovernanceReminder" ADD CONSTRAINT "ResearchGovernanceReminder_recipientId_fkey" FOREIGN KEY ("recipientId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

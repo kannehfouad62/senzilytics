@@ -2418,6 +2418,7 @@ model Organization {
   researchDataLifecyclePlans         ResearchDataLifecyclePlan[]
   researchPrivacyReviews             ResearchPrivacyReview[]
   researchDatasetAccessRequests      ResearchDatasetAccessRequest[]
+  researchGovernanceReminders        ResearchGovernanceReminder[]
 }
 
 model PricingInquiry {
@@ -2797,6 +2798,7 @@ model User {
   reviewedResearchPrivacyReviews             ResearchPrivacyReview[]             @relation("ResearchPrivacyReviewReviewer")
   requestedResearchDatasetAccess             ResearchDatasetAccessRequest[]      @relation("ResearchDatasetAccessRequester")
   decidedResearchDatasetAccess               ResearchDatasetAccessRequest[]      @relation("ResearchDatasetAccessDecider")
+  researchGovernanceReminders                ResearchGovernanceReminder[]        @relation("ResearchGovernanceReminderRecipient")
 
   requestedChanges ManagementOfChange[] @relation("MocRequestor")
   ownedChanges     ManagementOfChange[] @relation("MocOwner")
@@ -8690,6 +8692,26 @@ model ResearchDatasetAccessRequest {
   @@index([organizationId, status, accessExpiresAt])
   @@index([projectId, datasetReference, status])
   @@index([requestedById, status])
+}
+
+model ResearchGovernanceReminder {
+  id             String    @id @default(cuid())
+  organizationId String
+  recipientId    String
+  targetType     String
+  targetId       String
+  reminderKind   String
+  dueAt          DateTime
+  sentAt         DateTime?
+  emailSent      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recipient    User         @relation("ResearchGovernanceReminderRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, recipientId, targetType, targetId, reminderKind, dueAt])
+  @@index([organizationId, sentAt, dueAt])
+  @@index([recipientId, sentAt])
 }
 
 model ResearchTeamMember {
