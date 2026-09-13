@@ -8,6 +8,7 @@ const common = new Set([
 
 const profiles: Partial<Record<IndustryCategory, readonly string[]>> = {
   RESEARCH_AND_ANALYTICS: ["/research", "/intelligence", "/compliance", "/audits"],
+  AUDIT_AND_ASSURANCE_SERVICES: ["/audits", "/audit-services", "/compliance", "/risks", "/documents", "/workflows", "/performance", "/management-reviews", "/reports", "/intelligence"],
   CONSTRUCTION_AND_ENGINEERING: ["/incidents", "/observations", "/risks", "/moc", "/assets", "/contractors", "/permits-to-work", "/inspections", "/audits", "/training", "/compliance", "/emergency"],
   MANUFACTURING: ["/incidents", "/observations", "/risks", "/moc", "/assets", "/chemicals", "/industrial-hygiene", "/occupational-health", "/inspections", "/audits", "/training", "/compliance", "/emergency", "/environmental"],
   ENERGY_AND_MINING: ["/incidents", "/observations", "/risks", "/moc", "/assets", "/contractors", "/permits-to-work", "/industrial-hygiene", "/occupational-health", "/assurance", "/inspections", "/audits", "/training", "/compliance", "/emergency", "/environmental", "/esg"],
@@ -31,6 +32,7 @@ export function filterIndustryRecommendedModules<T extends { href: string }>(cat
 export const industryCategoryLabels: Record<IndustryCategory, string> = {
   GENERAL: "General / Show all modules",
   RESEARCH_AND_ANALYTICS: "Research, Statistics & Analytics",
+  AUDIT_AND_ASSURANCE_SERVICES: "Audit, Assurance & Compliance Services",
   CONSTRUCTION_AND_ENGINEERING: "Construction & Engineering",
   MANUFACTURING: "Manufacturing",
   ENERGY_AND_MINING: "Energy, Utilities & Mining",

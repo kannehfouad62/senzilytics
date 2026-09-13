@@ -24,6 +24,7 @@ enum OrganizationStatus {
 enum IndustryCategory {
   GENERAL
   RESEARCH_AND_ANALYTICS
+  AUDIT_AND_ASSURANCE_SERVICES
   CONSTRUCTION_AND_ENGINEERING
   MANUFACTURING
   ENERGY_AND_MINING
@@ -32,6 +33,11 @@ enum IndustryCategory {
   PUBLIC_SECTOR_AND_EDUCATION
   PROFESSIONAL_SERVICES
   OTHER
+}
+
+enum TenantModuleAssignmentSource {
+  INDUSTRY_DEFAULT
+  MANUAL
 }
 
 enum SubscriptionPlan {
@@ -2253,19 +2259,20 @@ enum EnterpriseAuditHistoryAction {
 }
 
 model Organization {
-  id                    String             @id @default(cuid())
+  id                    String                   @id @default(cuid())
   name                  String
   industry              String?
-  industryCategory      IndustryCategory   @default(GENERAL)
+  industryCategory      IndustryCategory         @default(GENERAL)
   address               String?
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
-  status                OrganizationStatus @default(ACTIVE)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  status                OrganizationStatus       @default(ACTIVE)
   allowedEmailDomains   String[]
-  isDemo                Boolean            @default(false)
-  subscriptionPlan      SubscriptionPlan   @default(PREMIUM)
+  isDemo                Boolean                  @default(false)
+  subscriptionPlan      SubscriptionPlan         @default(PREMIUM)
   contractedUserMinimum Int?
   subscriptionNotes     String?
+  moduleAssignments     TenantModuleAssignment[]
 
   sites                        Site[]
   users                        User[]
@@ -2421,6 +2428,24 @@ model Organization {
   researchGovernanceReminders        ResearchGovernanceReminder[]
 }
 
+model TenantModuleAssignment {
+  id             String                       @id @default(cuid())
+  organizationId String
+  moduleKey      String
+  enabled        Boolean                      @default(true)
+  source         TenantModuleAssignmentSource @default(MANUAL)
+  assignedById   String?
+  assignedAt     DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedBy   User?        @relation("TenantModuleAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, moduleKey])
+  @@index([organizationId, enabled])
+  @@index([assignedById])
+}
+
 model PricingInquiry {
   id            String           @id @default(cuid())
   fullName      String
@@ -2542,8 +2567,9 @@ model User {
   sessionVersion  Int       @default(0)
   demoExpiresAt   DateTime?
 
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId        String?
+  organization          Organization?            @relation(fields: [organizationId], references: [id])
+  assignedTenantModules TenantModuleAssignment[] @relation("TenantModuleAssignedBy")
 
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
