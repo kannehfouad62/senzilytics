@@ -9,16 +9,20 @@ import {
   changeAuditServiceEngagementStatus,
   createAuditServiceClientRecord,
   createAuditServiceEngagementRecord,
+  changeAuditServiceClientStatus,
+  linkEnterpriseAuditToEngagement,
 } from "@/modules/audit/audit-service.service";
 import {
   AuditServiceEngagementKind,
+  AuditServiceClientStatus,
   AuditServiceEngagementStatus,
   AuditServiceEngagementTeamRole,
   PermissionKey,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
-const value = (data: FormData, key: string) => String(data.get(key) ?? "").trim();
+const value = (data: FormData, key: string) =>
+  String(data.get(key) ?? "").trim();
 const required = (data: FormData, key: string) => {
   const result = value(data, key);
   if (!result) throw new Error(`${key} is required.`);
@@ -28,7 +32,8 @@ const optionalDate = (data: FormData, key: string) => {
   const raw = value(data, key);
   if (!raw) return null;
   const date = new Date(`${raw}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) throw new Error(`${key} is not a valid date.`);
+  if (Number.isNaN(date.getTime()))
+    throw new Error(`${key} is not a valid date.`);
   return date;
 };
 
@@ -75,7 +80,8 @@ export async function createAuditServiceContact(data: FormData) {
 export async function createAuditServiceEngagement(data: FormData) {
   const { organizationId, user } = await auditServiceContext();
   const kind = required(data, "kind") as AuditServiceEngagementKind;
-  if (!Object.values(AuditServiceEngagementKind).includes(kind)) throw new Error("Select a valid engagement kind.");
+  if (!Object.values(AuditServiceEngagementKind).includes(kind))
+    throw new Error("Select a valid engagement kind.");
   await createAuditServiceEngagementRecord({
     organizationId,
     userId: user.id,
@@ -101,7 +107,8 @@ export async function createAuditServiceEngagement(data: FormData) {
 export async function updateAuditServiceEngagementStatus(data: FormData) {
   const { organizationId, user } = await auditServiceContext();
   const status = required(data, "status") as AuditServiceEngagementStatus;
-  if (!Object.values(AuditServiceEngagementStatus).includes(status)) throw new Error("Select a valid engagement status.");
+  if (!Object.values(AuditServiceEngagementStatus).includes(status))
+    throw new Error("Select a valid engagement status.");
   await changeAuditServiceEngagementStatus({
     organizationId,
     userId: user.id,
@@ -115,7 +122,8 @@ export async function updateAuditServiceEngagementStatus(data: FormData) {
 export async function assignAuditServiceEngagementMember(data: FormData) {
   const { organizationId, user } = await auditServiceContext();
   const role = required(data, "role") as AuditServiceEngagementTeamRole;
-  if (!Object.values(AuditServiceEngagementTeamRole).includes(role)) throw new Error("Select a valid engagement role.");
+  if (!Object.values(AuditServiceEngagementTeamRole).includes(role))
+    throw new Error("Select a valid engagement role.");
   await addAuditServiceEngagementTeamMember({
     organizationId,
     userId: user.id,
@@ -124,4 +132,33 @@ export async function assignAuditServiceEngagementMember(data: FormData) {
     role,
   });
   revalidatePath("/audit-services");
+}
+
+export async function updateAuditServiceClientStatus(data: FormData) {
+  const { organizationId, user } = await auditServiceContext();
+  const status = required(data, "status") as AuditServiceClientStatus;
+  if (!Object.values(AuditServiceClientStatus).includes(status))
+    throw new Error("Select a valid client status.");
+  await changeAuditServiceClientStatus({
+    organizationId,
+    userId: user.id,
+    clientId: required(data, "clientId"),
+    status,
+  });
+  revalidatePath("/audit-services");
+  revalidatePath(`/audit-services/clients/${required(data, "clientId")}`);
+}
+
+export async function linkAuditServiceEngagementAudit(data: FormData) {
+  const { organizationId, user } = await auditServiceContext();
+  const engagementId = required(data, "engagementId");
+  await linkEnterpriseAuditToEngagement({
+    organizationId,
+    userId: user.id,
+    engagementId,
+    auditId: required(data, "auditId"),
+  });
+  revalidatePath("/audit-services");
+  revalidatePath(`/audit-services/engagements/${engagementId}`);
+  revalidatePath("/audits");
 }

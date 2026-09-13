@@ -2,6 +2,7 @@ import { logActivity } from "@/core/activity-log/activity-log.service";
 import { prisma } from "@/lib/prisma";
 import {
   ActivityAction,
+  AuditServiceClientStatus,
   AuditServiceEngagementKind,
   AuditServiceEngagementStatus,
 } from "@prisma/client";
@@ -85,7 +86,7 @@ export async function addAuditServiceClientContact(input: {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error("Enter a valid contact email address.");
   }
-  const contact = await prisma.$transaction(async transaction => {
+  const contact = await prisma.$transaction(async (transaction) => {
     if (input.isPrimary) {
       await transaction.auditServiceClientContact.updateMany({
         where: { clientId: client.id },
@@ -145,21 +146,42 @@ export async function createAuditServiceEngagementRecord(input: {
     throw new Error("External engagements require an audit client.");
   }
   if (input.kind === AuditServiceEngagementKind.INTERNAL && clientId) {
-    throw new Error("Internal engagements cannot be assigned to an external client.");
+    throw new Error(
+      "Internal engagements cannot be assigned to an external client.",
+    );
   }
-  if (clientId && !(await prisma.auditServiceClient.findFirst({
-    where: { id: clientId, organizationId: input.organizationId, status: { not: "ARCHIVED" } },
-    select: { id: true },
-  }))) throw new Error("Select an active audit client in this tenant.");
+  if (
+    clientId &&
+    !(await prisma.auditServiceClient.findFirst({
+      where: {
+        id: clientId,
+        organizationId: input.organizationId,
+        status: { not: "ARCHIVED" },
+      },
+      select: { id: true },
+    }))
+  )
+    throw new Error("Select an active audit client in this tenant.");
 
-  const userIds = [input.ownerId, input.managerId, input.leadAuditorId].filter(Boolean) as string[];
+  const userIds = [input.ownerId, input.managerId, input.leadAuditorId].filter(
+    Boolean,
+  ) as string[];
   if (userIds.length) {
     const matched = await prisma.user.count({
-      where: { id: { in: [...new Set(userIds)] }, organizationId: input.organizationId, isActive: true },
+      where: {
+        id: { in: [...new Set(userIds)] },
+        organizationId: input.organizationId,
+        isActive: true,
+      },
     });
-    if (matched !== new Set(userIds).size) throw new Error("Select active team members in this tenant.");
+    if (matched !== new Set(userIds).size)
+      throw new Error("Select active team members in this tenant.");
   }
-  if (input.plannedStartDate && input.plannedEndDate && input.plannedEndDate < input.plannedStartDate) {
+  if (
+    input.plannedStartDate &&
+    input.plannedEndDate &&
+    input.plannedEndDate < input.plannedStartDate
+  ) {
     throw new Error("Planned end date cannot precede the start date.");
   }
 
@@ -212,13 +234,26 @@ export async function changeAuditServiceEngagementStatus(input: {
   if (!engagement) throw new Error("Audit engagement not found.");
   assertAuditServiceEngagementTransition(engagement.status, input.status);
   if (input.status === AuditServiceEngagementStatus.READY) {
-    if (!engagement.managerId || !engagement.leadAuditorId || !engagement.plannedStartDate || !engagement.dueDate) {
-      throw new Error("Ready engagements require a manager, lead auditor, planned start date, and due date.");
+    if (
+      !engagement.managerId ||
+      !engagement.leadAuditorId ||
+      !engagement.plannedStartDate ||
+      !engagement.dueDate
+    ) {
+      throw new Error(
+        "Ready engagements require a manager, lead auditor, planned start date, and due date.",
+      );
     }
-    if (engagement._count.teamMembers < 1) throw new Error("Assign at least one engagement team member before readiness.");
+    if (engagement._count.teamMembers < 1)
+      throw new Error(
+        "Assign at least one engagement team member before readiness.",
+      );
   }
   const cancellationReason = clean(input.cancellationReason, 1000);
-  if (input.status === AuditServiceEngagementStatus.CANCELLED && !cancellationReason) {
+  if (
+    input.status === AuditServiceEngagementStatus.CANCELLED &&
+    !cancellationReason
+  ) {
     throw new Error("A cancellation reason is required.");
   }
   const now = new Date();
@@ -227,10 +262,23 @@ export async function changeAuditServiceEngagementStatus(input: {
     data: {
       status: input.status,
       updatedById: input.userId,
-      startedAt: input.status === AuditServiceEngagementStatus.IN_PROGRESS && !engagement.startedAt ? now : undefined,
-      completedAt: input.status === AuditServiceEngagementStatus.COMPLETED ? now : undefined,
-      cancelledAt: input.status === AuditServiceEngagementStatus.CANCELLED ? now : undefined,
-      cancellationReason: input.status === AuditServiceEngagementStatus.CANCELLED ? cancellationReason : undefined,
+      startedAt:
+        input.status === AuditServiceEngagementStatus.IN_PROGRESS &&
+        !engagement.startedAt
+          ? now
+          : undefined,
+      completedAt:
+        input.status === AuditServiceEngagementStatus.COMPLETED
+          ? now
+          : undefined,
+      cancelledAt:
+        input.status === AuditServiceEngagementStatus.CANCELLED
+          ? now
+          : undefined,
+      cancellationReason:
+        input.status === AuditServiceEngagementStatus.CANCELLED
+          ? cancellationReason
+          : undefined,
     },
   });
   await logActivity({
@@ -254,17 +302,36 @@ export async function addAuditServiceEngagementTeamMember(input: {
   role: import("@prisma/client").AuditServiceEngagementTeamRole;
 }) {
   const [engagement, member] = await Promise.all([
-    prisma.auditServiceEngagement.findFirst({ where: { id: input.engagementId, organizationId: input.organizationId }, select: { id: true, status: true } }),
-    prisma.user.findFirst({ where: { id: input.memberUserId, organizationId: input.organizationId, isActive: true }, select: { id: true, name: true } }),
+    prisma.auditServiceEngagement.findFirst({
+      where: { id: input.engagementId, organizationId: input.organizationId },
+      select: { id: true, status: true },
+    }),
+    prisma.user.findFirst({
+      where: {
+        id: input.memberUserId,
+        organizationId: input.organizationId,
+        isActive: true,
+      },
+      select: { id: true, name: true },
+    }),
   ]);
   if (!engagement) throw new Error("Audit engagement not found.");
   if (!member) throw new Error("Select an active tenant user.");
-  if (engagement.status === AuditServiceEngagementStatus.COMPLETED || engagement.status === AuditServiceEngagementStatus.CANCELLED) {
+  if (
+    engagement.status === AuditServiceEngagementStatus.COMPLETED ||
+    engagement.status === AuditServiceEngagementStatus.CANCELLED
+  ) {
     throw new Error("A terminal engagement team cannot be changed.");
   }
   const assignment = await prisma.auditServiceEngagementTeamMember.upsert({
-    where: { engagementId_userId: { engagementId: engagement.id, userId: member.id } },
-    create: { engagementId: engagement.id, userId: member.id, role: input.role },
+    where: {
+      engagementId_userId: { engagementId: engagement.id, userId: member.id },
+    },
+    create: {
+      engagementId: engagement.id,
+      userId: member.id,
+      role: input.role,
+    },
     update: { role: input.role, declinedAt: null },
   });
   await logActivity({
@@ -280,27 +347,194 @@ export async function addAuditServiceEngagementTeamMember(input: {
   return assignment;
 }
 
-export async function findAuditServiceWorkspace(organizationId: string, query?: string) {
+export async function findAuditServiceWorkspace(
+  organizationId: string,
+  query?: string,
+) {
   const search = clean(query, 120);
   const [clients, engagements] = await Promise.all([
     prisma.auditServiceClient.findMany({
       where: {
         organizationId,
-        ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { reference: { contains: search, mode: "insensitive" } }] } : {}),
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { reference: { contains: search, mode: "insensitive" } },
+              ],
+            }
+          : {}),
       },
-      include: { contacts: { where: { isActive: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] }, _count: { select: { engagements: true } } },
+      include: {
+        contacts: {
+          where: { isActive: true },
+          orderBy: [{ isPrimary: "desc" }, { name: "asc" }],
+        },
+        _count: { select: { engagements: true } },
+      },
       orderBy: { name: "asc" },
       take: 100,
     }),
     prisma.auditServiceEngagement.findMany({
       where: {
         organizationId,
-        ...(search ? { OR: [{ title: { contains: search, mode: "insensitive" } }, { reference: { contains: search, mode: "insensitive" } }, { client: { name: { contains: search, mode: "insensitive" } } }] } : {}),
+        ...(search
+          ? {
+              OR: [
+                { title: { contains: search, mode: "insensitive" } },
+                { reference: { contains: search, mode: "insensitive" } },
+                { client: { name: { contains: search, mode: "insensitive" } } },
+              ],
+            }
+          : {}),
       },
-      include: { client: true, manager: { select: { name: true } }, leadAuditor: { select: { name: true } }, teamMembers: { include: { user: { select: { name: true } } } }, _count: { select: { audits: true } } },
+      include: {
+        client: true,
+        manager: { select: { name: true } },
+        leadAuditor: { select: { name: true } },
+        teamMembers: { include: { user: { select: { name: true } } } },
+        _count: { select: { audits: true } },
+      },
       orderBy: { updatedAt: "desc" },
       take: 100,
     }),
   ]);
   return { clients, engagements };
+}
+
+export async function changeAuditServiceClientStatus(input: {
+  organizationId: string;
+  userId: string;
+  clientId: string;
+  status: AuditServiceClientStatus;
+}) {
+  const client = await prisma.auditServiceClient.findFirst({
+    where: { id: input.clientId, organizationId: input.organizationId },
+  });
+  if (!client) throw new Error("Audit client not found.");
+  if (client.status === AuditServiceClientStatus.ARCHIVED)
+    throw new Error("An archived audit client cannot be reopened.");
+  if (input.status === AuditServiceClientStatus.ARCHIVED) {
+    const open = await prisma.auditServiceEngagement.count({
+      where: {
+        clientId: client.id,
+        organizationId: input.organizationId,
+        status: {
+          notIn: [
+            AuditServiceEngagementStatus.COMPLETED,
+            AuditServiceEngagementStatus.CANCELLED,
+          ],
+        },
+      },
+    });
+    if (open)
+      throw new Error(
+        "Complete or cancel all open client engagements before archival.",
+      );
+  }
+  const updated = await prisma.auditServiceClient.update({
+    where: { id: client.id },
+    data: { status: input.status, updatedById: input.userId },
+  });
+  await logActivity({
+    organizationId: input.organizationId,
+    userId: input.userId,
+    action: ActivityAction.UPDATE,
+    entityType: "AuditServiceClient",
+    entityId: client.id,
+    title: "Audit client status changed",
+    description: `${client.status} → ${updated.status}`,
+  });
+  return updated;
+}
+
+export async function linkEnterpriseAuditToEngagement(input: {
+  organizationId: string;
+  userId: string;
+  engagementId: string;
+  auditId: string;
+}) {
+  const [engagement, audit] = await Promise.all([
+    prisma.auditServiceEngagement.findFirst({
+      where: { id: input.engagementId, organizationId: input.organizationId },
+      select: { id: true, reference: true, status: true },
+    }),
+    prisma.enterpriseAudit.findFirst({
+      where: { id: input.auditId, organizationId: input.organizationId },
+      select: { id: true, reference: true, engagementId: true },
+    }),
+  ]);
+  if (!engagement) throw new Error("Audit engagement not found.");
+  if (!audit) throw new Error("Enterprise audit not found.");
+  if (
+    engagement.status === AuditServiceEngagementStatus.COMPLETED ||
+    engagement.status === AuditServiceEngagementStatus.CANCELLED
+  )
+    throw new Error("Audits cannot be linked to a terminal engagement.");
+  if (audit.engagementId && audit.engagementId !== engagement.id)
+    throw new Error("This audit is already linked to another engagement.");
+  await prisma.enterpriseAudit.update({
+    where: { id: audit.id },
+    data: { engagementId: engagement.id, updatedById: input.userId },
+  });
+  await logActivity({
+    organizationId: input.organizationId,
+    userId: input.userId,
+    action: ActivityAction.UPDATE,
+    entityType: "AuditServiceEngagement",
+    entityId: engagement.id,
+    title: "Enterprise audit linked to engagement",
+    description: `${audit.reference} → ${engagement.reference}`,
+    metadata: { auditId: audit.id },
+  });
+}
+
+export function findAuditServiceClient(
+  organizationId: string,
+  clientId: string,
+) {
+  return prisma.auditServiceClient.findFirst({
+    where: { id: clientId, organizationId },
+    include: {
+      contacts: { orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
+      engagements: {
+        include: {
+          manager: { select: { name: true } },
+          leadAuditor: { select: { name: true } },
+          _count: { select: { audits: true } },
+        },
+        orderBy: { updatedAt: "desc" },
+      },
+    },
+  });
+}
+
+export function findAuditServiceEngagement(
+  organizationId: string,
+  engagementId: string,
+) {
+  return prisma.auditServiceEngagement.findFirst({
+    where: { id: engagementId, organizationId },
+    include: {
+      client: {
+        include: {
+          contacts: {
+            where: { isActive: true },
+            orderBy: [{ isPrimary: "desc" }, { name: "asc" }],
+          },
+        },
+      },
+      owner: { select: { name: true } },
+      manager: { select: { name: true } },
+      leadAuditor: { select: { name: true } },
+      teamMembers: {
+        include: { user: { select: { name: true, email: true } } },
+        orderBy: { assignedAt: "asc" },
+      },
+      audits: {
+        include: { site: { select: { name: true } } },
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
 }
