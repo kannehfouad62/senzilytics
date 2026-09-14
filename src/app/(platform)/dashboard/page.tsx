@@ -11,6 +11,8 @@ import {
 } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
 import { getResearchExecutiveSummary } from "@/modules/research/research-executive-summary.service";
+import { getAuditServiceAnalytics } from "@/modules/audit/audit-service-analytics.service";
+import { organizationHasAuditServices } from "@/modules/audit/audit-services-entitlement";
 import { PermissionKey } from "@prisma/client";
 import {
   AlertTriangle,
@@ -78,9 +80,15 @@ export default async function DashboardPage({
     filters: parseExecutiveDashboardFilters(params),
   });
   const allowed = new Set(permissions);
-  const research = allowed.has(PermissionKey.VIEW_RESEARCH)
-    ? await getResearchExecutiveSummary(organizationId, dashboard.filters.days)
-    : null;
+  const [research, auditServices] = await Promise.all([
+    allowed.has(PermissionKey.VIEW_RESEARCH)
+      ? getResearchExecutiveSummary(organizationId, dashboard.filters.days)
+      : null,
+    allowed.has(PermissionKey.VIEW_AUDITS) &&
+    (await organizationHasAuditServices(organizationId))
+      ? getAuditServiceAnalytics(organizationId, dashboard.filters.days)
+      : null,
+  ]);
   const query = new URLSearchParams({
     days: String(dashboard.filters.days),
     ...(dashboard.scope.siteId ? { siteId: dashboard.scope.siteId } : {}),
@@ -266,6 +274,21 @@ export default async function DashboardPage({
         modules={dashboard.portfolio.modules}
         attentionCount={dashboard.portfolio.attentionCount}
       />
+
+      {auditServices ? (
+        <section className="rounded-3xl border border-cyan-400/15 bg-[linear-gradient(135deg,rgba(34,211,238,.07),rgba(139,92,246,.04))] p-6 shadow-xl">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div><p className="text-sm text-cyan-300">Audit &amp; Assurance Services intelligence</p><h2 className="mt-1 text-2xl font-semibold text-white">Professional assurance delivery portfolio</h2><p className="mt-2 max-w-3xl text-sm text-slate-400">Governed visibility across engagement delivery, planning exceptions, external-client decisions, remediation, and released reports.</p></div>
+            <Link href="/audit-services/analytics" className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[.06] px-4 py-2.5 text-sm font-semibold text-cyan-100">Open Audit Service Analytics <ArrowRight size={16} /></Link>
+          </div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <AuditServiceMetric label="Open engagements" value={auditServices.summary.openEngagements} note={`${auditServices.summary.overdueEngagements} overdue · ${auditServices.summary.highRiskEngagements} high/critical risk`} />
+            <AuditServiceMetric label="Governance exceptions" value={auditServices.summary.planningExceptions + auditServices.summary.deliverableReviewQueue} note={`${auditServices.summary.planningExceptions} planning · ${auditServices.summary.deliverableReviewQueue} deliverable review`} />
+            <AuditServiceMetric label="Client decisions pending" value={auditServices.summary.pendingClientDecisions} note={`${auditServices.summary.activeExternalAccesses} active secure links`} />
+            <AuditServiceMetric label={`${dashboard.filters.days}-day downloads`} value={auditServices.summary.recentDownloads} note={`${auditServices.summary.externalDownloads} external · ${auditServices.summary.releasedDeliverables} released deliverables`} />
+          </div>
+        </section>
+      ) : null}
 
       {research ? (
         <section className="rounded-3xl border border-violet-400/15 bg-[linear-gradient(135deg,rgba(139,92,246,.08),rgba(34,211,238,.035))] p-6 shadow-xl">
@@ -637,6 +660,10 @@ function ResearchMetric({
       <p className="mt-2 text-xs leading-5 text-slate-500">{note}</p>
     </Link>
   );
+}
+
+function AuditServiceMetric({ label, value, note }: { label: string; value: string | number; note: string }) {
+  return <Link href="/audit-services/analytics" className="rounded-2xl border border-white/10 bg-slate-950/35 p-5 transition hover:border-cyan-400/30"><p className="text-sm text-slate-400">{label}</p><p className="mt-2 text-3xl font-bold text-white">{value}</p><p className="mt-2 text-xs leading-5 text-slate-500">{note}</p></Link>;
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {

@@ -293,6 +293,28 @@ test("released audit deliverables use secure branded downloads with delivery evi
   assert.match(page, /Download controlled PDF/);
 });
 
+test("audit service analytics are tenant scoped, permission protected, and executive visible", async () => {
+  const [service, page, charts, exportRoute, executive] = await Promise.all([
+    readFile(new URL("../src/modules/audit/audit-service-analytics.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/(platform)/audit-services/analytics/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/features/audits/audit-service-analytics-charts.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/audit-services/analytics/export/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/(platform)/dashboard/page.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(service, /where: \{ organizationId \}/);
+  assert.match(service, /planningExceptions/);
+  assert.match(service, /clientAcceptanceRate/);
+  assert.match(service, /deliverableReviewQueue/);
+  assert.match(page, /requireAuditServicesEntitlement/);
+  assert.match(page, /Assurance Delivery Analytics/);
+  assert.match(charts, /12-month service-delivery trend/);
+  assert.match(exportRoute, /PermissionKey\.VIEW_AUDITS/);
+  assert.match(exportRoute, /private, no-store/);
+  assert.match(exportRoute, /\^\[=\+\\-@\]/);
+  assert.match(executive, /organizationHasAuditServices/);
+  assert.match(executive, /Professional assurance delivery portfolio/);
+});
+
 test("audit service coordination governs requests, meetings, and attendance", async () => {
   const [schema, migration, service, actions, page] = await Promise.all([
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),

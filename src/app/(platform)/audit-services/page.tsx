@@ -80,6 +80,8 @@ export default async function AuditServicesPage({
             contacts are controlled records and never receive tenant accounts.
           </p>
         </div>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/audit-services/analytics" className="inline-flex items-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[.06] px-4 py-3 text-sm font-semibold text-violet-100"><ShieldCheck size={17} /> Delivery analytics</Link>
         <form className="flex min-w-72 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4">
           <Search size={17} className="text-slate-500" />
           <input
@@ -89,6 +91,7 @@ export default async function AuditServicesPage({
             className="w-full bg-transparent py-3 text-sm outline-none"
           />
         </form>
+        </div>
       </div>
 
       <div className="mt-7 grid gap-4 md:grid-cols-3">
