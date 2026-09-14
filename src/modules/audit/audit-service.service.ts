@@ -536,7 +536,18 @@ export function findAuditServiceEngagement(
         orderBy: { assignedAt: "asc" },
       },
       audits: {
-        include: { site: { select: { name: true } } },
+        include: {
+          site: { select: { name: true } },
+          sections: {
+            orderBy: { sequence: "asc" },
+            include: {
+              questions: {
+                orderBy: { sequence: "asc" },
+                select: { id: true, sequence: true, questionText: true },
+              },
+            },
+          },
+        },
         orderBy: { createdAt: "desc" },
       },
       independenceDeclarations: {
@@ -569,6 +580,8 @@ export function findAuditServiceEngagement(
         include: {
           contact: { select: { name: true, email: true } },
           informationRequest: { select: { reference: true, title: true } },
+          decision: true,
+          _count: { select: { comments: true } },
         },
         orderBy: { createdAt: "desc" },
       },

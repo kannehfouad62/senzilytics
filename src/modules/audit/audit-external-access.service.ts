@@ -6,7 +6,10 @@ import {
   ActivityAction,
   AuditExternalAccessScope,
   AuditExternalAccessStatus,
+  AuditExternalDecisionType,
   AuditServiceEngagementKind,
+  EnterpriseAuditStatus,
+  Prisma,
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes, randomInt } from "node:crypto";
@@ -23,6 +26,8 @@ export async function issueAuditExternalAccess(input: {
   engagementId: string;
   contactId: string;
   informationRequestId?: string | null;
+  auditId?: string | null;
+  questionId?: string | null;
   scope: AuditExternalAccessScope;
   title: string;
   instructions?: string | null;
@@ -61,6 +66,9 @@ export async function issueAuditExternalAccess(input: {
       "Select an active authorized representative for this external engagement.",
     );
   const informationRequestId = clean(input.informationRequestId, 100);
+  const auditId = clean(input.auditId, 100);
+  const questionId = clean(input.questionId, 100);
+  let resourceSnapshot: Prisma.InputJsonValue | undefined;
   if (input.scope === AuditExternalAccessScope.INFORMATION_REQUEST) {
     if (!informationRequestId)
       throw new Error("Select an information request for this access link.");
@@ -76,6 +84,88 @@ export async function issueAuditExternalAccess(input: {
   } else if (informationRequestId) {
     throw new Error("Information requests require the matching access scope.");
   }
+  if (
+    input.scope === AuditExternalAccessScope.AUDIT_REPORT ||
+    input.scope === AuditExternalAccessScope.AUDIT_QUESTION
+  ) {
+    if (!auditId) throw new Error("Select a linked audit for this access link.");
+    const audit = await prisma.enterpriseAudit.findFirst({
+      where: {
+        id: auditId,
+        organizationId: input.organizationId,
+        engagementId: engagement.id,
+        status:
+          input.scope === AuditExternalAccessScope.AUDIT_REPORT
+            ? { in: [EnterpriseAuditStatus.COMPLETED, EnterpriseAuditStatus.CLOSED] }
+            : { notIn: [EnterpriseAuditStatus.DRAFT, EnterpriseAuditStatus.CANCELLED] },
+      },
+      include: {
+        site: { select: { name: true } },
+        sections: {
+          orderBy: { sequence: "asc" },
+          include: {
+            questions: {
+              orderBy: { sequence: "asc" },
+              include: { response: true },
+            },
+          },
+        },
+      },
+    });
+    if (!audit) throw new Error("Eligible linked audit not found.");
+    if (input.scope === AuditExternalAccessScope.AUDIT_QUESTION) {
+      if (!questionId) throw new Error("Select an audit question to share.");
+      const question = audit.sections
+        .flatMap((section) => section.questions)
+        .find((item) => item.id === questionId);
+      if (!question) throw new Error("Audit question not found in the selected audit.");
+      resourceSnapshot = {
+        kind: "AUDIT_QUESTION",
+        auditReference: audit.reference,
+        auditTitle: audit.title,
+        questionId: question.id,
+        questionText: question.questionText,
+        standardClause: question.standardClause,
+        regulatoryRef: question.regulatoryRef,
+        status: question.status,
+        response: question.response
+          ? {
+              result: question.response.result,
+              responseText: question.response.responseText,
+              comments: question.response.comments,
+            }
+          : null,
+        frozenAt: now.toISOString(),
+      };
+    } else {
+      if (questionId) throw new Error("Question selection requires question scope.");
+      resourceSnapshot = {
+        kind: "AUDIT_REPORT",
+        auditReference: audit.reference,
+        auditTitle: audit.title,
+        status: audit.status,
+        site: audit.site.name,
+        scorePercentage:
+          audit.scorePercentage === null ? null : Number(audit.scorePercentage),
+        executiveSummary: audit.executiveSummary,
+        overallOpinion: audit.overallOpinion,
+        positivePractices: audit.positivePractices,
+        majorConcerns: audit.majorConcerns,
+        recommendations: audit.recommendations,
+        results: audit.sections.map((section) => ({
+          title: section.title,
+          questions: section.questions.map((question) => ({
+            text: question.questionText,
+            result: question.response?.result ?? "NOT_ASSESSED",
+            comments: question.response?.comments ?? null,
+          })),
+        })),
+        frozenAt: now.toISOString(),
+      };
+    }
+  } else if (auditId || questionId) {
+    throw new Error("Audit resources require report or question access scope.");
+  }
   const title = clean(input.title, 200);
   if (!title) throw new Error("External access title is required.");
   const token = randomBytes(32).toString("base64url");
@@ -89,9 +179,15 @@ export async function issueAuditExternalAccess(input: {
         input.scope === AuditExternalAccessScope.INFORMATION_REQUEST
           ? informationRequestId
           : null,
+      auditId,
+      questionId:
+        input.scope === AuditExternalAccessScope.AUDIT_QUESTION
+          ? questionId
+          : null,
       scope: input.scope,
       title,
       instructions: clean(input.instructions),
+      resourceSnapshot,
       tokenHash: digest(token),
       passcodeHash: await bcrypt.hash(passcode, 12),
       expiresAt: input.expiresAt,
@@ -214,6 +310,8 @@ export async function resolveAuditExternalAccess(
       informationRequest: {
         select: { reference: true, title: true, description: true, dueDate: true },
       },
+      decision: true,
+      comments: { orderBy: { createdAt: "asc" } },
     },
   });
   if (access)
@@ -222,6 +320,82 @@ export async function resolveAuditExternalAccess(
       data: { lastAccessedAt: now },
     });
   return access;
+}
+
+export async function recordAuditExternalComment(input: {
+  accessId: string;
+  body: string;
+}) {
+  const body = clean(input.body, 4000);
+  if (!body || body.length < 2) throw new Error("Enter a substantive comment.");
+  const access = await prisma.auditServiceExternalAccess.findFirst({
+    where: {
+      id: input.accessId,
+      status: AuditExternalAccessStatus.ACTIVE,
+      expiresAt: { gt: new Date() },
+    },
+    include: { contact: true },
+  });
+  if (!access) throw new Error("External audit access is no longer available.");
+  const comment = await prisma.auditServiceExternalComment.create({
+    data: {
+      organizationId: access.organizationId,
+      accessId: access.id,
+      body,
+      representativeName: access.contact.name,
+      representativeEmail: access.contact.email,
+    },
+  });
+  await logActivity({
+    organizationId: access.organizationId,
+    action: ActivityAction.COMMENT,
+    entityType: "AuditServiceExternalAccess",
+    entityId: access.id,
+    title: "External audit comment recorded",
+    description: `${access.contact.name} · ${access.title}`,
+    metadata: { commentId: comment.id, contactId: access.contactId },
+  });
+  return comment;
+}
+
+export async function recordAuditExternalDecision(input: {
+  accessId: string;
+  decision: AuditExternalDecisionType;
+  comment?: string | null;
+}) {
+  const access = await prisma.auditServiceExternalAccess.findFirst({
+    where: {
+      id: input.accessId,
+      status: AuditExternalAccessStatus.ACTIVE,
+      expiresAt: { gt: new Date() },
+    },
+    include: { contact: true, decision: true },
+  });
+  if (!access) throw new Error("External audit access is no longer available.");
+  if (access.decision) throw new Error("A final decision has already been recorded.");
+  const comment = clean(input.comment, 4000);
+  if (input.decision === AuditExternalDecisionType.DENIED && !comment)
+    throw new Error("A denial requires an explanatory comment.");
+  const decision = await prisma.auditServiceExternalDecision.create({
+    data: {
+      organizationId: access.organizationId,
+      accessId: access.id,
+      decision: input.decision,
+      comment,
+      representativeName: access.contact.name,
+      representativeEmail: access.contact.email,
+    },
+  });
+  await logActivity({
+    organizationId: access.organizationId,
+    action: ActivityAction.STATUS_CHANGE,
+    entityType: "AuditServiceExternalAccess",
+    entityId: access.id,
+    title: "External audit decision recorded",
+    description: `${access.contact.name} · ${decision.decision}`,
+    metadata: { decisionId: decision.id, contactId: access.contactId },
+  });
+  return decision;
 }
 
 export async function revokeAuditExternalAccess(input: {

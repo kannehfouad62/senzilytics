@@ -239,3 +239,45 @@ test("external audit access uses expiring hashed credentials without client acco
   assert.match(publicPage, /robots: \{ index: false, follow: false \}/);
   assert.match(engagementPage, /Generate and email secure access/);
 });
+
+test("external audit reviews freeze shared resources and accept one governed decision", async () => {
+  const [schema, migration, service, actions, publicPage] = await Promise.all([
+    readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../prisma/migrations/20260924120000_audit_external_reviews/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/modules/audit/audit-external-access.service.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/features/audits/audit-external-access.actions.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/app/audit-client/[token]/page.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(schema, /model AuditServiceExternalDecision/);
+  assert.match(schema, /accessId\s+String\s+@unique/);
+  assert.match(schema, /model AuditServiceExternalComment/);
+  assert.match(migration, /AuditExternalDecisionType/);
+  assert.match(service, /resourceSnapshot/);
+  assert.match(service, /frozenAt: now\.toISOString\(\)/);
+  assert.match(service, /A denial requires an explanatory comment/);
+  assert.match(service, /A final decision has already been recorded/);
+  assert.match(actions, /resolveAuditExternalAccess/);
+  assert.match(publicPage, /Formal response/);
+  assert.match(publicPage, /Comments and feedback/);
+});

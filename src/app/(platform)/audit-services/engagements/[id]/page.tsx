@@ -715,14 +715,40 @@ export default async function AuditEngagementPage({
                   defaultValue={AuditExternalAccessScope.ENGAGEMENT}
                   className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
                 >
-                  {[
-                    AuditExternalAccessScope.ENGAGEMENT,
-                    AuditExternalAccessScope.INFORMATION_REQUEST,
-                  ].map((scope) => (
+                  {Object.values(AuditExternalAccessScope).map((scope) => (
                     <option key={scope} value={scope}>
                       {pretty(scope)}
                     </option>
                   ))}
+                </select>
+                <select
+                  name="auditId"
+                  defaultValue=""
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                >
+                  <option value="">Linked audit — for report/question</option>
+                  {engagement.audits.map((audit) => (
+                    <option key={audit.id} value={audit.id}>
+                      {audit.reference} · {audit.title}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  name="questionId"
+                  defaultValue=""
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                >
+                  <option value="">Audit question — for question scope</option>
+                  {engagement.audits.flatMap((audit) =>
+                    audit.sections.flatMap((section) =>
+                      section.questions.map((question) => (
+                        <option key={question.id} value={question.id}>
+                          {audit.reference} · {section.sequence}.{question.sequence}{" "}
+                          {question.questionText}
+                        </option>
+                      )),
+                    ),
+                  )}
                 </select>
                 <input
                   name="title"
@@ -786,6 +812,12 @@ export default async function AuditEngagementPage({
                             : access.verifiedAt
                               ? "Verified"
                               : "Awaiting verification"}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {access._count.comments} comment(s) · decision: {" "}
+                        {access.decision
+                          ? pretty(access.decision.decision)
+                          : "Pending"}
                       </p>
                     </div>
                     {canManage &&

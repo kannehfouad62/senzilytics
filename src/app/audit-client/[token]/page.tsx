@@ -1,10 +1,15 @@
-import { verifyExternalAuditPasscode } from "@/features/audits/audit-external-access.actions";
+import {
+  addExternalAuditComment,
+  submitExternalAuditDecision,
+  verifyExternalAuditPasscode,
+} from "@/features/audits/audit-external-access.actions";
 import {
   auditExternalSessionCookie,
   resolveAuditExternalAccess,
 } from "@/modules/audit/audit-external-access.service";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { AuditExternalDecisionType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -23,7 +28,7 @@ export default async function ExternalAuditPage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string }>;
 }) {
   const [{ token }, query, jar] = await Promise.all([
     params,
@@ -113,6 +118,89 @@ export default async function ExternalAuditPage({
                 </p>
               </div>
             )}
+            {access.resourceSnapshot && (
+              <ExternalSnapshot value={access.resourceSnapshot} />
+            )}
+            {query.saved && (
+              <p className="mt-5 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] p-3 text-sm text-emerald-200">
+                Your {query.saved} was recorded successfully.
+              </p>
+            )}
+            {query.error === "action" && (
+              <p className="mt-5 rounded-xl border border-red-400/20 bg-red-400/[.07] p-3 text-sm text-red-200">
+                The action could not be recorded. Confirm the session is still
+                active and provide all required information.
+              </p>
+            )}
+            <section className="mt-6 rounded-2xl border border-white/10 bg-slate-950/50 p-5">
+              <h2 className="text-xl font-semibold">Comments and feedback</h2>
+              <div className="mt-4 space-y-3">
+                {access.comments.map((comment) => (
+                  <div key={comment.id} className="rounded-xl bg-white/[.04] p-3">
+                    <p className="text-xs text-slate-500">
+                      {comment.representativeName} · {comment.createdAt.toLocaleString()}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">
+                      {comment.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <form action={addExternalAuditComment} className="mt-4">
+                <input type="hidden" name="token" value={token} />
+                <textarea
+                  name="body"
+                  required
+                  rows={3}
+                  placeholder="Write a comment or feedback"
+                  className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                />
+                <button className="mt-2 rounded-xl border border-cyan-300/25 px-4 py-2 text-sm text-cyan-200">
+                  Add comment
+                </button>
+              </form>
+            </section>
+            <section className="mt-6 rounded-2xl border border-violet-300/15 bg-violet-300/[.035] p-5">
+              <h2 className="text-xl font-semibold">Formal response</h2>
+              {access.decision ? (
+                <div className="mt-4 rounded-xl bg-white/[.04] p-4">
+                  <p className="font-semibold text-violet-200">
+                    {pretty(access.decision.decision)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {access.decision.representativeName} ·{" "}
+                    {access.decision.decidedAt.toLocaleString()}
+                  </p>
+                  {access.decision.comment && (
+                    <p className="mt-3 whitespace-pre-wrap text-sm text-slate-300">
+                      {access.decision.comment}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <form action={submitExternalAuditDecision} className="mt-4">
+                  <input type="hidden" name="token" value={token} />
+                  <textarea
+                    name="comment"
+                    rows={3}
+                    placeholder="Decision comment (required when denying)"
+                    className="w-full rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                  />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {Object.values(AuditExternalDecisionType).map((decision) => (
+                      <button
+                        key={decision}
+                        name="decision"
+                        value={decision}
+                        className="rounded-xl border border-violet-300/25 px-4 py-2 text-sm text-violet-100"
+                      >
+                        {pretty(decision)}
+                      </button>
+                    ))}
+                  </div>
+                </form>
+              )}
+            </section>
             <p className="mt-6 text-xs leading-5 text-slate-500">
               This controlled session expires automatically. Decision and
               feedback controls will appear only for explicitly shared items.
@@ -121,5 +209,62 @@ export default async function ExternalAuditPage({
         )}
       </div>
     </main>
+  );
+}
+
+function ExternalSnapshot({ value }: { value: unknown }) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const snapshot = value as Record<string, unknown>;
+  const results = Array.isArray(snapshot.results) ? snapshot.results : [];
+  return (
+    <section className="mt-5 rounded-2xl border border-white/10 bg-slate-950/50 p-5">
+      <p className="text-xs text-violet-300">Frozen controlled snapshot</p>
+      <h2 className="mt-2 text-xl font-semibold">
+        {String(snapshot.auditTitle ?? snapshot.questionText ?? "Audit record")}
+      </h2>
+      {Boolean(snapshot.questionText) && (
+        <div className="mt-4 space-y-2 text-sm">
+          <p>{String(snapshot.questionText)}</p>
+          <p className="text-slate-400">
+            Result: {String((snapshot.response as Record<string, unknown> | null)?.result ?? "Not assessed")}
+          </p>
+          {(snapshot.response as Record<string, unknown> | null)?.comments ? (
+            <p className="whitespace-pre-wrap text-slate-300">
+              {String((snapshot.response as Record<string, unknown>).comments)}
+            </p>
+          ) : null}
+        </div>
+      )}
+      {Boolean(snapshot.executiveSummary) && (
+        <p className="mt-4 whitespace-pre-wrap text-sm text-slate-300">
+          {String(snapshot.executiveSummary)}
+        </p>
+      )}
+      {results.map((section, index) => {
+        const item = section as Record<string, unknown>;
+        const questions = Array.isArray(item.questions) ? item.questions : [];
+        return (
+          <div key={index} className="mt-5">
+            <h3 className="font-semibold">{String(item.title ?? "Section")}</h3>
+            <div className="mt-2 divide-y divide-white/10">
+              {questions.map((question, questionIndex) => {
+                const row = question as Record<string, unknown>;
+                return (
+                  <div key={questionIndex} className="py-2 text-sm">
+                    <p>{String(row.text ?? "Question")}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {String(row.result ?? "NOT_ASSESSED")}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      <p className="mt-4 text-xs text-slate-500">
+        Frozen {String(snapshot.frozenAt ?? "at issuance")}
+      </p>
+    </section>
   );
 }

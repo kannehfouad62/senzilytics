@@ -5,11 +5,18 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import {
   auditExternalSessionCookie,
   issueAuditExternalAccess,
+  recordAuditExternalComment,
+  recordAuditExternalDecision,
+  resolveAuditExternalAccess,
   revokeAuditExternalAccess,
   verifyAuditExternalPasscode,
 } from "@/modules/audit/audit-external-access.service";
 import { requireAuditServicesEntitlement } from "@/modules/audit/audit-services-entitlement";
-import { AuditExternalAccessScope, PermissionKey } from "@prisma/client";
+import {
+  AuditExternalAccessScope,
+  AuditExternalDecisionType,
+  PermissionKey,
+} from "@prisma/client";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -21,10 +28,6 @@ const required = (data: FormData, key: string) => {
   if (!result) throw new Error(`${key} is required.`);
   return result;
 };
-const phase4aScopes = [
-  AuditExternalAccessScope.ENGAGEMENT,
-  AuditExternalAccessScope.INFORMATION_REQUEST,
-] as const;
 
 async function internalContext() {
   await requirePermission(PermissionKey.MANAGE_AUDITS);
@@ -37,7 +40,7 @@ export async function createAuditExternalAccess(data: FormData) {
   const { organizationId, user } = await internalContext();
   const engagementId = required(data, "engagementId");
   const scope = required(data, "scope") as AuditExternalAccessScope;
-  if (!phase4aScopes.includes(scope as (typeof phase4aScopes)[number]))
+  if (!Object.values(AuditExternalAccessScope).includes(scope))
     throw new Error("Select a valid external access scope.");
   const expiresAt = new Date(required(data, "expiresAt"));
   await issueAuditExternalAccess({
@@ -46,6 +49,8 @@ export async function createAuditExternalAccess(data: FormData) {
     engagementId,
     contactId: required(data, "contactId"),
     informationRequestId: value(data, "informationRequestId"),
+    auditId: value(data, "auditId"),
+    questionId: value(data, "questionId"),
     scope,
     title: required(data, "title"),
     instructions: value(data, "instructions"),
@@ -87,4 +92,48 @@ export async function verifyExternalAuditPasscode(data: FormData) {
     expires: verified.sessionExpiresAt,
   });
   redirect(`/audit-client/${encodeURIComponent(token)}`);
+}
+
+async function verifiedExternalAccess(data: FormData) {
+  const token = required(data, "token");
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token))
+    throw new Error("Invalid external audit access.");
+  const sessionToken = (await cookies()).get(auditExternalSessionCookie)?.value;
+  const access = await resolveAuditExternalAccess(token, sessionToken);
+  if (!access) throw new Error("External audit session is invalid or expired.");
+  return { token, access };
+}
+
+export async function addExternalAuditComment(data: FormData) {
+  let token = "invalid";
+  try {
+    const verified = await verifiedExternalAccess(data);
+    token = verified.token;
+    await recordAuditExternalComment({
+      accessId: verified.access.id,
+      body: required(data, "body"),
+    });
+  } catch {
+    redirect(`/audit-client/${encodeURIComponent(token)}?error=action`);
+  }
+  redirect(`/audit-client/${encodeURIComponent(token)}?saved=comment`);
+}
+
+export async function submitExternalAuditDecision(data: FormData) {
+  let token = "invalid";
+  try {
+    const verified = await verifiedExternalAccess(data);
+    token = verified.token;
+    const decision = required(data, "decision") as AuditExternalDecisionType;
+    if (!Object.values(AuditExternalDecisionType).includes(decision))
+      throw new Error("Invalid external decision.");
+    await recordAuditExternalDecision({
+      accessId: verified.access.id,
+      decision,
+      comment: value(data, "comment"),
+    });
+  } catch {
+    redirect(`/audit-client/${encodeURIComponent(token)}?error=action`);
+  }
+  redirect(`/audit-client/${encodeURIComponent(token)}?saved=decision`);
 }

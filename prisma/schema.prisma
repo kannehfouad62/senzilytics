@@ -1727,6 +1727,12 @@ enum AuditExternalAccessStatus {
   REVOKED
 }
 
+enum AuditExternalDecisionType {
+  ACKNOWLEDGED
+  APPROVED
+  DENIED
+}
+
 enum AuditTeamRole {
   LEAD_AUDITOR
   AUDITOR
@@ -2385,6 +2391,8 @@ model Organization {
   auditServiceInformationRequests      AuditServiceInformationRequest[]
   auditServiceMeetings                 AuditServiceMeeting[]
   auditServiceExternalAccesses         AuditServiceExternalAccess[]
+  auditServiceExternalDecisions        AuditServiceExternalDecision[]
+  auditServiceExternalComments         AuditServiceExternalComment[]
 
   auditSchedulesV2 AuditSchedule[] @relation("AuditScheduleOrganization")
 
@@ -3844,11 +3852,14 @@ model AuditServiceExternalAccess {
   engagementId         String
   contactId            String
   informationRequestId String?
+  auditId              String?
+  questionId           String?
 
-  scope        AuditExternalAccessScope
-  status       AuditExternalAccessStatus @default(ACTIVE)
-  title        String
-  instructions String?
+  scope            AuditExternalAccessScope
+  status           AuditExternalAccessStatus @default(ACTIVE)
+  title            String
+  instructions     String?
+  resourceSnapshot Json?
 
   tokenHash        String    @unique
   passcodeHash     String
@@ -3869,11 +3880,49 @@ model AuditServiceExternalAccess {
   engagement         AuditServiceEngagement          @relation(fields: [engagementId], references: [id], onDelete: Cascade)
   contact            AuditServiceClientContact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
   informationRequest AuditServiceInformationRequest? @relation(fields: [informationRequestId], references: [id], onDelete: Cascade)
+  audit              EnterpriseAudit?                @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  question           EnterpriseAuditQuestion?        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  decision           AuditServiceExternalDecision?
+  comments           AuditServiceExternalComment[]
 
   @@index([organizationId, status, expiresAt])
   @@index([engagementId, status])
   @@index([contactId, status])
   @@index([informationRequestId])
+  @@index([auditId])
+  @@index([questionId])
+}
+
+model AuditServiceExternalDecision {
+  id                  String                    @id @default(cuid())
+  organizationId      String
+  accessId            String                    @unique
+  decision            AuditExternalDecisionType
+  comment             String?
+  representativeName  String
+  representativeEmail String
+  decidedAt           DateTime                  @default(now())
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  access       AuditServiceExternalAccess @relation(fields: [accessId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, decision, decidedAt])
+}
+
+model AuditServiceExternalComment {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  accessId            String
+  body                String
+  representativeName  String
+  representativeEmail String
+  createdAt           DateTime @default(now())
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  access       AuditServiceExternalAccess @relation(fields: [accessId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([accessId, createdAt])
 }
 
 model AuditServiceEngagementTeamMember {
@@ -4355,6 +4404,8 @@ model EnterpriseAudit {
 
   owner User? @relation("EnterpriseAuditOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 
+  externalAccesses AuditServiceExternalAccess[]
+
   createdBy User? @relation("EnterpriseAuditCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   updatedBy User? @relation("EnterpriseAuditUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
@@ -4512,10 +4563,11 @@ model EnterpriseAuditQuestion {
 
   sourceProtocolQuestion AuditProtocolQuestion? @relation("EnterpriseAuditSourceProtocolQuestion", fields: [sourceProtocolQuestionId], references: [id], onDelete: SetNull)
 
-  options  EnterpriseAuditQuestionOptionSnapshot[]
-  response EnterpriseAuditResponse?
-  evidence EnterpriseAuditEvidence[]
-  findings EnterpriseAuditFinding[]
+  options          EnterpriseAuditQuestionOptionSnapshot[]
+  response         EnterpriseAuditResponse?
+  evidence         EnterpriseAuditEvidence[]
+  findings         EnterpriseAuditFinding[]
+  externalAccesses AuditServiceExternalAccess[]
 
   @@unique([sectionId, sequence])
   @@index([auditId, status])
