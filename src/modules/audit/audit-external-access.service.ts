@@ -7,6 +7,7 @@ import {
   AuditExternalAccessScope,
   AuditExternalAccessStatus,
   AuditExternalDecisionType,
+  AuditExternalFindingPosition,
   AuditServiceEngagementKind,
   EnterpriseAuditStatus,
   Prisma,
@@ -28,6 +29,7 @@ export async function issueAuditExternalAccess(input: {
   informationRequestId?: string | null;
   auditId?: string | null;
   questionId?: string | null;
+  findingId?: string | null;
   scope: AuditExternalAccessScope;
   title: string;
   instructions?: string | null;
@@ -68,6 +70,7 @@ export async function issueAuditExternalAccess(input: {
   const informationRequestId = clean(input.informationRequestId, 100);
   const auditId = clean(input.auditId, 100);
   const questionId = clean(input.questionId, 100);
+  const findingId = clean(input.findingId, 100);
   let resourceSnapshot: Prisma.InputJsonValue | undefined;
   if (input.scope === AuditExternalAccessScope.INFORMATION_REQUEST) {
     if (!informationRequestId)
@@ -86,7 +89,8 @@ export async function issueAuditExternalAccess(input: {
   }
   if (
     input.scope === AuditExternalAccessScope.AUDIT_REPORT ||
-    input.scope === AuditExternalAccessScope.AUDIT_QUESTION
+    input.scope === AuditExternalAccessScope.AUDIT_QUESTION ||
+    input.scope === AuditExternalAccessScope.AUDIT_FINDING
   ) {
     if (!auditId) throw new Error("Select a linked audit for this access link.");
     const audit = await prisma.enterpriseAudit.findFirst({
@@ -110,10 +114,31 @@ export async function issueAuditExternalAccess(input: {
             },
           },
         },
+        findings: true,
       },
     });
     if (!audit) throw new Error("Eligible linked audit not found.");
-    if (input.scope === AuditExternalAccessScope.AUDIT_QUESTION) {
+    if (input.scope === AuditExternalAccessScope.AUDIT_FINDING) {
+      if (!findingId) throw new Error("Select an audit finding to share.");
+      const finding = audit.findings.find((item) => item.id === findingId);
+      if (!finding) throw new Error("Audit finding not found in the selected audit.");
+      resourceSnapshot = {
+        kind: "AUDIT_FINDING",
+        auditReference: audit.reference,
+        auditTitle: audit.title,
+        findingId: finding.id,
+        reference: finding.reference,
+        title: finding.title,
+        severity: finding.severity,
+        status: finding.status,
+        description: finding.description,
+        objectiveEvidence: finding.objectiveEvidence,
+        standardClause: finding.standardClause,
+        regulatoryRef: finding.regulatoryRef,
+        dueDate: finding.dueDate?.toISOString() ?? null,
+        frozenAt: now.toISOString(),
+      };
+    } else if (input.scope === AuditExternalAccessScope.AUDIT_QUESTION) {
       if (!questionId) throw new Error("Select an audit question to share.");
       const question = audit.sections
         .flatMap((section) => section.questions)
@@ -163,7 +188,7 @@ export async function issueAuditExternalAccess(input: {
         frozenAt: now.toISOString(),
       };
     }
-  } else if (auditId || questionId) {
+  } else if (auditId || questionId || findingId) {
     throw new Error("Audit resources require report or question access scope.");
   }
   const title = clean(input.title, 200);
@@ -183,6 +208,10 @@ export async function issueAuditExternalAccess(input: {
       questionId:
         input.scope === AuditExternalAccessScope.AUDIT_QUESTION
           ? questionId
+          : null,
+      findingId:
+        input.scope === AuditExternalAccessScope.AUDIT_FINDING
+          ? findingId
           : null,
       scope: input.scope,
       title,
@@ -311,6 +340,7 @@ export async function resolveAuditExternalAccess(
         select: { reference: true, title: true, description: true, dueDate: true },
       },
       decision: true,
+      findingResponse: true,
       comments: { orderBy: { createdAt: "asc" } },
     },
   });
@@ -396,6 +426,37 @@ export async function recordAuditExternalDecision(input: {
     metadata: { decisionId: decision.id, contactId: access.contactId },
   });
   return decision;
+}
+
+export async function recordAuditExternalFindingResponse(input: {
+  accessId: string;
+  position: AuditExternalFindingPosition;
+  response: string;
+  proposedRootCause?: string | null;
+  immediateCorrection?: string | null;
+  remediationPlan?: string | null;
+  targetDate?: Date | null;
+}) {
+  const access = await prisma.auditServiceExternalAccess.findFirst({
+    where: { id: input.accessId, scope: AuditExternalAccessScope.AUDIT_FINDING, status: AuditExternalAccessStatus.ACTIVE, expiresAt: { gt: new Date() } },
+    include: { contact: true, findingResponse: true },
+  });
+  if (!access) throw new Error("External finding access is no longer available.");
+  if (access.findingResponse) throw new Error("A finding response has already been submitted.");
+  const response = clean(input.response, 4000);
+  if (!response) throw new Error("A client finding response is required.");
+  const remediationPlan = clean(input.remediationPlan, 4000);
+  if (input.position === AuditExternalFindingPosition.REMEDIATION_PROPOSED && !remediationPlan)
+    throw new Error("A proposed remediation plan is required.");
+  if (input.targetDate && input.targetDate <= new Date())
+    throw new Error("The proposed target date must be in the future.");
+  const record = await prisma.auditServiceExternalFindingResponse.create({ data: {
+    organizationId: access.organizationId, accessId: access.id, position: input.position,
+    response, proposedRootCause: clean(input.proposedRootCause), immediateCorrection: clean(input.immediateCorrection),
+    remediationPlan, targetDate: input.targetDate, representativeName: access.contact.name, representativeEmail: access.contact.email,
+  }});
+  await logActivity({ organizationId: access.organizationId, action: ActivityAction.CREATE, entityType: "AuditServiceExternalFindingResponse", entityId: record.id, title: "External audit finding response submitted", description: `${access.contact.name} · ${record.position}`, metadata: { accessId: access.id, findingId: access.findingId } });
+  return record;
 }
 
 export async function revokeAuditExternalAccess(input: {

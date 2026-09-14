@@ -547,6 +547,10 @@ export function findAuditServiceEngagement(
               },
             },
           },
+          findings: {
+            select: { id: true, reference: true, title: true, status: true },
+            orderBy: { createdAt: "desc" },
+          },
         },
         orderBy: { createdAt: "desc" },
       },
@@ -581,6 +585,7 @@ export function findAuditServiceEngagement(
           contact: { select: { name: true, email: true } },
           informationRequest: { select: { reference: true, title: true } },
           decision: true,
+          findingResponse: true,
           _count: { select: { comments: true } },
         },
         orderBy: { createdAt: "desc" },

@@ -750,6 +750,20 @@ export default async function AuditEngagementPage({
                     ),
                   )}
                 </select>
+                <select
+                  name="findingId"
+                  defaultValue=""
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm md:col-span-2"
+                >
+                  <option value="">Audit finding — for finding scope</option>
+                  {engagement.audits.flatMap((audit) =>
+                    audit.findings.map((finding) => (
+                      <option key={finding.id} value={finding.id}>
+                        {audit.reference} · {finding.reference} · {finding.title}
+                      </option>
+                    )),
+                  )}
+                </select>
                 <input
                   name="title"
                   required
@@ -819,6 +833,11 @@ export default async function AuditEngagementPage({
                           ? pretty(access.decision.decision)
                           : "Pending"}
                       </p>
+                      {access.findingResponse && (
+                        <p className="mt-1 text-xs text-amber-200">
+                          Finding response: {pretty(access.findingResponse.position)}
+                        </p>
+                      )}
                     </div>
                     {canManage &&
                       access.status === AuditExternalAccessStatus.ACTIVE &&

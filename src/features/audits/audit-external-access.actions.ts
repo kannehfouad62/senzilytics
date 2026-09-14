@@ -7,6 +7,7 @@ import {
   issueAuditExternalAccess,
   recordAuditExternalComment,
   recordAuditExternalDecision,
+  recordAuditExternalFindingResponse,
   resolveAuditExternalAccess,
   revokeAuditExternalAccess,
   verifyAuditExternalPasscode,
@@ -15,6 +16,7 @@ import { requireAuditServicesEntitlement } from "@/modules/audit/audit-services-
 import {
   AuditExternalAccessScope,
   AuditExternalDecisionType,
+  AuditExternalFindingPosition,
   PermissionKey,
 } from "@prisma/client";
 import { cookies } from "next/headers";
@@ -51,6 +53,7 @@ export async function createAuditExternalAccess(data: FormData) {
     informationRequestId: value(data, "informationRequestId"),
     auditId: value(data, "auditId"),
     questionId: value(data, "questionId"),
+    findingId: value(data, "findingId"),
     scope,
     title: required(data, "title"),
     instructions: value(data, "instructions"),
@@ -136,4 +139,29 @@ export async function submitExternalAuditDecision(data: FormData) {
     redirect(`/audit-client/${encodeURIComponent(token)}?error=action`);
   }
   redirect(`/audit-client/${encodeURIComponent(token)}?saved=decision`);
+}
+
+export async function submitExternalFindingResponse(data: FormData) {
+  let token = "invalid";
+  try {
+    const verified = await verifiedExternalAccess(data);
+    token = verified.token;
+    const position = required(data, "position") as AuditExternalFindingPosition;
+    if (!Object.values(AuditExternalFindingPosition).includes(position))
+      throw new Error("Invalid finding response position.");
+    const target = value(data, "targetDate");
+    const targetDate = target ? new Date(`${target}T00:00:00Z`) : null;
+    await recordAuditExternalFindingResponse({
+      accessId: verified.access.id,
+      position,
+      response: required(data, "response"),
+      proposedRootCause: value(data, "proposedRootCause"),
+      immediateCorrection: value(data, "immediateCorrection"),
+      remediationPlan: value(data, "remediationPlan"),
+      targetDate,
+    });
+  } catch {
+    redirect(`/audit-client/${encodeURIComponent(token)}?error=action`);
+  }
+  redirect(`/audit-client/${encodeURIComponent(token)}?saved=finding-response`);
 }

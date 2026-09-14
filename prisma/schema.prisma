@@ -1720,6 +1720,7 @@ enum AuditExternalAccessScope {
   INFORMATION_REQUEST
   AUDIT_REPORT
   AUDIT_QUESTION
+  AUDIT_FINDING
 }
 
 enum AuditExternalAccessStatus {
@@ -1731,6 +1732,12 @@ enum AuditExternalDecisionType {
   ACKNOWLEDGED
   APPROVED
   DENIED
+}
+
+enum AuditExternalFindingPosition {
+  ACKNOWLEDGED
+  DISPUTED
+  REMEDIATION_PROPOSED
 }
 
 enum AuditTeamRole {
@@ -2393,6 +2400,7 @@ model Organization {
   auditServiceExternalAccesses         AuditServiceExternalAccess[]
   auditServiceExternalDecisions        AuditServiceExternalDecision[]
   auditServiceExternalComments         AuditServiceExternalComment[]
+  auditServiceExternalFindingResponses AuditServiceExternalFindingResponse[]
 
   auditSchedulesV2 AuditSchedule[] @relation("AuditScheduleOrganization")
 
@@ -3854,6 +3862,7 @@ model AuditServiceExternalAccess {
   informationRequestId String?
   auditId              String?
   questionId           String?
+  findingId            String?
 
   scope            AuditExternalAccessScope
   status           AuditExternalAccessStatus @default(ACTIVE)
@@ -3876,13 +3885,15 @@ model AuditServiceExternalAccess {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  organization       Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  engagement         AuditServiceEngagement          @relation(fields: [engagementId], references: [id], onDelete: Cascade)
-  contact            AuditServiceClientContact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  informationRequest AuditServiceInformationRequest? @relation(fields: [informationRequestId], references: [id], onDelete: Cascade)
-  audit              EnterpriseAudit?                @relation(fields: [auditId], references: [id], onDelete: Cascade)
-  question           EnterpriseAuditQuestion?        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  organization       Organization                         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  engagement         AuditServiceEngagement               @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  contact            AuditServiceClientContact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  informationRequest AuditServiceInformationRequest?      @relation(fields: [informationRequestId], references: [id], onDelete: Cascade)
+  audit              EnterpriseAudit?                     @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  question           EnterpriseAuditQuestion?             @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  finding            EnterpriseAuditFinding?              @relation(fields: [findingId], references: [id], onDelete: Cascade)
   decision           AuditServiceExternalDecision?
+  findingResponse    AuditServiceExternalFindingResponse?
   comments           AuditServiceExternalComment[]
 
   @@index([organizationId, status, expiresAt])
@@ -3891,6 +3902,27 @@ model AuditServiceExternalAccess {
   @@index([informationRequestId])
   @@index([auditId])
   @@index([questionId])
+  @@index([findingId])
+}
+
+model AuditServiceExternalFindingResponse {
+  id                  String                       @id @default(cuid())
+  organizationId      String
+  accessId            String                       @unique
+  position            AuditExternalFindingPosition
+  response            String
+  proposedRootCause   String?
+  immediateCorrection String?
+  remediationPlan     String?
+  targetDate          DateTime?
+  representativeName  String
+  representativeEmail String
+  submittedAt         DateTime                     @default(now())
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  access       AuditServiceExternalAccess @relation(fields: [accessId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, position, submittedAt])
 }
 
 model AuditServiceExternalDecision {
@@ -4781,6 +4813,7 @@ model EnterpriseAuditFinding {
   correctiveActionLinks EnterpriseAuditFindingActionLink[]
   riskLinks             EnterpriseAuditFindingRiskLink[]
   history               EnterpriseAuditFindingHistory[]
+  externalAccesses      AuditServiceExternalAccess[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, status])

@@ -1,6 +1,7 @@
 import {
   addExternalAuditComment,
   submitExternalAuditDecision,
+  submitExternalFindingResponse,
   verifyExternalAuditPasscode,
 } from "@/features/audits/audit-external-access.actions";
 import {
@@ -9,7 +10,7 @@ import {
 } from "@/modules/audit/audit-external-access.service";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { AuditExternalDecisionType } from "@prisma/client";
+import { AuditExternalAccessScope, AuditExternalDecisionType, AuditExternalFindingPosition } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -201,6 +202,29 @@ export default async function ExternalAuditPage({
                 </form>
               )}
             </section>
+            {access.scope === AuditExternalAccessScope.AUDIT_FINDING && (
+              <section className="mt-6 rounded-2xl border border-amber-300/15 bg-amber-300/[.035] p-5">
+                <h2 className="text-xl font-semibold">Finding response</h2>
+                {access.findingResponse ? (
+                  <div className="mt-4 rounded-xl bg-white/[.04] p-4 text-sm">
+                    <p className="font-semibold text-amber-200">{pretty(access.findingResponse.position)}</p>
+                    <p className="mt-2 whitespace-pre-wrap text-slate-300">{access.findingResponse.response}</p>
+                    {access.findingResponse.remediationPlan && <p className="mt-3 whitespace-pre-wrap text-slate-300">Remediation: {access.findingResponse.remediationPlan}</p>}
+                  </div>
+                ) : (
+                  <form action={submitExternalFindingResponse} className="mt-4 grid gap-3">
+                    <input type="hidden" name="token" value={token} />
+                    <select name="position" className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm">{Object.values(AuditExternalFindingPosition).map((position) => <option key={position} value={position}>{pretty(position)}</option>)}</select>
+                    <textarea name="response" required rows={3} placeholder="Official response or basis for dispute" className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm" />
+                    <textarea name="proposedRootCause" rows={2} placeholder="Proposed root cause" className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm" />
+                    <textarea name="immediateCorrection" rows={2} placeholder="Immediate correction already taken" className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm" />
+                    <textarea name="remediationPlan" rows={3} placeholder="Proposed remediation plan (required when remediation is proposed)" className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm" />
+                    <input name="targetDate" type="date" className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm" />
+                    <button className="rounded-xl bg-amber-300 px-4 py-3 text-sm font-semibold text-slate-950">Submit finding response</button>
+                  </form>
+                )}
+              </section>
+            )}
             <p className="mt-6 text-xs leading-5 text-slate-500">
               This controlled session expires automatically. Decision and
               feedback controls will appear only for explicitly shared items.
@@ -239,6 +263,14 @@ function ExternalSnapshot({ value }: { value: unknown }) {
         <p className="mt-4 whitespace-pre-wrap text-sm text-slate-300">
           {String(snapshot.executiveSummary)}
         </p>
+      )}
+      {snapshot.kind === "AUDIT_FINDING" && (
+        <div className="mt-4 space-y-2 text-sm">
+          <p className="font-semibold">{String(snapshot.reference)} · {String(snapshot.title)}</p>
+          <p className="text-amber-200">{String(snapshot.severity)} · {String(snapshot.status)}</p>
+          <p className="whitespace-pre-wrap text-slate-300">{String(snapshot.description ?? "No description recorded.")}</p>
+          {Boolean(snapshot.objectiveEvidence) && <p className="whitespace-pre-wrap text-slate-400">Evidence: {String(snapshot.objectiveEvidence)}</p>}
+        </div>
       )}
       {results.map((section, index) => {
         const item = section as Record<string, unknown>;

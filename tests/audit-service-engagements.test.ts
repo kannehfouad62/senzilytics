@@ -281,3 +281,19 @@ test("external audit reviews freeze shared resources and accept one governed dec
   assert.match(publicPage, /Formal response/);
   assert.match(publicPage, /Comments and feedback/);
 });
+
+test("external finding responses remain structured immutable and separate from internal CAPA", async () => {
+  const [schema, migration, service, page] = await Promise.all([
+    readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
+    readFile(new URL("../prisma/migrations/20260925120000_audit_external_finding_responses/migration.sql", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/audit/audit-external-access.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/audit-client/[token]/page.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(schema, /model AuditServiceExternalFindingResponse/);
+  assert.match(schema, /accessId\s+String\s+@unique/);
+  assert.match(migration, /AUDIT_FINDING/);
+  assert.match(service, /A finding response has already been submitted/);
+  assert.match(service, /A proposed remediation plan is required/);
+  assert.doesNotMatch(service, /correctiveAction\.create/);
+  assert.match(page, /Finding response/);
+});
