@@ -6,6 +6,7 @@ import {
   assertAuditServiceEngagementTransition,
   auditServiceEngagementTransitions,
 } from "../src/modules/audit/audit-service-engagement-lifecycle";
+import { auditServiceSlaLevel } from "../src/modules/audit/audit-service-sla.service";
 
 test("audit service engagements follow controlled forward transitions", () => {
   assert.deepEqual(
@@ -31,6 +32,47 @@ test("audit service engagements follow controlled forward transitions", () => {
     auditServiceEngagementTransitions(AuditServiceEngagementStatus.COMPLETED),
     [],
   );
+});
+
+test("audit service SLA levels progress deterministically", () => {
+  const now = new Date("2026-09-30T12:00:00.000Z");
+  assert.equal(
+    auditServiceSlaLevel(new Date("2026-10-02T12:00:00.000Z"), now),
+    "DUE_SOON",
+  );
+  assert.equal(
+    auditServiceSlaLevel(new Date("2026-09-29T12:00:00.000Z"), now),
+    "OVERDUE",
+  );
+  assert.equal(
+    auditServiceSlaLevel(new Date("2026-09-26T12:00:00.000Z"), now),
+    "ESCALATED",
+  );
+});
+
+test("audit service workflow and calendar integration reuse governed processors", async () => {
+  const [schema, migration, service, deliverables, external, sla, scheduler, calendar] = await Promise.all([
+    readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
+    readFile(new URL("../prisma/migrations/20260929120000_audit_service_workflow_entity/migration.sql", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/audit/audit-service.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/audit/audit-service-deliverable.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/audit/audit-external-access.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/audit/audit-service-sla.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/workflows/process-sla/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/compliance/unified-calendar.service.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(schema, /AUDIT_SERVICE/);
+  assert.match(migration, /ALTER TYPE "WorkflowEntityType" ADD VALUE 'AUDIT_SERVICE'/);
+  assert.match(service, /enqueueWorkflowAutomationEvent/);
+  assert.match(deliverables, /WorkflowEntityType\.AUDIT_SERVICE/);
+  assert.match(external, /audit-service-external-decision/);
+  assert.match(sla, /sendTenantNotificationEmail/);
+  assert.match(sla, /Audit service SLA:/);
+  assert.match(scheduler, /processAuditServiceSla\(\)/);
+  assert.match(scheduler, /runTrackedScheduledJob\("workflow-sla"/);
+  assert.doesNotMatch(await readFile(new URL("../src/app/api/cron/workflow-sla/route.ts", import.meta.url), "utf8"), /processAuditServiceSla/);
+  assert.match(calendar, /AUDIT_SERVICE_ENGAGEMENT/);
+  assert.match(calendar, /Secure Audit Client Access/);
 });
 
 test("audit service delivery is tenant-scoped, entitled, and excludes financial data", async () => {

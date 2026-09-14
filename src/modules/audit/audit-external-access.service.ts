@@ -1,5 +1,6 @@
 import { logActivity } from "@/core/activity-log/activity-log.service";
 import { createSenzilyticsEmailTemplate } from "@/core/email/email-template";
+import { enqueueWorkflowAutomationEvent } from "@/core/workflow/workflow-automation-event.service";
 import { getApplicationUrl, sendEmail } from "@/core/email/email.service";
 import { prisma } from "@/lib/prisma";
 import {
@@ -12,6 +13,8 @@ import {
   AuditServiceEngagementKind,
   EnterpriseAuditStatus,
   Prisma,
+  WorkflowEntityType,
+  WorkflowTriggerEvent,
 } from "@prisma/client";
 import { createCapaFromAuditFindingService } from "./audit-finding.service";
 import bcrypt from "bcryptjs";
@@ -496,6 +499,21 @@ export async function recordAuditExternalDecision(input: {
     description: `${access.contact.name} · ${decision.decision}`,
     metadata: { decisionId: decision.id, contactId: access.contactId },
   });
+  await prisma.$transaction((tx) =>
+    enqueueWorkflowAutomationEvent(tx, {
+      organizationId: access.organizationId,
+      entityType: WorkflowEntityType.AUDIT_SERVICE,
+      entityId: access.id,
+      triggerEvent: WorkflowTriggerEvent.STATUS_CHANGED,
+      context: {
+        recordType: "EXTERNAL_DECISION",
+        scope: access.scope,
+        decision: decision.decision,
+        contactId: access.contactId,
+      },
+      dedupeKey: `audit-service-external-decision:${decision.id}`,
+    }),
+  );
   return decision;
 }
 

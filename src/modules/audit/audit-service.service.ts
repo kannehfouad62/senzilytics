@@ -1,10 +1,13 @@
 import { logActivity } from "@/core/activity-log/activity-log.service";
+import { enqueueWorkflowAutomationEvent } from "@/core/workflow/workflow-automation-event.service";
 import { prisma } from "@/lib/prisma";
 import {
   ActivityAction,
   AuditServiceClientStatus,
   AuditServiceEngagementKind,
   AuditServiceEngagementStatus,
+  WorkflowEntityType,
+  WorkflowTriggerEvent,
 } from "@prisma/client";
 import { assertAuditServiceEngagementTransition } from "./audit-service-engagement-lifecycle";
 
@@ -217,6 +220,22 @@ export async function createAuditServiceEngagementRecord(input: {
     description: `${engagement.reference} · ${engagement.title}`,
     metadata: { kind: engagement.kind, clientId: engagement.clientId },
   });
+  await prisma.$transaction((tx) =>
+    enqueueWorkflowAutomationEvent(tx, {
+      organizationId: input.organizationId,
+      entityType: WorkflowEntityType.AUDIT_SERVICE,
+      entityId: engagement.id,
+      triggerEvent: WorkflowTriggerEvent.RECORD_CREATED,
+      context: {
+        recordType: "ENGAGEMENT",
+        reference: engagement.reference,
+        kind: engagement.kind,
+        status: engagement.status,
+      },
+      initiatedById: input.userId,
+      dedupeKey: `audit-service-engagement-created:${engagement.id}`,
+    }),
+  );
   return engagement;
 }
 
@@ -295,6 +314,22 @@ export async function changeAuditServiceEngagementStatus(input: {
     description: `${engagement.status} → ${updated.status}`,
     metadata: { from: engagement.status, to: updated.status },
   });
+  await prisma.$transaction((tx) =>
+    enqueueWorkflowAutomationEvent(tx, {
+      organizationId: input.organizationId,
+      entityType: WorkflowEntityType.AUDIT_SERVICE,
+      entityId: engagement.id,
+      triggerEvent: WorkflowTriggerEvent.STATUS_CHANGED,
+      context: {
+        recordType: "ENGAGEMENT",
+        reference: engagement.reference,
+        previousStatus: engagement.status,
+        status: updated.status,
+      },
+      initiatedById: input.userId,
+      dedupeKey: `audit-service-engagement-status:${engagement.id}:${updated.status}`,
+    }),
+  );
   return updated;
 }
 

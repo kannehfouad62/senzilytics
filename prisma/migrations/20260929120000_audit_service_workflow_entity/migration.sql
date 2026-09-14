@@ -1,0 +1,1 @@
+ALTER TYPE "WorkflowEntityType" ADD VALUE 'AUDIT_SERVICE';

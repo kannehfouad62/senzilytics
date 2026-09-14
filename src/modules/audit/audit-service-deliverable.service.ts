@@ -3,8 +3,11 @@ import {
   AuditServiceDeliverableStatus,
   AuditServiceDeliverableType,
   Prisma,
+  WorkflowEntityType,
+  WorkflowTriggerEvent,
 } from "@prisma/client";
 import { logActivity } from "@/core/activity-log/activity-log.service";
+import { enqueueWorkflowAutomationEvent } from "@/core/workflow/workflow-automation-event.service";
 import { prisma } from "@/lib/prisma";
 
 const clean = (value: string | null | undefined, maximum = 4000) =>
@@ -138,6 +141,17 @@ export async function createAuditServiceDeliverable(input: {
     description: `${reference} v1 — ${title}`,
     metadata: { engagementId: engagement.id, type: input.type },
   });
+  await prisma.$transaction((tx) =>
+    enqueueWorkflowAutomationEvent(tx, {
+      organizationId: input.organizationId,
+      entityType: WorkflowEntityType.AUDIT_SERVICE,
+      entityId: deliverable.id,
+      triggerEvent: WorkflowTriggerEvent.RECORD_CREATED,
+      context: { recordType: "DELIVERABLE", reference, version: 1, status: deliverable.status, deliverableType: deliverable.type },
+      initiatedById: input.actorId,
+      dedupeKey: `audit-service-deliverable-created:${deliverable.id}`,
+    }),
+  );
   return deliverable;
 }
 
@@ -294,6 +308,17 @@ export async function transitionAuditServiceDeliverable(input: {
     description: `${deliverable.reference} v${deliverable.version}: ${deliverable.status} → ${input.status}`,
     metadata: { engagementId: deliverable.engagementId, notes },
   });
+  await prisma.$transaction((tx) =>
+    enqueueWorkflowAutomationEvent(tx, {
+      organizationId: input.organizationId,
+      entityType: WorkflowEntityType.AUDIT_SERVICE,
+      entityId: updated.id,
+      triggerEvent: WorkflowTriggerEvent.STATUS_CHANGED,
+      context: { recordType: "DELIVERABLE", reference: deliverable.reference, version: deliverable.version, previousStatus: deliverable.status, status: updated.status },
+      initiatedById: input.actorId,
+      dedupeKey: `audit-service-deliverable-status:${updated.id}:${updated.status}`,
+    }),
+  );
   return updated;
 }
 

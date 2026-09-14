@@ -11,6 +11,7 @@ import { cleanupExpiredDemoUsers } from "@/features/demo/cleanup.service";
 import { processIntegrationWebhookDeliveries } from "@/modules/integrations/webhook-delivery.service";
 import { processMobilePushDeliveries } from "@/modules/mobile/mobile-push.service";
 import { runTrackedScheduledJob } from "@/modules/platform/scheduled-job-monitor.service";
+import { processAuditServiceSla } from "@/modules/audit/audit-service-sla.service";
 import {
   NextRequest,
   NextResponse,
@@ -57,6 +58,7 @@ export async function GET(
       auditResult,
       inspectionResult,
       demoResult,
+      auditServiceResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
 
@@ -71,6 +73,8 @@ export async function GET(
       processInspectionSlaNotifications(),
 
       cleanupExpiredDemoUsers(),
+
+      processAuditServiceSla(),
 
     ]);
     const workflowOutcomeResult =
@@ -107,6 +111,9 @@ export async function GET(
       audits:
         auditResult,
 
+      auditServices:
+        auditServiceResult,
+
       inspections:
         inspectionResult,
 
@@ -128,6 +135,7 @@ export async function GET(
           incidentEscalationResult.checked +
           investigationResult.checked +
           auditResult.checked +
+          auditServiceResult.checked +
           inspectionResult.checked,
 
         remindersSent:
@@ -175,6 +183,15 @@ export async function GET(
         auditEmailsSent:
           auditResult
             .emailsSent,
+
+        auditServiceNotificationsSent:
+          auditServiceResult.notificationsSent,
+
+        auditServiceEmailsSent:
+          auditServiceResult.emailsSent,
+
+        auditServiceEscalations:
+          auditServiceResult.escalations,
 
         inspectionInAppNotificationsSent:
           inspectionResult
