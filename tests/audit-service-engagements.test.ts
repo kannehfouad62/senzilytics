@@ -172,3 +172,21 @@ test("audit planning requires independent conflict review and approval", async (
     /AuditServiceIndependenceDeclaration_engagementId_userId_key/,
   );
 });
+
+test("audit service coordination governs requests, meetings, and attendance", async () => {
+  const [schema, migration, service, actions, page] = await Promise.all([
+    readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
+    readFile(new URL("../prisma/migrations/20260922120000_audit_service_requests_meetings/migration.sql", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/audit/audit-service-coordination.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/features/audits/audit-service-coordination.actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/(platform)/audit-services/engagements/[id]/page.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(schema, /model AuditServiceInformationRequest/);
+  assert.match(schema, /model AuditServiceMeetingAttendee/);
+  assert.match(migration, /AuditServiceMeetingAttendee_contactId_fkey/);
+  assert.match(service, /Select exactly one internal user or client contact/);
+  assert.match(service, /Completed meetings require minutes and outcomes/);
+  assert.match(service, /Receipt notes are required/);
+  assert.match(actions, /requireAuditServicesEntitlement/);
+  assert.match(page, /Entrance, status and exit meetings/);
+});

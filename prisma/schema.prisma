@@ -1692,6 +1692,29 @@ enum AuditIndependenceDecision {
   REJECTED
 }
 
+enum AuditInformationRequestStatus {
+  DRAFT
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  ACCEPTED
+  CLOSED
+  CANCELLED
+}
+
+enum AuditServiceMeetingType {
+  PLANNING
+  ENTRANCE
+  STATUS
+  EXIT
+}
+
+enum AuditServiceMeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
 enum AuditTeamRole {
   LEAD_AUDITOR
   AUDITOR
@@ -2347,6 +2370,8 @@ model Organization {
   auditServiceClients                  AuditServiceClient[]
   auditServiceEngagements              AuditServiceEngagement[]
   auditServiceIndependenceDeclarations AuditServiceIndependenceDeclaration[]
+  auditServiceInformationRequests      AuditServiceInformationRequest[]
+  auditServiceMeetings                 AuditServiceMeeting[]
 
   auditSchedulesV2 AuditSchedule[] @relation("AuditScheduleOrganization")
 
@@ -2900,6 +2925,11 @@ model User {
   reviewedAuditServicePlans                    AuditServiceEngagement[]              @relation("AuditServicePlanningReviewedBy")
   auditServiceIndependenceDeclarations         AuditServiceIndependenceDeclaration[] @relation("AuditServiceIndependenceDeclarant")
   reviewedAuditServiceIndependenceDeclarations AuditServiceIndependenceDeclaration[] @relation("AuditServiceIndependenceReviewer")
+  requestedAuditServiceInformation             AuditServiceInformationRequest[]      @relation("AuditInformationRequestedBy")
+  ownedAuditServiceInformation                 AuditServiceInformationRequest[]      @relation("AuditInformationOwner")
+  chairedAuditServiceMeetings                  AuditServiceMeeting[]                 @relation("AuditServiceMeetingChair")
+  createdAuditServiceMeetings                  AuditServiceMeeting[]                 @relation("AuditServiceMeetingCreator")
+  auditServiceMeetingAttendance                AuditServiceMeetingAttendee[]
   ledAuditSchedulesV2                          AuditSchedule[]                       @relation("AuditScheduleLeadAuditor")
   auditScheduleMembershipsV2                   AuditScheduleTeamMember[]             @relation("AuditScheduleTeamMemberUser")
   createdAuditSchedulesV2                      AuditSchedule[]                       @relation("AuditScheduleCreatedBy")
@@ -3602,7 +3632,9 @@ model AuditServiceClientContact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  client AuditServiceClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client              AuditServiceClient               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  informationRequests AuditServiceInformationRequest[]
+  meetingAttendance   AuditServiceMeetingAttendee[]
 
   @@unique([clientId, email])
   @@index([clientId, isActive])
@@ -3666,6 +3698,8 @@ model AuditServiceEngagement {
   teamMembers              AuditServiceEngagementTeamMember[]
   audits                   EnterpriseAudit[]
   independenceDeclarations AuditServiceIndependenceDeclaration[]
+  informationRequests      AuditServiceInformationRequest[]
+  meetings                 AuditServiceMeeting[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, kind, status])
@@ -3701,6 +3735,91 @@ model AuditServiceIndependenceDeclaration {
   @@index([organizationId, decision])
   @@index([userId])
   @@index([reviewedById])
+}
+
+model AuditServiceInformationRequest {
+  id             String  @id @default(cuid())
+  organizationId String
+  engagementId   String
+  contactId      String?
+  requestedById  String?
+  ownerId        String?
+
+  reference     String
+  title         String
+  description   String
+  status        AuditInformationRequestStatus @default(DRAFT)
+  dueDate       DateTime?
+  sentAt        DateTime?
+  receivedAt    DateTime?
+  acceptedAt    DateTime?
+  closedAt      DateTime?
+  responseNotes String?
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  engagement   AuditServiceEngagement     @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  contact      AuditServiceClientContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  requestedBy  User?                      @relation("AuditInformationRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  owner        User?                      @relation("AuditInformationOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@unique([engagementId, reference])
+  @@index([organizationId, status, dueDate])
+  @@index([contactId])
+  @@index([ownerId])
+}
+
+model AuditServiceMeeting {
+  id             String  @id @default(cuid())
+  organizationId String
+  engagementId   String
+  chairedById    String?
+  createdById    String?
+
+  type               AuditServiceMeetingType
+  status             AuditServiceMeetingStatus @default(SCHEDULED)
+  title              String
+  agenda             String
+  scheduledAt        DateTime
+  location           String?
+  minutes            String?
+  outcomes           String?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  organization Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  engagement   AuditServiceEngagement        @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  chairedBy    User?                         @relation("AuditServiceMeetingChair", fields: [chairedById], references: [id], onDelete: SetNull)
+  createdBy    User?                         @relation("AuditServiceMeetingCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  attendees    AuditServiceMeetingAttendee[]
+
+  @@index([organizationId, status, scheduledAt])
+  @@index([engagementId, type])
+  @@index([chairedById])
+}
+
+model AuditServiceMeetingAttendee {
+  id                   String    @id @default(cuid())
+  meetingId            String
+  userId               String?
+  contactId            String?
+  attended             Boolean   @default(false)
+  attendanceRecordedAt DateTime?
+  notes                String?
+  createdAt            DateTime  @default(now())
+
+  meeting AuditServiceMeeting        @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user    User?                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact AuditServiceClientContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, userId])
+  @@unique([meetingId, contactId])
+  @@index([userId])
+  @@index([contactId])
 }
 
 model AuditServiceEngagementTeamMember {

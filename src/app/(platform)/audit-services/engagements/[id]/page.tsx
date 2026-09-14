@@ -18,6 +18,20 @@ import {
 } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  addMeetingAttendee,
+  closeMeeting,
+  createInformationRequest,
+  recordMeetingAttendance,
+  scheduleAuditServiceMeeting,
+  transitionInformationRequest,
+} from "@/features/audits/audit-service-coordination.actions";
+import { informationRequestTransitions } from "@/modules/audit/audit-service-coordination.service";
+import {
+  AuditInformationRequestStatus,
+  AuditServiceMeetingStatus,
+  AuditServiceMeetingType,
+} from "@prisma/client";
 
 const pretty = (value: string) =>
   value
@@ -37,13 +51,18 @@ export default async function AuditEngagementPage({
     hasPermission(PermissionKey.MANAGE_AUDITS),
   ]);
   await requireAuditServicesEntitlement(organizationId);
-  const [engagement, availableAudits] = await Promise.all([
+  const [engagement, availableAudits, users] = await Promise.all([
     findAuditServiceEngagement(organizationId, id),
     prisma.enterpriseAudit.findMany({
       where: { organizationId, engagementId: null },
       select: { id: true, reference: true, title: true },
       orderBy: { createdAt: "desc" },
       take: 100,
+    }),
+    prisma.user.findMany({
+      where: { organizationId, isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
     }),
   ]);
   if (!engagement) notFound();
@@ -266,6 +285,385 @@ export default async function AuditEngagementPage({
                 </div>
               </form>
             )}
+        </div>
+      </section>
+      <section className="mt-8 grid gap-5 xl:grid-cols-2">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+          <h2 className="text-xl font-semibold">Information requests</h2>
+          {canManage && (
+            <details className="mt-4 rounded-xl border border-white/10 p-4">
+              <summary className="cursor-pointer text-sm text-cyan-200">
+                Create request
+              </summary>
+              <form
+                action={createInformationRequest}
+                className="mt-3 grid gap-3"
+              >
+                <input
+                  type="hidden"
+                  name="engagementId"
+                  value={engagement.id}
+                />
+                <input
+                  name="title"
+                  required
+                  placeholder="Requested information"
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                />
+                <textarea
+                  name="description"
+                  required
+                  rows={2}
+                  placeholder="Describe the evidence or information required"
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <select
+                    name="contactId"
+                    defaultValue=""
+                    className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                  >
+                    <option value="">No client contact</option>
+                    {engagement.client?.contacts.map((contact) => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    name="ownerId"
+                    defaultValue=""
+                    className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                  >
+                    <option value="">No internal owner</option>
+                    {users.map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    name="dueDate"
+                    type="date"
+                    className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                  />
+                  <input
+                    name="reference"
+                    placeholder="Auto reference"
+                    className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                  />
+                </div>
+                <button className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950">
+                  Create request
+                </button>
+              </form>
+            </details>
+          )}
+          <div className="mt-4 space-y-3">
+            {engagement.informationRequests.map((request) => (
+              <div key={request.id} className="rounded-xl bg-slate-950/50 p-4">
+                <p className="text-xs text-cyan-300">
+                  {request.reference} · {pretty(request.status)}
+                </p>
+                <p className="mt-1 font-medium">{request.title}</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {request.contact?.name ?? "Internal request"}
+                  {request.dueDate
+                    ? ` · Due ${request.dueDate.toLocaleDateString()}`
+                    : ""}
+                </p>
+                {canManage &&
+                  informationRequestTransitions(request.status).map(
+                    (status) => (
+                      <form
+                        key={status}
+                        action={transitionInformationRequest}
+                        className="mt-2 flex gap-2"
+                      >
+                        <input
+                          type="hidden"
+                          name="engagementId"
+                          value={engagement.id}
+                        />
+                        <input
+                          type="hidden"
+                          name="requestId"
+                          value={request.id}
+                        />
+                        <input type="hidden" name="status" value={status} />
+                        {(status ===
+                          AuditInformationRequestStatus.PARTIALLY_RECEIVED ||
+                          status ===
+                            AuditInformationRequestStatus.RECEIVED) && (
+                          <input
+                            name="responseNotes"
+                            required
+                            placeholder="Receipt notes"
+                            className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-xs"
+                          />
+                        )}
+                        <button className="rounded-lg border border-cyan-400/20 px-3 py-1 text-xs text-cyan-200">
+                          {pretty(status)}
+                        </button>
+                      </form>
+                    ),
+                  )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+          <h2 className="text-xl font-semibold">
+            Entrance, status and exit meetings
+          </h2>
+          {canManage && (
+            <details className="mt-4 rounded-xl border border-white/10 p-4">
+              <summary className="cursor-pointer text-sm text-violet-200">
+                Schedule meeting
+              </summary>
+              <form
+                action={scheduleAuditServiceMeeting}
+                className="mt-3 grid gap-3"
+              >
+                <input
+                  type="hidden"
+                  name="engagementId"
+                  value={engagement.id}
+                />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <select
+                    name="type"
+                    className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                  >
+                    {Object.values(AuditServiceMeetingType).map((type) => (
+                      <option key={type}>{type}</option>
+                    ))}
+                  </select>
+                  <input
+                    name="scheduledAt"
+                    required
+                    type="datetime-local"
+                    className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                  />
+                  <input
+                    name="title"
+                    required
+                    placeholder="Meeting title"
+                    className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                  />
+                  <select
+                    name="chairedById"
+                    defaultValue=""
+                    className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                  >
+                    <option value="">No chairperson</option>
+                    {users.map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <textarea
+                  name="agenda"
+                  required
+                  rows={2}
+                  placeholder="Controlled agenda"
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                />
+                <input
+                  name="location"
+                  placeholder="Location or meeting channel"
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                />
+                <button className="rounded-xl bg-violet-300 px-4 py-2 text-sm font-semibold text-slate-950">
+                  Schedule meeting
+                </button>
+              </form>
+            </details>
+          )}
+          <div className="mt-4 space-y-3">
+            {engagement.meetings.map((meeting) => (
+              <div key={meeting.id} className="rounded-xl bg-slate-950/50 p-4">
+                <p className="text-xs text-violet-300">
+                  {pretty(meeting.type)} · {pretty(meeting.status)}
+                </p>
+                <p className="mt-1 font-medium">{meeting.title}</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {meeting.scheduledAt.toLocaleString()} ·{" "}
+                  {meeting.attendees.length} attendee(s)
+                </p>
+                <div className="mt-2 space-y-1">
+                  {meeting.attendees.map((attendee) => (
+                    <form
+                      key={attendee.id}
+                      action={recordMeetingAttendance}
+                      className="flex flex-wrap items-center gap-2 text-xs"
+                    >
+                      <input
+                        type="hidden"
+                        name="engagementId"
+                        value={engagement.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="attendeeId"
+                        value={attendee.id}
+                      />
+                      <span className="min-w-32">
+                        {attendee.user?.name ?? attendee.contact?.name} ·{" "}
+                        {attendee.attendanceRecordedAt
+                          ? attendee.attended
+                            ? "Present"
+                            : "Absent"
+                          : "Not marked"}
+                      </span>
+                      {canManage &&
+                        meeting.status ===
+                          AuditServiceMeetingStatus.SCHEDULED && (
+                          <>
+                            <button
+                              name="attended"
+                              value="true"
+                              className="rounded border border-emerald-400/20 px-2 py-1 text-emerald-200"
+                            >
+                              Present
+                            </button>
+                            <button
+                              name="attended"
+                              value="false"
+                              className="rounded border border-slate-400/20 px-2 py-1 text-slate-300"
+                            >
+                              Absent
+                            </button>
+                          </>
+                        )}
+                    </form>
+                  ))}
+                </div>
+                {canManage &&
+                  meeting.status === AuditServiceMeetingStatus.SCHEDULED && (
+                    <>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <form
+                          action={addMeetingAttendee}
+                          className="flex gap-2"
+                        >
+                          <input
+                            type="hidden"
+                            name="engagementId"
+                            value={engagement.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="meetingId"
+                            value={meeting.id}
+                          />
+                          <select
+                            name="attendeeUserId"
+                            required
+                            defaultValue=""
+                            className="rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-xs"
+                          >
+                            <option value="" disabled>
+                              Internal attendee
+                            </option>
+                            {users.map((person) => (
+                              <option key={person.id} value={person.id}>
+                                {person.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button className="rounded-lg border border-white/10 px-2 py-1 text-xs">
+                            Add
+                          </button>
+                        </form>
+                        {engagement.client && (
+                          <form
+                            action={addMeetingAttendee}
+                            className="flex gap-2"
+                          >
+                            <input
+                              type="hidden"
+                              name="engagementId"
+                              value={engagement.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="meetingId"
+                              value={meeting.id}
+                            />
+                            <select
+                              name="contactId"
+                              required
+                              defaultValue=""
+                              className="rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-xs"
+                            >
+                              <option value="" disabled>
+                                Client attendee
+                              </option>
+                              {engagement.client.contacts.map((contact) => (
+                                <option key={contact.id} value={contact.id}>
+                                  {contact.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button className="rounded-lg border border-white/10 px-2 py-1 text-xs">
+                              Add
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                      <form action={closeMeeting} className="mt-3 grid gap-2">
+                        <input
+                          type="hidden"
+                          name="engagementId"
+                          value={engagement.id}
+                        />
+                        <input
+                          type="hidden"
+                          name="meetingId"
+                          value={meeting.id}
+                        />
+                        <textarea
+                          name="minutes"
+                          rows={2}
+                          placeholder="Meeting minutes"
+                          className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
+                        />
+                        <textarea
+                          name="outcomes"
+                          rows={2}
+                          placeholder="Decisions and outcomes"
+                          className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
+                        />
+                        <input
+                          name="cancellationReason"
+                          placeholder="Cancellation reason, when applicable"
+                          className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            name="status"
+                            value="COMPLETED"
+                            className="rounded-lg border border-emerald-400/20 px-3 py-1 text-xs text-emerald-200"
+                          >
+                            Complete
+                          </button>
+                          <button
+                            name="status"
+                            value="CANCELLED"
+                            className="rounded-lg border border-red-400/20 px-3 py-1 text-xs text-red-200"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    </>
+                  )}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
       <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">

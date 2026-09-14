@@ -546,6 +546,25 @@ export function findAuditServiceEngagement(
         },
         orderBy: { declaredAt: "desc" },
       },
+      informationRequests: {
+        include: {
+          contact: { select: { name: true, email: true } },
+          owner: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      meetings: {
+        include: {
+          chairedBy: { select: { name: true } },
+          attendees: {
+            include: {
+              user: { select: { name: true } },
+              contact: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { scheduledAt: "desc" },
+      },
     },
   });
 }
