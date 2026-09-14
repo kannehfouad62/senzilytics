@@ -176,16 +176,49 @@ test("audit planning requires independent conflict review and approval", async (
 test("audit service deliverables are versioned, frozen, and independently approved", async () => {
   const [schema, migration, service, actions, page] = await Promise.all([
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
-    readFile(new URL("../prisma/migrations/20260927120000_audit_service_deliverables/migration.sql", import.meta.url), "utf8"),
-    readFile(new URL("../src/modules/audit/audit-service-deliverable.service.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/features/audits/audit-service-deliverable.actions.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/app/(platform)/audit-services/engagements/[id]/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../prisma/migrations/20260927120000_audit_service_deliverables/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/modules/audit/audit-service-deliverable.service.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/features/audits/audit-service-deliverable.actions.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/app/(platform)/audit-services/engagements/[id]/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ]);
   assert.match(schema, /model AuditServiceDeliverable/);
   assert.match(schema, /contentSnapshot\s+Json/);
-  assert.match(migration, /AuditServiceDeliverable_engagementId_reference_version_key/);
-  assert.match(service, /The deliverable creator cannot approve their own deliverable/);
-  assert.match(service, /Only approved, released, or withdrawn deliverables can be revised/);
+  assert.match(
+    migration,
+    /AuditServiceDeliverable_engagementId_reference_version_key/,
+  );
+  assert.match(
+    service,
+    /The deliverable creator cannot approve their own deliverable/,
+  );
+  assert.match(
+    service,
+    /Only approved, released, or withdrawn deliverables can be revised/,
+  );
   assert.match(service, /frozenAt/);
   assert.match(service, /organizationId: input\.organizationId/);
   assert.match(actions, /PermissionKey\.MANAGE_AUDITS/);
@@ -193,13 +226,104 @@ test("audit service deliverables are versioned, frozen, and independently approv
   assert.match(page, /Controlled reports and deliverables/);
 });
 
+test("released audit deliverables use secure branded downloads with delivery evidence", async () => {
+  const [
+    schema,
+    migration,
+    exporter,
+    internalRoute,
+    externalRoute,
+    accessService,
+    page,
+  ] = await Promise.all([
+    readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../prisma/migrations/20260928120000_audit_service_deliverable_publishing/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/modules/audit/audit-service-deliverable-export.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/app/api/audit-services/deliverables/[id]/pdf/route.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/app/audit-client/[token]/deliverable/route.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/modules/audit/audit-external-access.service.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/app/audit-client/[token]/page.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(schema, /model AuditServiceDeliverableDownload/);
+  assert.match(migration, /AuditServiceExternalAccess_deliverableId_fkey/);
+  assert.match(exporter, /SENZILYTICS · CONTROLLED AUDIT DELIVERABLE/);
+  assert.match(internalRoute, /PermissionKey\.VIEW_AUDITS/);
+  assert.match(internalRoute, /private, no-store/);
+  assert.match(externalRoute, /resolveAuditExternalAccess/);
+  assert.match(externalRoute, /AuditServiceDeliverableStatus\.RELEASED/);
+  assert.match(externalRoute, /recordAuditDeliverableDownload/);
+  assert.match(accessService, /Select a released deliverable version/);
+  assert.match(
+    accessService,
+    /Share either a released deliverable or a direct audit resource/,
+  );
+  assert.match(page, /Download controlled PDF/);
+});
+
 test("audit service coordination governs requests, meetings, and attendance", async () => {
   const [schema, migration, service, actions, page] = await Promise.all([
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
-    readFile(new URL("../prisma/migrations/20260922120000_audit_service_requests_meetings/migration.sql", import.meta.url), "utf8"),
-    readFile(new URL("../src/modules/audit/audit-service-coordination.service.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/features/audits/audit-service-coordination.actions.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/app/(platform)/audit-services/engagements/[id]/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../prisma/migrations/20260922120000_audit_service_requests_meetings/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/modules/audit/audit-service-coordination.service.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/features/audits/audit-service-coordination.actions.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/app/(platform)/audit-services/engagements/[id]/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ]);
   assert.match(schema, /model AuditServiceInformationRequest/);
   assert.match(schema, /model AuditServiceMeetingAttendee/);
@@ -305,9 +429,24 @@ test("external audit reviews freeze shared resources and accept one governed dec
 test("external finding responses remain structured immutable and separate from internal CAPA", async () => {
   const [schema, migration, service, page] = await Promise.all([
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
-    readFile(new URL("../prisma/migrations/20260925120000_audit_external_finding_responses/migration.sql", import.meta.url), "utf8"),
-    readFile(new URL("../src/modules/audit/audit-external-access.service.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/app/audit-client/[token]/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../prisma/migrations/20260925120000_audit_external_finding_responses/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/modules/audit/audit-external-access.service.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/app/audit-client/[token]/page.tsx", import.meta.url),
+      "utf8",
+    ),
   ]);
   assert.match(schema, /model AuditServiceExternalFindingResponse/);
   assert.match(schema, /accessId\s+String\s+@unique/);
@@ -321,10 +460,34 @@ test("external finding responses remain structured immutable and separate from i
 test("accepted external remediation enters governed internal CAPA controls", async () => {
   const [schema, migration, service, actions, page] = await Promise.all([
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
-    readFile(new URL("../prisma/migrations/20260926120000_audit_finding_response_governance/migration.sql", import.meta.url), "utf8"),
-    readFile(new URL("../src/modules/audit/audit-external-access.service.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/features/audits/audit-external-access.actions.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/app/(platform)/audit-services/engagements/[id]/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../prisma/migrations/20260926120000_audit_finding_response_governance/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/modules/audit/audit-external-access.service.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/features/audits/audit-external-access.actions.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/app/(platform)/audit-services/engagements/[id]/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ]);
   assert.match(schema, /AuditExternalFindingReviewStatus/);
   assert.match(migration, /CONVERTED_TO_CAPA/);

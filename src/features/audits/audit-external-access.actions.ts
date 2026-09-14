@@ -57,6 +57,7 @@ export async function createAuditExternalAccess(data: FormData) {
     auditId: value(data, "auditId"),
     questionId: value(data, "questionId"),
     findingId: value(data, "findingId"),
+    deliverableId: value(data, "deliverableId"),
     scope,
     title: required(data, "title"),
     instructions: value(data, "instructions"),

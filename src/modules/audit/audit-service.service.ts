@@ -583,15 +583,20 @@ export function findAuditServiceEngagement(
       externalAccesses: {
         include: {
           contact: { select: { name: true, email: true } },
+          deliverable: {
+            select: { reference: true, title: true, version: true },
+          },
           informationRequest: { select: { reference: true, title: true } },
           decision: true,
           findingResponse: {
             include: {
               reviewedBy: { select: { name: true } },
-              correctiveAction: { select: { id: true, title: true, status: true } },
+              correctiveAction: {
+                select: { id: true, title: true, status: true },
+              },
             },
           },
-          _count: { select: { comments: true } },
+          _count: { select: { comments: true, deliverableDownloads: true } },
         },
         orderBy: { createdAt: "desc" },
       },
@@ -602,6 +607,17 @@ export function findAuditServiceEngagement(
           approvedBy: { select: { name: true } },
           releasedBy: { select: { name: true } },
           sourceAudit: { select: { reference: true, title: true } },
+          downloads: {
+            select: {
+              id: true,
+              representativeName: true,
+              representativeEmail: true,
+              downloadedAt: true,
+            },
+            orderBy: { downloadedAt: "desc" },
+            take: 10,
+          },
+          _count: { select: { downloads: true, externalAccesses: true } },
         },
         orderBy: [{ reference: "asc" }, { version: "desc" }],
       },

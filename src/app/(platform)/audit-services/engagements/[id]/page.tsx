@@ -782,6 +782,25 @@ export default async function AuditEngagementPage({
                     )),
                   )}
                 </select>
+                <select
+                  name="deliverableId"
+                  defaultValue=""
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm md:col-span-2"
+                >
+                  <option value="">
+                    Released deliverable — for report scope
+                  </option>
+                  {engagement.deliverables
+                    .filter(
+                      (item) =>
+                        item.status === AuditServiceDeliverableStatus.RELEASED,
+                    )
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.reference} · v{item.version} · {item.title}
+                      </option>
+                    ))}
+                </select>
                 <input
                   name="title"
                   required
@@ -834,6 +853,13 @@ export default async function AuditEngagementPage({
                         {pretty(access.scope)} · {access.contact.name}
                       </p>
                       <h3 className="mt-1 font-semibold">{access.title}</h3>
+                      {access.deliverable && (
+                        <p className="mt-1 text-xs text-emerald-200">
+                          {access.deliverable.reference} · v
+                          {access.deliverable.version} ·{" "}
+                          {access._count.deliverableDownloads} download(s)
+                        </p>
+                      )}
                       <p className="mt-2 text-xs text-slate-500">
                         {access.contact.email} · expires{" "}
                         {access.expiresAt.toLocaleString()} ·{" "}
@@ -1099,6 +1125,34 @@ export default async function AuditEngagementPage({
                   )}
                 </div>
                 <p className="mt-3 text-sm text-slate-300">{item.summary}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                  <span>{item._count.externalAccesses} secure link(s)</span>
+                  <span>{item._count.downloads} governed download(s)</span>
+                  {item.status === AuditServiceDeliverableStatus.RELEASED && (
+                    <a
+                      href={`/api/audit-services/deliverables/${item.id}/pdf`}
+                      className="rounded-lg border border-cyan-400/20 px-3 py-1 text-cyan-200"
+                    >
+                      Download branded PDF
+                    </a>
+                  )}
+                </div>
+                {item.downloads.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs text-slate-400">
+                      Recent delivery evidence
+                    </summary>
+                    <div className="mt-2 space-y-1 text-xs text-slate-500">
+                      {item.downloads.map((download) => (
+                        <p key={download.id}>
+                          {download.representativeName ??
+                            "Authorized tenant user"}{" "}
+                          · {download.downloadedAt.toLocaleString()}
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                )}
                 {item.reviewNotes && (
                   <p className="mt-2 text-xs text-amber-200">
                     Review record: {item.reviewNotes}
@@ -1146,46 +1200,46 @@ export default async function AuditEngagementPage({
                   </div>
                 )}
                 {canManage && canReviseDeliverable(item.status) && (
-                    <details className="mt-3">
-                      <summary className="cursor-pointer text-xs text-cyan-200">
-                        Create controlled revision
-                      </summary>
-                      <form
-                        action={reviseEngagementDeliverable}
-                        className="mt-2 grid gap-2"
-                      >
-                        <input
-                          type="hidden"
-                          name="engagementId"
-                          value={engagement.id}
-                        />
-                        <input
-                          type="hidden"
-                          name="deliverableId"
-                          value={item.id}
-                        />
-                        <input
-                          name="changeNote"
-                          required
-                          placeholder="Required change note"
-                          className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
-                        />
-                        <textarea
-                          name="summary"
-                          placeholder="Revised summary (optional)"
-                          className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
-                        />
-                        <textarea
-                          name="narrative"
-                          placeholder="Revised manual narrative"
-                          className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
-                        />
-                        <button className="rounded-lg border border-cyan-400/20 px-3 py-2 text-xs text-cyan-200">
-                          Create next version
-                        </button>
-                      </form>
-                    </details>
-                  )}
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-xs text-cyan-200">
+                      Create controlled revision
+                    </summary>
+                    <form
+                      action={reviseEngagementDeliverable}
+                      className="mt-2 grid gap-2"
+                    >
+                      <input
+                        type="hidden"
+                        name="engagementId"
+                        value={engagement.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="deliverableId"
+                        value={item.id}
+                      />
+                      <input
+                        name="changeNote"
+                        required
+                        placeholder="Required change note"
+                        className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
+                      />
+                      <textarea
+                        name="summary"
+                        placeholder="Revised summary (optional)"
+                        className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
+                      />
+                      <textarea
+                        name="narrative"
+                        placeholder="Revised manual narrative"
+                        className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
+                      />
+                      <button className="rounded-lg border border-cyan-400/20 px-3 py-2 text-xs text-cyan-200">
+                        Create next version
+                      </button>
+                    </form>
+                  </details>
+                )}
               </article>
             );
           })}

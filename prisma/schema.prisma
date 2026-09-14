@@ -2428,6 +2428,7 @@ model Organization {
   auditServiceExternalComments         AuditServiceExternalComment[]
   auditServiceExternalFindingResponses AuditServiceExternalFindingResponse[]
   auditServiceDeliverables             AuditServiceDeliverable[]
+  auditServiceDeliverableDownloads     AuditServiceDeliverableDownload[]
 
   auditSchedulesV2 AuditSchedule[] @relation("AuditScheduleOrganization")
 
@@ -3897,6 +3898,7 @@ model AuditServiceExternalAccess {
   auditId              String?
   questionId           String?
   findingId            String?
+  deliverableId        String?
 
   scope            AuditExternalAccessScope
   status           AuditExternalAccessStatus @default(ACTIVE)
@@ -3919,16 +3921,18 @@ model AuditServiceExternalAccess {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  organization       Organization                         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  engagement         AuditServiceEngagement               @relation(fields: [engagementId], references: [id], onDelete: Cascade)
-  contact            AuditServiceClientContact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  informationRequest AuditServiceInformationRequest?      @relation(fields: [informationRequestId], references: [id], onDelete: Cascade)
-  audit              EnterpriseAudit?                     @relation(fields: [auditId], references: [id], onDelete: Cascade)
-  question           EnterpriseAuditQuestion?             @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  finding            EnterpriseAuditFinding?              @relation(fields: [findingId], references: [id], onDelete: Cascade)
-  decision           AuditServiceExternalDecision?
-  findingResponse    AuditServiceExternalFindingResponse?
-  comments           AuditServiceExternalComment[]
+  organization         Organization                         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  engagement           AuditServiceEngagement               @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  contact              AuditServiceClientContact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  informationRequest   AuditServiceInformationRequest?      @relation(fields: [informationRequestId], references: [id], onDelete: Cascade)
+  audit                EnterpriseAudit?                     @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  question             EnterpriseAuditQuestion?             @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  finding              EnterpriseAuditFinding?              @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  deliverable          AuditServiceDeliverable?             @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  decision             AuditServiceExternalDecision?
+  findingResponse      AuditServiceExternalFindingResponse?
+  comments             AuditServiceExternalComment[]
+  deliverableDownloads AuditServiceDeliverableDownload[]
 
   @@index([organizationId, status, expiresAt])
   @@index([engagementId, status])
@@ -3937,6 +3941,7 @@ model AuditServiceExternalAccess {
   @@index([auditId])
   @@index([questionId])
   @@index([findingId])
+  @@index([deliverableId])
 }
 
 model AuditServiceExternalFindingResponse {
@@ -4030,21 +4035,41 @@ model AuditServiceDeliverable {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  engagement      AuditServiceEngagement    @relation(fields: [engagementId], references: [id], onDelete: Cascade)
-  sourceAudit     EnterpriseAudit?          @relation(fields: [sourceAuditId], references: [id], onDelete: SetNull)
-  previousVersion AuditServiceDeliverable?  @relation("AuditServiceDeliverableVersions", fields: [previousVersionId], references: [id], onDelete: SetNull)
-  newerVersions   AuditServiceDeliverable[] @relation("AuditServiceDeliverableVersions")
-  createdBy       User                      @relation("AuditServiceDeliverableCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  reviewedBy      User?                     @relation("AuditServiceDeliverableReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  approvedBy      User?                     @relation("AuditServiceDeliverableApprover", fields: [approvedById], references: [id], onDelete: SetNull)
-  releasedBy      User?                     @relation("AuditServiceDeliverableReleaser", fields: [releasedById], references: [id], onDelete: SetNull)
+  organization     Organization                      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  engagement       AuditServiceEngagement            @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  sourceAudit      EnterpriseAudit?                  @relation(fields: [sourceAuditId], references: [id], onDelete: SetNull)
+  previousVersion  AuditServiceDeliverable?          @relation("AuditServiceDeliverableVersions", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  newerVersions    AuditServiceDeliverable[]         @relation("AuditServiceDeliverableVersions")
+  externalAccesses AuditServiceExternalAccess[]
+  downloads        AuditServiceDeliverableDownload[]
+  createdBy        User                              @relation("AuditServiceDeliverableCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  reviewedBy       User?                             @relation("AuditServiceDeliverableReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  approvedBy       User?                             @relation("AuditServiceDeliverableApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  releasedBy       User?                             @relation("AuditServiceDeliverableReleaser", fields: [releasedById], references: [id], onDelete: SetNull)
 
   @@unique([engagementId, reference, version])
   @@index([organizationId, status, updatedAt])
   @@index([engagementId, type, status])
   @@index([sourceAuditId])
   @@index([previousVersionId])
+}
+
+model AuditServiceDeliverableDownload {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  deliverableId       String
+  accessId            String?
+  representativeName  String?
+  representativeEmail String?
+  downloadedAt        DateTime @default(now())
+
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliverable  AuditServiceDeliverable     @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  access       AuditServiceExternalAccess? @relation(fields: [accessId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, downloadedAt])
+  @@index([deliverableId, downloadedAt])
+  @@index([accessId])
 }
 
 model AuditServiceEngagementTeamMember {

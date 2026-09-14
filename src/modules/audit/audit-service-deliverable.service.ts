@@ -296,3 +296,54 @@ export async function transitionAuditServiceDeliverable(input: {
   });
   return updated;
 }
+
+export function authorizeInternalAuditDeliverableDownload(
+  organizationId: string,
+  deliverableId: string,
+) {
+  return prisma.auditServiceDeliverable.findFirst({
+    where: {
+      id: deliverableId,
+      organizationId,
+      status: AuditServiceDeliverableStatus.RELEASED,
+    },
+    include: {
+      organization: { select: { name: true } },
+      engagement: {
+        include: { client: { select: { name: true } } },
+      },
+    },
+  });
+}
+
+export async function recordAuditDeliverableDownload(input: {
+  organizationId: string;
+  deliverableId: string;
+  actorId?: string | null;
+  accessId?: string | null;
+  representativeName?: string | null;
+  representativeEmail?: string | null;
+}) {
+  const download = await prisma.auditServiceDeliverableDownload.create({
+    data: {
+      organizationId: input.organizationId,
+      deliverableId: input.deliverableId,
+      accessId: input.accessId || null,
+      representativeName: clean(input.representativeName, 200),
+      representativeEmail: clean(input.representativeEmail, 320),
+    },
+  });
+  await logActivity({
+    organizationId: input.organizationId,
+    userId: input.actorId || undefined,
+    action: ActivityAction.SYSTEM,
+    entityType: "AuditServiceDeliverable",
+    entityId: input.deliverableId,
+    title: "Audit deliverable downloaded",
+    description: input.representativeName
+      ? `Downloaded by ${input.representativeName}`
+      : "Downloaded by an authorized tenant user",
+    metadata: { downloadId: download.id, accessId: input.accessId || null },
+  });
+  return download;
+}

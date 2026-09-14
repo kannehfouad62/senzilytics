@@ -32,6 +32,7 @@ export async function issueAuditExternalAccess(input: {
   auditId?: string | null;
   questionId?: string | null;
   findingId?: string | null;
+  deliverableId?: string | null;
   scope: AuditExternalAccessScope;
   title: string;
   instructions?: string | null;
@@ -73,6 +74,7 @@ export async function issueAuditExternalAccess(input: {
   const auditId = clean(input.auditId, 100);
   const questionId = clean(input.questionId, 100);
   const findingId = clean(input.findingId, 100);
+  const deliverableId = clean(input.deliverableId, 100);
   let resourceSnapshot: Prisma.InputJsonValue | undefined;
   if (input.scope === AuditExternalAccessScope.INFORMATION_REQUEST) {
     if (!informationRequestId)
@@ -89,12 +91,42 @@ export async function issueAuditExternalAccess(input: {
   } else if (informationRequestId) {
     throw new Error("Information requests require the matching access scope.");
   }
-  if (
+  if (deliverableId) {
+    if (input.scope !== AuditExternalAccessScope.AUDIT_REPORT)
+      throw new Error(
+        "Controlled deliverables require audit report access scope.",
+      );
+    if (auditId || questionId || findingId)
+      throw new Error(
+        "Share either a released deliverable or a direct audit resource.",
+      );
+    const deliverable = await prisma.auditServiceDeliverable.findFirst({
+      where: {
+        id: deliverableId,
+        organizationId: input.organizationId,
+        engagementId: engagement.id,
+        status: "RELEASED",
+      },
+    });
+    if (!deliverable) throw new Error("Select a released deliverable version.");
+    resourceSnapshot = {
+      kind: "AUDIT_SERVICE_DELIVERABLE",
+      deliverableId: deliverable.id,
+      reference: deliverable.reference,
+      title: deliverable.title,
+      version: deliverable.version,
+      type: deliverable.type,
+      summary: deliverable.summary,
+      releasedAt: deliverable.releasedAt?.toISOString() ?? null,
+      frozenAt: now.toISOString(),
+    };
+  } else if (
     input.scope === AuditExternalAccessScope.AUDIT_REPORT ||
     input.scope === AuditExternalAccessScope.AUDIT_QUESTION ||
     input.scope === AuditExternalAccessScope.AUDIT_FINDING
   ) {
-    if (!auditId) throw new Error("Select a linked audit for this access link.");
+    if (!auditId)
+      throw new Error("Select a linked audit for this access link.");
     const audit = await prisma.enterpriseAudit.findFirst({
       where: {
         id: auditId,
@@ -102,8 +134,18 @@ export async function issueAuditExternalAccess(input: {
         engagementId: engagement.id,
         status:
           input.scope === AuditExternalAccessScope.AUDIT_REPORT
-            ? { in: [EnterpriseAuditStatus.COMPLETED, EnterpriseAuditStatus.CLOSED] }
-            : { notIn: [EnterpriseAuditStatus.DRAFT, EnterpriseAuditStatus.CANCELLED] },
+            ? {
+                in: [
+                  EnterpriseAuditStatus.COMPLETED,
+                  EnterpriseAuditStatus.CLOSED,
+                ],
+              }
+            : {
+                notIn: [
+                  EnterpriseAuditStatus.DRAFT,
+                  EnterpriseAuditStatus.CANCELLED,
+                ],
+              },
       },
       include: {
         site: { select: { name: true } },
@@ -123,7 +165,8 @@ export async function issueAuditExternalAccess(input: {
     if (input.scope === AuditExternalAccessScope.AUDIT_FINDING) {
       if (!findingId) throw new Error("Select an audit finding to share.");
       const finding = audit.findings.find((item) => item.id === findingId);
-      if (!finding) throw new Error("Audit finding not found in the selected audit.");
+      if (!finding)
+        throw new Error("Audit finding not found in the selected audit.");
       resourceSnapshot = {
         kind: "AUDIT_FINDING",
         auditReference: audit.reference,
@@ -145,7 +188,8 @@ export async function issueAuditExternalAccess(input: {
       const question = audit.sections
         .flatMap((section) => section.questions)
         .find((item) => item.id === questionId);
-      if (!question) throw new Error("Audit question not found in the selected audit.");
+      if (!question)
+        throw new Error("Audit question not found in the selected audit.");
       resourceSnapshot = {
         kind: "AUDIT_QUESTION",
         auditReference: audit.reference,
@@ -165,7 +209,8 @@ export async function issueAuditExternalAccess(input: {
         frozenAt: now.toISOString(),
       };
     } else {
-      if (questionId) throw new Error("Question selection requires question scope.");
+      if (questionId)
+        throw new Error("Question selection requires question scope.");
       resourceSnapshot = {
         kind: "AUDIT_REPORT",
         auditReference: audit.reference,
@@ -215,6 +260,7 @@ export async function issueAuditExternalAccess(input: {
         input.scope === AuditExternalAccessScope.AUDIT_FINDING
           ? findingId
           : null,
+      deliverableId,
       scope: input.scope,
       title,
       instructions: clean(input.instructions),
@@ -246,9 +292,14 @@ export async function issueAuditExternalAccess(input: {
   if (!delivery.success) {
     await prisma.auditServiceExternalAccess.update({
       where: { id: access.id },
-      data: { status: AuditExternalAccessStatus.REVOKED, revokedAt: new Date() },
+      data: {
+        status: AuditExternalAccessStatus.REVOKED,
+        revokedAt: new Date(),
+      },
     });
-    throw new Error("The access email could not be delivered. No active link was issued.");
+    throw new Error(
+      "The access email could not be delivered. No active link was issued.",
+    );
   }
   await logActivity({
     organizationId: input.organizationId,
@@ -269,7 +320,10 @@ export async function issueAuditExternalAccess(input: {
   return access;
 }
 
-export async function verifyAuditExternalPasscode(token: string, passcode: string) {
+export async function verifyAuditExternalPasscode(
+  token: string,
+  passcode: string,
+) {
   const now = new Date();
   const access = await prisma.auditServiceExternalAccess.findUnique({
     where: { tokenHash: digest(token) },
@@ -339,7 +393,21 @@ export async function resolveAuditExternalAccess(
       },
       contact: { select: { name: true, email: true } },
       informationRequest: {
-        select: { reference: true, title: true, description: true, dueDate: true },
+        select: {
+          reference: true,
+          title: true,
+          description: true,
+          dueDate: true,
+        },
+      },
+      deliverable: {
+        select: {
+          id: true,
+          reference: true,
+          title: true,
+          version: true,
+          status: true,
+        },
       },
       decision: true,
       findingResponse: true,
@@ -404,7 +472,8 @@ export async function recordAuditExternalDecision(input: {
     include: { contact: true, decision: true },
   });
   if (!access) throw new Error("External audit access is no longer available.");
-  if (access.decision) throw new Error("A final decision has already been recorded.");
+  if (access.decision)
+    throw new Error("A final decision has already been recorded.");
   const comment = clean(input.comment, 4000);
   if (input.decision === AuditExternalDecisionType.DENIED && !comment)
     throw new Error("A denial requires an explanatory comment.");
@@ -440,24 +509,51 @@ export async function recordAuditExternalFindingResponse(input: {
   targetDate?: Date | null;
 }) {
   const access = await prisma.auditServiceExternalAccess.findFirst({
-    where: { id: input.accessId, scope: AuditExternalAccessScope.AUDIT_FINDING, status: AuditExternalAccessStatus.ACTIVE, expiresAt: { gt: new Date() } },
+    where: {
+      id: input.accessId,
+      scope: AuditExternalAccessScope.AUDIT_FINDING,
+      status: AuditExternalAccessStatus.ACTIVE,
+      expiresAt: { gt: new Date() },
+    },
     include: { contact: true, findingResponse: true },
   });
-  if (!access) throw new Error("External finding access is no longer available.");
-  if (access.findingResponse) throw new Error("A finding response has already been submitted.");
+  if (!access)
+    throw new Error("External finding access is no longer available.");
+  if (access.findingResponse)
+    throw new Error("A finding response has already been submitted.");
   const response = clean(input.response, 4000);
   if (!response) throw new Error("A client finding response is required.");
   const remediationPlan = clean(input.remediationPlan, 4000);
-  if (input.position === AuditExternalFindingPosition.REMEDIATION_PROPOSED && !remediationPlan)
+  if (
+    input.position === AuditExternalFindingPosition.REMEDIATION_PROPOSED &&
+    !remediationPlan
+  )
     throw new Error("A proposed remediation plan is required.");
   if (input.targetDate && input.targetDate <= new Date())
     throw new Error("The proposed target date must be in the future.");
-  const record = await prisma.auditServiceExternalFindingResponse.create({ data: {
-    organizationId: access.organizationId, accessId: access.id, position: input.position,
-    response, proposedRootCause: clean(input.proposedRootCause), immediateCorrection: clean(input.immediateCorrection),
-    remediationPlan, targetDate: input.targetDate, representativeName: access.contact.name, representativeEmail: access.contact.email,
-  }});
-  await logActivity({ organizationId: access.organizationId, action: ActivityAction.CREATE, entityType: "AuditServiceExternalFindingResponse", entityId: record.id, title: "External audit finding response submitted", description: `${access.contact.name} · ${record.position}`, metadata: { accessId: access.id, findingId: access.findingId } });
+  const record = await prisma.auditServiceExternalFindingResponse.create({
+    data: {
+      organizationId: access.organizationId,
+      accessId: access.id,
+      position: input.position,
+      response,
+      proposedRootCause: clean(input.proposedRootCause),
+      immediateCorrection: clean(input.immediateCorrection),
+      remediationPlan,
+      targetDate: input.targetDate,
+      representativeName: access.contact.name,
+      representativeEmail: access.contact.email,
+    },
+  });
+  await logActivity({
+    organizationId: access.organizationId,
+    action: ActivityAction.CREATE,
+    entityType: "AuditServiceExternalFindingResponse",
+    entityId: record.id,
+    title: "External audit finding response submitted",
+    description: `${access.contact.name} · ${record.position}`,
+    metadata: { accessId: access.id, findingId: access.findingId },
+  });
   return record;
 }
 
@@ -468,16 +564,44 @@ export async function reviewAuditExternalFindingResponse(input: {
   decision: AuditExternalFindingReviewStatus;
   notes: string;
 }) {
-  if (!new Set<AuditExternalFindingReviewStatus>([AuditExternalFindingReviewStatus.ACCEPTED, AuditExternalFindingReviewStatus.CHANGES_REQUESTED, AuditExternalFindingReviewStatus.REJECTED]).has(input.decision))
+  if (
+    !new Set<AuditExternalFindingReviewStatus>([
+      AuditExternalFindingReviewStatus.ACCEPTED,
+      AuditExternalFindingReviewStatus.CHANGES_REQUESTED,
+      AuditExternalFindingReviewStatus.REJECTED,
+    ]).has(input.decision)
+  )
     throw new Error("Select a valid internal review decision.");
-  const record = await prisma.auditServiceExternalFindingResponse.findFirst({ where: { id: input.responseId, organizationId: input.organizationId }, include: { access: true } });
+  const record = await prisma.auditServiceExternalFindingResponse.findFirst({
+    where: { id: input.responseId, organizationId: input.organizationId },
+    include: { access: true },
+  });
   if (!record) throw new Error("External finding response not found.");
   if (record.reviewStatus !== AuditExternalFindingReviewStatus.PENDING)
-    throw new Error("This external finding response has already been reviewed.");
+    throw new Error(
+      "This external finding response has already been reviewed.",
+    );
   const notes = clean(input.notes, 4000);
   if (!notes) throw new Error("Internal review notes are required.");
-  const updated = await prisma.auditServiceExternalFindingResponse.update({ where: { id: record.id }, data: { reviewStatus: input.decision, reviewNotes: notes, reviewedById: input.reviewerId, reviewedAt: new Date() } });
-  await logActivity({ organizationId: input.organizationId, userId: input.reviewerId, action: ActivityAction.STATUS_CHANGE, entityType: "AuditServiceExternalFindingResponse", entityId: record.id, title: "External finding response reviewed", description: `${record.reviewStatus} → ${updated.reviewStatus}`, metadata: { accessId: record.accessId, findingId: record.access.findingId } });
+  const updated = await prisma.auditServiceExternalFindingResponse.update({
+    where: { id: record.id },
+    data: {
+      reviewStatus: input.decision,
+      reviewNotes: notes,
+      reviewedById: input.reviewerId,
+      reviewedAt: new Date(),
+    },
+  });
+  await logActivity({
+    organizationId: input.organizationId,
+    userId: input.reviewerId,
+    action: ActivityAction.STATUS_CHANGE,
+    entityType: "AuditServiceExternalFindingResponse",
+    entityId: record.id,
+    title: "External finding response reviewed",
+    description: `${record.reviewStatus} → ${updated.reviewStatus}`,
+    metadata: { accessId: record.accessId, findingId: record.access.findingId },
+  });
   return updated;
 }
 
@@ -488,16 +612,55 @@ export async function convertExternalFindingResponseToCapa(input: {
   assignedToId: string;
   dueDate: Date;
 }) {
-  const record = await prisma.auditServiceExternalFindingResponse.findFirst({ where: { id: input.responseId, organizationId: input.organizationId }, include: { access: true } });
+  const record = await prisma.auditServiceExternalFindingResponse.findFirst({
+    where: { id: input.responseId, organizationId: input.organizationId },
+    include: { access: true },
+  });
   if (!record || !record.access.auditId || !record.access.findingId)
     throw new Error("Governed external finding response not found.");
   if (record.reviewStatus !== AuditExternalFindingReviewStatus.ACCEPTED)
     throw new Error("Accept the client response before CAPA conversion.");
   if (!record.remediationPlan)
     throw new Error("A remediation plan is required for CAPA conversion.");
-  const action = await createCapaFromAuditFindingService({ organizationId: input.organizationId, userId: input.reviewerId, auditId: record.access.auditId, findingId: record.access.findingId, title: `Client remediation — ${record.access.title}`, description: [record.response, record.proposedRootCause && `Proposed root cause: ${record.proposedRootCause}`, record.immediateCorrection && `Immediate correction: ${record.immediateCorrection}`, `Remediation plan: ${record.remediationPlan}`].filter(Boolean).join("\n\n"), assignedToId: input.assignedToId, dueDate: input.dueDate });
-  await prisma.auditServiceExternalFindingResponse.update({ where: { id: record.id }, data: { reviewStatus: AuditExternalFindingReviewStatus.CONVERTED_TO_CAPA, correctiveActionId: action.id } });
-  await logActivity({ organizationId: input.organizationId, userId: input.reviewerId, action: ActivityAction.CREATE, entityType: "AuditServiceExternalFindingResponse", entityId: record.id, title: "Client remediation converted to CAPA", description: action.title, metadata: { correctiveActionId: action.id, findingId: record.access.findingId } });
+  const action = await createCapaFromAuditFindingService({
+    organizationId: input.organizationId,
+    userId: input.reviewerId,
+    auditId: record.access.auditId,
+    findingId: record.access.findingId,
+    title: `Client remediation — ${record.access.title}`,
+    description: [
+      record.response,
+      record.proposedRootCause &&
+        `Proposed root cause: ${record.proposedRootCause}`,
+      record.immediateCorrection &&
+        `Immediate correction: ${record.immediateCorrection}`,
+      `Remediation plan: ${record.remediationPlan}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+    assignedToId: input.assignedToId,
+    dueDate: input.dueDate,
+  });
+  await prisma.auditServiceExternalFindingResponse.update({
+    where: { id: record.id },
+    data: {
+      reviewStatus: AuditExternalFindingReviewStatus.CONVERTED_TO_CAPA,
+      correctiveActionId: action.id,
+    },
+  });
+  await logActivity({
+    organizationId: input.organizationId,
+    userId: input.reviewerId,
+    action: ActivityAction.CREATE,
+    entityType: "AuditServiceExternalFindingResponse",
+    entityId: record.id,
+    title: "Client remediation converted to CAPA",
+    description: action.title,
+    metadata: {
+      correctiveActionId: action.id,
+      findingId: record.access.findingId,
+    },
+  });
   return action;
 }
 
