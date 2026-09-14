@@ -35,6 +35,18 @@ test("audit services defaults to audit-service tenants and supports manual overr
   );
 });
 
+test("approved platform administrators can operate the audit service workspace", async () => {
+  const source = await readFile(
+    new URL(
+      "../src/modules/audit/audit-services-entitlement.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(source, /getPlatformAdministrator/);
+  assert.match(source, /!platformAdministrator && !entitled/);
+});
+
 test("manual module assignments override industry navigation defaults", () => {
   const items = [
     { href: "/audits" },

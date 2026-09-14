@@ -1,4 +1,5 @@
 import { hasAuditServicesEntitlement } from "@/core/navigation/tenant-module-catalog";
+import { getPlatformAdministrator } from "@/lib/platform-admin";
 import { prisma } from "@/lib/prisma";
 
 export async function organizationHasAuditServices(organizationId: string) {
@@ -23,7 +24,12 @@ export async function organizationHasAuditServices(organizationId: string) {
 }
 
 export async function requireAuditServicesEntitlement(organizationId: string) {
-  if (!(await organizationHasAuditServices(organizationId))) {
+  const [platformAdministrator, entitled] = await Promise.all([
+    getPlatformAdministrator(),
+    organizationHasAuditServices(organizationId),
+  ]);
+
+  if (!platformAdministrator && !entitled) {
     throw new Error("Audit & Assurance Services is not assigned to this tenant.");
   }
 }
