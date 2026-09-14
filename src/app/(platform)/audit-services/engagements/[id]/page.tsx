@@ -41,12 +41,26 @@ import {
   revokeAuditExternalAccessLink,
   reviewExternalFindingResponse,
 } from "@/features/audits/audit-external-access.actions";
+import {
+  createEngagementDeliverable,
+  reviseEngagementDeliverable,
+  transitionEngagementDeliverable,
+} from "@/features/audits/audit-service-deliverable.actions";
+import {
+  AuditServiceDeliverableStatus,
+  AuditServiceDeliverableType,
+} from "@prisma/client";
 
 const pretty = (value: string) =>
   value
     .replaceAll("_", " ")
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const canReviseDeliverable = (status: AuditServiceDeliverableStatus) =>
+  status === AuditServiceDeliverableStatus.APPROVED ||
+  status === AuditServiceDeliverableStatus.RELEASED ||
+  status === AuditServiceDeliverableStatus.WITHDRAWN;
 
 export default async function AuditEngagementPage({
   params,
@@ -746,8 +760,8 @@ export default async function AuditEngagementPage({
                     audit.sections.flatMap((section) =>
                       section.questions.map((question) => (
                         <option key={question.id} value={question.id}>
-                          {audit.reference} · {section.sequence}.{question.sequence}{" "}
-                          {question.questionText}
+                          {audit.reference} · {section.sequence}.
+                          {question.sequence} {question.questionText}
                         </option>
                       )),
                     ),
@@ -762,7 +776,8 @@ export default async function AuditEngagementPage({
                   {engagement.audits.flatMap((audit) =>
                     audit.findings.map((finding) => (
                       <option key={finding.id} value={finding.id}>
-                        {audit.reference} · {finding.reference} · {finding.title}
+                        {audit.reference} · {finding.reference} ·{" "}
+                        {finding.title}
                       </option>
                     )),
                   )}
@@ -831,31 +846,119 @@ export default async function AuditEngagementPage({
                               : "Awaiting verification"}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {access._count.comments} comment(s) · decision: {" "}
+                        {access._count.comments} comment(s) · decision:{" "}
                         {access.decision
                           ? pretty(access.decision.decision)
                           : "Pending"}
                       </p>
                       {access.findingResponse && (
                         <div className="mt-2 rounded-lg border border-amber-300/10 p-3 text-xs">
-                          <p className="text-amber-200">Finding response: {pretty(access.findingResponse.position)} · {pretty(access.findingResponse.reviewStatus)}</p>
-                          <p className="mt-1 text-slate-400">{access.findingResponse.response}</p>
-                          {canManage && access.findingResponse.reviewStatus === AuditExternalFindingReviewStatus.PENDING && (
-                            <form action={reviewExternalFindingResponse} className="mt-3 grid gap-2">
-                              <input type="hidden" name="engagementId" value={engagement.id} /><input type="hidden" name="responseId" value={access.findingResponse.id} />
-                              <textarea name="reviewNotes" required rows={2} placeholder="Internal review rationale" className="rounded-lg border border-white/10 bg-slate-950 p-2" />
-                              <div className="flex flex-wrap gap-2">{[AuditExternalFindingReviewStatus.ACCEPTED, AuditExternalFindingReviewStatus.CHANGES_REQUESTED, AuditExternalFindingReviewStatus.REJECTED].map((decision) => <button key={decision} name="decision" value={decision} className="rounded border border-amber-300/20 px-2 py-1">{pretty(decision)}</button>)}</div>
-                            </form>
+                          <p className="text-amber-200">
+                            Finding response:{" "}
+                            {pretty(access.findingResponse.position)} ·{" "}
+                            {pretty(access.findingResponse.reviewStatus)}
+                          </p>
+                          <p className="mt-1 text-slate-400">
+                            {access.findingResponse.response}
+                          </p>
+                          {canManage &&
+                            access.findingResponse.reviewStatus ===
+                              AuditExternalFindingReviewStatus.PENDING && (
+                              <form
+                                action={reviewExternalFindingResponse}
+                                className="mt-3 grid gap-2"
+                              >
+                                <input
+                                  type="hidden"
+                                  name="engagementId"
+                                  value={engagement.id}
+                                />
+                                <input
+                                  type="hidden"
+                                  name="responseId"
+                                  value={access.findingResponse.id}
+                                />
+                                <textarea
+                                  name="reviewNotes"
+                                  required
+                                  rows={2}
+                                  placeholder="Internal review rationale"
+                                  className="rounded-lg border border-white/10 bg-slate-950 p-2"
+                                />
+                                <div className="flex flex-wrap gap-2">
+                                  {[
+                                    AuditExternalFindingReviewStatus.ACCEPTED,
+                                    AuditExternalFindingReviewStatus.CHANGES_REQUESTED,
+                                    AuditExternalFindingReviewStatus.REJECTED,
+                                  ].map((decision) => (
+                                    <button
+                                      key={decision}
+                                      name="decision"
+                                      value={decision}
+                                      className="rounded border border-amber-300/20 px-2 py-1"
+                                    >
+                                      {pretty(decision)}
+                                    </button>
+                                  ))}
+                                </div>
+                              </form>
+                            )}
+                          {canManage &&
+                            access.findingResponse.reviewStatus ===
+                              AuditExternalFindingReviewStatus.ACCEPTED &&
+                            access.findingResponse.remediationPlan && (
+                              <form
+                                action={convertExternalFindingResponse}
+                                className="mt-3 grid gap-2 md:grid-cols-2"
+                              >
+                                <input
+                                  type="hidden"
+                                  name="engagementId"
+                                  value={engagement.id}
+                                />
+                                <input
+                                  type="hidden"
+                                  name="responseId"
+                                  value={access.findingResponse.id}
+                                />
+                                <select
+                                  name="assignedToId"
+                                  required
+                                  defaultValue=""
+                                  className="rounded-lg border border-white/10 bg-slate-950 p-2"
+                                >
+                                  <option value="" disabled>
+                                    CAPA owner
+                                  </option>
+                                  {users.map((person) => (
+                                    <option key={person.id} value={person.id}>
+                                      {person.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  name="dueDate"
+                                  required
+                                  type="date"
+                                  defaultValue={access.findingResponse.targetDate
+                                    ?.toISOString()
+                                    .slice(0, 10)}
+                                  className="rounded-lg border border-white/10 bg-slate-950 p-2"
+                                />
+                                <button className="rounded-lg bg-amber-300 px-3 py-2 font-semibold text-slate-950 md:col-span-2">
+                                  Convert accepted plan to CAPA
+                                </button>
+                              </form>
+                            )}
+                          {access.findingResponse.correctiveAction && (
+                            <p className="mt-2 text-emerald-200">
+                              CAPA:{" "}
+                              {access.findingResponse.correctiveAction.title} ·{" "}
+                              {pretty(
+                                access.findingResponse.correctiveAction.status,
+                              )}
+                            </p>
                           )}
-                          {canManage && access.findingResponse.reviewStatus === AuditExternalFindingReviewStatus.ACCEPTED && access.findingResponse.remediationPlan && (
-                            <form action={convertExternalFindingResponse} className="mt-3 grid gap-2 md:grid-cols-2">
-                              <input type="hidden" name="engagementId" value={engagement.id} /><input type="hidden" name="responseId" value={access.findingResponse.id} />
-                              <select name="assignedToId" required defaultValue="" className="rounded-lg border border-white/10 bg-slate-950 p-2"><option value="" disabled>CAPA owner</option>{users.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select>
-                              <input name="dueDate" required type="date" defaultValue={access.findingResponse.targetDate?.toISOString().slice(0, 10)} className="rounded-lg border border-white/10 bg-slate-950 p-2" />
-                              <button className="rounded-lg bg-amber-300 px-3 py-2 font-semibold text-slate-950 md:col-span-2">Convert accepted plan to CAPA</button>
-                            </form>
-                          )}
-                          {access.findingResponse.correctiveAction && <p className="mt-2 text-emerald-200">CAPA: {access.findingResponse.correctiveAction.title} · {pretty(access.findingResponse.correctiveAction.status)}</p>}
                         </div>
                       )}
                     </div>
@@ -890,6 +993,209 @@ export default async function AuditEngagementPage({
           </div>
         </section>
       )}
+      <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
+        <h2 className="text-xl font-semibold">
+          Controlled reports and deliverables
+        </h2>
+        <p className="mt-2 text-sm text-slate-500">
+          Create frozen report versions, route them for independent approval,
+          and preserve release and withdrawal evidence.
+        </p>
+        {canManage && (
+          <details className="mt-4 rounded-xl border border-white/10 p-4">
+            <summary className="cursor-pointer text-sm text-cyan-200">
+              Create deliverable
+            </summary>
+            <form
+              action={createEngagementDeliverable}
+              className="mt-3 grid gap-3 md:grid-cols-2"
+            >
+              <input type="hidden" name="engagementId" value={engagement.id} />
+              <select
+                name="type"
+                className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+              >
+                {Object.values(AuditServiceDeliverableType).map((type) => (
+                  <option key={type}>{type}</option>
+                ))}
+              </select>
+              <select
+                name="sourceAuditId"
+                defaultValue=""
+                className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+              >
+                <option value="">Manual deliverable</option>
+                {engagement.audits.map((audit) => (
+                  <option key={audit.id} value={audit.id}>
+                    {audit.reference} · {audit.title}
+                  </option>
+                ))}
+              </select>
+              <input
+                name="reference"
+                placeholder="Auto reference"
+                className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+              />
+              <input
+                name="title"
+                required
+                placeholder="Deliverable title"
+                className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+              />
+              <textarea
+                name="summary"
+                required
+                rows={3}
+                placeholder="Executive summary"
+                className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm md:col-span-2"
+              />
+              <textarea
+                name="narrative"
+                rows={4}
+                placeholder="Controlled narrative for a manual deliverable"
+                className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm md:col-span-2"
+              />
+              <button className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 md:col-span-2">
+                Freeze version 1
+              </button>
+            </form>
+          </details>
+        )}
+        <div className="mt-4 space-y-3">
+          {engagement.deliverables.map((item) => {
+            const next =
+              item.status === AuditServiceDeliverableStatus.DRAFT ||
+              item.status === AuditServiceDeliverableStatus.CHANGES_REQUESTED
+                ? [AuditServiceDeliverableStatus.UNDER_REVIEW]
+                : item.status === AuditServiceDeliverableStatus.UNDER_REVIEW
+                  ? [
+                      AuditServiceDeliverableStatus.CHANGES_REQUESTED,
+                      AuditServiceDeliverableStatus.APPROVED,
+                    ]
+                  : item.status === AuditServiceDeliverableStatus.APPROVED
+                    ? [AuditServiceDeliverableStatus.RELEASED]
+                    : item.status === AuditServiceDeliverableStatus.RELEASED
+                      ? [AuditServiceDeliverableStatus.WITHDRAWN]
+                      : [];
+            return (
+              <article key={item.id} className="rounded-xl bg-slate-950/50 p-4">
+                <div className="flex flex-wrap justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-cyan-300">
+                      {item.reference} · v{item.version} · {pretty(item.status)}
+                    </p>
+                    <p className="mt-1 font-medium">{item.title}</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {pretty(item.type)} · Created by {item.createdBy.name}
+                      {item.sourceAudit
+                        ? ` · ${item.sourceAudit.reference}`
+                        : ""}
+                    </p>
+                  </div>
+                  {item.releasedAt && (
+                    <p className="text-xs text-emerald-200">
+                      Released {item.releasedAt.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <p className="mt-3 text-sm text-slate-300">{item.summary}</p>
+                {item.reviewNotes && (
+                  <p className="mt-2 text-xs text-amber-200">
+                    Review record: {item.reviewNotes}
+                  </p>
+                )}
+                {canManage && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {next.map((status) => (
+                      <form
+                        key={status}
+                        action={transitionEngagementDeliverable}
+                        className="flex gap-2"
+                      >
+                        <input
+                          type="hidden"
+                          name="engagementId"
+                          value={engagement.id}
+                        />
+                        <input
+                          type="hidden"
+                          name="deliverableId"
+                          value={item.id}
+                        />
+                        <input type="hidden" name="status" value={status} />
+                        {(status ===
+                          AuditServiceDeliverableStatus.CHANGES_REQUESTED ||
+                          status ===
+                            AuditServiceDeliverableStatus.WITHDRAWN) && (
+                          <input
+                            name="notes"
+                            required
+                            placeholder={
+                              status === AuditServiceDeliverableStatus.WITHDRAWN
+                                ? "Withdrawal reason"
+                                : "Required changes"
+                            }
+                            className="rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-xs"
+                          />
+                        )}
+                        <button className="rounded-lg border border-violet-400/20 px-3 py-1 text-xs text-violet-200">
+                          {pretty(status)}
+                        </button>
+                      </form>
+                    ))}
+                  </div>
+                )}
+                {canManage && canReviseDeliverable(item.status) && (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-xs text-cyan-200">
+                        Create controlled revision
+                      </summary>
+                      <form
+                        action={reviseEngagementDeliverable}
+                        className="mt-2 grid gap-2"
+                      >
+                        <input
+                          type="hidden"
+                          name="engagementId"
+                          value={engagement.id}
+                        />
+                        <input
+                          type="hidden"
+                          name="deliverableId"
+                          value={item.id}
+                        />
+                        <input
+                          name="changeNote"
+                          required
+                          placeholder="Required change note"
+                          className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
+                        />
+                        <textarea
+                          name="summary"
+                          placeholder="Revised summary (optional)"
+                          className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
+                        />
+                        <textarea
+                          name="narrative"
+                          placeholder="Revised manual narrative"
+                          className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs"
+                        />
+                        <button className="rounded-lg border border-cyan-400/20 px-3 py-2 text-xs text-cyan-200">
+                          Create next version
+                        </button>
+                      </form>
+                    </details>
+                  )}
+              </article>
+            );
+          })}
+          {!engagement.deliverables.length && (
+            <p className="text-sm text-slate-500">
+              No controlled deliverables have been created.
+            </p>
+          )}
+        </div>
+      </section>
       <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">Linked enterprise audits</h2>

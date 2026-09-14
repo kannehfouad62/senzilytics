@@ -1748,6 +1748,24 @@ enum AuditExternalFindingReviewStatus {
   CONVERTED_TO_CAPA
 }
 
+enum AuditServiceDeliverableType {
+  DRAFT_REPORT
+  FINAL_REPORT
+  MANAGEMENT_LETTER
+  EXECUTIVE_SUMMARY
+  EVIDENCE_INDEX
+  OTHER
+}
+
+enum AuditServiceDeliverableStatus {
+  DRAFT
+  UNDER_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  RELEASED
+  WITHDRAWN
+}
+
 enum AuditTeamRole {
   LEAD_AUDITOR
   AUDITOR
@@ -2409,6 +2427,7 @@ model Organization {
   auditServiceExternalDecisions        AuditServiceExternalDecision[]
   auditServiceExternalComments         AuditServiceExternalComment[]
   auditServiceExternalFindingResponses AuditServiceExternalFindingResponse[]
+  auditServiceDeliverables             AuditServiceDeliverable[]
 
   auditSchedulesV2 AuditSchedule[] @relation("AuditScheduleOrganization")
 
@@ -2966,6 +2985,10 @@ model User {
   ownedAuditServiceInformation                 AuditServiceInformationRequest[]      @relation("AuditInformationOwner")
   chairedAuditServiceMeetings                  AuditServiceMeeting[]                 @relation("AuditServiceMeetingChair")
   createdAuditServiceMeetings                  AuditServiceMeeting[]                 @relation("AuditServiceMeetingCreator")
+  createdAuditServiceDeliverables              AuditServiceDeliverable[]             @relation("AuditServiceDeliverableCreator")
+  reviewedAuditServiceDeliverables             AuditServiceDeliverable[]             @relation("AuditServiceDeliverableReviewer")
+  approvedAuditServiceDeliverables             AuditServiceDeliverable[]             @relation("AuditServiceDeliverableApprover")
+  releasedAuditServiceDeliverables             AuditServiceDeliverable[]             @relation("AuditServiceDeliverableReleaser")
   auditServiceMeetingAttendance                AuditServiceMeetingAttendee[]
   reviewedExternalAuditFindingResponses        AuditServiceExternalFindingResponse[] @relation("ExternalFindingResponseReviewer")
   ledAuditSchedulesV2                          AuditSchedule[]                       @relation("AuditScheduleLeadAuditor")
@@ -3741,6 +3764,7 @@ model AuditServiceEngagement {
   informationRequests      AuditServiceInformationRequest[]
   meetings                 AuditServiceMeeting[]
   externalAccesses         AuditServiceExternalAccess[]
+  deliverables             AuditServiceDeliverable[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, kind, status])
@@ -3975,6 +3999,52 @@ model AuditServiceExternalComment {
 
   @@index([organizationId, createdAt])
   @@index([accessId, createdAt])
+}
+
+model AuditServiceDeliverable {
+  id                String  @id @default(cuid())
+  organizationId    String
+  engagementId      String
+  sourceAuditId     String?
+  previousVersionId String?
+
+  reference       String
+  type            AuditServiceDeliverableType
+  title           String
+  version         Int                           @default(1)
+  status          AuditServiceDeliverableStatus @default(DRAFT)
+  summary         String
+  contentSnapshot Json
+  changeNote      String?
+
+  createdById  String
+  reviewedById String?
+  approvedById String?
+  releasedById String?
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  approvedAt   DateTime?
+  releasedAt   DateTime?
+  withdrawnAt  DateTime?
+  reviewNotes  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  engagement      AuditServiceEngagement    @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  sourceAudit     EnterpriseAudit?          @relation(fields: [sourceAuditId], references: [id], onDelete: SetNull)
+  previousVersion AuditServiceDeliverable?  @relation("AuditServiceDeliverableVersions", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  newerVersions   AuditServiceDeliverable[] @relation("AuditServiceDeliverableVersions")
+  createdBy       User                      @relation("AuditServiceDeliverableCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  reviewedBy      User?                     @relation("AuditServiceDeliverableReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  approvedBy      User?                     @relation("AuditServiceDeliverableApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  releasedBy      User?                     @relation("AuditServiceDeliverableReleaser", fields: [releasedById], references: [id], onDelete: SetNull)
+
+  @@unique([engagementId, reference, version])
+  @@index([organizationId, status, updatedAt])
+  @@index([engagementId, type, status])
+  @@index([sourceAuditId])
+  @@index([previousVersionId])
 }
 
 model AuditServiceEngagementTeamMember {
@@ -4456,7 +4526,8 @@ model EnterpriseAudit {
 
   owner User? @relation("EnterpriseAuditOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 
-  externalAccesses AuditServiceExternalAccess[]
+  externalAccesses    AuditServiceExternalAccess[]
+  serviceDeliverables AuditServiceDeliverable[]
 
   createdBy User? @relation("EnterpriseAuditCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 

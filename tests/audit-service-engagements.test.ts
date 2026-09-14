@@ -173,6 +173,26 @@ test("audit planning requires independent conflict review and approval", async (
   );
 });
 
+test("audit service deliverables are versioned, frozen, and independently approved", async () => {
+  const [schema, migration, service, actions, page] = await Promise.all([
+    readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
+    readFile(new URL("../prisma/migrations/20260927120000_audit_service_deliverables/migration.sql", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/audit/audit-service-deliverable.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/features/audits/audit-service-deliverable.actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/(platform)/audit-services/engagements/[id]/page.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(schema, /model AuditServiceDeliverable/);
+  assert.match(schema, /contentSnapshot\s+Json/);
+  assert.match(migration, /AuditServiceDeliverable_engagementId_reference_version_key/);
+  assert.match(service, /The deliverable creator cannot approve their own deliverable/);
+  assert.match(service, /Only approved, released, or withdrawn deliverables can be revised/);
+  assert.match(service, /frozenAt/);
+  assert.match(service, /organizationId: input\.organizationId/);
+  assert.match(actions, /PermissionKey\.MANAGE_AUDITS/);
+  assert.match(actions, /requireAuditServicesEntitlement/);
+  assert.match(page, /Controlled reports and deliverables/);
+});
+
 test("audit service coordination governs requests, meetings, and attendance", async () => {
   const [schema, migration, service, actions, page] = await Promise.all([
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),

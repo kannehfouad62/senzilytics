@@ -595,6 +595,16 @@ export function findAuditServiceEngagement(
         },
         orderBy: { createdAt: "desc" },
       },
+      deliverables: {
+        include: {
+          createdBy: { select: { name: true } },
+          reviewedBy: { select: { name: true } },
+          approvedBy: { select: { name: true } },
+          releasedBy: { select: { name: true } },
+          sourceAudit: { select: { reference: true, title: true } },
+        },
+        orderBy: [{ reference: "asc" }, { version: "desc" }],
+      },
     },
   });
 }
