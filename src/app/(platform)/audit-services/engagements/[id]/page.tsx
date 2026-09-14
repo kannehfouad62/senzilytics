@@ -31,12 +31,15 @@ import {
   AuditInformationRequestStatus,
   AuditExternalAccessScope,
   AuditExternalAccessStatus,
+  AuditExternalFindingReviewStatus,
   AuditServiceMeetingStatus,
   AuditServiceMeetingType,
 } from "@prisma/client";
 import {
+  convertExternalFindingResponse,
   createAuditExternalAccess,
   revokeAuditExternalAccessLink,
+  reviewExternalFindingResponse,
 } from "@/features/audits/audit-external-access.actions";
 
 const pretty = (value: string) =>
@@ -834,9 +837,26 @@ export default async function AuditEngagementPage({
                           : "Pending"}
                       </p>
                       {access.findingResponse && (
-                        <p className="mt-1 text-xs text-amber-200">
-                          Finding response: {pretty(access.findingResponse.position)}
-                        </p>
+                        <div className="mt-2 rounded-lg border border-amber-300/10 p-3 text-xs">
+                          <p className="text-amber-200">Finding response: {pretty(access.findingResponse.position)} · {pretty(access.findingResponse.reviewStatus)}</p>
+                          <p className="mt-1 text-slate-400">{access.findingResponse.response}</p>
+                          {canManage && access.findingResponse.reviewStatus === AuditExternalFindingReviewStatus.PENDING && (
+                            <form action={reviewExternalFindingResponse} className="mt-3 grid gap-2">
+                              <input type="hidden" name="engagementId" value={engagement.id} /><input type="hidden" name="responseId" value={access.findingResponse.id} />
+                              <textarea name="reviewNotes" required rows={2} placeholder="Internal review rationale" className="rounded-lg border border-white/10 bg-slate-950 p-2" />
+                              <div className="flex flex-wrap gap-2">{[AuditExternalFindingReviewStatus.ACCEPTED, AuditExternalFindingReviewStatus.CHANGES_REQUESTED, AuditExternalFindingReviewStatus.REJECTED].map((decision) => <button key={decision} name="decision" value={decision} className="rounded border border-amber-300/20 px-2 py-1">{pretty(decision)}</button>)}</div>
+                            </form>
+                          )}
+                          {canManage && access.findingResponse.reviewStatus === AuditExternalFindingReviewStatus.ACCEPTED && access.findingResponse.remediationPlan && (
+                            <form action={convertExternalFindingResponse} className="mt-3 grid gap-2 md:grid-cols-2">
+                              <input type="hidden" name="engagementId" value={engagement.id} /><input type="hidden" name="responseId" value={access.findingResponse.id} />
+                              <select name="assignedToId" required defaultValue="" className="rounded-lg border border-white/10 bg-slate-950 p-2"><option value="" disabled>CAPA owner</option>{users.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select>
+                              <input name="dueDate" required type="date" defaultValue={access.findingResponse.targetDate?.toISOString().slice(0, 10)} className="rounded-lg border border-white/10 bg-slate-950 p-2" />
+                              <button className="rounded-lg bg-amber-300 px-3 py-2 font-semibold text-slate-950 md:col-span-2">Convert accepted plan to CAPA</button>
+                            </form>
+                          )}
+                          {access.findingResponse.correctiveAction && <p className="mt-2 text-emerald-200">CAPA: {access.findingResponse.correctiveAction.title} · {pretty(access.findingResponse.correctiveAction.status)}</p>}
+                        </div>
                       )}
                     </div>
                     {canManage &&

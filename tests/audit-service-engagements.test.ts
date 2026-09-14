@@ -297,3 +297,19 @@ test("external finding responses remain structured immutable and separate from i
   assert.doesNotMatch(service, /correctiveAction\.create/);
   assert.match(page, /Finding response/);
 });
+
+test("accepted external remediation enters governed internal CAPA controls", async () => {
+  const [schema, migration, service, actions, page] = await Promise.all([
+    readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
+    readFile(new URL("../prisma/migrations/20260926120000_audit_finding_response_governance/migration.sql", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/audit/audit-external-access.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/features/audits/audit-external-access.actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/(platform)/audit-services/engagements/[id]/page.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(schema, /AuditExternalFindingReviewStatus/);
+  assert.match(migration, /CONVERTED_TO_CAPA/);
+  assert.match(service, /Accept the client response before CAPA conversion/);
+  assert.match(service, /createCapaFromAuditFindingService/);
+  assert.match(actions, /PermissionKey\.CREATE_CAPA/);
+  assert.match(page, /Convert accepted plan to CAPA/);
+});

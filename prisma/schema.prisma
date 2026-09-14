@@ -1740,6 +1740,14 @@ enum AuditExternalFindingPosition {
   REMEDIATION_PROPOSED
 }
 
+enum AuditExternalFindingReviewStatus {
+  PENDING
+  ACCEPTED
+  CHANGES_REQUESTED
+  REJECTED
+  CONVERTED_TO_CAPA
+}
+
 enum AuditTeamRole {
   LEAD_AUDITOR
   AUDITOR
@@ -2959,6 +2967,7 @@ model User {
   chairedAuditServiceMeetings                  AuditServiceMeeting[]                 @relation("AuditServiceMeetingChair")
   createdAuditServiceMeetings                  AuditServiceMeeting[]                 @relation("AuditServiceMeetingCreator")
   auditServiceMeetingAttendance                AuditServiceMeetingAttendee[]
+  reviewedExternalAuditFindingResponses        AuditServiceExternalFindingResponse[] @relation("ExternalFindingResponseReviewer")
   ledAuditSchedulesV2                          AuditSchedule[]                       @relation("AuditScheduleLeadAuditor")
   auditScheduleMembershipsV2                   AuditScheduleTeamMember[]             @relation("AuditScheduleTeamMemberUser")
   createdAuditSchedulesV2                      AuditSchedule[]                       @relation("AuditScheduleCreatedBy")
@@ -3420,14 +3429,15 @@ model CorrectiveAction {
 
   behaviorSessions BehaviorCoachingSession[]
 
-  enterpriseAuditFindingLinks  EnterpriseAuditFindingActionLink[] @relation("EnterpriseAuditFindingCorrectiveAction")
-  criticalControlVerifications CriticalControlVerification[]
-  certificationReviewActions   CertificationReviewActionLink[]
-  assetDefects                 AssetDefect[]
-  regulatoryChangeLinks        RegulatoryChangeActionLink[]
-  emergencyImprovements        EmergencyImprovement[]
-  continuityImprovements       ContinuityImprovement[]
-  executiveReviewDecisions     ExecutiveReviewDecision[]
+  enterpriseAuditFindingLinks   EnterpriseAuditFindingActionLink[]    @relation("EnterpriseAuditFindingCorrectiveAction")
+  criticalControlVerifications  CriticalControlVerification[]
+  certificationReviewActions    CertificationReviewActionLink[]
+  assetDefects                  AssetDefect[]
+  regulatoryChangeLinks         RegulatoryChangeActionLink[]
+  emergencyImprovements         EmergencyImprovement[]
+  continuityImprovements        ContinuityImprovement[]
+  executiveReviewDecisions      ExecutiveReviewDecision[]
+  externalAuditFindingResponses AuditServiceExternalFindingResponse[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3906,9 +3916,9 @@ model AuditServiceExternalAccess {
 }
 
 model AuditServiceExternalFindingResponse {
-  id                  String                       @id @default(cuid())
+  id                  String                           @id @default(cuid())
   organizationId      String
-  accessId            String                       @unique
+  accessId            String                           @unique
   position            AuditExternalFindingPosition
   response            String
   proposedRootCause   String?
@@ -3917,12 +3927,22 @@ model AuditServiceExternalFindingResponse {
   targetDate          DateTime?
   representativeName  String
   representativeEmail String
-  submittedAt         DateTime                     @default(now())
+  submittedAt         DateTime                         @default(now())
+  reviewStatus        AuditExternalFindingReviewStatus @default(PENDING)
+  reviewNotes         String?
+  reviewedById        String?
+  reviewedAt          DateTime?
+  correctiveActionId  String?
 
-  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  access       AuditServiceExternalAccess @relation(fields: [accessId], references: [id], onDelete: Cascade)
+  organization     Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  access           AuditServiceExternalAccess @relation(fields: [accessId], references: [id], onDelete: Cascade)
+  reviewedBy       User?                      @relation("ExternalFindingResponseReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  correctiveAction CorrectiveAction?          @relation(fields: [correctiveActionId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, position, submittedAt])
+  @@index([reviewStatus, reviewedAt])
+  @@index([reviewedById])
+  @@index([correctiveActionId])
 }
 
 model AuditServiceExternalDecision {

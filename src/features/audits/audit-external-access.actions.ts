@@ -11,12 +11,15 @@ import {
   resolveAuditExternalAccess,
   revokeAuditExternalAccess,
   verifyAuditExternalPasscode,
+  reviewAuditExternalFindingResponse,
+  convertExternalFindingResponseToCapa,
 } from "@/modules/audit/audit-external-access.service";
 import { requireAuditServicesEntitlement } from "@/modules/audit/audit-services-entitlement";
 import {
   AuditExternalAccessScope,
   AuditExternalDecisionType,
   AuditExternalFindingPosition,
+  AuditExternalFindingReviewStatus,
   PermissionKey,
 } from "@prisma/client";
 import { cookies } from "next/headers";
@@ -164,4 +167,22 @@ export async function submitExternalFindingResponse(data: FormData) {
     redirect(`/audit-client/${encodeURIComponent(token)}?error=action`);
   }
   redirect(`/audit-client/${encodeURIComponent(token)}?saved=finding-response`);
+}
+
+export async function reviewExternalFindingResponse(data: FormData) {
+  const { organizationId, user } = await internalContext();
+  const decision = required(data, "decision") as AuditExternalFindingReviewStatus;
+  await reviewAuditExternalFindingResponse({ organizationId, reviewerId: user.id, responseId: required(data, "responseId"), decision, notes: required(data, "reviewNotes") });
+  revalidatePath(`/audit-services/engagements/${required(data, "engagementId")}`);
+}
+
+export async function convertExternalFindingResponse(data: FormData) {
+  await requirePermission(PermissionKey.CREATE_CAPA);
+  const { organizationId, user } = await internalContext();
+  const dueDate = new Date(required(data, "dueDate"));
+  if (!Number.isFinite(dueDate.valueOf())) throw new Error("Enter a valid CAPA due date.");
+  await convertExternalFindingResponseToCapa({ organizationId, reviewerId: user.id, responseId: required(data, "responseId"), assignedToId: required(data, "assignedToId"), dueDate });
+  revalidatePath(`/audit-services/engagements/${required(data, "engagementId")}`);
+  revalidatePath("/actions");
+  revalidatePath("/capa");
 }

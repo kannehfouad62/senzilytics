@@ -8,10 +8,12 @@ import {
   AuditExternalAccessStatus,
   AuditExternalDecisionType,
   AuditExternalFindingPosition,
+  AuditExternalFindingReviewStatus,
   AuditServiceEngagementKind,
   EnterpriseAuditStatus,
   Prisma,
 } from "@prisma/client";
+import { createCapaFromAuditFindingService } from "./audit-finding.service";
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes, randomInt } from "node:crypto";
 
@@ -457,6 +459,46 @@ export async function recordAuditExternalFindingResponse(input: {
   }});
   await logActivity({ organizationId: access.organizationId, action: ActivityAction.CREATE, entityType: "AuditServiceExternalFindingResponse", entityId: record.id, title: "External audit finding response submitted", description: `${access.contact.name} · ${record.position}`, metadata: { accessId: access.id, findingId: access.findingId } });
   return record;
+}
+
+export async function reviewAuditExternalFindingResponse(input: {
+  organizationId: string;
+  reviewerId: string;
+  responseId: string;
+  decision: AuditExternalFindingReviewStatus;
+  notes: string;
+}) {
+  if (!new Set<AuditExternalFindingReviewStatus>([AuditExternalFindingReviewStatus.ACCEPTED, AuditExternalFindingReviewStatus.CHANGES_REQUESTED, AuditExternalFindingReviewStatus.REJECTED]).has(input.decision))
+    throw new Error("Select a valid internal review decision.");
+  const record = await prisma.auditServiceExternalFindingResponse.findFirst({ where: { id: input.responseId, organizationId: input.organizationId }, include: { access: true } });
+  if (!record) throw new Error("External finding response not found.");
+  if (record.reviewStatus !== AuditExternalFindingReviewStatus.PENDING)
+    throw new Error("This external finding response has already been reviewed.");
+  const notes = clean(input.notes, 4000);
+  if (!notes) throw new Error("Internal review notes are required.");
+  const updated = await prisma.auditServiceExternalFindingResponse.update({ where: { id: record.id }, data: { reviewStatus: input.decision, reviewNotes: notes, reviewedById: input.reviewerId, reviewedAt: new Date() } });
+  await logActivity({ organizationId: input.organizationId, userId: input.reviewerId, action: ActivityAction.STATUS_CHANGE, entityType: "AuditServiceExternalFindingResponse", entityId: record.id, title: "External finding response reviewed", description: `${record.reviewStatus} → ${updated.reviewStatus}`, metadata: { accessId: record.accessId, findingId: record.access.findingId } });
+  return updated;
+}
+
+export async function convertExternalFindingResponseToCapa(input: {
+  organizationId: string;
+  reviewerId: string;
+  responseId: string;
+  assignedToId: string;
+  dueDate: Date;
+}) {
+  const record = await prisma.auditServiceExternalFindingResponse.findFirst({ where: { id: input.responseId, organizationId: input.organizationId }, include: { access: true } });
+  if (!record || !record.access.auditId || !record.access.findingId)
+    throw new Error("Governed external finding response not found.");
+  if (record.reviewStatus !== AuditExternalFindingReviewStatus.ACCEPTED)
+    throw new Error("Accept the client response before CAPA conversion.");
+  if (!record.remediationPlan)
+    throw new Error("A remediation plan is required for CAPA conversion.");
+  const action = await createCapaFromAuditFindingService({ organizationId: input.organizationId, userId: input.reviewerId, auditId: record.access.auditId, findingId: record.access.findingId, title: `Client remediation — ${record.access.title}`, description: [record.response, record.proposedRootCause && `Proposed root cause: ${record.proposedRootCause}`, record.immediateCorrection && `Immediate correction: ${record.immediateCorrection}`, `Remediation plan: ${record.remediationPlan}`].filter(Boolean).join("\n\n"), assignedToId: input.assignedToId, dueDate: input.dueDate });
+  await prisma.auditServiceExternalFindingResponse.update({ where: { id: record.id }, data: { reviewStatus: AuditExternalFindingReviewStatus.CONVERTED_TO_CAPA, correctiveActionId: action.id } });
+  await logActivity({ organizationId: input.organizationId, userId: input.reviewerId, action: ActivityAction.CREATE, entityType: "AuditServiceExternalFindingResponse", entityId: record.id, title: "Client remediation converted to CAPA", description: action.title, metadata: { correctiveActionId: action.id, findingId: record.access.findingId } });
+  return action;
 }
 
 export async function revokeAuditExternalAccess(input: {
