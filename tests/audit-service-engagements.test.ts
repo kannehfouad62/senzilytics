@@ -190,3 +190,52 @@ test("audit service coordination governs requests, meetings, and attendance", as
   assert.match(actions, /requireAuditServicesEntitlement/);
   assert.match(page, /Entrance, status and exit meetings/);
 });
+
+test("external audit access uses expiring hashed credentials without client accounts", async () => {
+  const [schema, migration, service, actions, publicPage, engagementPage] =
+    await Promise.all([
+      readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
+      readFile(
+        new URL(
+          "../prisma/migrations/20260923120000_audit_service_external_access/migration.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/modules/audit/audit-external-access.service.ts",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/features/audits/audit-external-access.actions.ts",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL("../src/app/audit-client/[token]/page.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/app/(platform)/audit-services/engagements/[id]/page.tsx",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ]);
+  assert.match(schema, /model AuditServiceExternalAccess/);
+  assert.match(migration, /AuditServiceExternalAccess_tokenHash_key/);
+  assert.match(service, /randomBytes\(32\)/);
+  assert.match(service, /bcrypt\.hash\(passcode, 12\)/);
+  assert.match(service, /maxAttempts/);
+  assert.match(service, /isAuthorizedRepresentative: true/);
+  assert.doesNotMatch(service, /prisma\.user\.create/);
+  assert.match(actions, /sameSite: "strict"/);
+  assert.match(publicPage, /robots: \{ index: false, follow: false \}/);
+  assert.match(engagementPage, /Generate and email secure access/);
+});

@@ -29,9 +29,15 @@ import {
 import { informationRequestTransitions } from "@/modules/audit/audit-service-coordination.service";
 import {
   AuditInformationRequestStatus,
+  AuditExternalAccessScope,
+  AuditExternalAccessStatus,
   AuditServiceMeetingStatus,
   AuditServiceMeetingType,
 } from "@prisma/client";
+import {
+  createAuditExternalAccess,
+  revokeAuditExternalAccessLink,
+} from "@/features/audits/audit-external-access.actions";
 
 const pretty = (value: string) =>
   value
@@ -666,6 +672,153 @@ export default async function AuditEngagementPage({
           </div>
         </div>
       </section>
+      {engagement.kind === "EXTERNAL" && engagement.client && (
+        <section className="mt-8 rounded-3xl border border-cyan-300/15 bg-cyan-300/[.025] p-6">
+          <h2 className="text-xl font-semibold">Secure external access</h2>
+          <p className="mt-2 text-sm text-slate-400">
+            Send an expiring link and six-digit passcode to an authorized client
+            representative. Client accounts are never created.
+          </p>
+          {canManage && (
+            <details className="mt-5 rounded-2xl border border-white/10 p-4">
+              <summary className="cursor-pointer text-sm font-medium text-cyan-200">
+                Issue controlled access
+              </summary>
+              <form
+                action={createAuditExternalAccess}
+                className="mt-4 grid gap-3 md:grid-cols-2"
+              >
+                <input
+                  type="hidden"
+                  name="engagementId"
+                  value={engagement.id}
+                />
+                <select
+                  name="contactId"
+                  required
+                  defaultValue=""
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                >
+                  <option value="" disabled>
+                    Authorized representative
+                  </option>
+                  {engagement.client.contacts
+                    .filter((contact) => contact.isAuthorizedRepresentative)
+                    .map((contact) => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.name} · {contact.email}
+                      </option>
+                    ))}
+                </select>
+                <select
+                  name="scope"
+                  defaultValue={AuditExternalAccessScope.ENGAGEMENT}
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                >
+                  {[
+                    AuditExternalAccessScope.ENGAGEMENT,
+                    AuditExternalAccessScope.INFORMATION_REQUEST,
+                  ].map((scope) => (
+                    <option key={scope} value={scope}>
+                      {pretty(scope)}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  name="title"
+                  required
+                  placeholder="Review title"
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                />
+                <input
+                  name="expiresAt"
+                  required
+                  type="datetime-local"
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm"
+                />
+                <select
+                  name="informationRequestId"
+                  defaultValue=""
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm md:col-span-2"
+                >
+                  <option value="">
+                    No information request — required only for that scope
+                  </option>
+                  {engagement.informationRequests.map((request) => (
+                    <option key={request.id} value={request.id}>
+                      {request.reference} · {request.title}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  name="instructions"
+                  rows={2}
+                  placeholder="Instructions for the authorized representative"
+                  className="rounded-xl border border-white/10 bg-slate-950 p-3 text-sm md:col-span-2"
+                />
+                <button className="rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 md:col-span-2">
+                  Generate and email secure access
+                </button>
+              </form>
+            </details>
+          )}
+          <div className="mt-5 space-y-3">
+            {engagement.externalAccesses.map((access) => {
+              const expired = access.expiresAt <= new Date();
+              return (
+                <article
+                  key={access.id}
+                  className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs text-cyan-300">
+                        {pretty(access.scope)} · {access.contact.name}
+                      </p>
+                      <h3 className="mt-1 font-semibold">{access.title}</h3>
+                      <p className="mt-2 text-xs text-slate-500">
+                        {access.contact.email} · expires{" "}
+                        {access.expiresAt.toLocaleString()} ·{" "}
+                        {access.status === AuditExternalAccessStatus.REVOKED
+                          ? "Revoked"
+                          : expired
+                            ? "Expired"
+                            : access.verifiedAt
+                              ? "Verified"
+                              : "Awaiting verification"}
+                      </p>
+                    </div>
+                    {canManage &&
+                      access.status === AuditExternalAccessStatus.ACTIVE &&
+                      !expired && (
+                        <form action={revokeAuditExternalAccessLink}>
+                          <input
+                            type="hidden"
+                            name="engagementId"
+                            value={engagement.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="accessId"
+                            value={access.id}
+                          />
+                          <button className="rounded-lg border border-red-400/20 px-3 py-1 text-xs text-red-200">
+                            Revoke
+                          </button>
+                        </form>
+                      )}
+                  </div>
+                </article>
+              );
+            })}
+            {!engagement.externalAccesses.length && (
+              <p className="text-sm text-slate-500">
+                No external access has been issued for this engagement.
+              </p>
+            )}
+          </div>
+        </section>
+      )}
       <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">Linked enterprise audits</h2>

@@ -1715,6 +1715,18 @@ enum AuditServiceMeetingStatus {
   CANCELLED
 }
 
+enum AuditExternalAccessScope {
+  ENGAGEMENT
+  INFORMATION_REQUEST
+  AUDIT_REPORT
+  AUDIT_QUESTION
+}
+
+enum AuditExternalAccessStatus {
+  ACTIVE
+  REVOKED
+}
+
 enum AuditTeamRole {
   LEAD_AUDITOR
   AUDITOR
@@ -2372,6 +2384,7 @@ model Organization {
   auditServiceIndependenceDeclarations AuditServiceIndependenceDeclaration[]
   auditServiceInformationRequests      AuditServiceInformationRequest[]
   auditServiceMeetings                 AuditServiceMeeting[]
+  auditServiceExternalAccesses         AuditServiceExternalAccess[]
 
   auditSchedulesV2 AuditSchedule[] @relation("AuditScheduleOrganization")
 
@@ -3635,6 +3648,7 @@ model AuditServiceClientContact {
   client              AuditServiceClient               @relation(fields: [clientId], references: [id], onDelete: Cascade)
   informationRequests AuditServiceInformationRequest[]
   meetingAttendance   AuditServiceMeetingAttendee[]
+  externalAccesses    AuditServiceExternalAccess[]
 
   @@unique([clientId, email])
   @@index([clientId, isActive])
@@ -3700,6 +3714,7 @@ model AuditServiceEngagement {
   independenceDeclarations AuditServiceIndependenceDeclaration[]
   informationRequests      AuditServiceInformationRequest[]
   meetings                 AuditServiceMeeting[]
+  externalAccesses         AuditServiceExternalAccess[]
 
   @@unique([organizationId, reference])
   @@index([organizationId, kind, status])
@@ -3758,11 +3773,12 @@ model AuditServiceInformationRequest {
   createdAt     DateTime                      @default(now())
   updatedAt     DateTime                      @updatedAt
 
-  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  engagement   AuditServiceEngagement     @relation(fields: [engagementId], references: [id], onDelete: Cascade)
-  contact      AuditServiceClientContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  requestedBy  User?                      @relation("AuditInformationRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
-  owner        User?                      @relation("AuditInformationOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  organization     Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  engagement       AuditServiceEngagement       @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  contact          AuditServiceClientContact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  requestedBy      User?                        @relation("AuditInformationRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  owner            User?                        @relation("AuditInformationOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  externalAccesses AuditServiceExternalAccess[]
 
   @@unique([engagementId, reference])
   @@index([organizationId, status, dueDate])
@@ -3820,6 +3836,44 @@ model AuditServiceMeetingAttendee {
   @@unique([meetingId, contactId])
   @@index([userId])
   @@index([contactId])
+}
+
+model AuditServiceExternalAccess {
+  id                   String  @id @default(cuid())
+  organizationId       String
+  engagementId         String
+  contactId            String
+  informationRequestId String?
+
+  scope        AuditExternalAccessScope
+  status       AuditExternalAccessStatus @default(ACTIVE)
+  title        String
+  instructions String?
+
+  tokenHash        String    @unique
+  passcodeHash     String
+  sessionTokenHash String?   @unique
+  expiresAt        DateTime
+  sessionExpiresAt DateTime?
+  verifiedAt       DateTime?
+  lastAccessedAt   DateTime?
+  failedAttempts   Int       @default(0)
+  maxAttempts      Int       @default(5)
+  lockedUntil      DateTime?
+  revokedAt        DateTime?
+  createdById      String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization       Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  engagement         AuditServiceEngagement          @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  contact            AuditServiceClientContact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  informationRequest AuditServiceInformationRequest? @relation(fields: [informationRequestId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, expiresAt])
+  @@index([engagementId, status])
+  @@index([contactId, status])
+  @@index([informationRequestId])
 }
 
 model AuditServiceEngagementTeamMember {

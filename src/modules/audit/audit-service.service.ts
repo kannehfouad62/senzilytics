@@ -565,6 +565,13 @@ export function findAuditServiceEngagement(
         },
         orderBy: { scheduledAt: "desc" },
       },
+      externalAccesses: {
+        include: {
+          contact: { select: { name: true, email: true } },
+          informationRequest: { select: { reference: true, title: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 }
