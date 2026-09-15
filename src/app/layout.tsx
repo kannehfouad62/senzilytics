@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Senzilytics EHS Intelligence",
-  description: "Connected EHS, ESG, compliance and risk intelligence.",
+  title: "Senzilytics | Governed Enterprise Intelligence",
+  description: "Connected EHS, ESG, research, audit, compliance and risk intelligence.",
   manifest: "/manifest.webmanifest",
 };
 
@@ -25,11 +25,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col"><PwaRegister/>{children}</body>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col">
+        <PwaRegister />
+        {children}
+      </body>
     </html>
   );
 }

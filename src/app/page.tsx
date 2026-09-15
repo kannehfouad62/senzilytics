@@ -15,65 +15,412 @@ const solutions = [
   [Leaf, "Environment & ESG", "Govern environmental metrics, targets and disclosure evidence with transparent data lineage."],
   [Workflow, "CAPA & Workflows", "Standardize accountability with approvals, SLAs, notifications and cross-module traceability."],
   [CloudCog, "Connected Field Data", "Collect operational information online or offline and synchronize it safely when connectivity returns."],
+  [BarChart3, "Research & Analytics", "Design questionnaires, govern fieldwork, analyze datasets and publish client-ready dashboards and reports."],
+  [FileCheck2, "Audit & Assurance Services", "Deliver internal and external audit engagements with secure client review links, findings and controlled reports."],
 ];
 
-export default async function HomePage({searchParams}:{searchParams:Promise<{plan?:string;pricing?:string}>}) {
-  const params=await searchParams; const selectedPlan=Object.values(SubscriptionPlan).includes(params.plan as SubscriptionPlan)?params.plan as SubscriptionPlan:SubscriptionPlan.ESSENTIAL;
-  return <main className="landing-canvas min-h-screen overflow-hidden text-white">
-    <MarketingHeader/>
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ plan?: string; pricing?: string }> }) {
+  const params = await searchParams;
+  const selectedPlan = Object.values(SubscriptionPlan).includes(params.plan as SubscriptionPlan) ? (params.plan as SubscriptionPlan) : SubscriptionPlan.ESSENTIAL;
+  return (
+    <main className="landing-canvas min-h-screen overflow-hidden text-white">
+      <MarketingHeader />
 
-    <section className="relative px-5 pb-24 pt-16 sm:px-8 lg:pb-32 lg:pt-24 xl:px-10"><div className="landing-grid absolute inset-0 opacity-70"/><div className="landing-orb absolute -left-40 top-20 h-96 w-96 rounded-full bg-cyan-400/20 blur-3xl"/><div className="landing-orb-reverse absolute -right-32 top-0 h-[34rem] w-[34rem] rounded-full bg-blue-500/20 blur-3xl"/><div className="relative mx-auto grid max-w-[90rem] gap-14 lg:grid-cols-[minmax(0,1.12fr)_minmax(32rem,.88fr)] lg:items-center xl:gap-20"><div className="landing-rise"><p className="inline-flex items-center gap-2 rounded-full border border-cyan-200/30 bg-cyan-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[.18em] text-cyan-100"><Sparkles size={15}/>Connected operational intelligence</p><h1 className="mt-7 max-w-4xl text-5xl font-bold tracking-[-.04em] sm:text-7xl xl:text-[5.8rem] xl:leading-[.96]">See risk sooner.<br/><span className="bg-gradient-to-r from-cyan-200 via-sky-200 to-emerald-200 bg-clip-text text-transparent">Act with confidence.</span></h1><p className="mt-7 max-w-3xl text-lg leading-8 text-slate-200 sm:text-xl sm:leading-9">Senzilytics unifies EHS, ESG, compliance and enterprise risk—turning field activity into governed workflows and decision-ready executive intelligence.</p><div className="mt-9 flex flex-wrap gap-4"><Link href="/demo" className="inline-flex items-center gap-2 rounded-2xl bg-cyan-300 px-6 py-3.5 font-semibold text-slate-950 shadow-[0_0_45px_rgba(34,211,238,.2)] transition hover:-translate-y-0.5 hover:bg-cyan-200">Explore Interactive Demo <ArrowRight size={18}/></Link><a href="#solutions" className="rounded-2xl border border-white/20 bg-white/[.06] px-6 py-3.5 font-semibold text-white backdrop-blur transition hover:border-cyan-200/50 hover:bg-white/[.09]">Explore Solutions</a></div><div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm text-slate-300">{["Tenant-isolated", "Evidence-driven", "Mobile-ready", "Online + offline"].map(item=><span key={item} className="inline-flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-300"/>{item}</span>)}</div></div>
-      <IntelligenceNetwork/>
-    </div></section>
+      <section className="relative px-5 pb-24 pt-16 sm:px-8 lg:pb-32 lg:pt-24 xl:px-10">
+        <div className="landing-grid absolute inset-0 opacity-70" />
+        <div className="landing-orb absolute -left-40 top-20 h-96 w-96 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="landing-orb-reverse absolute -right-32 top-0 h-[34rem] w-[34rem] rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="relative mx-auto grid max-w-[90rem] gap-14 lg:grid-cols-[minmax(0,1.12fr)_minmax(32rem,.88fr)] lg:items-center xl:gap-20">
+          <div className="landing-rise">
+            <p className="inline-flex items-center gap-2 rounded-full border border-cyan-200/30 bg-cyan-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[.18em] text-cyan-100">
+              <Sparkles size={15} />
+              Connected operational intelligence
+            </p>
+            <h1 className="mt-7 max-w-4xl text-5xl font-bold tracking-[-.04em] sm:text-7xl xl:text-[5.8rem] xl:leading-[.96]">
+              See risk sooner.
+              <br />
+              <span className="bg-gradient-to-r from-cyan-200 via-sky-200 to-emerald-200 bg-clip-text text-transparent">Act with confidence.</span>
+            </h1>
+            <p className="mt-7 max-w-3xl text-lg leading-8 text-slate-200 sm:text-xl sm:leading-9">Senzilytics unifies EHS, ESG, research, audit, compliance and enterprise risk—turning field and professional-service activity into governed workflows and decision-ready intelligence.</p>
+            <div className="mt-9 flex flex-wrap gap-4">
+              <Link href="/demo" className="inline-flex items-center gap-2 rounded-2xl bg-cyan-300 px-6 py-3.5 font-semibold text-slate-950 shadow-[0_0_45px_rgba(34,211,238,.2)] transition hover:-translate-y-0.5 hover:bg-cyan-200">
+                Explore Interactive Demo <ArrowRight size={18} />
+              </Link>
+              <a href="#solutions" className="rounded-2xl border border-white/20 bg-white/[.06] px-6 py-3.5 font-semibold text-white backdrop-blur transition hover:border-cyan-200/50 hover:bg-white/[.09]">
+                Explore Solutions
+              </a>
+            </div>
+            <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm text-slate-300">
+              {["Tenant-isolated", "Evidence-driven", "Mobile-ready", "Online + offline"].map((item) => (
+                <span key={item} className="inline-flex items-center gap-2">
+                  <CheckCircle2 size={16} className="text-emerald-300" />
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+          <IntelligenceNetwork />
+        </div>
+      </section>
 
-    <section id="about" className="scroll-mt-24 border-y border-white/10 bg-white/[.025] px-5 py-24 sm:px-8"><div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[.8fr_1.2fr] lg:items-center"><div><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">About Us</p><h2 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">Technology for safer work and stronger organizations.</h2><Link href="/about" className="mt-7 inline-flex items-center gap-2 font-semibold text-cyan-200">Learn about Senzilytics <ArrowRight size={17}/></Link></div><div className="space-y-5 text-lg leading-8 text-slate-300"><p>Senzilytics is a cloud-based EHS, ESG, compliance and risk-management platform designed to connect frontline activity with accountable leadership.</p><p>We help organizations replace fragmented spreadsheets and disconnected systems with one secure operating environment for reporting, assurance, compliance, learning and continuous improvement.</p></div></div></section>
+      <section id="about" className="scroll-mt-24 border-y border-white/10 bg-white/[.025] px-5 py-24 sm:px-8">
+        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[.8fr_1.2fr] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">About Us</p>
+            <h2 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">Technology for safer work and stronger organizations.</h2>
+            <Link href="/about" className="mt-7 inline-flex items-center gap-2 font-semibold text-cyan-200">
+              Learn about Senzilytics <ArrowRight size={17} />
+            </Link>
+          </div>
+          <div className="space-y-5 text-lg leading-8 text-slate-300">
+            <p>Senzilytics is a cloud-based enterprise intelligence platform for EHS, ESG, compliance, risk, research and professional audit service delivery.</p>
+            <p>We help organizations replace fragmented spreadsheets and disconnected systems with one secure operating environment for reporting, research, assurance, client delivery, compliance, learning and continuous improvement.</p>
+          </div>
+        </div>
+      </section>
 
-    <section id="solutions" className="scroll-mt-24 px-5 py-24 sm:px-8"><div className="mx-auto max-w-7xl"><div className="max-w-3xl"><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Senzilytics Solutions</p><h2 className="mt-4 text-4xl font-bold sm:text-5xl">One connected system. Every operational signal.</h2><p className="mt-5 text-lg leading-8 text-slate-400">Modular enough to meet teams where they are, integrated enough to reveal what isolated tools cannot.</p><Link href="/solutions" className="mt-7 inline-flex items-center gap-2 font-semibold text-cyan-200">Explore every solution <ArrowRight size={17}/></Link></div><div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">{solutions.map(([Icon,title,text],index)=>{const I=Icon as typeof ShieldAlert;return <article key={String(title)} className="landing-card group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[.035] p-6"><span className="absolute right-5 top-4 text-xs text-slate-700">0{index+1}</span><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-300/10 text-cyan-300 transition group-hover:bg-cyan-300 group-hover:text-slate-950"><I size={22}/></div><h3 className="mt-5 text-lg font-semibold">{String(title)}</h3><p className="mt-3 text-sm leading-6 text-slate-400">{String(text)}</p></article>})}</div></div></section>
+      <section id="solutions" className="scroll-mt-24 px-5 py-24 sm:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-3xl">
+            <p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Senzilytics Solutions</p>
+            <h2 className="mt-4 text-4xl font-bold sm:text-5xl">One connected system. Every operational signal.</h2>
+            <p className="mt-5 text-lg leading-8 text-slate-400">Modular enough to meet teams where they are, integrated enough to reveal what isolated tools cannot.</p>
+            <Link href="/solutions" className="mt-7 inline-flex items-center gap-2 font-semibold text-cyan-200">
+              Explore every solution <ArrowRight size={17} />
+            </Link>
+          </div>
+          <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {solutions.map(([Icon, title, text], index) => {
+              const I = Icon as typeof ShieldAlert;
+              return (
+                <article key={String(title)} className="landing-card group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[.035] p-6">
+                  <span className="absolute right-5 top-4 text-xs text-slate-700">0{index + 1}</span>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-300/10 text-cyan-300 transition group-hover:bg-cyan-300 group-hover:text-slate-950">
+                    <I size={22} />
+                  </div>
+                  <h3 className="mt-5 text-lg font-semibold">{String(title)}</h3>
+                  <p className="mt-3 text-sm leading-6 text-slate-400">{String(text)}</p>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
-    <section id="industries" className="scroll-mt-24 border-y border-white/10 bg-white/[.025] px-5 py-24 sm:px-8"><div className="mx-auto max-w-7xl"><div className="grid gap-12 lg:grid-cols-[.9fr_1.1fr]"><div><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Industries We Serve</p><h2 className="mt-4 text-4xl font-bold sm:text-5xl">Designed for complex, high-consequence operations.</h2><p className="mt-5 text-lg leading-8 text-slate-300">Adapt Senzilytics to your operating model while preserving consistent governance, evidence and enterprise visibility.</p><Link href="/industries" className="mt-7 inline-flex items-center gap-2 font-semibold text-cyan-200">View all industries <ArrowRight size={17}/></Link></div><div className="grid gap-4 sm:grid-cols-2">{[[Factory,"Manufacturing"],[UtilityPole,"Energy & Utilities"],[Building2,"Construction & Engineering"],[Truck,"Transportation & Logistics"]].map(([Icon,label])=>{const I=Icon as typeof Factory;return <article key={String(label)} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#081827]/70 p-5"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-200/10 text-cyan-200"><I size={21}/></span><h3 className="font-semibold">{String(label)}</h3></article>})}</div></div></div></section>
+      <section id="industries" className="scroll-mt-24 border-y border-white/10 bg-white/[.025] px-5 py-24 sm:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-12 lg:grid-cols-[.9fr_1.1fr]">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Industries We Serve</p>
+              <h2 className="mt-4 text-4xl font-bold sm:text-5xl">Designed for evidence-intensive organizations and services.</h2>
+              <p className="mt-5 text-lg leading-8 text-slate-300">Adapt Senzilytics to your operating model while preserving consistent governance, evidence and enterprise visibility.</p>
+              <Link href="/industries" className="mt-7 inline-flex items-center gap-2 font-semibold text-cyan-200">
+                View all industries <ArrowRight size={17} />
+              </Link>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[
+                [Factory, "Manufacturing"],
+                [UtilityPole, "Energy & Utilities"],
+                [Building2, "Construction & Engineering"],
+                [Truck, "Transportation & Logistics"],
+                [BarChart3, "Research & Data Services"],
+                [FileCheck2, "Audit & Compliance Services"],
+              ].map(([Icon, label]) => {
+                const I = Icon as typeof Factory;
+                return (
+                  <article key={String(label)} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#081827]/70 p-5">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-200/10 text-cyan-200">
+                      <I size={21} />
+                    </span>
+                    <h3 className="font-semibold">{String(label)}</h3>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section id="why" className="scroll-mt-24 border-y border-white/10 bg-gradient-to-b from-cyan-400/[.04] to-transparent px-5 py-24 sm:px-8"><div className="mx-auto max-w-7xl"><div className="grid gap-12 lg:grid-cols-2"><div><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Why Senzilytics</p><h2 className="mt-4 text-4xl font-bold sm:text-5xl">From compliance activity to business intelligence.</h2><p className="mt-6 text-lg leading-8 text-slate-300">Senzilytics preserves the chain from a frontline observation to corrective action, risk escalation, assurance evidence and executive insight.</p></div><div className="grid gap-4 sm:grid-cols-2">{[["Connected by design","Every module contributes to a shared operational picture."],["Accountability built in","Ownership, approvals, SLAs and escalation are explicit."],["Evidence you can trust","Tenant isolation, audit trails and controlled records support assurance."],["Built for the field","Responsive workflows and offline capture keep work moving anywhere."]].map(([title,text])=><div key={title} className="rounded-3xl border border-white/10 bg-slate-950/60 p-6"><h3 className="font-semibold text-cyan-200">{title}</h3><p className="mt-3 text-sm leading-6 text-slate-400">{text}</p></div>)}</div></div><div className="mt-16 grid gap-4 border-t border-white/10 pt-10 sm:grid-cols-2 lg:grid-cols-4">{[["01","Capture"],["02","Connect"],["03","Understand"],["04","Improve"]].map(([n,label])=><div key={n} className="flex items-center gap-4"><span className="text-3xl font-light text-cyan-300">{n}</span><span className="text-lg font-semibold">{label}</span></div>)}</div></div></section>
+      <section id="why" className="scroll-mt-24 border-y border-white/10 bg-gradient-to-b from-cyan-400/[.04] to-transparent px-5 py-24 sm:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-12 lg:grid-cols-2">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Why Senzilytics</p>
+              <h2 className="mt-4 text-4xl font-bold sm:text-5xl">From evidence and service delivery to intelligence.</h2>
+              <p className="mt-6 text-lg leading-8 text-slate-300">Senzilytics preserves the chain from frontline activity and collected data to governed action, analysis, assurance, controlled client delivery and executive insight.</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[
+                ["Connected by design", "Every module contributes to a shared operational picture."],
+                ["Accountability built in", "Ownership, approvals, SLAs and escalation are explicit."],
+                ["Evidence you can trust", "Tenant isolation, audit trails and controlled records support assurance."],
+                ["Built for the field", "Responsive workflows and offline capture keep work moving anywhere."],
+              ].map(([title, text]) => (
+                <div key={title} className="rounded-3xl border border-white/10 bg-slate-950/60 p-6">
+                  <h3 className="font-semibold text-cyan-200">{title}</h3>
+                  <p className="mt-3 text-sm leading-6 text-slate-400">{text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-16 grid gap-4 border-t border-white/10 pt-10 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ["01", "Capture"],
+              ["02", "Connect"],
+              ["03", "Understand"],
+              ["04", "Improve"],
+            ].map(([n, label]) => (
+              <div key={n} className="flex items-center gap-4">
+                <span className="text-3xl font-light text-cyan-300">{n}</span>
+                <span className="text-lg font-semibold">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-    <section id="pricing" className="scroll-mt-24 px-5 py-24 sm:px-8"><div className="mx-auto max-w-7xl"><div className="mx-auto max-w-3xl text-center"><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Simple, scalable plans</p><h2 className="mt-4 text-4xl font-bold sm:text-5xl">Choose the intelligence your organization needs.</h2><p className="mt-5 text-lg text-slate-400">Every plan includes every operational module and analytics. Advanced engagement, evidence and intelligence capabilities scale with your plan.</p></div><div className="mt-12 grid gap-6 lg:grid-cols-3">
-      <PricingCard name="Essential" price="$20" detail="USD per user / month" note="Minimum 25 users · Billed annually" plan={SubscriptionPlan.ESSENTIAL} features={["All Senzilytics modules","Analytics and dashboards","Secure web access"]} limitations={["No in-app or email notifications","No AI insights or generated reports","No document or file uploads","No offline data collection"]}/>
-      <PricingCard featured name="Enterprise" price="$40" detail="USD per user / month" note="Minimum 20 users · Billed annually" plan={SubscriptionPlan.ENTERPRISE} features={["All Senzilytics modules","Analytics and dashboards","Email and in-app notifications","Document and file uploads","Secure web access"]} limitations={["No AI insights or generated reports","No offline data collection"]}/>
-      <PricingCard name="Premium" price="Let’s talk" detail="A solution designed around your needs" note="Connect with our experts for pricing" plan={SubscriptionPlan.PREMIUM} features={["Everything in Enterprise","AI insights and generated reports","Offline field data collection","Web, iOS and Android access","Full platform access"]} limitations={[]}/>
-    </div><div id="pricing-contact" className="mt-16 scroll-mt-28 rounded-[2rem] border border-cyan-300/20 bg-cyan-300/[.045] p-7 sm:p-10"><div className="grid gap-10 lg:grid-cols-[.8fr_1.2fr]"><div><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Get in touch</p><h3 className="mt-4 text-3xl font-bold">Let’s find the right plan.</h3><p className="mt-4 leading-7 text-slate-400">Tell us about your organization. A Senzilytics expert will contact you to discuss users, implementation and the appropriate subscription.</p><a href="mailto:info@senzilytics.com" className="mt-6 inline-flex items-center gap-2 text-cyan-300"><Mail size={17}/>info@senzilytics.com</a></div><form action={submitPricingInquiry} className="grid gap-4 sm:grid-cols-2">{params.pricing==="success"&&<p className="sm:col-span-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-sm text-emerald-200">Thank you. Your inquiry was sent successfully.</p>}{params.pricing==="invalid"&&<p className="sm:col-span-2 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-200">Complete every field with valid contact information.</p>}{params.pricing==="limit"&&<p className="sm:col-span-2 rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-200">This email has reached today’s inquiry limit.</p>}<input name="website" tabIndex={-1} autoComplete="off" className="hidden"/><PricingField label="Full Name"><input name="fullName" required autoComplete="name" className={pricingInput}/></PricingField><PricingField label="Company"><input name="company" required autoComplete="organization" className={pricingInput}/></PricingField><PricingField label="Job Title"><input name="jobTitle" required autoComplete="organization-title" className={pricingInput}/></PricingField><PricingField label="Work Email"><input name="workEmail" type="email" required autoComplete="email" className={pricingInput}/></PricingField><PricingField label="Phone Number"><input name="phoneNumber" type="tel" required autoComplete="tel" className={pricingInput}/></PricingField><PricingField label="Plan"><select name="requestedPlan" defaultValue={selectedPlan} className={pricingInput}>{Object.values(SubscriptionPlan).map(plan=><option key={plan} value={plan}>{plan.charAt(0)+plan.slice(1).toLowerCase()}</option>)}</select></PricingField><button className="sm:col-span-2 rounded-2xl bg-cyan-300 px-6 py-3.5 font-semibold text-slate-950 transition hover:bg-cyan-200">Submit Pricing Inquiry</button><p className="sm:col-span-2 text-xs leading-5 text-slate-500">By submitting, you consent to Senzilytics contacting you about products and pricing. See our <Link href="/privacy" className="text-cyan-300 underline">Privacy Policy</Link>.</p></form></div></div></div></section>
+      <section id="pricing" className="scroll-mt-24 px-5 py-24 sm:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Simple, scalable plans</p>
+            <h2 className="mt-4 text-4xl font-bold sm:text-5xl">Choose the intelligence your organization needs.</h2>
+            <p className="mt-5 text-lg text-slate-400">Every plan uses the same governed platform foundation. Assigned modules, engagement, evidence and intelligence capabilities scale with your organization and plan.</p>
+          </div>
+          <div className="mt-12 grid gap-6 lg:grid-cols-3">
+            <PricingCard name="Essential" price="$20" detail="USD per user / month" note="Minimum 25 users · Billed annually" plan={SubscriptionPlan.ESSENTIAL} features={["Assigned operational and service modules", "Analytics and dashboards", "Secure web access"]} limitations={["No in-app or email notifications", "No AI insights or generated reports", "No document or file uploads", "No offline data collection"]} />
+            <PricingCard featured name="Enterprise" price="$40" detail="USD per user / month" note="Minimum 20 users · Billed annually" plan={SubscriptionPlan.ENTERPRISE} features={["Assigned operational and service modules", "Analytics and dashboards", "Email and in-app notifications", "Document and file uploads", "Secure web access"]} limitations={["No AI insights or generated reports", "No offline data collection"]} />
+            <PricingCard name="Premium" price="Let’s talk" detail="A solution designed around your needs" note="Connect with our experts for pricing" plan={SubscriptionPlan.PREMIUM} features={["Everything in Enterprise", "AI insights and generated reports", "Offline field data collection", "Web, iOS and Android access", "Full platform access"]} limitations={[]} />
+          </div>
+          <div id="pricing-contact" className="mt-16 scroll-mt-28 rounded-[2rem] border border-cyan-300/20 bg-cyan-300/[.045] p-7 sm:p-10">
+            <p className="mb-8 rounded-2xl border border-emerald-200/15 bg-emerald-300/[.06] p-4 text-sm leading-6 text-slate-300">Research and audit workspaces support governed service delivery. Client contracts, invoicing and payments remain outside Senzilytics.</p>
+            <div className="grid gap-10 lg:grid-cols-[.8fr_1.2fr]">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Get in touch</p>
+                <h3 className="mt-4 text-3xl font-bold">Let’s find the right plan.</h3>
+                <p className="mt-4 leading-7 text-slate-400">Tell us about your organization. A Senzilytics expert will contact you to discuss users, implementation and the appropriate subscription.</p>
+                <a href="mailto:info@senzilytics.com" className="mt-6 inline-flex items-center gap-2 text-cyan-300">
+                  <Mail size={17} />
+                  info@senzilytics.com
+                </a>
+              </div>
+              <form action={submitPricingInquiry} className="grid gap-4 sm:grid-cols-2">
+                {params.pricing === "success" && <p className="sm:col-span-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-sm text-emerald-200">Thank you. Your inquiry was sent successfully.</p>}
+                {params.pricing === "invalid" && <p className="sm:col-span-2 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-200">Complete every field with valid contact information.</p>}
+                {params.pricing === "limit" && <p className="sm:col-span-2 rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-200">This email has reached today’s inquiry limit.</p>}
+                <input name="website" tabIndex={-1} autoComplete="off" className="hidden" />
+                <PricingField label="Full Name">
+                  <input name="fullName" required autoComplete="name" className={pricingInput} />
+                </PricingField>
+                <PricingField label="Company">
+                  <input name="company" required autoComplete="organization" className={pricingInput} />
+                </PricingField>
+                <PricingField label="Job Title">
+                  <input name="jobTitle" required autoComplete="organization-title" className={pricingInput} />
+                </PricingField>
+                <PricingField label="Work Email">
+                  <input name="workEmail" type="email" required autoComplete="email" className={pricingInput} />
+                </PricingField>
+                <PricingField label="Phone Number">
+                  <input name="phoneNumber" type="tel" required autoComplete="tel" className={pricingInput} />
+                </PricingField>
+                <PricingField label="Plan">
+                  <select name="requestedPlan" defaultValue={selectedPlan} className={pricingInput}>
+                    {Object.values(SubscriptionPlan).map((plan) => (
+                      <option key={plan} value={plan}>
+                        {plan.charAt(0) + plan.slice(1).toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </PricingField>
+                <button className="sm:col-span-2 rounded-2xl bg-cyan-300 px-6 py-3.5 font-semibold text-slate-950 transition hover:bg-cyan-200">Submit Pricing Inquiry</button>
+                <p className="sm:col-span-2 text-xs leading-5 text-slate-500">
+                  By submitting, you consent to Senzilytics contacting you about products and pricing. See our{" "}
+                  <Link href="/privacy" className="text-cyan-300 underline">
+                    Privacy Policy
+                  </Link>
+                  .
+                </p>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section id="contact" className="scroll-mt-24 px-5 py-24 sm:px-8"><div className="mx-auto grid max-w-7xl gap-8 rounded-[2rem] border border-cyan-300/20 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,.12),transparent_40%)] p-8 sm:p-12 lg:grid-cols-[1fr_auto] lg:items-center"><div><p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Contact Us</p><h2 className="mt-4 text-3xl font-bold sm:text-5xl">Ready to see your EHS data differently?</h2><p className="mt-4 max-w-2xl text-slate-300">Explore the interactive environment or speak with us about your organization’s operational assurance goals.</p><a href="mailto:info@senzilytics.com" className="mt-5 inline-flex items-center gap-2 text-cyan-300"><Mail size={17}/>info@senzilytics.com</a></div><div className="flex flex-col gap-3 sm:flex-row lg:flex-col"><Link href="/demo" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-7 py-3.5 font-semibold text-slate-950">Try Demo <ArrowRight size={18}/></Link><a href="mailto:info@senzilytics.com" className="rounded-2xl border border-white/15 px-7 py-3.5 text-center font-semibold">Contact Sales</a></div></div></section>
+      <section id="contact" className="scroll-mt-24 px-5 py-24 sm:px-8">
+        <div className="mx-auto grid max-w-7xl gap-8 rounded-[2rem] border border-cyan-300/20 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,.12),transparent_40%)] p-8 sm:p-12 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-300">Contact Us</p>
+            <h2 className="mt-4 text-3xl font-bold sm:text-5xl">Ready to connect your evidence and decisions?</h2>
+            <p className="mt-4 max-w-2xl text-slate-300">Explore the interactive environment or speak with us about your organization’s EHS, ESG, research, audit or assurance goals.</p>
+            <a href="mailto:info@senzilytics.com" className="mt-5 inline-flex items-center gap-2 text-cyan-300">
+              <Mail size={17} />
+              info@senzilytics.com
+            </a>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+            <Link href="/demo" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-7 py-3.5 font-semibold text-slate-950">
+              Try Demo <ArrowRight size={18} />
+            </Link>
+            <a href="mailto:info@senzilytics.com" className="rounded-2xl border border-white/15 px-7 py-3.5 text-center font-semibold">
+              Contact Sales
+            </a>
+          </div>
+        </div>
+      </section>
 
-    <MarketingFooter/>
-  </main>;
+      <MarketingFooter />
+    </main>
+  );
 }
 
-function IntelligenceNetwork(){
-  const stages=[
-    {Icon:RadioTower,label:"Field signals",detail:"Mobile + offline",position:"left-[4%] top-[18%]",delay:"0s"},
-    {Icon:ShieldAlert,label:"Risk & safety",detail:"Exposure detected",position:"right-[3%] top-[16%]",delay:"-1.4s"},
-    {Icon:FileCheck2,label:"Assurance",detail:"Evidence verified",position:"left-[1%] bottom-[20%]",delay:"-2.8s"},
-    {Icon:Workflow,label:"Governed action",detail:"Owner + SLA",position:"right-[1%] bottom-[19%]",delay:"-4.2s"},
+function IntelligenceNetwork() {
+  const stages = [
+    {
+      Icon: RadioTower,
+      label: "EHS operations",
+      detail: "Field + mobile",
+      position: "left-[4%] top-[18%]",
+      delay: "0s",
+    },
+    {
+      Icon: ShieldAlert,
+      label: "Audit services",
+      detail: "Evidence + clients",
+      position: "right-[3%] top-[16%]",
+      delay: "-1.4s",
+    },
+    {
+      Icon: BarChart3,
+      label: "Research",
+      detail: "Data + analysis",
+      position: "left-[1%] bottom-[20%]",
+      delay: "-2.8s",
+    },
+    {
+      Icon: Leaf,
+      label: "ESG governance",
+      detail: "Metrics + disclosure",
+      position: "right-[1%] bottom-[19%]",
+      delay: "-4.2s",
+    },
   ];
-  return <div className="landing-network landing-rise relative mx-auto w-full max-w-[42rem]" aria-label="Senzilytics operational intelligence flow">
-    <div className="landing-network-grid absolute inset-0"/>
-    <div className="landing-scan absolute inset-x-[8%] top-1/2 h-px"/>
-    <svg className="absolute inset-0 h-full w-full" viewBox="0 0 680 600" fill="none" aria-hidden="true">
-      <defs><linearGradient id="signal-line" x1="70" y1="90" x2="610" y2="520" gradientUnits="userSpaceOnUse"><stop stopColor="#67e8f9" stopOpacity=".15"/><stop offset=".5" stopColor="#22d3ee" stopOpacity=".8"/><stop offset="1" stopColor="#6ee7b7" stopOpacity=".15"/></linearGradient></defs>
-      <path className="landing-signal-path" d="M116 134C190 160 218 232 300 270" stroke="url(#signal-line)" strokeWidth="1.5"/>
-      <path className="landing-signal-path landing-signal-path-delay" d="M562 126C486 162 464 222 382 270" stroke="url(#signal-line)" strokeWidth="1.5"/>
-      <path className="landing-signal-path landing-signal-path-delay-2" d="M108 476C190 446 228 376 303 333" stroke="url(#signal-line)" strokeWidth="1.5"/>
-      <path className="landing-signal-path landing-signal-path-delay-3" d="M570 474C486 444 451 377 378 334" stroke="url(#signal-line)" strokeWidth="1.5"/>
-      <circle cx="340" cy="301" r="130" stroke="#67e8f9" strokeOpacity=".12"/><circle cx="340" cy="301" r="176" stroke="#67e8f9" strokeOpacity=".07" strokeDasharray="5 10"/>
-    </svg>
-    <div className="landing-core absolute left-1/2 top-1/2 flex h-44 w-44 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-200/30 bg-[#0b2233]/90 shadow-[0_0_80px_rgba(34,211,238,.2)] backdrop-blur-xl">
-      <span className="landing-core-ring absolute inset-3 rounded-full border border-cyan-200/20"/>
-      <span className="landing-core-ring landing-core-ring-reverse absolute -inset-5 rounded-full border border-dashed border-cyan-200/20"/>
-      <div className="relative text-center"><BrainCircuit className="mx-auto text-cyan-200" size={34}/><strong className="mt-3 block text-lg tracking-tight">Senzilytics</strong><span className="mt-1 block text-[10px] uppercase tracking-[.22em] text-cyan-200">Intelligence core</span></div>
+  return (
+    <div className="landing-network landing-rise relative mx-auto w-full max-w-[42rem]" aria-label="Senzilytics connected enterprise intelligence flow">
+      <div className="landing-network-grid absolute inset-0" />
+      <div className="landing-scan absolute inset-x-[8%] top-1/2 h-px" />
+      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 680 600" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="signal-line" x1="70" y1="90" x2="610" y2="520" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#67e8f9" stopOpacity=".15" />
+            <stop offset=".5" stopColor="#22d3ee" stopOpacity=".8" />
+            <stop offset="1" stopColor="#6ee7b7" stopOpacity=".15" />
+          </linearGradient>
+        </defs>
+        <path className="landing-signal-path" d="M116 134C190 160 218 232 300 270" stroke="url(#signal-line)" strokeWidth="1.5" />
+        <path className="landing-signal-path landing-signal-path-delay" d="M562 126C486 162 464 222 382 270" stroke="url(#signal-line)" strokeWidth="1.5" />
+        <path className="landing-signal-path landing-signal-path-delay-2" d="M108 476C190 446 228 376 303 333" stroke="url(#signal-line)" strokeWidth="1.5" />
+        <path className="landing-signal-path landing-signal-path-delay-3" d="M570 474C486 444 451 377 378 334" stroke="url(#signal-line)" strokeWidth="1.5" />
+        <circle cx="340" cy="301" r="130" stroke="#67e8f9" strokeOpacity=".12" />
+        <circle cx="340" cy="301" r="176" stroke="#67e8f9" strokeOpacity=".07" strokeDasharray="5 10" />
+      </svg>
+      <div className="landing-core absolute left-1/2 top-1/2 flex h-44 w-44 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-200/30 bg-[#0b2233]/90 shadow-[0_0_80px_rgba(34,211,238,.2)] backdrop-blur-xl">
+        <span className="landing-core-ring absolute inset-3 rounded-full border border-cyan-200/20" />
+        <span className="landing-core-ring landing-core-ring-reverse absolute -inset-5 rounded-full border border-dashed border-cyan-200/20" />
+        <div className="relative text-center">
+          <BrainCircuit className="mx-auto text-cyan-200" size={34} />
+          <strong className="mt-3 block text-lg tracking-tight">Senzilytics</strong>
+          <span className="mt-1 block text-[10px] uppercase tracking-[.22em] text-cyan-200">Intelligence core</span>
+        </div>
+      </div>
+      {stages.map(({ Icon, label, detail, position, delay }) => (
+        <div key={label} className={`landing-node absolute ${position}`} style={{ animationDelay: delay }}>
+          <div className="flex items-center gap-3 rounded-2xl border border-cyan-100/20 bg-[#0b1f31]/92 p-3.5 shadow-[0_18px_50px_rgba(0,0,0,.25)] backdrop-blur-xl">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-200/10 text-cyan-200">
+              <Icon size={20} />
+            </span>
+            <span>
+              <strong className="block text-sm text-white">{label}</strong>
+              <span className="mt-0.5 block text-xs text-slate-300">{detail}</span>
+            </span>
+          </div>
+        </div>
+      ))}
+      <div className="absolute bottom-[5%] left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-200/20 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-emerald-200">
+        <Activity size={13} />
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
+        Governed enterprise intelligence
+      </div>
     </div>
-    {stages.map(({Icon,label,detail,position,delay})=><div key={label} className={`landing-node absolute ${position}`} style={{animationDelay:delay}}><div className="flex items-center gap-3 rounded-2xl border border-cyan-100/20 bg-[#0b1f31]/92 p-3.5 shadow-[0_18px_50px_rgba(0,0,0,.25)] backdrop-blur-xl"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-200/10 text-cyan-200"><Icon size={20}/></span><span><strong className="block text-sm text-white">{label}</strong><span className="mt-0.5 block text-xs text-slate-300">{detail}</span></span></div></div>)}
-    <div className="absolute bottom-[5%] left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-200/20 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[.16em] text-emerald-200"><Activity size={13}/><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300"/>Decision-ready intelligence</div>
-  </div>;
+  );
 }
 
-function PricingCard({name,price,detail,note,plan,features,limitations,featured=false}:{name:string;price:string;detail:string;note:string;plan:SubscriptionPlan;features:string[];limitations:string[];featured?:boolean}){return <article className={`pricing-card relative flex flex-col rounded-[2rem] border p-7 ${featured?"border-cyan-300/40 bg-cyan-300/[.075] shadow-[0_0_70px_rgba(34,211,238,.08)]":"border-white/10 bg-white/[.035]"}`}>{featured&&<span className="absolute right-6 top-0 -translate-y-1/2 rounded-full bg-cyan-300 px-3 py-1 text-xs font-bold text-slate-950">MOST POPULAR</span>}<p className="text-sm font-semibold uppercase tracking-[.18em] text-cyan-300">{name}</p><p className="mt-5 text-4xl font-bold">{price}</p><p className="mt-2 text-sm text-slate-400">{detail}</p><p className="mt-2 text-xs text-slate-500">{note}</p><div className="mt-7 border-t border-white/10 pt-6"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Included</p><ul className="mt-4 space-y-3">{features.map(item=><li key={item} className="flex gap-3 text-sm text-slate-300"><Check size={17} className="shrink-0 text-emerald-300"/>{item}</li>)}</ul>{limitations.length>0&&<><p className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500">Limitations</p><ul className="mt-4 space-y-3">{limitations.map(item=><li key={item} className="flex gap-3 text-sm text-slate-500"><X size={17} className="shrink-0 text-slate-600"/>{item}</li>)}</ul></>}</div><Link href={`/?plan=${plan}#pricing-contact`} className={`mt-8 block rounded-2xl px-5 py-3 text-center text-sm font-bold ${featured?"bg-cyan-300 text-slate-950":"border border-white/15 text-white hover:border-cyan-300/40"}`}>GET IN TOUCH</Link></article>}
-const pricingInput="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-400";
-function PricingField({label,children}:{label:string;children:React.ReactNode}){if(label==="Phone Number")return <><label className="text-sm text-slate-300">Phone Number (optional){isValidElement<{required?:boolean}>(children)?cloneElement(children,{required:false}):children}</label><label className="text-sm text-slate-300">Country<select name="country" required defaultValue="" autoComplete="country-name" className={pricingInput}><option value="" disabled>Select your country</option>{countries.map(country=><option key={country} value={country}>{country}</option>)}</select></label></>;return <label className="text-sm text-slate-300">{label}{children}</label>}
+function PricingCard({ name, price, detail, note, plan, features, limitations, featured = false }: { name: string; price: string; detail: string; note: string; plan: SubscriptionPlan; features: string[]; limitations: string[]; featured?: boolean }) {
+  return (
+    <article className={`pricing-card relative flex flex-col rounded-[2rem] border p-7 ${featured ? "border-cyan-300/40 bg-cyan-300/[.075] shadow-[0_0_70px_rgba(34,211,238,.08)]" : "border-white/10 bg-white/[.035]"}`}>
+      {featured && <span className="absolute right-6 top-0 -translate-y-1/2 rounded-full bg-cyan-300 px-3 py-1 text-xs font-bold text-slate-950">MOST POPULAR</span>}
+      <p className="text-sm font-semibold uppercase tracking-[.18em] text-cyan-300">{name}</p>
+      <p className="mt-5 text-4xl font-bold">{price}</p>
+      <p className="mt-2 text-sm text-slate-400">{detail}</p>
+      <p className="mt-2 text-xs text-slate-500">{note}</p>
+      <div className="mt-7 border-t border-white/10 pt-6">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Included</p>
+        <ul className="mt-4 space-y-3">
+          {features.map((item) => (
+            <li key={item} className="flex gap-3 text-sm text-slate-300">
+              <Check size={17} className="shrink-0 text-emerald-300" />
+              {item}
+            </li>
+          ))}
+        </ul>
+        {limitations.length > 0 && (
+          <>
+            <p className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500">Limitations</p>
+            <ul className="mt-4 space-y-3">
+              {limitations.map((item) => (
+                <li key={item} className="flex gap-3 text-sm text-slate-500">
+                  <X size={17} className="shrink-0 text-slate-600" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+      <Link href={`/?plan=${plan}#pricing-contact`} className={`mt-8 block rounded-2xl px-5 py-3 text-center text-sm font-bold ${featured ? "bg-cyan-300 text-slate-950" : "border border-white/15 text-white hover:border-cyan-300/40"}`}>
+        GET IN TOUCH
+      </Link>
+    </article>
+  );
+}
+const pricingInput = "mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-400";
+function PricingField({ label, children }: { label: string; children: React.ReactNode }) {
+  if (label === "Phone Number")
+    return (
+      <>
+        <label className="text-sm text-slate-300">
+          Phone Number (optional)
+          {isValidElement<{ required?: boolean }>(children) ? cloneElement(children, { required: false }) : children}
+        </label>
+        <label className="text-sm text-slate-300">
+          Country
+          <select name="country" required defaultValue="" autoComplete="country-name" className={pricingInput}>
+            <option value="" disabled>
+              Select your country
+            </option>
+            {countries.map((country) => (
+              <option key={country} value={country}>
+                {country}
+              </option>
+            ))}
+          </select>
+        </label>
+      </>
+    );
+  return (
+    <label className="text-sm text-slate-300">
+      {label}
+      {children}
+    </label>
+  );
+}
