@@ -11,6 +11,7 @@ import { authenticateMobileRequest, MobileAuthError } from "@/modules/mobile/mob
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.service";
 import { getMobileAssetContractorWorkspace } from "@/modules/mobile/mobile-asset-contractor.service";
+import { getMobileAuditServiceWorkspace } from "@/modules/mobile/mobile-audit-service.service";
 import { getMobileBehaviorAssuranceWorkspace } from "@/modules/mobile/mobile-behavior-assurance.service";
 import { getMobileComplianceTraining } from "@/modules/mobile/mobile-compliance-training.service";
 import { getMobileComplianceDocumentWorkspace } from "@/modules/mobile/mobile-compliance-documents.service";
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
       UserRole.EHS_MANAGER,
     ]).has(user.role);
 
-    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, complianceDocuments, mocPermits, assetContractors, hygieneHealth, chemicalEnvironmental, esg, behaviorAssurance, regulatoryIntelligence, inspectionRecords, auditRecords] = await Promise.all([
+    const [sites, observationRuntimeForms, incidentRuntimeForms, notifications, actionCenter, riskField, complianceTraining, complianceDocuments, mocPermits, assetContractors, auditServices, hygieneHealth, chemicalEnvironmental, esg, behaviorAssurance, regulatoryIntelligence, inspectionRecords, auditRecords] = await Promise.all([
       prisma.site.findMany({
         where: { organizationId: organization.id },
         select: { id: true, name: true },
@@ -86,6 +87,12 @@ export async function GET(request: Request) {
       getMobileAssetContractorWorkspace({
         organizationId: organization.id,
         userId: user.id,
+        permissions: assigned,
+      }),
+      getMobileAuditServiceWorkspace({
+        organizationId: organization.id,
+        userId: user.id,
+        userRole: user.role,
         permissions: assigned,
       }),
       getMobileHygieneHealthWorkspace({
@@ -292,6 +299,7 @@ export async function GET(request: Request) {
 
     const modules = getMobileModuleCatalog({
       permissions: assigned,
+      auditServicesEnabled: auditServices.auditServiceCapabilities.enabled,
       user: {
         email: user.email,
         role: user.role,
@@ -360,6 +368,10 @@ export async function GET(request: Request) {
       incidentForms: serializeRuntimeForms(incidentRuntimeForms),
       inspections,
       audits,
+      auditServiceGeneratedAt: auditServices.auditServiceGeneratedAt,
+      auditServiceCapabilities: auditServices.auditServiceCapabilities,
+      auditServiceMetrics: auditServices.auditServiceMetrics,
+      auditServiceEngagements: auditServices.auditServiceEngagements,
       departments: riskField.departments,
       risks: riskField.risks,
       jsas: riskField.jsas,

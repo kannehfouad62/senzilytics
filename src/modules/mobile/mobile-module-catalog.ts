@@ -17,7 +17,7 @@ export type MobileModuleDefinition = {
   permission?: PermissionKey;
   anyPermissions?: readonly PermissionKey[];
   platformOnly?: boolean;
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RESEARCH_FIELDWORK" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE" | "ORGANIZATION_ADMIN" | "USER_ADMIN" | "WORKFLOW_ADMIN" | "ACTIVITY_AUDIT" | "CONFIGURATION_HEALTH";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "AUDIT_SERVICE_DELIVERY" | "RESEARCH_FIELDWORK" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE" | "ORGANIZATION_ADMIN" | "USER_ADMIN" | "WORKFLOW_ADMIN" | "ACTIVITY_AUDIT" | "CONFIGURATION_HEALTH";
   nativePermission?: PermissionKey;
 };
 
@@ -48,6 +48,7 @@ const modules: readonly MobileModuleDefinition[] = [
   { key: "certification", label: "Certification Readiness", description: "Management-system readiness, evidence, and gap reviews.", href: "/assurance/certification", category: "ASSURANCE", permission: PermissionKey.VIEW_CERTIFICATION_READINESS, nativeCapability: "CERTIFICATION_ASSURANCE" },
   { key: "inspections", label: "Inspections", description: "Inspection planning, checklist execution, and findings.", href: "/inspections", category: "ASSURANCE", permission: PermissionKey.VIEW_INSPECTIONS, nativeCapability: "INSPECTION_EXECUTION", nativePermission: PermissionKey.MANAGE_INSPECTIONS },
   { key: "audits", label: "Audit Workspace", description: "Programs, protocols, schedules, execution, findings, and reports.", href: "/audits", category: "ASSURANCE", permission: PermissionKey.VIEW_AUDITS, nativeCapability: "AUDIT_EXECUTION", nativePermission: PermissionKey.MANAGE_AUDITS },
+  { key: "audit-services", label: "Audit & Assurance Services", description: "Client engagements, coordination, external reviews, findings, and governed deliverables.", href: "/audit-services", category: "ASSURANCE", permission: PermissionKey.VIEW_AUDITS, nativeCapability: "AUDIT_SERVICE_DELIVERY" },
   { key: "compliance", label: "Compliance", description: "Legal obligations, evaluations, permits, and compliance status.", href: "/compliance", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE, nativeCapability: "COMPLIANCE_REGISTER" },
   { key: "compliance-calendar", label: "Compliance Calendar", description: "Daily through annual assigned obligations and completion tracking.", href: "/compliance/calendar", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE, nativeCapability: "COMPLIANCE_CALENDAR" },
   { key: "regulatory", label: "Regulatory Intelligence", description: "Regulatory changes, applicability, impact, and response governance.", href: "/compliance/regulatory", category: "GOVERNANCE", permission: PermissionKey.VIEW_COMPLIANCE, nativeCapability: "REGULATORY_INTELLIGENCE" },
@@ -68,6 +69,7 @@ const modules: readonly MobileModuleDefinition[] = [
 
 export function getMobileModuleCatalog(input: {
   permissions: readonly PermissionKey[];
+  auditServicesEnabled?: boolean;
   user: {
     email: string;
     role: string;
@@ -81,6 +83,7 @@ export function getMobileModuleCatalog(input: {
   return modules
     .filter((module) => {
       if (module.platformOnly) return platformAdministrator;
+      if (module.key === "audit-services" && !input.auditServicesEnabled) return false;
       if (module.permission && !granted.has(module.permission)) return false;
       if (module.anyPermissions?.length && !module.anyPermissions.some((permission) => granted.has(permission))) return false;
       return true;

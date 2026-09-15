@@ -84,7 +84,38 @@ export type MobileModule = {
   description: string;
   href: string;
   category: "COMMAND" | "SAFETY" | "ASSURANCE" | "GOVERNANCE" | "ADMINISTRATION";
-  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "RESEARCH_FIELDWORK" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE" | "ORGANIZATION_ADMIN" | "USER_ADMIN" | "WORKFLOW_ADMIN" | "ACTIVITY_AUDIT" | "CONFIGURATION_HEALTH";
+  nativeCapability?: "ACTION_CENTER" | "CAPA_EXECUTION" | "OBSERVATION_CAPTURE" | "INCIDENT_CAPTURE" | "INSPECTION_EXECUTION" | "AUDIT_EXECUTION" | "AUDIT_SERVICE_DELIVERY" | "RESEARCH_FIELDWORK" | "RISK_FIELD" | "JSA_FIELD" | "COMPLIANCE_REGISTER" | "COMPLIANCE_CALENDAR" | "TRAINING_ASSIGNMENTS" | "MOC_EXECUTION" | "PERMIT_TO_WORK_EXECUTION" | "ASSET_FIELD" | "CONTRACTOR_FIELD" | "INDUSTRIAL_HYGIENE_FIELD" | "OCCUPATIONAL_HEALTH_FIELD" | "CHEMICAL_FIELD" | "ENVIRONMENTAL_FIELD" | "ESG_FIELD" | "BEHAVIOR_SAFETY_FIELD" | "SIF_ASSURANCE_FIELD" | "CERTIFICATION_ASSURANCE" | "REGULATORY_INTELLIGENCE" | "CONTROLLED_DOCUMENTS" | "EXECUTIVE_DASHBOARD" | "OPERATIONAL_ASSURANCE" | "EXECUTIVE_REPORTING" | "AI_INTELLIGENCE" | "ORGANIZATION_ADMIN" | "USER_ADMIN" | "WORKFLOW_ADMIN" | "ACTIVITY_AUDIT" | "CONFIGURATION_HEALTH";
+};
+
+export type MobileAuditServiceCapabilities = {
+  enabled: boolean;
+  canView: boolean;
+  canManage: boolean;
+  onlineOnlyWrites: true;
+};
+
+export type MobileAuditServiceEngagement = {
+  id: string;
+  reference: string;
+  title: string;
+  kind: "INTERNAL" | "EXTERNAL";
+  status: string;
+  purpose: string;
+  scope: string;
+  planningStatus: string;
+  riskRating: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  plannedStartDate: string | null;
+  plannedEndDate: string | null;
+  dueDate: string | null;
+  client: { id: string; reference: string; name: string } | null;
+  manager: { id: string; name: string } | null;
+  leadAuditor: { id: string; name: string } | null;
+  teamMembers: Array<{ id: string; role: string; acceptedAt: string | null; declinedAt: string | null; user: { id: string; name: string } }>;
+  informationRequests: Array<{ id: string; reference: string; title: string; status: string; dueDate: string | null; owner: { id: string; name: string } | null }>;
+  meetings: Array<{ id: string; type: string; status: string; title: string; scheduledAt: string; location: string | null; chairedBy: { id: string; name: string } | null; _count: { attendees: number } }>;
+  externalAccesses: Array<{ id: string; scope: string; status: string; title: string; expiresAt: string; verifiedAt: string | null; contact: { id: string; name: string; email: string }; decision: { decision: string; decidedAt: string } | null; findingResponse: { position: string; reviewStatus: string; submittedAt: string } | null; _count: { comments: number; deliverableDownloads: number } }>;
+  deliverables: Array<{ id: string; reference: string; type: string; title: string; version: number; status: string; updatedAt: string; releasedAt: string | null }>;
+  audits: Array<{ id: string; reference: string; title: string; status: string; scorePercentage: number | null }>;
 };
 
 export type MobileDepartment = {
@@ -1962,6 +1993,18 @@ export type MobileBootstrap = {
   incidentForms: RuntimeForm[];
   inspections: MobileInspection[];
   audits: MobileAudit[];
+  auditServiceGeneratedAt: string;
+  auditServiceCapabilities: MobileAuditServiceCapabilities;
+  auditServiceMetrics: {
+    engagements: number;
+    activeEngagements: number;
+    overdueEngagements: number;
+    openRequests: number;
+    externalReviewsPending: number;
+    deliverablesInReview: number;
+    releasedDeliverables: number;
+  };
+  auditServiceEngagements: MobileAuditServiceEngagement[];
   departments: MobileDepartment[];
   risks: MobileRisk[];
   jsas: MobileJsa[];

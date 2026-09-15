@@ -54,6 +54,7 @@ test("tenant provisioning remains restricted to approved Senzilytics platform ad
 test("every mobile module uses a local application path", () => {
   const modules = getMobileModuleCatalog({
     permissions: Object.values(PermissionKey),
+    auditServicesEnabled: true,
     user: {
       email: "admin@senzilytics.com",
       role: UserRole.SUPER_ADMIN,
