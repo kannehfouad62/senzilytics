@@ -7,7 +7,7 @@ import { IndustryCategory, PermissionKey, UserRole } from "@prisma/client";
 import { planEntitlements } from "@/lib/subscription";
 import { filterNavigationItems } from "@/core/permissions/navigation-access";
 import { ActiveNavigationLink } from "@/components/layout/active-navigation-link";
-import { filterTenantVisibleModules } from "@/core/navigation/tenant-module-catalog";
+import { filterTenantVisibleModules, filterUserVisibleModules } from "@/core/navigation/tenant-module-catalog";
 import { prisma } from "@/lib/prisma";
 import {
   Activity,
@@ -450,15 +450,24 @@ export async function Sidebar() {
         select: { moduleKey: true, enabled: true },
       })
     : [];
+  const userModuleAssignments = organization
+    ? await prisma.userModuleAssignment.findMany({
+        where: { organizationId: organization.id, userId: user.id },
+        select: { moduleKey: true, enabled: true },
+      })
+    : [];
   const isDemo = user.role === UserRole.DEMO_VIEWER;
   const entitlements = organization ? planEntitlements[organization.subscriptionPlan] : planEntitlements.PREMIUM;
   const permittedPrimaryItems = filterNavigationItems(primaryNavItems, permissions).filter(item => item.href !== "/field-collection" || entitlements.OFFLINE_COLLECTION);
   const recommend = <T extends NavigationItem>(items: T[]) => platformAdministrator
     ? items
-    : filterTenantVisibleModules(
-        organization?.industryCategory ?? IndustryCategory.GENERAL,
-        moduleAssignments,
-        items,
+    : filterUserVisibleModules(
+        userModuleAssignments,
+        filterTenantVisibleModules(
+          organization?.industryCategory ?? IndustryCategory.GENERAL,
+          moduleAssignments,
+          items,
+        ),
       );
   const entitledPrimaryItems = recommend(permittedPrimaryItems);
   const platformNavItems = platformAdministrator

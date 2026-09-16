@@ -2416,6 +2416,7 @@ model Organization {
   contractedUserMinimum      Int?
   subscriptionNotes          String?
   moduleAssignments          TenantModuleAssignment[]
+  userModuleAssignments      UserModuleAssignment[]
   employeePerformanceGoals   EmployeePerformanceGoal[]
   employeePerformanceReviews EmployeePerformanceReview[]
 
@@ -2603,6 +2604,25 @@ model TenantModuleAssignment {
   @@index([assignedById])
 }
 
+model UserModuleAssignment {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  moduleKey      String
+  enabled        Boolean  @default(true)
+  assignedById   String
+  assignedAt     DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation("UserModuleAssignmentTarget", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy   User         @relation("UserModuleAssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+
+  @@unique([userId, moduleKey])
+  @@index([organizationId, userId, enabled])
+  @@index([assignedById])
+}
+
 model EmployeePerformanceGoal {
   id             String                        @id @default(cuid())
   organizationId String
@@ -2784,6 +2804,8 @@ model User {
   organizationId                   String?
   organization                     Organization?               @relation(fields: [organizationId], references: [id])
   assignedTenantModules            TenantModuleAssignment[]    @relation("TenantModuleAssignedBy")
+  assignedUserModules              UserModuleAssignment[]      @relation("UserModuleAssignmentAssignedBy")
+  userModuleAssignments            UserModuleAssignment[]      @relation("UserModuleAssignmentTarget")
   employeePerformanceGoals         EmployeePerformanceGoal[]   @relation("EmployeePerformanceGoalEmployee")
   createdEmployeePerformanceGoals  EmployeePerformanceGoal[]   @relation("EmployeePerformanceGoalCreatedBy")
   employeePerformanceReviews       EmployeePerformanceReview[] @relation("EmployeePerformanceReviewEmployee")
@@ -3389,6 +3411,7 @@ model TenantInvitation {
   name           String
   role           UserRole
   departmentId   String?
+  moduleKeys     String[]               @default([])
   tokenHash      String                 @unique
   status         TenantInvitationStatus @default(PENDING)
   expiresAt      DateTime

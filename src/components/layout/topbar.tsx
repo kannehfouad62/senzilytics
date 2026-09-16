@@ -26,7 +26,7 @@ import { planEntitlements } from "@/lib/subscription";
 import { getCurrentUserPermissions } from "@/lib/permissions";
 import { filterNavigationItems } from "@/core/permissions/navigation-access";
 import { ActiveNavigationLink } from "@/components/layout/active-navigation-link";
-import { filterTenantVisibleModules } from "@/core/navigation/tenant-module-catalog";
+import { filterTenantVisibleModules, filterUserVisibleModules } from "@/core/navigation/tenant-module-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +49,7 @@ export async function Topbar() {
           isActive: true,
           isPlatformAdmin: true,
           organizationId: true,
+          userModuleAssignments: { select: { moduleKey: true, enabled: true } },
           organization: {
             select: {
               subscriptionPlan: true,
@@ -120,10 +121,13 @@ export async function Topbar() {
   const platformAdministrator = Boolean(currentUser && isApprovedPlatformAdministrator(currentUser));
   const recommend = <T extends NavigationItem>(items: T[]) => platformAdministrator
     ? items
-    : filterTenantVisibleModules(
-        currentUser?.organization?.industryCategory ?? IndustryCategory.GENERAL,
-        currentUser?.organization?.moduleAssignments ?? [],
-        items,
+    : filterUserVisibleModules(
+        currentUser?.userModuleAssignments ?? [],
+        filterTenantVisibleModules(
+          currentUser?.organization?.industryCategory ?? IndustryCategory.GENERAL,
+          currentUser?.organization?.moduleAssignments ?? [],
+          items,
+        ),
       );
   const visiblePrimaryItems = recommend(permittedPrimaryItems);
   const platformItems: NavigationItem[] =

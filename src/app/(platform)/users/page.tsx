@@ -5,13 +5,14 @@ import { requirePermission } from "@/lib/permissions";
 import { hasPermission } from "@/lib/permissions";
 import { PermissionKey, Prisma } from "@prisma/client";
 import { UserRole } from "@prisma/client";
-import { inviteTenantUser, setTenantUserActive } from "@/features/identity/tenant.actions";
+import { inviteTenantUser, setTenantUserActive, setUserModuleAssignments } from "@/features/identity/tenant.actions";
 import { RevokeMobileDeviceForm } from "@/features/mobile/mobile-device-management";
+import { tenantAssignableModules } from "@/core/navigation/tenant-module-catalog";
 
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ search?: string; page?: string }> }) {
   await requirePermission(PermissionKey.VIEW_USERS);
-  const [{ organizationId }, params] = await Promise.all([getCurrentUserTenant(), searchParams]);
+  const [{ organizationId, organization, user: currentUser }, params] = await Promise.all([getCurrentUserTenant(), searchParams]);
   const query = normalizeRegisterQuery(params);
   const where: Prisma.UserWhereInput = { organizationId, ...(query.search ? { OR: [
     { name: { contains: query.search, mode: "insensitive" } },
@@ -31,9 +32,13 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         site: true,
       },
     },
+    userModuleAssignments: { select: { moduleKey: true, enabled: true } },
   },
   skip: query.skip, take: query.take,
 }), prisma.user.count({ where }), prisma.department.findMany({where:{site:{organizationId}},include:{site:true},orderBy:{name:"asc"}}), prisma.mobileSession.findMany({where:{organizationId,status:"ACTIVE",expiresAt:{gt:new Date()}},select:{id:true,deviceName:true,platform:true,lastUsedAt:true,expiresAt:true,user:{select:{name:true,email:true}},_count:{select:{pushTokens:{where:{enabled:true}}}}},orderBy:{lastUsedAt:"desc"},take:100}), hasPermission(PermissionKey.MANAGE_USERS)]);
+  const tenantModuleAssignments = await prisma.tenantModuleAssignment.findMany({ where: { organizationId }, select: { moduleKey: true, enabled: true } });
+  const assignableModules = tenantAssignableModules(organization!.industryCategory, tenantModuleAssignments);
+  const canAssignModules = canManageUsers && (currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.ORG_ADMIN);
 
   return (
     <div>
@@ -50,9 +55,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         </p>
       </div>
 
-      <form action={inviteTenantUser} className="mb-8 grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 md:grid-cols-2 xl:grid-cols-5">
+      {canAssignModules && <form action={inviteTenantUser} className="mb-8 grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 md:grid-cols-2 xl:grid-cols-5">
         <input name="name" required placeholder="Full name" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3"/><input name="email" type="email" required placeholder="Email" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3"/><select name="role" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3">{Object.values(UserRole).filter(x=>x!==UserRole.SUPER_ADMIN).map(x=><option key={x}>{x}</option>)}</select><select name="departmentId" className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3"><option value="">No department</option>{departments.map(x=><option key={x.id} value={x.id}>{x.site.name} — {x.name}</option>)}</select><button className="rounded-xl bg-cyan-300 px-4 py-3 font-semibold text-slate-950">Invite User</button>
-      </form>
+        <fieldset className="md:col-span-2 xl:col-span-5"><legend className="text-sm font-medium text-white">Assigned modules</legend><p className="mt-1 text-xs text-slate-500">Role permissions remain the maximum authority. Select the tenant modules this user should see.</p><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{assignableModules.map(module=><label key={module.key} className="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm"><input type="checkbox" name="moduleKeys" value={module.key} defaultChecked className="accent-cyan-300"/>{module.label}</label>)}</div></fieldset>
+      </form>}
 
       <div className="mb-5"><RegisterSearch action="/users" value={query.search} placeholder="Search name, email, job title, department, or site"/><p className="mt-3 text-sm text-slate-500">{total} matching user{total === 1 ? "" : "s"}</p></div>
 
@@ -67,6 +73,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               <th className="px-6 py-4 font-medium">Site</th>
               <th className="px-6 py-4 font-medium">Department</th>
               <th className="px-6 py-4 font-medium">Access</th>
+              <th className="px-6 py-4 font-medium">Modules</th>
             </tr>
           </thead>
 
@@ -103,6 +110,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                   {user.department?.name || "N/A"}
                 </td>
                 <td className="px-6 py-5"><form action={setTenantUserActive}><input type="hidden" name="id" value={user.id}/><input type="hidden" name="active" value={user.isActive?"false":"true"}/><button className={user.isActive?"text-emerald-300":"text-red-300"}>{user.isActive?"Active · Suspend":"Suspended · Restore"}</button></form></td>
+                <td className="px-6 py-5">{canAssignModules?<details className="min-w-64"><summary className="cursor-pointer text-cyan-300">Assign modules</summary><form action={setUserModuleAssignments} className="mt-3 space-y-3"><input type="hidden" name="userId" value={user.id}/><div className="grid gap-2">{assignableModules.map(module=>{const inherited=!user.userModuleAssignments.length;const checked=inherited||user.userModuleAssignments.some(assignment=>assignment.moduleKey===module.key&&assignment.enabled);return <label key={module.key} className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" name="moduleKeys" value={module.key} defaultChecked={checked} className="accent-cyan-300"/>{module.label}</label>})}</div><button className="rounded-lg bg-cyan-300 px-3 py-2 text-xs font-semibold text-slate-950">Save module access</button></form></details>:<span className="text-slate-500">Owner access required</span>}</td>
               </tr>
             ))}
           </tbody>

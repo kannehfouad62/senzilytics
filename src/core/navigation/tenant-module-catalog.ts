@@ -1,4 +1,4 @@
-import { IndustryCategory } from "@prisma/client";
+import { IndustryCategory, PermissionKey } from "@prisma/client";
 import { isIndustryRecommendedModule } from "@/core/navigation/industry-module-recommendations";
 
 export const tenantModuleCatalog = [
@@ -36,6 +36,7 @@ export const tenantModuleCatalog = [
 
 export type TenantModuleKey = (typeof tenantModuleCatalog)[number]["key"];
 export type TenantModuleOverride = { moduleKey: string; enabled: boolean };
+export type UserModuleOverride = { moduleKey: string; enabled: boolean };
 
 export function isTenantModuleKey(value: string): value is TenantModuleKey {
   return tenantModuleCatalog.some(module => module.key === value);
@@ -55,6 +56,55 @@ export function isTenantModuleVisible(category: IndustryCategory, assignments: r
 
 export function filterTenantVisibleModules<T extends { href: string }>(category: IndustryCategory, assignments: readonly TenantModuleOverride[], items: readonly T[]) {
   return items.filter(item => isTenantModuleVisible(category, assignments, item.href));
+}
+
+export function filterUserVisibleModules<T extends { href: string }>(assignments: readonly UserModuleOverride[], items: readonly T[]) {
+  if (!assignments.length) return [...items];
+  return items.filter((item) => {
+    const catalogEntry = moduleForHref(item.href);
+    if (!catalogEntry) return true;
+    return assignments.find((assignment) => assignment.moduleKey === catalogEntry.key)?.enabled === true;
+  });
+}
+
+export function tenantAssignableModules(category: IndustryCategory, assignments: readonly TenantModuleOverride[]) {
+  return tenantModuleCatalog.filter((module) => isTenantModuleVisible(category, assignments, module.root));
+}
+
+const permissionModules: Partial<Record<PermissionKey, TenantModuleKey>> = {
+  VIEW_REPORTS: "REPORTS",
+  CREATE_INCIDENT: "INCIDENTS", VIEW_INCIDENT: "INCIDENTS", UPDATE_INCIDENT: "INCIDENTS", DELETE_INCIDENT: "INCIDENTS",
+  CREATE_CAPA: "INCIDENTS", UPDATE_CAPA: "INCIDENTS", CLOSE_CAPA: "INCIDENTS",
+  VIEW_AUDITS: "AUDITS", MANAGE_AUDITS: "AUDITS",
+  VIEW_INSPECTIONS: "INSPECTIONS", MANAGE_INSPECTIONS: "INSPECTIONS",
+  VIEW_COMPLIANCE: "COMPLIANCE", MANAGE_COMPLIANCE: "COMPLIANCE",
+  VIEW_TRAINING: "TRAINING", MANAGE_TRAINING: "TRAINING",
+  USE_AI: "AI_INTELLIGENCE", VIEW_PREDICTIVE_INTELLIGENCE: "AI_INTELLIGENCE", MANAGE_PREDICTIVE_INTELLIGENCE: "AI_INTELLIGENCE",
+  MANAGE_WORKFLOWS: "WORKFLOWS", MANAGE_DOCUMENTS: "DOCUMENTS", MANAGE_INTEGRATIONS: "INTEGRATIONS",
+  VIEW_RISKS: "RISKS", MANAGE_RISKS: "RISKS", VIEW_MOC: "MOC", MANAGE_MOC: "MOC",
+  CREATE_OBSERVATION: "OBSERVATIONS", VIEW_OBSERVATIONS: "OBSERVATIONS", MANAGE_OBSERVATIONS: "OBSERVATIONS",
+  VIEW_CHEMICALS: "CHEMICALS", MANAGE_CHEMICALS: "CHEMICALS", VIEW_ENVIRONMENTAL: "ENVIRONMENTAL", MANAGE_ENVIRONMENTAL: "ENVIRONMENTAL",
+  VIEW_ESG: "ESG", MANAGE_ESG: "ESG", VIEW_CONTRACTORS: "CONTRACTORS", MANAGE_CONTRACTORS: "CONTRACTORS",
+  VIEW_PERMITS_TO_WORK: "PERMITS", MANAGE_PERMITS_TO_WORK: "PERMITS",
+  VIEW_INDUSTRIAL_HYGIENE: "HYGIENE", MANAGE_INDUSTRIAL_HYGIENE: "HYGIENE",
+  VIEW_OCCUPATIONAL_HEALTH: "HEALTH", MANAGE_OCCUPATIONAL_HEALTH: "HEALTH",
+  VIEW_SIF_INTELLIGENCE: "ASSURANCE", MANAGE_CRITICAL_CONTROLS: "ASSURANCE", VIEW_CERTIFICATION_READINESS: "ASSURANCE", MANAGE_CERTIFICATION_READINESS: "ASSURANCE",
+  VIEW_ASSETS: "ASSETS", MANAGE_ASSETS: "ASSETS", VIEW_BEHAVIOR_SAFETY: "BEHAVIOR_SAFETY", RECORD_BEHAVIOR_COACHING: "BEHAVIOR_SAFETY", MANAGE_BEHAVIOR_SAFETY: "BEHAVIOR_SAFETY",
+  VIEW_PERFORMANCE_SCORECARDS: "PERFORMANCE", MANAGE_PERFORMANCE_SCORECARDS: "PERFORMANCE",
+  VIEW_OWN_EMPLOYEE_PERFORMANCE: "EMPLOYEE_PERFORMANCE", VIEW_EMPLOYEE_PERFORMANCE: "EMPLOYEE_PERFORMANCE", MANAGE_EMPLOYEE_PERFORMANCE: "EMPLOYEE_PERFORMANCE",
+  VIEW_EMERGENCY_PREPAREDNESS: "EMERGENCY", MANAGE_EMERGENCY_PREPAREDNESS: "EMERGENCY", RECORD_EMERGENCY_RESPONSE: "EMERGENCY",
+  VIEW_BUSINESS_CONTINUITY: "CONTINUITY", MANAGE_BUSINESS_CONTINUITY: "CONTINUITY", RECORD_CONTINUITY_EVENT: "CONTINUITY",
+  VIEW_EXECUTIVE_REVIEWS: "MANAGEMENT_REVIEWS", MANAGE_EXECUTIVE_REVIEWS: "MANAGEMENT_REVIEWS", APPROVE_EXECUTIVE_REVIEWS: "MANAGEMENT_REVIEWS",
+  VIEW_RESEARCH: "RESEARCH", CREATE_RESEARCH_PROJECT: "RESEARCH", MANAGE_RESEARCH_PROJECTS: "RESEARCH", MANAGE_RESEARCH_CLIENTS: "RESEARCH", MANAGE_RESEARCH_TEAMS: "RESEARCH", DESIGN_RESEARCH_QUESTIONNAIRES: "RESEARCH", PUBLISH_RESEARCH_QUESTIONNAIRES: "RESEARCH", COLLECT_RESEARCH_DATA: "RESEARCH", MANAGE_RESEARCH_DATASETS: "RESEARCH", RUN_RESEARCH_ANALYSIS: "RESEARCH", PUBLISH_RESEARCH_DASHBOARDS: "RESEARCH", EXPORT_RESEARCH_OUTPUTS: "RESEARCH", APPROVE_RESEARCH_OUTPUTS: "RESEARCH",
+};
+
+export function filterUserModulePermissions(permissions: readonly PermissionKey[], assignments: readonly UserModuleOverride[]) {
+  if (!assignments.length) return [...permissions];
+  const enabled = new Set(assignments.filter((assignment) => assignment.enabled).map((assignment) => assignment.moduleKey));
+  return permissions.filter((permission) => {
+    const moduleKey = permissionModules[permission];
+    return !moduleKey || enabled.has(moduleKey);
+  });
 }
 
 export function hasAuditServicesEntitlement(category: IndustryCategory, assignments: readonly TenantModuleOverride[]) {
