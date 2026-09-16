@@ -12,6 +12,7 @@ import { processIntegrationWebhookDeliveries } from "@/modules/integrations/webh
 import { processMobilePushDeliveries } from "@/modules/mobile/mobile-push.service";
 import { runTrackedScheduledJob } from "@/modules/platform/scheduled-job-monitor.service";
 import { processAuditServiceSla } from "@/modules/audit/audit-service-sla.service";
+import { processEmployeePerformanceSla } from "@/modules/employee-performance/employee-performance-sla.service";
 import {
   NextRequest,
   NextResponse,
@@ -59,6 +60,7 @@ export async function GET(
       inspectionResult,
       demoResult,
       auditServiceResult,
+      employeePerformanceResult,
     ] = await Promise.all([
       processWorkflowSlaNotifications(),
 
@@ -75,6 +77,8 @@ export async function GET(
       cleanupExpiredDemoUsers(),
 
       processAuditServiceSla(),
+
+      processEmployeePerformanceSla(),
 
     ]);
     const workflowOutcomeResult =
@@ -114,6 +118,9 @@ export async function GET(
       auditServices:
         auditServiceResult,
 
+      employeePerformance:
+        employeePerformanceResult,
+
       inspections:
         inspectionResult,
 
@@ -136,6 +143,7 @@ export async function GET(
           investigationResult.checked +
           auditResult.checked +
           auditServiceResult.checked +
+          employeePerformanceResult.checked +
           inspectionResult.checked,
 
         remindersSent:
@@ -193,6 +201,15 @@ export async function GET(
         auditServiceEscalations:
           auditServiceResult.escalations,
 
+        employeePerformanceNotificationsSent:
+          employeePerformanceResult.notificationsSent,
+
+        employeePerformanceEmailsSent:
+          employeePerformanceResult.emailsSent,
+
+        employeePerformanceEscalations:
+          employeePerformanceResult.escalations,
+
         inspectionInAppNotificationsSent:
           inspectionResult
             .inAppNotificationsSent,
@@ -209,6 +226,7 @@ export async function GET(
           incidentEscalationResult.skipped +
           investigationResult.skipped +
           auditResult.skipped +
+          employeePerformanceResult.skipped +
           inspectionResult.skipped,
 
         automationEventsProcessed:

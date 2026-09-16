@@ -13,6 +13,7 @@ import { getCurrentUserTenant } from "@/lib/tenant";
 import { getResearchExecutiveSummary } from "@/modules/research/research-executive-summary.service";
 import { getAuditServiceAnalytics } from "@/modules/audit/audit-service-analytics.service";
 import { organizationHasAuditServices } from "@/modules/audit/audit-services-entitlement";
+import { getEmployeePerformanceExecutiveSummary } from "@/modules/employee-performance/employee-performance-executive.service";
 import { PermissionKey } from "@prisma/client";
 import {
   AlertTriangle,
@@ -31,6 +32,7 @@ import {
   Presentation,
   MessageSquareText,
   FlaskConical,
+  UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -80,13 +82,16 @@ export default async function DashboardPage({
     filters: parseExecutiveDashboardFilters(params),
   });
   const allowed = new Set(permissions);
-  const [research, auditServices] = await Promise.all([
+  const [research, auditServices, employeePerformance] = await Promise.all([
     allowed.has(PermissionKey.VIEW_RESEARCH)
       ? getResearchExecutiveSummary(organizationId, dashboard.filters.days)
       : null,
     allowed.has(PermissionKey.VIEW_AUDITS) &&
     (await organizationHasAuditServices(organizationId))
       ? getAuditServiceAnalytics(organizationId, dashboard.filters.days)
+      : null,
+    allowed.has(PermissionKey.VIEW_EMPLOYEE_PERFORMANCE)
+      ? getEmployeePerformanceExecutiveSummary(organizationId, dashboard.filters.days)
       : null,
   ]);
   const query = new URLSearchParams({
@@ -346,6 +351,21 @@ export default async function DashboardPage({
             <FlaskConical size={15} className="text-violet-300" />
             Research indicators respect tenant boundaries and Research &
             Analytics permissions.
+          </div>
+        </section>
+      ) : null}
+
+      {employeePerformance ? (
+        <section className="rounded-3xl border border-emerald-400/15 bg-[linear-gradient(135deg,rgba(16,185,129,.07),rgba(34,211,238,.035))] p-6 shadow-xl">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div><p className="flex items-center gap-2 text-sm text-emerald-300"><UsersRound size={17}/>Employee Performance intelligence</p><h2 className="mt-1 text-2xl font-semibold text-white">Goals, evidence and review governance</h2><p className="mt-2 max-w-3xl text-sm text-slate-400">Operational visibility only—source evidence and human review remain authoritative, and no metric automatically determines an employment outcome.</p></div>
+            <Link href="/employee-performance" className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[.07] px-4 py-2.5 text-sm font-semibold text-emerald-100">Open Employee Performance <ArrowRight size={16}/></Link>
+          </div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <EmployeePerformanceMetric label="Active goals" value={employeePerformance.activeGoals} note={`${employeePerformance.completedGoals} completed in this ${dashboard.filters.days}-day window`}/>
+            <EmployeePerformanceMetric label="Overdue goals" value={employeePerformance.overdueGoals} note="Active goals past their governed due date" attention={employeePerformance.overdueGoals > 0}/>
+            <EmployeePerformanceMetric label="Awaiting employee" value={employeePerformance.awaitingEmployee} note={`${employeePerformance.closedReviews} reviews closed in this window`}/>
+            <EmployeePerformanceMetric label="Management queue" value={employeePerformance.contextRequested + employeePerformance.awaitingClosure} note={`${employeePerformance.contextRequested} context requests · ${employeePerformance.awaitingClosure} acknowledged for closure`} attention={employeePerformance.contextRequested + employeePerformance.awaitingClosure > 0}/>
           </div>
         </section>
       ) : null}
@@ -664,6 +684,10 @@ function ResearchMetric({
 
 function AuditServiceMetric({ label, value, note }: { label: string; value: string | number; note: string }) {
   return <Link href="/audit-services/analytics" className="rounded-2xl border border-white/10 bg-slate-950/35 p-5 transition hover:border-cyan-400/30"><p className="text-sm text-slate-400">{label}</p><p className="mt-2 text-3xl font-bold text-white">{value}</p><p className="mt-2 text-xs leading-5 text-slate-500">{note}</p></Link>;
+}
+
+function EmployeePerformanceMetric({ label, value, note, attention = false }: { label: string; value: number; note: string; attention?: boolean }) {
+  return <Link href="/employee-performance" className={`rounded-2xl border bg-slate-950/35 p-5 transition ${attention ? "border-amber-400/25 hover:border-amber-300/40" : "border-white/10 hover:border-emerald-400/30"}`}><p className="text-sm text-slate-400">{label}</p><p className={`mt-2 text-3xl font-bold ${attention ? "text-amber-200" : "text-white"}`}>{value}</p><p className="mt-2 text-xs leading-5 text-slate-500">{note}</p></Link>;
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
