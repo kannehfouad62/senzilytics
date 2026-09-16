@@ -3,7 +3,7 @@ import { IndustryCategory } from "@prisma/client";
 const common = new Set([
   "/dashboard", "/modules", "/tasks", "/notifications", "/documents", "/users",
   "/organizations", "/implementation", "/form-studio", "/workflows",
-  "/performance", "/management-reviews", "/reports", "/activity", "/integrations",
+  "/performance", "/employee-performance", "/management-reviews", "/reports", "/activity", "/integrations",
 ]);
 
 const profiles: Partial<Record<IndustryCategory, readonly string[]>> = {

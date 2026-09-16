@@ -23,6 +23,7 @@ export type MobileModuleDefinition = {
 
 const modules: readonly MobileModuleDefinition[] = [
   { key: "dashboard", label: "Executive Dashboard", description: "Enterprise EHS performance, risk signals, and leadership indicators.", href: "/dashboard", category: "COMMAND", permission: PermissionKey.VIEW_DASHBOARD, nativeCapability: "EXECUTIVE_DASHBOARD" },
+  { key: "employee-performance", label: "Employee Performance", description: "Transparent personal work completion, timeliness, workload, and source-record evidence.", href: "/employee-performance", category: "COMMAND", anyPermissions: [PermissionKey.VIEW_OWN_EMPLOYEE_PERFORMANCE, PermissionKey.VIEW_EMPLOYEE_PERFORMANCE] },
   { key: "assurance", label: "Operational Assurance", description: "Connected assurance performance and control effectiveness.", href: "/assurance", category: "COMMAND", permission: PermissionKey.VIEW_DASHBOARD, nativeCapability: "OPERATIONAL_ASSURANCE" },
   { key: "intelligence", label: "AI Intelligence", description: "Governed EHS intelligence, analysis, and decision support.", href: "/intelligence", category: "COMMAND", permission: PermissionKey.USE_AI, anyPermissions: [PermissionKey.VIEW_DASHBOARD], nativeCapability: "AI_INTELLIGENCE" },
   { key: "ehs-copilot", label: "EHS Copilot", description: "Private, permission-filtered conversations with frozen evidence citations and tenant retention controls.", href: "/intelligence/copilot", category: "COMMAND", permission: PermissionKey.USE_AI, anyPermissions: [PermissionKey.VIEW_DASHBOARD] },

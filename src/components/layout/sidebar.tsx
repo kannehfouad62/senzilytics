@@ -55,6 +55,7 @@ import {
   MessageSquareText,
   PanelsTopLeft,
   BriefcaseBusiness,
+  UserRoundCheck,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -80,6 +81,15 @@ export const primaryNavItems: NavigationItem[] = [
     href: "/performance",
     icon: Target,
     permission: PermissionKey.VIEW_PERFORMANCE_SCORECARDS,
+  },
+  {
+    label: "Employee Performance",
+    href: "/employee-performance",
+    icon: UserRoundCheck,
+    anyPermissions: [
+      PermissionKey.VIEW_OWN_EMPLOYEE_PERFORMANCE,
+      PermissionKey.VIEW_EMPLOYEE_PERFORMANCE,
+    ],
   },
   {
     label: "Management Reviews",

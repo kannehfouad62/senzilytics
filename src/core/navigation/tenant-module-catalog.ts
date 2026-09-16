@@ -3,6 +3,7 @@ import { isIndustryRecommendedModule } from "@/core/navigation/industry-module-r
 
 export const tenantModuleCatalog = [
   { key: "PERFORMANCE", label: "Performance Scorecards", root: "/performance" },
+  { key: "EMPLOYEE_PERFORMANCE", label: "Employee Performance", root: "/employee-performance" },
   { key: "MANAGEMENT_REVIEWS", label: "Management Reviews", root: "/management-reviews" },
   { key: "ASSURANCE", label: "Operational Assurance", root: "/assurance" },
   { key: "AI_INTELLIGENCE", label: "AI Intelligence", root: "/intelligence" },
