@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PermissionKey } from "@prisma/client";
-import { ArrowLeft, CalendarClock, CheckCircle2, UserRoundCheck } from "lucide-react";
+import { ArrowLeft, CalendarClock, CheckCircle2, Printer, UserRoundCheck } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getCurrentUserPermissions } from "@/lib/permissions";
 import { getCurrentUserTenant } from "@/lib/tenant";
@@ -24,7 +24,7 @@ export default async function EmployeePerformanceReportPage({ params, searchPara
 
   return <div>
     <Link href={`/employee-performance?days=${days}`} className="inline-flex items-center gap-2 text-sm text-cyan-300"><ArrowLeft size={16}/>Employee performance</Link>
-    <div className="mt-6 flex flex-wrap items-start justify-between gap-5"><div><p className="flex items-center gap-2 text-sm text-violet-300"><UserRoundCheck size={16}/>Individual governed report</p><h1 className="mt-2 text-4xl font-bold">{employee.name}</h1><p className="mt-2 text-slate-400">{employee.jobTitle || employee.role.replaceAll("_", " ")} · {employee.siteName || "No site"} · {employee.departmentName || "No department"}</p></div><div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm"><p className="text-slate-500">Reporting window</p><p className="mt-1 font-medium">{workspace.filters.from.toLocaleDateString()}–{workspace.filters.to.toLocaleDateString()}</p></div></div>
+    <div className="mt-6 flex flex-wrap items-start justify-between gap-5"><div><p className="flex items-center gap-2 text-sm text-violet-300"><UserRoundCheck size={16}/>Individual governed report</p><h1 className="mt-2 text-4xl font-bold">{employee.name}</h1><p className="mt-2 text-slate-400">{employee.jobTitle || employee.role.replaceAll("_", " ")} · {employee.siteName || "No site"} · {employee.departmentName || "No department"}</p></div><div className="flex items-start gap-3"><Link href={`/employee-performance/${employee.id}/print?days=${days}`} className="inline-flex items-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950"><Printer size={17}/>Print / PDF</Link><div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm"><p className="text-slate-500">Reporting window</p><p className="mt-1 font-medium">{workspace.filters.from.toLocaleDateString()}–{workspace.filters.to.toLocaleDateString()}</p></div></div></div>
 
     <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Metric label="Assigned" value={employee.summary.assigned}/><Metric label="Completed" value={employee.summary.completed} tone="text-emerald-300"/><Metric label="On-time completion" value={formatRate(employee.summary.onTimeRate)} tone="text-violet-300"/><Metric label="Open overdue" value={employee.summary.overdue} tone={employee.summary.overdue ? "text-amber-300" : "text-emerald-300"}/></div>
 

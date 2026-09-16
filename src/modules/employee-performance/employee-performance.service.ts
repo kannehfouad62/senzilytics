@@ -44,11 +44,32 @@ export type EmployeePerformanceSummary = {
   averageCompletionDays: number | null;
 };
 
+export type EmployeePerformanceFilters = {
+  days: EmployeePerformanceWindow;
+  search: string;
+  siteId: string | null;
+  departmentId: string | null;
+};
+
 export function parseEmployeePerformanceWindow(value: string | undefined): EmployeePerformanceWindow {
   const parsed = Number(value);
   return employeePerformanceWindows.includes(parsed as EmployeePerformanceWindow)
     ? (parsed as EmployeePerformanceWindow)
     : 90;
+}
+
+export function parseEmployeePerformanceFilters(input: {
+  days?: string;
+  search?: string;
+  siteId?: string;
+  departmentId?: string;
+}): EmployeePerformanceFilters {
+  return {
+    days: parseEmployeePerformanceWindow(input.days),
+    search: String(input.search ?? "").trim().slice(0, 100),
+    siteId: boundedIdentifier(input.siteId),
+    departmentId: boundedIdentifier(input.departmentId),
+  };
 }
 
 export function summarizeEmployeeWork(
@@ -101,6 +122,9 @@ export async function getEmployeePerformanceWorkspace(input: {
   canViewTeam: boolean;
   days: EmployeePerformanceWindow;
   employeeId?: string;
+  search?: string;
+  siteId?: string | null;
+  departmentId?: string | null;
 }) {
   const to = new Date();
   const from = new Date(to.getTime() - input.days * 86_400_000);
@@ -110,6 +134,20 @@ export async function getEmployeePerformanceWorkspace(input: {
       organizationId: input.organizationId,
       isActive: true,
       ...(requestedEmployeeId ? { id: requestedEmployeeId } : {}),
+      ...(input.canViewTeam && input.departmentId
+        ? { departmentId: input.departmentId }
+        : input.canViewTeam && input.siteId
+          ? { department: { siteId: input.siteId } }
+          : {}),
+      ...(input.canViewTeam && input.search
+        ? {
+            OR: [
+              { name: { contains: input.search, mode: "insensitive" as const } },
+              { email: { contains: input.search, mode: "insensitive" as const } },
+              { jobTitle: { contains: input.search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
     },
     select: {
       id: true,
@@ -160,13 +198,58 @@ export async function getEmployeePerformanceWorkspace(input: {
     };
   });
 
+  const [sites, departments] = input.canViewTeam
+    ? await Promise.all([
+        prisma.site.findMany({ where: { organizationId: input.organizationId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+        prisma.department.findMany({ where: { site: { organizationId: input.organizationId } }, select: { id: true, name: true, siteId: true, site: { select: { name: true } } }, orderBy: [{ site: { name: "asc" } }, { name: "asc" }] }),
+      ])
+    : [[], []];
+
+  const workload = employees.slice(0, 20).map((employee) => ({
+    name: compactName(employee.name),
+    assigned: employee.summary.assigned,
+    completed: employee.summary.completed,
+    overdue: employee.summary.overdue,
+  }));
+  const sourceMix = Object.entries(employeeWorkSourceLabels).map(([source, label]) => {
+    const sourceRecords = records.filter((record) => record.source === source);
+    const summary = summarizeEmployeeWork(sourceRecords, to);
+    return { source, label, assigned: summary.assigned, completed: summary.completed, overdue: summary.overdue };
+  });
+  const trends = buildMonthlyTrends(records, from, to);
+
   return {
-    filters: { days: input.days, from, to },
+    filters: { days: input.days, search: input.search ?? "", siteId: input.siteId ?? null, departmentId: input.departmentId ?? null, from, to },
+    sites,
+    departments,
     employees,
     portfolio: summarizeEmployeeWork(records, to),
+    charts: { workload, sourceMix, trends },
     provenance:
       "Calculated from tenant-scoped workflow tasks, corrective actions, compliance occurrences, MOC tasks, and training assignments. Cancelled work is excluded. Rates are descriptive evidence for human review, not automated employment decisions.",
   };
+}
+
+export function buildEmployeePerformanceCsv(
+  workspace: Awaited<ReturnType<typeof getEmployeePerformanceWorkspace>>,
+) {
+  const rows: Array<Array<string | number | null>> = [
+    ["Employee", "Role", "Site", "Department", "Assigned", "Completed", "Open", "Overdue", "Completion rate (%)", "On-time rate (%)", "Average completion days"],
+    ...workspace.employees.map((employee) => [
+      employee.name,
+      employee.role,
+      employee.siteName,
+      employee.departmentName,
+      employee.summary.assigned,
+      employee.summary.completed,
+      employee.summary.open,
+      employee.summary.overdue,
+      employee.summary.completionRate,
+      employee.summary.onTimeRate,
+      employee.summary.averageCompletionDays,
+    ]),
+  ];
+  return rows.map((row) => row.map(csvCell).join(",")).join("\n");
 }
 
 async function loadEmployeeWorkRecords(input: {
@@ -288,4 +371,51 @@ function compareWorkRecords(a: EmployeeWorkRecord, b: EmployeeWorkRecord) {
 
 function roundPercent(value: number) {
   return Math.round(value * 1_000) / 10;
+}
+
+function boundedIdentifier(value: string | undefined) {
+  const normalized = String(value ?? "").trim();
+  return normalized && normalized.length <= 64 && /^[A-Za-z0-9_-]+$/.test(normalized)
+    ? normalized
+    : null;
+}
+
+function compactName(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return parts.length > 1 ? `${parts[0]} ${parts.at(-1)?.slice(0, 1)}.` : name;
+}
+
+function buildMonthlyTrends(records: readonly EmployeeWorkRecord[], from: Date, to: Date) {
+  const buckets = new Map<string, { month: string; assigned: number; completed: number; onTime: number }>();
+  const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1));
+  const finalMonth = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1));
+  while (cursor <= finalMonth) {
+    const key = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, "0")}`;
+    buckets.set(key, { month: cursor.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }), assigned: 0, completed: 0, onTime: 0 });
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  for (const record of records.filter((item) => !item.cancelled)) {
+    if (record.assignedAt >= from) {
+      const bucket = buckets.get(monthKey(record.assignedAt));
+      if (bucket) bucket.assigned += 1;
+    }
+    if (record.completedAt && record.completedAt >= from) {
+      const bucket = buckets.get(monthKey(record.completedAt));
+      if (bucket) {
+        bucket.completed += 1;
+        if (record.dueAt && record.completedAt <= record.dueAt) bucket.onTime += 1;
+      }
+    }
+  }
+  return [...buckets.values()];
+}
+
+function monthKey(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function csvCell(value: string | number | null) {
+  const raw = value === null ? "" : String(value);
+  const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+  return `"${safe.replaceAll('"', '""')}"`;
 }

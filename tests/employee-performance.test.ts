@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  buildEmployeePerformanceCsv,
+  parseEmployeePerformanceFilters,
   parseEmployeePerformanceWindow,
   summarizeEmployeeWork,
   type EmployeeWorkRecord,
@@ -51,11 +53,30 @@ test("employee performance windows are bounded", () => {
   assert.equal(parseEmployeePerformanceWindow(undefined), 90);
 });
 
+test("employee performance filters are bounded and identifiers are safe", () => {
+  assert.deepEqual(parseEmployeePerformanceFilters({ days: "30", search: "  Analyst  ", siteId: "site_1", departmentId: "../../unsafe" }), {
+    days: 30,
+    search: "Analyst",
+    siteId: "site_1",
+    departmentId: null,
+  });
+});
+
+test("employee performance CSV neutralizes spreadsheet formulas", () => {
+  const csv = buildEmployeePerformanceCsv({
+    employees: [{ name: "=cmd", role: "EMPLOYEE", siteName: null, departmentName: null, summary: { assigned: 1, completed: 1, open: 0, overdue: 0, completionRate: 100, onTimeRate: 100, averageCompletionDays: 1 } }],
+  } as never);
+  assert.match(csv, /"'=cmd"/);
+});
+
 test("employee performance remains tenant scoped permission governed and source traceable", async () => {
-  const [service, dashboard, report, schema, migration, sidebar, catalog] = await Promise.all([
+  const [service, dashboard, report, printable, exportRoute, charts, schema, migration, sidebar, catalog] = await Promise.all([
     readFile(new URL("../src/modules/employee-performance/employee-performance.service.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/app/(platform)/employee-performance/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/app/(platform)/employee-performance/[userId]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/(platform)/employee-performance/[userId]/print/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/employee-performance/export/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/features/employee-performance/employee-performance-charts.tsx", import.meta.url), "utf8"),
     readFile(new URL("../prisma/schema.prisma", import.meta.url), "utf8"),
     readFile(new URL("../prisma/migrations/20260930120000_employee_performance_foundation/migration.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/components/layout/sidebar.tsx", import.meta.url), "utf8"),
@@ -69,6 +90,9 @@ test("employee performance remains tenant scoped permission governed and source 
   assert.match(dashboard, /VIEW_EMPLOYEE_PERFORMANCE/);
   assert.match(report, /route\.userId !== user\.id/);
   assert.match(report, /Source-record evidence/);
+  assert.match(printable, /PrintReportButton/);
+  assert.match(exportRoute, /Cache-Control.*private, no-store/);
+  assert.match(charts, /Workload distribution/);
   assert.match(schema, /VIEW_OWN_EMPLOYEE_PERFORMANCE/);
   assert.match(schema, /VIEW_EMPLOYEE_PERFORMANCE/);
   assert.match(migration, /ON CONFLICT \("role", "permission"\) DO NOTHING/);
