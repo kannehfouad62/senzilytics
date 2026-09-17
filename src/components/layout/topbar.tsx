@@ -9,6 +9,7 @@ import {
   ServerCog,
   Sparkles,
   LifeBuoy,
+  UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -307,12 +308,23 @@ export async function Topbar() {
           </Link>
         )}
 
-        <div className="hidden text-right md:block">
-          <p className="text-sm font-medium text-white">{currentUser?.name}</p>
-          <p className="text-xs text-slate-400">
-            {currentUser?.role?.replaceAll("_", " ")}
-          </p>
-        </div>
+        <Link
+          href="/profile"
+          className="group flex items-center gap-3 rounded-2xl border border-transparent p-2 text-right transition hover:border-cyan-400/20 hover:bg-cyan-400/[.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 md:px-3"
+          title="Open my profile"
+        >
+          <span className="grid size-9 place-items-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200 transition group-hover:bg-cyan-400/15">
+            <UserRound size={18} />
+          </span>
+          <span className="hidden md:block">
+            <span className="block text-sm font-medium text-white group-hover:text-cyan-100">
+              {currentUser?.name}
+            </span>
+            <span className="block text-xs text-slate-400">
+              {currentUser?.role?.replaceAll("_", " ")}
+            </span>
+          </span>
+        </Link>
 
         <form action={logout}>
           <button
