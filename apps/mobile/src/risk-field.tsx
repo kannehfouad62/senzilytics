@@ -75,6 +75,7 @@ export function RiskFieldScreen({
   ownerKey,
   online,
   initialView,
+  initialRecordId = null,
   onBack,
   onQueued,
   onSync,
@@ -83,14 +84,19 @@ export function RiskFieldScreen({
   ownerKey: string;
   online: boolean;
   initialView: RiskFieldView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
 }) {
   const [view, setView] = useState<RiskFieldView>(initialView);
   const [query, setQuery] = useState("");
-  const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
-  const [selectedJsaId, setSelectedJsaId] = useState<string | null>(null);
+  const [selectedRiskId, setSelectedRiskId] = useState<string | null>(
+    initialView === "risks" ? initialRecordId : null
+  );
+  const [selectedJsaId, setSelectedJsaId] = useState<string | null>(
+    initialView === "jsa" ? initialRecordId : null
+  );
   const [creatingRisk, setCreatingRisk] = useState(false);
 
   const selectedRisk = workspace.risks.find(

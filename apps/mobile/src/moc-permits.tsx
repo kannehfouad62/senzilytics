@@ -39,6 +39,7 @@ export function MocPermitScreen({
   ownerKey,
   online,
   initialView,
+  initialRecordId = null,
   onBack,
   onQueued,
   onSync,
@@ -47,14 +48,19 @@ export function MocPermitScreen({
   ownerKey: string;
   online: boolean;
   initialView: MocPermitView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
 }) {
   const [view, setView] = useState<MocPermitView>(initialView);
   const [query, setQuery] = useState("");
-  const [selectedMocId, setSelectedMocId] = useState<string | null>(null);
-  const [selectedPermitId, setSelectedPermitId] = useState<string | null>(null);
+  const [selectedMocId, setSelectedMocId] = useState<string | null>(
+    initialView === "moc" ? initialRecordId : null
+  );
+  const [selectedPermitId, setSelectedPermitId] = useState<string | null>(
+    initialView === "permits" ? initialRecordId : null
+  );
   const mocs = workspace.managementOfChanges ?? [];
   const permits = workspace.permitsToWork ?? [];
   const capabilities = workspace.mocPermitCapabilities ?? {

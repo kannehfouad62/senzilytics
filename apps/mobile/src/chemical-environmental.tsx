@@ -50,6 +50,7 @@ export function ChemicalEnvironmentalScreen({
   ownerKey,
   online,
   initialView,
+  initialRecordId = null,
   onBack,
   onQueued,
   onSync,
@@ -58,6 +59,7 @@ export function ChemicalEnvironmentalScreen({
   ownerKey: string;
   online: boolean;
   initialView: ChemicalEnvironmentalView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
@@ -73,8 +75,12 @@ export function ChemicalEnvironmentalScreen({
   ];
   const [view, setView] = useState(initialView);
   const [query, setQuery] = useState("");
-  const [chemicalId, setChemicalId] = useState<string | null>(null);
-  const [metricId, setMetricId] = useState<string | null>(null);
+  const [chemicalId, setChemicalId] = useState<string | null>(
+    initialView === "chemicals" ? initialRecordId : null
+  );
+  const [metricId, setMetricId] = useState<string | null>(
+    initialView === "environmental" ? initialRecordId : null
+  );
   const activeView = availableViews.some((item) => item.value === view)
     ? view
     : availableViews[0]?.value;
