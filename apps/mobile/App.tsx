@@ -155,6 +155,9 @@ function SenzilyticsApp() {
   const [nativeControlledWorkId, setNativeControlledWorkId] = useState<string | null>(null);
   const [nativeAssetContractorId, setNativeAssetContractorId] = useState<string | null>(null);
   const [nativeChemicalEnvironmentalId, setNativeChemicalEnvironmentalId] = useState<string | null>(null);
+  const [nativeActionId, setNativeActionId] = useState<string | null>(null);
+  const [nativeGovernanceId, setNativeGovernanceId] = useState<string | null>(null);
+  const [nativeComplianceDocumentId, setNativeComplianceDocumentId] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
   const [busy, setBusy] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -365,6 +368,7 @@ function SenzilyticsApp() {
         setTab("capture");
         break;
       case "actions":
+        setNativeActionId(target.recordId ?? null);
         setActionCenterView(target.view);
         setTab("actions");
         break;
@@ -386,10 +390,12 @@ function SenzilyticsApp() {
         setTab("risks");
         break;
       case "governance":
+        setNativeGovernanceId(target.recordId ?? null);
         setComplianceTrainingView(target.view);
         setTab("governance");
         break;
       case "complianceDocuments":
+        setNativeComplianceDocumentId(target.recordId ?? null);
         setComplianceDocumentView(target.view);
         setTab("complianceDocuments");
         break;
@@ -477,8 +483,8 @@ function SenzilyticsApp() {
       {tab === "auditServices" && <AuditServicesScreen workspace={workspace} online={online} onBack={() => setTab("workspace")} onRefresh={refreshWorkspace} onNotice={setNotice} />}
       {tab === "research" && <ResearchFieldworkScreen assignments={workspace.researchFieldworkAssignments ?? []} initialRecordId={nativeResearchId} ownerKey={ownerKey} online={online} onBack={() => { setNativeResearchId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "risks" && <RiskFieldScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={riskFieldView} initialRecordId={nativeRiskId} onBack={() => { setNativeRiskId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "governance" && <ComplianceTrainingScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={complianceTrainingView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "complianceDocuments" && <ComplianceDocumentsScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={complianceDocumentView} onBack={() => setTab("workspace")} onRefresh={refreshWorkspace} onNotice={setNotice} />}
+      {tab === "governance" && <ComplianceTrainingScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={complianceTrainingView} initialRecordId={nativeGovernanceId} onBack={() => { setNativeGovernanceId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "complianceDocuments" && <ComplianceDocumentsScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={complianceDocumentView} initialRecordId={nativeComplianceDocumentId} onBack={() => { setNativeComplianceDocumentId(null); setTab("workspace"); }} onRefresh={refreshWorkspace} onNotice={setNotice} />}
       {tab === "controlledWork" && <MocPermitScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={mocPermitView} initialRecordId={nativeControlledWorkId} onBack={() => { setNativeControlledWorkId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "assetContractors" && <AssetContractorScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={assetContractorView} initialRecordId={nativeAssetContractorId} onBack={() => { setNativeAssetContractorId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "hygieneHealth" && <HygieneHealthScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={hygieneHealthView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
@@ -488,7 +494,7 @@ function SenzilyticsApp() {
       {tab === "regulatory" && <RegulatoryIntelligenceScreen workspace={workspace} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "executive" && <ExecutiveCommandScreen workspace={workspace} online={online} initialView={executiveCommandView} onBack={() => setTab("workspace")} onRefresh={refreshExecutiveWorkspace} onNotice={setNotice} />}
       {tab === "administration" && <TenantAdministrationScreen workspace={workspace} online={online} initialView={tenantAdministrationView} onBack={() => setTab("workspace")} onRefresh={refreshTenantAdministrationWorkspace} onNotice={setNotice} />}
-      {tab === "actions" && <ActionCenterScreen workspace={workspace} ownerKey={ownerKey} online={online} view={actionCenterView} onViewChange={setActionCenterView} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} onOpenNativeTarget={openNativeTarget} onReadNotification={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
+      {tab === "actions" && <ActionCenterScreen workspace={workspace} ownerKey={ownerKey} online={online} view={actionCenterView} initialRecordId={nativeActionId} onViewChange={setActionCenterView} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} onOpenNativeTarget={openNativeTarget} onReadNotification={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
       {tab === "settings" && <SettingsScreen workspace={workspace} pending={pending} signingOut={signingOut} releaseStatus={releaseStatus} systemHealth={systemHealth} verifiedAt={verifiedAt} onRefreshDiagnostics={() => { void refreshDiagnostics().catch((error) => setNotice(`Diagnostics refresh paused: ${messageOf(error)}`)); }} onEnablePush={async () => { setBusy(true); try { setNotice(await registerForMobilePush()); } catch (error) { setNotice(messageOf(error)); } finally { setBusy(false); } }} onLogout={async () => { if (signingOut) return; setSigningOut(true); setNotice("Signing out securely…"); let remoteRevokeFailed = false; try { await logoutMobileSession(); } catch { remoteRevokeFailed = true; } try { await clearWorkspaceCache(ownerKey); } finally { setWorkspace(null); setVerifiedAt(null); setPending(0); setTab("home"); setNotice(remoteRevokeFailed ? "You have signed out on this device. The server session could not be reached and will expire automatically." : "You have signed out securely. Your protected workspace is no longer available on this device session."); setAuthState("signed-out"); setSigningOut(false); } }} />}
       {signingOut ? <View style={styles.blockingOverlay}><ActivityIndicator size="large" color="#67e8f9" /><Text style={styles.blockingTitle}>Signing out securely…</Text><Text style={styles.blockingText}>Revoking this device session and removing the local workspace cache.</Text></View> : null}
       <View style={styles.tabs}>

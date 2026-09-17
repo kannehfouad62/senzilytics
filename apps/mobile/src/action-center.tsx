@@ -36,6 +36,7 @@ export function ActionCenterScreen({
   onViewChange,
   onQueued,
   onSync,
+  initialRecordId = null,
   onReadNotification,
   onOpenNativeTarget,
 }: {
@@ -46,10 +47,13 @@ export function ActionCenterScreen({
   onViewChange: (view: ActionCenterView) => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
+  initialRecordId?: string | null;
   onReadNotification: (id: string) => Promise<void>;
   onOpenNativeTarget: (target: NativeRecordTarget) => void;
 }) {
-  const [selectedCapaId, setSelectedCapaId] = useState<string | null>(null);
+  const [selectedCapaId, setSelectedCapaId] = useState<string | null>(
+    view === "capa" ? initialRecordId : null
+  );
   const selected = (workspace.correctiveActions ?? []).find(
     (action) => action.id === selectedCapaId
   ) ?? null;

@@ -28,6 +28,7 @@ export function ComplianceTrainingScreen({
   ownerKey,
   online,
   initialView,
+  initialRecordId = null,
   onBack,
   onQueued,
   onSync,
@@ -36,14 +37,19 @@ export function ComplianceTrainingScreen({
   ownerKey: string;
   online: boolean;
   initialView: ComplianceTrainingView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
 }) {
   const [view, setView] = useState<ComplianceTrainingView>(initialView);
   const [query, setQuery] = useState("");
-  const [selectedOccurrenceId, setSelectedOccurrenceId] = useState<string | null>(null);
-  const [selectedTrainingId, setSelectedTrainingId] = useState<string | null>(null);
+  const [selectedOccurrenceId, setSelectedOccurrenceId] = useState<string | null>(
+    initialView === "calendar" ? initialRecordId : null
+  );
+  const [selectedTrainingId, setSelectedTrainingId] = useState<string | null>(
+    initialView === "training" ? initialRecordId : null
+  );
   const complianceOccurrences = workspace.complianceOccurrences ?? [];
   const trainingAssignments = workspace.trainingAssignments ?? [];
   const capabilities = workspace.complianceTrainingCapabilities ?? {

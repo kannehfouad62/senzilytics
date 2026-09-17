@@ -39,6 +39,7 @@ type Props = {
   ownerKey: string;
   online: boolean;
   initialView: ComplianceDocumentView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onRefresh: () => Promise<MobileBootstrap>;
   onNotice: (message: string) => void;
@@ -118,7 +119,7 @@ function ComplianceWorkspace(props: Props) {
   const [mode, setMode] = useState<"obligations" | "permits">("obligations");
   const [selectedObligationId, setSelectedObligationId] = useState<
     string | null
-  >(null);
+  >(props.initialView === "compliance" ? (props.initialRecordId ?? null) : null);
   const [selectedPermitId, setSelectedPermitId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const metrics = props.workspace.complianceDocumentMetrics;
@@ -465,7 +466,9 @@ function PermitDetail({
 function DocumentWorkspace(props: Props) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    props.initialView === "documents" ? (props.initialRecordId ?? null) : null
+  );
   const [cachedIds, setCachedIds] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
   const [uploadFile, setUploadFile] = useState<SelectedEvidence | null>(null);
