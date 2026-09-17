@@ -119,3 +119,39 @@ test("store submission metadata matches the native release candidate", async () 
   assert.match(googleWorksheet, versionPattern);
   assert.match(playListing, versionPattern);
 });
+
+test("Expo plist parsing keeps each XML parser on its compatible patched line", async () => {
+  const [mobilePackageText, mobileLockText] = await Promise.all([
+    readFile(
+      new URL("../apps/mobile/package.json", import.meta.url),
+      "utf8"
+    ),
+    readFile(
+      new URL("../apps/mobile/package-lock.json", import.meta.url),
+      "utf8"
+    ),
+  ]);
+  const mobilePackage = JSON.parse(mobilePackageText) as {
+    overrides: Record<string, unknown>;
+  };
+  const mobileLock = JSON.parse(mobileLockText) as {
+    packages: Record<string, { version?: string }>;
+  };
+
+  assert.deepEqual(mobilePackage.overrides["@expo/plist"], {
+    "@xmldom/xmldom": "0.8.15",
+  });
+  assert.deepEqual(mobilePackage.overrides.plist, {
+    "@xmldom/xmldom": "0.9.12",
+  });
+  assert.equal(
+    mobileLock.packages[
+      "node_modules/@expo/plist/node_modules/@xmldom/xmldom"
+    ]?.version,
+    "0.8.15"
+  );
+  assert.equal(
+    mobileLock.packages["node_modules/@xmldom/xmldom"]?.version,
+    "0.9.12"
+  );
+});
