@@ -56,6 +56,7 @@ export function AssetContractorScreen({
   ownerKey,
   online,
   initialView,
+  initialRecordId = null,
   onBack,
   onQueued,
   onSync,
@@ -64,15 +65,20 @@ export function AssetContractorScreen({
   ownerKey: string;
   online: boolean;
   initialView: AssetContractorView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
 }) {
   const [view, setView] = useState<AssetContractorView>(initialView);
   const [query, setQuery] = useState("");
-  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(
+    initialView === "assets" ? initialRecordId : null
+  );
   const [selectedContractorId, setSelectedContractorId] =
-    useState<string | null>(null);
+    useState<string | null>(
+      initialView === "contractors" ? initialRecordId : null
+    );
   const assets = workspace.assets ?? [];
   const contractors = workspace.contractors ?? [];
   const capabilities = workspace.assetContractorCapabilities ?? {
