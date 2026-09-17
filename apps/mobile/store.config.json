@@ -1,14 +1,14 @@
 {
   "configVersion": 0,
   "apple": {
-    "version": "1.1.0",
+    "version": "1.2.0",
     "copyright": "2026 Senzilytics",
     "categories": ["BUSINESS", "PRODUCTIVITY"],
     "info": {
       "en-US": {
         "title": "Senzilytics",
         "subtitle": "EHS Intelligence in the Field",
-        "description": "Senzilytics gives authorized Premium tenant users secure mobile access to environmental, health, safety, ESG, risk, audit, and compliance workflows. Review assigned workflow tasks, execute corrective actions, read notifications, capture observations and incidents, complete assigned inspections and Audits, collect photo or document evidence, complete tenant-configured fields, work through unreliable connectivity, and synchronize protected records with your organization's Senzilytics workspace.\n\nA provisioned Senzilytics Premium tenant account is required. Organization access, roles, permissions, subscription entitlements, account status, and session revocation are enforced by the Senzilytics platform.",
+        "description": "Senzilytics gives authorized Premium tenant users secure native access to environmental, health, safety, ESG, risk, audit-service, research, compliance, employee-performance, and executive workflows. Review assigned tasks, execute corrective actions, capture observations and incidents, complete inspections and Audits, collect governed research responses, review operational intelligence, work through unreliable connectivity, and synchronize protected records with your organization's Senzilytics workspace.\n\nA provisioned Senzilytics Premium tenant account is required. Organization access, roles, permissions, module assignments, subscription entitlements, account status, and session revocation are enforced by the Senzilytics platform.",
         "keywords": [
           "EHS",
           "ESG",
@@ -18,7 +18,7 @@
           "risk",
           "inspection"
         ],
-        "promoText": "Secure EHS intelligence and offline-ready field capture for Senzilytics Premium tenants.",
+        "promoText": "Native, offline-ready operational intelligence for authorized Senzilytics teams.",
         "marketingUrl": "https://www.senzilytics.cloud/",
         "supportUrl": "https://www.senzilytics.cloud/support",
         "privacyPolicyUrl": "https://www.senzilytics.cloud/privacy"

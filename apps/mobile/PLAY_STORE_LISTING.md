@@ -1,4 +1,4 @@
-# Google Play listing — Senzilytics 1.1.0
+# Google Play listing — Senzilytics 1.2.0
 
 ## Store presence
 
@@ -6,13 +6,13 @@
 Senzilytics
 
 **Short description**  
-Secure EHS, ESG, audit, risk and compliance intelligence for field teams.
+Native EHS, ESG, audit, research and compliance intelligence for teams.
 
 **Full description**
 
-Senzilytics gives authorized users of Premium tenant organizations a secure field workspace for environmental, health, safety, ESG, audit, risk and compliance operations.
+Senzilytics gives authorized users of Premium tenant organizations a secure native workspace for environmental, health, safety, ESG, audit-service, research, risk, compliance, employee-performance and executive operations.
 
-Review assigned workflow tasks and alerts, record governed corrective-action progress, capture safety observations and incidents, execute assigned inspections and Audits, collect photo or document evidence, complete organization-configured fields and continue working when connectivity is unreliable. Encrypted offline submissions and evidence synchronize with the correct tenant and user workspace when connectivity returns.
+Review assigned workflow tasks and alerts, record governed corrective-action progress, capture safety observations and incidents, execute assigned inspections and Audits, collect governed research responses, review operational intelligence, complete organization-configured fields and continue working when connectivity is unreliable. Encrypted offline submissions and evidence synchronize with the correct tenant and user workspace when connectivity returns. Operational module navigation remains inside the native app.
 
 Security and governance are built into the experience:
 

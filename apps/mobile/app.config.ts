@@ -9,7 +9,7 @@ const config: ExpoConfig = {
   owner: "senzilytics-app",
   version: releaseMetadata.appVersion,
   platforms: ["ios", "android"],
-  description: "Secure EHS, ESG, risk, audit, and compliance field intelligence for Senzilytics Premium tenants.",
+  description: "Secure native EHS, ESG, audit-service, research, compliance, performance, and executive intelligence for Senzilytics Premium tenants.",
   orientation: "portrait",
   userInterfaceStyle: "dark",
   scheme: "senzilytics",

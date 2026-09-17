@@ -1,6 +1,6 @@
 # Senzilytics mobile store release checklist
 
-Use this checklist for version 1.1.0. Store rules and questionnaire wording change; verify each answer in App Store Connect and Google Play Console at submission time.
+Use this checklist for version 1.2.0. Store rules and questionnaire wording change; verify each answer in App Store Connect and Google Play Console at submission time.
 
 ## Candidate identity and evidence
 
@@ -8,7 +8,8 @@ Use this checklist for version 1.1.0. Store rules and questionnaire wording chan
 - [ ] Confirm the Git working tree is clean before both production builds are queued.
 - [ ] Record the EAS Android build ID, URL and auto-incremented version code.
 - [ ] Record the EAS iOS build ID, URL and auto-incremented build number.
-- [ ] Confirm both binaries were produced from the same commit and version `1.1.0`.
+- [ ] Confirm both binaries were produced from the same commit and version `1.2.0`.
+- [ ] Confirm EAS remote auto-increment produces an iOS build number greater than `11` and a new Android version code.
 - [ ] Attach the release-candidate validation report and build links to the governed `MOBILE_COMPATIBILITY` check.
 - [ ] Attach migration, authenticated smoke, tenant-isolation, cron-heartbeat, backup and rollback evidence to the matching governed checks.
 
@@ -48,7 +49,8 @@ Use this checklist for version 1.1.0. Store rules and questionnaire wording chan
 - [ ] Test small and large phones plus an iPad or iPad simulator.
 - [ ] Sign in, force-close and reopen the app.
 - [ ] Sign out, choose **Use another account**, and verify a second credentials or SSO user can authorize the same device.
-- [ ] Confirm each test role sees only its permitted modules in **Workspace** and can open the corresponding responsive workspace.
+- [ ] Confirm each test role sees only its permitted modules in **Workspace** and every operational module remains inside the native app.
+- [ ] Confirm module cards, Audit Services, Action Center and Executive Command Center contain no operational web-workspace fallback.
 - [ ] Capture an observation offline, restart offline and synchronize after reconnecting.
 - [ ] Capture an incident or near miss offline and verify its tenant, site, reporter, occurrence time and configurable-form answers after synchronization.
 - [ ] Confirm an assigned lead inspector and team member can execute an active inspection offline, including compliant, noncompliant and not-applicable responses.
@@ -73,7 +75,7 @@ Use this checklist for version 1.1.0. Store rules and questionnaire wording chan
 - [ ] Replace a document in the web workspace and verify the native version history and integrity-checked current download are accurate.
 - [ ] Register push on a physical device, deliver a test alert and tap it into the **Alerts** view inside **Actions**.
 - [ ] Test declined notification permission and confirm core app use remains available.
-- [ ] Sign out with and without connectivity and verify protected workspace access is removed.
+- [ ] Sign out with and without connectivity; verify visible progress, a completion message and immediate removal of protected workspace access.
 - [ ] Verify Native Tenant Administration is independently gated by organization, user, workflow, integration-health, and activity-log permissions.
 - [ ] Create and edit a site and department online; confirm offline mode remains read-only and the changes are tenant-scoped.
 - [ ] Invite a user and confirm the 72-hour activation link is delivered by email but never displayed or cached in the app.

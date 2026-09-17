@@ -1,4 +1,4 @@
-# Apple App Store submission worksheet — Senzilytics 1.1.0
+# Apple App Store submission worksheet — Senzilytics 1.2.0
 
 This is an engineering working sheet, not legal advice. Confirm every answer against the final signed binary, production infrastructure, vendor contracts and current App Store Connect wording before submission.
 
@@ -14,7 +14,7 @@ Official references:
 | --- | --- |
 | App name | Senzilytics |
 | Bundle ID | `com.senzilytics.mobile` |
-| Version | `1.1.0` |
+| Version | `1.2.0` |
 | Primary category | Business |
 | Secondary category | Productivity |
 | Privacy Policy URL | `https://www.senzilytics.cloud/privacy` |
@@ -43,7 +43,7 @@ Before submission, verify that the account:
 Copy this into App Store Connect and replace bracketed values. Keep credentials only in App Store Connect.
 
 ```text
-Senzilytics is an enterprise EHS, ESG, audit, risk and compliance field workspace. A provisioned Premium organization account is required; users cannot create accounts or buy subscriptions in the app.
+Senzilytics is an enterprise EHS, ESG, audit-service, research, compliance and performance workspace. A provisioned Premium organization account is required; users cannot create accounts or buy subscriptions in the app.
 
 Review account
 Email: [REVIEW_EMAIL]
@@ -59,6 +59,7 @@ Sign-in steps
 
 Suggested review flow
 - Home: review fictional assigned workflow tasks, CAPAs and workspace metrics.
+- Workspace: open authorized operational modules natively without a web-workspace handoff.
 - Actions: inspect the workflow inbox, record fictional CAPA progress with evidence, and review tenant alerts.
 - Capture: select a fictional site and save a safety observation.
 - Offline behavior: saved records remain encrypted on device and synchronize when connectivity returns.
