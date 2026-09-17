@@ -60,6 +60,16 @@ enum EmployeePerformanceReviewStatus {
   CLOSED
 }
 
+enum SupportAccessStatus {
+  REQUESTED
+  APPROVED
+  ACTIVE
+  COMPLETED
+  DENIED
+  REVOKED
+  EXPIRED
+}
+
 enum IdentityProviderType {
   MICROSOFT_ENTRA
   OKTA
@@ -2419,6 +2429,7 @@ model Organization {
   userModuleAssignments      UserModuleAssignment[]
   employeePerformanceGoals   EmployeePerformanceGoal[]
   employeePerformanceReviews EmployeePerformanceReview[]
+  supportAccessGrants        SupportAccessGrant[]
 
   sites                        Site[]
   users                        User[]
@@ -2623,6 +2634,33 @@ model UserModuleAssignment {
   @@index([assignedById])
 }
 
+model SupportAccessGrant {
+  id              String              @id @default(cuid())
+  organizationId  String
+  requestedById   String
+  approvedById    String?
+  revokedById     String?
+  reason          String
+  moduleKeys      String[]
+  durationMinutes Int
+  status          SupportAccessStatus @default(REQUESTED)
+  requestedAt     DateTime            @default(now())
+  approvedAt      DateTime?
+  expiresAt       DateTime?
+  enteredAt       DateTime?
+  exitedAt        DateTime?
+  revokedAt       DateTime?
+  updatedAt       DateTime            @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestedBy  User         @relation("SupportAccessRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  approvedBy   User?        @relation("SupportAccessApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  revokedBy    User?        @relation("SupportAccessRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, requestedAt])
+  @@index([requestedById, status, expiresAt])
+}
+
 model EmployeePerformanceGoal {
   id             String                        @id @default(cuid())
   organizationId String
@@ -2806,6 +2844,9 @@ model User {
   assignedTenantModules            TenantModuleAssignment[]    @relation("TenantModuleAssignedBy")
   assignedUserModules              UserModuleAssignment[]      @relation("UserModuleAssignmentAssignedBy")
   userModuleAssignments            UserModuleAssignment[]      @relation("UserModuleAssignmentTarget")
+  requestedSupportAccesses         SupportAccessGrant[]        @relation("SupportAccessRequestedBy")
+  approvedSupportAccesses          SupportAccessGrant[]        @relation("SupportAccessApprovedBy")
+  revokedSupportAccesses           SupportAccessGrant[]        @relation("SupportAccessRevokedBy")
   employeePerformanceGoals         EmployeePerformanceGoal[]   @relation("EmployeePerformanceGoalEmployee")
   createdEmployeePerformanceGoals  EmployeePerformanceGoal[]   @relation("EmployeePerformanceGoalCreatedBy")
   employeePerformanceReviews       EmployeePerformanceReview[] @relation("EmployeePerformanceReviewEmployee")

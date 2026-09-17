@@ -14,7 +14,7 @@ export default async function PlatformLayout({
     redirect("/login");
   }
 
-  const { organization } = await getCurrentUserTenant();
+  const { organization, supportAccess } = await getCurrentUserTenant();
 
-  return <AppShell isDemo={organization?.isDemo ?? false}>{children}</AppShell>;
+  return <AppShell isDemo={organization?.isDemo ?? false} supportAccess={supportAccess?.expiresAt ? { organizationName: organization.name, expiresAt: supportAccess.expiresAt } : null}>{children}</AppShell>;
 }

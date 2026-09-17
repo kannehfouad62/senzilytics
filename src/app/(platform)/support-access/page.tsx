@@ -1,0 +1,14 @@
+import { SupportAccessStatus, UserRole } from "@prisma/client";
+import { decideSupportAccess, revokeSupportAccess } from "@/features/platform/support-access.actions";
+import { getPlatformAdministrator } from "@/lib/platform-admin";
+import { getCurrentUserTenant } from "@/lib/tenant";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+
+export default async function TenantSupportAccessPage() {
+  if (await getPlatformAdministrator()) redirect("/platform/support-access");
+  const { organizationId, user } = await getCurrentUserTenant();
+  if (user.role !== UserRole.ORG_ADMIN && user.role !== UserRole.SUPER_ADMIN) redirect("/unauthorized");
+  const grants = await prisma.supportAccessGrant.findMany({ where: { organizationId }, include: { requestedBy: { select: { name: true, email: true } }, approvedBy: { select: { name: true } } }, orderBy: { requestedAt: "desc" }, take: 50 });
+  return <div><p className="text-sm text-cyan-300">Tenant-controlled support</p><h1 className="mt-2 text-4xl font-bold">Senzilytics support access</h1><p className="mt-2 max-w-3xl text-slate-400">Approve only requests you recognize. Access is read-only, time-limited, module-scoped, and attributed to the named Senzilytics administrator. Never share a password.</p><div className="mt-8 space-y-4">{grants.map(grant=><article key={grant.id} className="rounded-3xl border border-white/10 bg-white/5 p-6"><div className="flex flex-wrap justify-between gap-4"><div><p className="font-semibold">{grant.requestedBy.name} · {grant.requestedBy.email}</p><p className="mt-2 text-sm text-slate-300">{grant.reason}</p><p className="mt-3 text-xs text-slate-500">Requested {grant.durationMinutes} minutes · {grant.moduleKeys.join(", ")}</p></div><span className="text-sm text-cyan-300">{grant.status}</span></div>{grant.status===SupportAccessStatus.REQUESTED?<form action={decideSupportAccess} className="mt-5 flex gap-3"><input type="hidden" name="grantId" value={grant.id}/><button name="decision" value="approve" className="rounded-xl bg-emerald-300 px-4 py-2 font-semibold text-slate-950">Approve request</button><button name="decision" value="deny" className="rounded-xl border border-red-400/30 px-4 py-2 text-red-200">Deny</button></form>:null}{[SupportAccessStatus.APPROVED,SupportAccessStatus.ACTIVE].includes(grant.status as never)?<form action={revokeSupportAccess} className="mt-5"><input type="hidden" name="grantId" value={grant.id}/><button className="rounded-xl border border-amber-400/30 px-4 py-2 text-amber-200">Revoke access now</button></form>:null}{grant.expiresAt&&<p className="mt-4 text-xs text-slate-500">Approval expires {grant.expiresAt.toLocaleString()}</p>}</article>)}{!grants.length&&<p className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-slate-500">No support-access requests have been submitted.</p>}</div></div>;
+}

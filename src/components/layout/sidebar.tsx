@@ -56,6 +56,7 @@ import {
   PanelsTopLeft,
   BriefcaseBusiness,
   UserRoundCheck,
+  LifeBuoy,
 } from "lucide-react";
 
 export type NavigationItem = {
@@ -192,6 +193,12 @@ export const primaryNavItems: NavigationItem[] = [
     href: "/users",
     icon: Users,
     permission: PermissionKey.VIEW_USERS,
+  },
+  {
+    label: "Support Access",
+    href: "/support-access",
+    icon: LifeBuoy,
+    permission: PermissionKey.MANAGE_ORGANIZATION,
   },
 ];
 
@@ -482,6 +489,11 @@ export async function Sidebar() {
           label: "Platform Operations",
           href: "/platform/operations",
           icon: ServerCog,
+        },
+        {
+          label: "Support Access Console",
+          href: "/platform/support-access",
+          icon: LifeBuoy,
         },
         {
           label: "Release Certification",

@@ -8,6 +8,7 @@ import {
   Search,
   ServerCog,
   Sparkles,
+  LifeBuoy,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -143,6 +144,11 @@ export async function Topbar() {
             label: "Platform Operations",
             href: "/platform/operations",
             icon: ServerCog,
+          },
+          {
+            label: "Support Access Console",
+            href: "/platform/support-access",
+            icon: LifeBuoy,
           },
         ]
       : currentUser?.role === UserRole.DEMO_VIEWER
