@@ -31,7 +31,6 @@ export function ActionCenterScreen({
   onViewChange,
   onQueued,
   onSync,
-  onOpenPath,
   onReadNotification,
 }: {
   workspace: MobileBootstrap;
@@ -41,7 +40,6 @@ export function ActionCenterScreen({
   onViewChange: (view: ActionCenterView) => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
-  onOpenPath: (path: string) => Promise<void>;
   onReadNotification: (id: string) => Promise<void>;
 }) {
   const [selectedCapaId, setSelectedCapaId] = useState<string | null>(null);
@@ -67,7 +65,6 @@ export function ActionCenterScreen({
         onBack={() => setSelectedCapaId(null)}
         onQueued={onQueued}
         onSync={onSync}
-        onOpenPath={onOpenPath}
       />
     );
   }
@@ -111,7 +108,7 @@ export function ActionCenterScreen({
       </View>
 
       {view === "tasks" ? (
-        <TaskInbox workspace={workspace} online={online} onOpenPath={onOpenPath} />
+        <TaskInbox workspace={workspace} />
       ) : null}
       {view === "capa" ? (
         <CapaInbox
@@ -123,7 +120,6 @@ export function ActionCenterScreen({
         <AlertInbox
           workspace={workspace}
           online={online}
-          onOpenPath={onOpenPath}
           onRead={onReadNotification}
         />
       ) : null}
@@ -133,12 +129,8 @@ export function ActionCenterScreen({
 
 function TaskInbox({
   workspace,
-  online,
-  onOpenPath,
 }: {
   workspace: MobileBootstrap;
-  online: boolean;
-  onOpenPath: (path: string) => Promise<void>;
 }) {
   if (!workspace.tasks.length) {
     return <Empty text="No active workflow steps are assigned to you." />;
@@ -159,13 +151,7 @@ function TaskInbox({
                 ? `${overdue ? "Overdue" : "Due"} ${formatDate(task.dueAt)}`
                 : "No due date"}
             </Text>
-            <SecondaryButton
-              label={online ? "Open assigned record" : "Connection required"}
-              disabled={!online}
-              onPress={() => {
-                void onOpenPath(task.href || "/tasks");
-              }}
-            />
+            <Text style={styles.fieldHelp}>Assignment details are available here in the native inbox. Related native execution appears in its authorized module.</Text>
           </Card>
         );
       })}
@@ -249,7 +235,6 @@ function CapaEditor({
   onBack,
   onQueued,
   onSync,
-  onOpenPath,
 }: {
   action: MobileCorrectiveAction;
   workspace: MobileBootstrap;
@@ -258,7 +243,6 @@ function CapaEditor({
   onBack: () => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
-  onOpenPath: (path: string) => Promise<void>;
 }) {
   const capabilities = workspace.capaCapabilities;
   const [status, setStatus] = useState<MobileCorrectiveActionStatus>(
@@ -344,13 +328,7 @@ function CapaEditor({
         <Text style={styles.muted}>
           {action.source.type}: {action.source.label}
         </Text>
-        <SecondaryButton
-          label={online ? "Open source record" : "Connection required"}
-          disabled={!online}
-          onPress={() => {
-            void onOpenPath(action.source.href);
-          }}
-        />
+        <Text style={styles.fieldHelp}>Source traceability is retained in this native record without opening a web workspace.</Text>
       </Card>
       {canEdit ? (
         <Card accent>
@@ -416,12 +394,10 @@ function CapaEditor({
 function AlertInbox({
   workspace,
   online,
-  onOpenPath,
   onRead,
 }: {
   workspace: MobileBootstrap;
   online: boolean;
-  onOpenPath: (path: string) => Promise<void>;
   onRead: (id: string) => Promise<void>;
 }) {
   if (!workspace.notifications.length) {
@@ -447,15 +423,7 @@ function AlertInbox({
                 }}
               />
             ) : null}
-            {item.link ? (
-              <SecondaryButton
-                label={online ? "Open record" : "Connection required"}
-                disabled={!online}
-                onPress={() => {
-                  void onOpenPath(item.link!);
-                }}
-              />
-            ) : null}
+            {item.link ? <Text style={styles.fieldHelp}>The linked record remains available through its native module.</Text> : null}
           </View>
         </Card>
       ))}

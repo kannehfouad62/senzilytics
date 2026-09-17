@@ -29,7 +29,6 @@ type Props = {
   onBack: () => void;
   onRefresh: () => Promise<MobileBootstrap>;
   onNotice: (message: string) => void;
-  onOpenPath: (path: string) => Promise<void>;
 };
 
 const useCases = [
@@ -91,20 +90,16 @@ export function ExecutiveCommandScreen(props: Props) {
         ))}
       </View>
       {view === "overview" ? (
-        <Overview workspace={props.workspace} onOpenPath={props.onOpenPath} />
+        <Overview workspace={props.workspace} />
       ) : null}
       {view === "assurance" ? (
         <Assurance
           assurance={props.workspace.operationalAssurance}
-          online={props.online}
-          onOpenPath={props.onOpenPath}
         />
       ) : null}
       {view === "reports" ? (
         <Reports
           report={props.workspace.executiveReport}
-          online={props.online}
-          onOpenPath={props.onOpenPath}
         />
       ) : null}
       {view === "ai" ? (
@@ -117,13 +112,7 @@ export function ExecutiveCommandScreen(props: Props) {
   );
 }
 
-function Overview({
-  workspace,
-  onOpenPath,
-}: {
-  workspace: MobileBootstrap;
-  onOpenPath: (path: string) => Promise<void>;
-}) {
+function Overview({ workspace }: { workspace: MobileBootstrap }) {
   const dashboard = workspace.executiveDashboard;
   const portfolio = workspace.executivePortfolio;
   if (!dashboard || !portfolio) {
@@ -171,12 +160,9 @@ function Overview({
         detail="Cross-module exposure ranked for leadership attention"
       >
         {portfolio.modules.map((module) => (
-          <Pressable
+          <View
             key={module.label}
             style={styles.listCard}
-            onPress={() => {
-              void onOpenPath(module.href);
-            }}
           >
             <View style={styles.listHeading}>
               <View style={styles.flexCopy}>
@@ -185,18 +171,15 @@ function Overview({
               </View>
               <Status value={String(module.value)} tone={module.tone} />
             </View>
-          </Pressable>
+          </View>
         ))}
       </Section>
 
       <Section title="Recent incidents" detail="Latest reported events">
         {dashboard.recentIncidents.map((incident) => (
-          <Pressable
+          <View
             key={incident.id}
             style={styles.listCard}
-            onPress={() => {
-              void onOpenPath(`/incidents/${incident.id}`);
-            }}
           >
             <View style={styles.listHeading}>
               <View style={styles.flexCopy}>
@@ -210,7 +193,7 @@ function Overview({
                 tone={riskTone(incident.riskLevel)}
               />
             </View>
-          </Pressable>
+          </View>
         ))}
         {!dashboard.recentIncidents.length ? (
           <Empty text="No incidents were reported in this tenant." />
@@ -222,20 +205,15 @@ function Overview({
         detail="Immediate ownership attention"
       >
         {dashboard.overdueActions.map((action) => (
-          <Pressable
+          <View
             key={action.id}
             style={[styles.listCard, styles.dangerCard]}
-            onPress={() => {
-              void onOpenPath(
-                action.incident ? `/incidents/${action.incident.id}` : "/actions"
-              );
-            }}
           >
             <Text style={styles.cardTitle}>{action.title}</Text>
             <Text style={styles.muted}>
               {action.assignedTo.name} · due {formatDate(action.dueDate)}
             </Text>
-          </Pressable>
+          </View>
         ))}
         {!dashboard.overdueActions.length ? (
           <Empty text="No overdue corrective actions require attention." />
@@ -247,12 +225,8 @@ function Overview({
 
 function Assurance({
   assurance,
-  online,
-  onOpenPath,
 }: {
   assurance: MobileOperationalAssurance | null;
-  online: boolean;
-  onOpenPath: (path: string) => Promise<void>;
 }) {
   if (!assurance) {
     return <Empty text="Operational Assurance access is not assigned to this role." />;
@@ -274,16 +248,12 @@ function Assurance({
         detail="Permission-filtered evidence requiring management attention"
       >
         {assurance.signals.map((signal) => (
-          <Pressable
+          <View
             key={signal.id}
             style={[
               styles.listCard,
               signal.severity === "CRITICAL" && styles.dangerCard,
             ]}
-            disabled={!online}
-            onPress={() => {
-              void onOpenPath(signal.href);
-            }}
           >
             <View style={styles.listHeading}>
               <View style={styles.flexCopy}>
@@ -299,7 +269,7 @@ function Assurance({
                 tone={riskTone(signal.severity)}
               />
             </View>
-          </Pressable>
+          </View>
         ))}
         {!assurance.signals.length ? (
           <Empty text="No elevated connected-risk signals are visible to this role." />
@@ -310,13 +280,9 @@ function Assurance({
         detail="Traceable links between governed records"
       >
         {assurance.connections.map((connection) => (
-          <Pressable
+          <View
             key={connection.label}
             style={styles.listCard}
-            disabled={!online}
-            onPress={() => {
-              void onOpenPath(connection.href);
-            }}
           >
             <View style={styles.listHeading}>
               <View style={styles.flexCopy}>
@@ -325,7 +291,7 @@ function Assurance({
               </View>
               <Text style={styles.largeValue}>{connection.count}</Text>
             </View>
-          </Pressable>
+          </View>
         ))}
       </Section>
     </>
@@ -334,12 +300,8 @@ function Assurance({
 
 function Reports({
   report,
-  online,
-  onOpenPath,
 }: {
   report: MobileExecutiveReport | null;
-  online: boolean;
-  onOpenPath: (path: string) => Promise<void>;
 }) {
   if (!report) {
     return <Empty text="Executive reporting access is not assigned to this role." />;
@@ -409,13 +371,9 @@ function Reports({
         detail="Highest-priority records in the reporting period"
       >
         {report.managementAttention.map((item) => (
-          <Pressable
+          <View
             key={`${item.type}:${item.id}`}
             style={styles.listCard}
-            disabled={!online}
-            onPress={() => {
-              void onOpenPath(item.link);
-            }}
           >
             <View style={styles.listHeading}>
               <View style={styles.flexCopy}>
@@ -434,7 +392,7 @@ function Reports({
                 />
               ) : null}
             </View>
-          </Pressable>
+          </View>
         ))}
         {!report.managementAttention.length ? (
           <Empty text="No records require management attention in this period." />
@@ -671,20 +629,16 @@ function AnalysisDetail(
         detail="Captured evidence available when this analysis was generated"
       >
         {props.analysis.sources.map((source) => (
-          <Pressable
+          <View
             key={source.sourceKey}
             style={styles.listCard}
-            disabled={!props.online}
-            onPress={() => {
-              void props.onOpenPath(source.href);
-            }}
           >
             <Text style={styles.eyebrow}>
               {source.sourceKey} · {source.module}
             </Text>
             <Text style={styles.cardTitle}>{source.title}</Text>
             <Text style={styles.muted}>{source.summary}</Text>
-          </Pressable>
+          </View>
         ))}
       </Section>
       {props.analysis.status === "PENDING_REVIEW" &&
