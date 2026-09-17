@@ -39,6 +39,7 @@ type Props = {
   ownerKey: string;
   online: boolean;
   initialView: ComplianceDocumentView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onRefresh: () => Promise<MobileBootstrap>;
   onNotice: (message: string) => void;
