@@ -64,6 +64,10 @@ import {
   type TenantAdministrationView,
 } from "./src/tenant-administration";
 import {
+  resolveNativeRecordTarget,
+  type NativeRecordTarget,
+} from "./src/native-routing";
+import {
   capturePhotoEvidence,
   MAX_EVIDENCE_FILES_PER_RECORD,
   pickEvidenceFiles,
@@ -144,6 +148,9 @@ function SenzilyticsApp() {
   const [tenantAdministrationView, setTenantAdministrationView] =
     useState<TenantAdministrationView>("organization");
   const [captureMode, setCaptureMode] = useState<CaptureMode>("observation");
+  const [nativeInspectionId, setNativeInspectionId] = useState<string | null>(null);
+  const [nativeAuditId, setNativeAuditId] = useState<string | null>(null);
+  const [nativeResearchId, setNativeResearchId] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
   const [busy, setBusy] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -343,11 +350,72 @@ function SenzilyticsApp() {
     );
   }, [online, refreshDiagnostics, tab]);
 
-  useEffect(() => subscribeToMobileNotificationResponses(() => {
-    setActionCenterView("alerts");
-    setTab("actions");
+  const openNativeTarget = useCallback((target: NativeRecordTarget) => {
+    switch (target.tab) {
+      case "capture":
+        if (target.recordId) {
+          setNotice("This linked record does not have an existing-record native view.");
+          return;
+        }
+        setCaptureMode(target.view);
+        setTab("capture");
+        break;
+      case "actions":
+        setActionCenterView(target.view);
+        setTab("actions");
+        break;
+      case "audits":
+        setNativeAuditId(target.recordId ?? null);
+        setTab("audits");
+        break;
+      case "inspections":
+        setNativeInspectionId(target.recordId ?? null);
+        setTab("inspections");
+        break;
+      case "research":
+        setNativeResearchId(target.recordId ?? null);
+        setTab("research");
+        break;
+      case "risks":
+        setRiskFieldView(target.view);
+        setTab("risks");
+        break;
+      case "governance":
+        setComplianceTrainingView(target.view);
+        setTab("governance");
+        break;
+      case "complianceDocuments":
+        setComplianceDocumentView(target.view);
+        setTab("complianceDocuments");
+        break;
+      case "controlledWork":
+        setMocPermitView(target.view);
+        setTab("controlledWork");
+        break;
+      case "assetContractors":
+        setAssetContractorView(target.view);
+        setTab("assetContractors");
+        break;
+      case "chemicalEnvironmental":
+        setChemicalEnvironmentalView(target.view);
+        setTab("chemicalEnvironmental");
+        break;
+      case "behaviorAssurance":
+        setBehaviorAssuranceView(target.view);
+        setTab("behaviorAssurance");
+        break;
+    }
+  }, []);
+
+  useEffect(() => subscribeToMobileNotificationResponses(({ link }) => {
+    const target = resolveNativeRecordTarget(link);
+    if (target) openNativeTarget(target);
+    else {
+      setActionCenterView("alerts");
+      setTab("actions");
+    }
     if (authState === "signed-in" && online) void refreshWorkspace().catch((error) => setNotice(`Notification refresh paused: ${messageOf(error)}`));
-  }), [authState, online, refreshWorkspace]);
+  }), [authState, online, openNativeTarget, refreshWorkspace]);
 
   useEffect(() => {
     if (authState !== "signed-in" || verifiedAt === null) return;
@@ -396,10 +464,10 @@ function SenzilyticsApp() {
       {tab === "home" && <HomeScreen workspace={workspace} pending={pending} busy={busy} onRefresh={async () => { try { return await refreshWorkspace(); } catch (error) { setNotice(`Refresh paused: ${messageOf(error)}`); return workspace; } }} onSync={sync} onNavigate={setTab} onOpenActions={(view) => { setActionCenterView(view); setTab("actions"); }} />}
       {tab === "workspace" && <WorkspaceScreen modules={workspace.modules ?? []} online={online} onCapture={(mode) => { setCaptureMode(mode); setTab("capture"); }} onInspect={() => setTab("inspections")} onAudit={() => setTab("audits")} onAuditServices={() => setTab("auditServices")} onResearch={() => setTab("research")} onRisk={(view) => { setRiskFieldView(view); setTab("risks"); }} onGovernance={(view) => { setComplianceTrainingView(view); setTab("governance"); }} onComplianceDocuments={(view) => { setComplianceDocumentView(view); setTab("complianceDocuments"); }} onControlledWork={(view) => { setMocPermitView(view); setTab("controlledWork"); }} onAssetContractor={(view) => { setAssetContractorView(view); setTab("assetContractors"); }} onHygieneHealth={(view) => { setHygieneHealthView(view); setTab("hygieneHealth"); }} onChemicalEnvironmental={(view) => { setChemicalEnvironmentalView(view); setTab("chemicalEnvironmental"); }} onEsg={(view) => { setEsgView(view); setTab("esg"); }} onBehaviorAssurance={(view) => { setBehaviorAssuranceView(view); setTab("behaviorAssurance"); }} onRegulatory={() => setTab("regulatory")} onExecutive={(view) => { setExecutiveCommandView(view); setTab("executive"); if (online) void refreshExecutiveWorkspace().catch((error) => setNotice(`Executive refresh paused: ${messageOf(error)}`)); }} onAdministration={(view) => { setTenantAdministrationView(view); setTab("administration"); if (online) void refreshTenantAdministrationWorkspace().catch((error) => setNotice(`Administration refresh paused: ${messageOf(error)}`)); }} onActions={(view) => { setActionCenterView(view); setTab("actions"); }} />}
       {tab === "capture" && <CaptureScreen mode={captureMode} onModeChange={setCaptureMode} workspace={workspace} ownerKey={ownerKey} online={online} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "inspections" && <InspectionsScreen inspections={workspace.inspections ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "audits" && <AuditsScreen audits={workspace.audits ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "inspections" && <InspectionsScreen inspections={workspace.inspections ?? []} initialRecordId={nativeInspectionId} ownerKey={ownerKey} online={online} onBack={() => { setNativeInspectionId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "audits" && <AuditsScreen audits={workspace.audits ?? []} initialRecordId={nativeAuditId} ownerKey={ownerKey} online={online} onBack={() => { setNativeAuditId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "auditServices" && <AuditServicesScreen workspace={workspace} online={online} onBack={() => setTab("workspace")} onRefresh={refreshWorkspace} onNotice={setNotice} />}
-      {tab === "research" && <ResearchFieldworkScreen assignments={workspace.researchFieldworkAssignments ?? []} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "research" && <ResearchFieldworkScreen assignments={workspace.researchFieldworkAssignments ?? []} initialRecordId={nativeResearchId} ownerKey={ownerKey} online={online} onBack={() => { setNativeResearchId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "risks" && <RiskFieldScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={riskFieldView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "governance" && <ComplianceTrainingScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={complianceTrainingView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "complianceDocuments" && <ComplianceDocumentsScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={complianceDocumentView} onBack={() => setTab("workspace")} onRefresh={refreshWorkspace} onNotice={setNotice} />}
@@ -412,7 +480,7 @@ function SenzilyticsApp() {
       {tab === "regulatory" && <RegulatoryIntelligenceScreen workspace={workspace} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "executive" && <ExecutiveCommandScreen workspace={workspace} online={online} initialView={executiveCommandView} onBack={() => setTab("workspace")} onRefresh={refreshExecutiveWorkspace} onNotice={setNotice} />}
       {tab === "administration" && <TenantAdministrationScreen workspace={workspace} online={online} initialView={tenantAdministrationView} onBack={() => setTab("workspace")} onRefresh={refreshTenantAdministrationWorkspace} onNotice={setNotice} />}
-      {tab === "actions" && <ActionCenterScreen workspace={workspace} ownerKey={ownerKey} online={online} view={actionCenterView} onViewChange={setActionCenterView} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} onReadNotification={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
+      {tab === "actions" && <ActionCenterScreen workspace={workspace} ownerKey={ownerKey} online={online} view={actionCenterView} onViewChange={setActionCenterView} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} onOpenNativeTarget={openNativeTarget} onReadNotification={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
       {tab === "settings" && <SettingsScreen workspace={workspace} pending={pending} signingOut={signingOut} releaseStatus={releaseStatus} systemHealth={systemHealth} verifiedAt={verifiedAt} onRefreshDiagnostics={() => { void refreshDiagnostics().catch((error) => setNotice(`Diagnostics refresh paused: ${messageOf(error)}`)); }} onEnablePush={async () => { setBusy(true); try { setNotice(await registerForMobilePush()); } catch (error) { setNotice(messageOf(error)); } finally { setBusy(false); } }} onLogout={async () => { if (signingOut) return; setSigningOut(true); setNotice("Signing out securely…"); let remoteRevokeFailed = false; try { await logoutMobileSession(); } catch { remoteRevokeFailed = true; } try { await clearWorkspaceCache(ownerKey); } finally { setWorkspace(null); setVerifiedAt(null); setPending(0); setTab("home"); setNotice(remoteRevokeFailed ? "You have signed out on this device. The server session could not be reached and will expire automatically." : "You have signed out securely. Your protected workspace is no longer available on this device session."); setAuthState("signed-out"); setSigningOut(false); } }} />}
       {signingOut ? <View style={styles.blockingOverlay}><ActivityIndicator size="large" color="#67e8f9" /><Text style={styles.blockingTitle}>Signing out securely…</Text><Text style={styles.blockingText}>Revoking this device session and removing the local workspace cache.</Text></View> : null}
       <View style={styles.tabs}>
@@ -558,8 +626,8 @@ function WorkspaceScreen({ modules, online, onCapture, onInspect, onAudit, onAud
   );
 }
 
-function ResearchFieldworkScreen({ assignments, ownerKey, online, onBack, onQueued, onSync }: { assignments: MobileResearchFieldworkAssignment[]; ownerKey: string; online: boolean; onBack: () => void; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+function ResearchFieldworkScreen({ assignments, initialRecordId = null, ownerKey, online, onBack, onQueued, onSync }: { assignments: MobileResearchFieldworkAssignment[]; initialRecordId?: string | null; ownerKey: string; online: boolean; onBack: () => void; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
+  const [selectedId, setSelectedId] = useState<string | null>(initialRecordId);
   const selected = assignments.find((item) => item.id === selectedId) ?? null;
   if (!selected) return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><SecondaryButton label="← Back to workspace" onPress={onBack} /><Text style={styles.eyebrow}>{online ? "ASSIGNED INTERVIEWS" : "OFFLINE INTERVIEWS"}</Text><Text style={styles.pageTitle}>Research fieldwork</Text><Text style={styles.muted}>Only sample units assigned to you from an active, governed sampling execution are stored on this device.</Text>{assignments.length ? assignments.map((assignment) => <Card key={assignment.id} accent><Text style={styles.cardTitle}>{assignment.unitReference}</Text><Text style={styles.muted}>{assignment.project.reference} · {assignment.project.title}</Text><Text style={styles.due}>{assignment.status.replaceAll("_", " ")}{assignment.dueAt ? ` · Due ${formatDate(assignment.dueAt)}` : ""}</Text><Text style={styles.fieldHelp}>{assignment.stratum ? `Stratum: ${assignment.stratum}` : "No stratum"}{assignment.cluster ? ` · Cluster: ${assignment.cluster}` : ""} · {assignment.collections.length} active questionnaire{assignment.collections.length === 1 ? "" : "s"}</Text><PrimaryButton label={assignment.collections.length ? "Open interview" : "No active collection"} disabled={!assignment.collections.length} onPress={() => setSelectedId(assignment.id)} /></Card>) : <EmptyState text="No active sample units are assigned to you. Connect to refresh or ask the research manager to assign fieldwork." />}</ScrollView>;
   return <ResearchInterviewEditor key={selected.id} assignment={selected} ownerKey={ownerKey} online={online} onBack={() => setSelectedId(null)} onQueued={onQueued} onSync={onSync} />;
@@ -700,8 +768,8 @@ function IncidentCaptureScreen({ workspace, ownerKey, online, onQueued, onSync }
   return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><Text style={styles.eyebrow}>{online ? "ONLINE" : "OFFLINE READY"}</Text><Text style={styles.pageTitle}>Report incident</Text><Text style={styles.muted}>Record an injury, near miss, environmental event, property damage, or other reportable event at the point of work.</Text><FieldLabel text="Site *" /><ChipGroup values={workspace.sites.map((site) => ({ value: site.id, label: site.name }))} selected={siteId} onSelect={setSiteId} /><FieldLabel text="Title *" /><Input value={title} onChangeText={setTitle} placeholder="Brief incident or near-miss title" /><FieldLabel text="Description *" /><Input value={description} onChangeText={setDescription} placeholder="Describe what happened and the immediate conditions" multiline /><FieldLabel text="Incident type" /><ChipGroup values={incidentTypes.map((value) => ({ value, label: humanize(value) }))} selected={type} onSelect={(value) => setType(value as IncidentPayload["type"])} /><FieldLabel text="Risk level" /><ChipGroup values={riskLevels.map((value) => ({ value, label: humanize(value) }))} selected={riskLevel} onSelect={(value) => setRiskLevel(value as IncidentPayload["riskLevel"])} /><FieldLabel text="Location" /><Input value={location} onChangeText={setLocation} placeholder="Area, building, vehicle, or equipment" /><EvidenceAttachmentPicker value={evidence} onChange={setEvidence} label="Incident evidence" />{(workspace.incidentForms ?? []).map((form) => <DynamicForm key={form.id} form={form} answers={answers} setAnswers={setAnswers} />)}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : online ? "Save and synchronize" : "Save offline"} disabled={saving} onPress={save} /></ScrollView></KeyboardAvoidingView>;
 }
 
-function InspectionsScreen({ inspections, ownerKey, online, onBack, onQueued, onSync }: { inspections: MobileInspection[]; ownerKey: string; online: boolean; onBack: () => void; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+function InspectionsScreen({ inspections, initialRecordId = null, ownerKey, online, onBack, onQueued, onSync }: { inspections: MobileInspection[]; initialRecordId?: string | null; ownerKey: string; online: boolean; onBack: () => void; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
+  const [selectedId, setSelectedId] = useState<string | null>(initialRecordId);
   const selected = inspections.find((inspection) => inspection.id === selectedId) ?? null;
   if (!selected) {
     return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><SecondaryButton label="← Back to workspace" onPress={onBack} /><Text style={styles.eyebrow}>{online ? "ASSIGNED FIELD WORK" : "OFFLINE ASSIGNMENTS"}</Text><Text style={styles.pageTitle}>My inspections</Text><Text style={styles.muted}>Only active inspections assigned to you as lead inspector or team member are stored on this device.</Text>{inspections.length ? inspections.map((inspection) => { const answered = inspection.checklistItems.filter((item) => item.response && item.response.result !== "NOT_ASSESSED").length; return <Card key={inspection.id} accent><Text style={styles.cardTitle}>{inspection.title}</Text><Text style={styles.muted}>{inspection.site.name}{inspection.area ? ` · ${inspection.area}` : ""}</Text><Text style={styles.due}>{answered} of {inspection.checklistItems.length} questions answered{inspection.dueDate ? ` · Due ${formatDate(inspection.dueDate)}` : ""}</Text><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${inspection.checklistItems.length ? Math.round((answered / inspection.checklistItems.length) * 100) : 0}%` }]} /></View><PrimaryButton label={answered ? "Continue inspection" : "Start inspection"} onPress={() => setSelectedId(inspection.id)} /></Card>; }) : <EmptyState text="No active inspections are assigned to you. Connect to refresh assignments or ask an inspection manager to add you to the team." />}</ScrollView>;
@@ -767,8 +835,8 @@ function InspectionItemEditor({ inspectionId, item, ownerKey, online, onQueued, 
   return <Card accent={queued || Boolean(item.response)}><Text style={styles.questionNumber}>Question {item.sequence}</Text><Text style={styles.cardTitle}>{item.questionText}{item.isRequired ? " *" : ""}</Text>{item.guidance ? <Text style={styles.fieldHelp}>{item.guidance}</Text> : null}<FieldLabel text="Result" /><ChipGroup values={[{ value: "COMPLIANT", label: item.questionType === "YES_NO" ? "Yes / compliant" : "Compliant" }, { value: "NON_COMPLIANT", label: item.questionType === "YES_NO" ? "No / noncompliant" : "Noncompliant" }, { value: "NOT_APPLICABLE", label: "Not applicable" }]} selected={result} onSelect={(value) => { setResult(value as InspectionResponsePayload["result"]); if (value !== "NON_COMPLIANT") setCreateFinding(false); }} />{item.questionType === "TEXT" ? <><FieldLabel text="Response" /><Input value={responseText} onChangeText={setResponseText} placeholder="Enter the inspection response" multiline /></> : null}{item.questionType === "NUMBER" ? <><FieldLabel text="Numeric response" /><Input value={numericValue} onChangeText={setNumericValue} placeholder="Enter a number" keyboardType="decimal-pad" /></> : null}{item.questionType === "PHOTO" ? <Text style={styles.fieldHelp}>This verification requires a photo captured or selected below.</Text> : null}<FieldLabel text="Comments" /><Input value={comments} onChangeText={setComments} placeholder="Evidence, conditions, or follow-up notes" multiline /><EvidenceAttachmentPicker value={evidence} onChange={setEvidence} label={item.questionType === "PHOTO" ? "Photo evidence *" : "Inspection evidence"} />{result === "NON_COMPLIANT" ? <><Pressable style={styles.checkRow} onPress={() => setCreateFinding((value) => !value)}><View style={[styles.checkbox, createFinding && styles.checkboxOn]}>{createFinding ? <Text style={styles.checkmark}>✓</Text> : null}</View><Text style={styles.checkLabel}>Create a linked inspection finding</Text></Pressable>{createFinding ? <View style={styles.findingPanel}><FieldLabel text="Finding title" /><Input value={findingTitle} onChangeText={setFindingTitle} placeholder={`Noncompliance: ${item.questionText}`} /><FieldLabel text="Finding description" /><Input value={findingDescription} onChangeText={setFindingDescription} placeholder="Describe the deficiency and objective evidence" multiline /><FieldLabel text="Risk level" /><ChipGroup values={riskLevels.map((value) => ({ value, label: humanize(value) }))} selected={findingRiskLevel} onSelect={(value) => setFindingRiskLevel(value as NonNullable<InspectionResponsePayload["findingRiskLevel"]>)} /><FieldLabel text="Due date" /><Input value={findingDueDate} onChangeText={setFindingDueDate} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View> : null}</> : null}{queued ? <Text style={styles.successText}>Saved to the encrypted synchronization queue.</Text> : null}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Saving securely…" : item.response ? "Save updated response" : "Save response"} disabled={saving} onPress={save} /></Card>;
 }
 
-function AuditsScreen({ audits, ownerKey, online, onBack, onQueued, onSync }: { audits: MobileAudit[]; ownerKey: string; online: boolean; onBack: () => void; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+function AuditsScreen({ audits, initialRecordId = null, ownerKey, online, onBack, onQueued, onSync }: { audits: MobileAudit[]; initialRecordId?: string | null; ownerKey: string; online: boolean; onBack: () => void; onQueued: (message: string) => Promise<void>; onSync: () => void }) {
+  const [selectedId, setSelectedId] = useState<string | null>(initialRecordId);
   const [locallyStarted, setLocallyStarted] = useState<string[]>([]);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");

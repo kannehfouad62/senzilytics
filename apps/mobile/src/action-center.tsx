@@ -14,6 +14,11 @@ import {
   pickPhotoEvidence,
   type SelectedEvidence,
 } from "./evidence";
+import {
+  resolveNativeRecordTarget,
+  resolveWorkflowNativeTarget,
+  type NativeRecordTarget,
+} from "./native-routing";
 import { queueCapaStatus } from "./storage";
 import type {
   MobileBootstrap,
@@ -32,6 +37,7 @@ export function ActionCenterScreen({
   onQueued,
   onSync,
   onReadNotification,
+  onOpenNativeTarget,
 }: {
   workspace: MobileBootstrap;
   ownerKey: string;
@@ -41,6 +47,7 @@ export function ActionCenterScreen({
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
   onReadNotification: (id: string) => Promise<void>;
+  onOpenNativeTarget: (target: NativeRecordTarget) => void;
 }) {
   const [selectedCapaId, setSelectedCapaId] = useState<string | null>(null);
   const selected = (workspace.correctiveActions ?? []).find(
@@ -108,7 +115,10 @@ export function ActionCenterScreen({
       </View>
 
       {view === "tasks" ? (
-        <TaskInbox workspace={workspace} />
+        <TaskInbox
+          workspace={workspace}
+          onOpenNativeTarget={onOpenNativeTarget}
+        />
       ) : null}
       {view === "capa" ? (
         <CapaInbox
@@ -121,6 +131,7 @@ export function ActionCenterScreen({
           workspace={workspace}
           online={online}
           onRead={onReadNotification}
+          onOpenNativeTarget={onOpenNativeTarget}
         />
       ) : null}
     </ScrollView>
@@ -129,8 +140,10 @@ export function ActionCenterScreen({
 
 function TaskInbox({
   workspace,
+  onOpenNativeTarget,
 }: {
   workspace: MobileBootstrap;
+  onOpenNativeTarget: (target: NativeRecordTarget) => void;
 }) {
   if (!workspace.tasks.length) {
     return <Empty text="No active workflow steps are assigned to you." />;
@@ -139,8 +152,18 @@ function TaskInbox({
     <View style={styles.section}>
       {workspace.tasks.map((task) => {
         const overdue = Boolean(task.dueAt && new Date(task.dueAt) < new Date());
+        const target = resolveWorkflowNativeTarget(
+          task.instance.entityType,
+          task.instance.entityId,
+          task.href
+        );
         return (
-          <Card key={task.id} accent={overdue}>
+          <Pressable
+            key={task.id}
+            disabled={!target}
+            onPress={() => target && onOpenNativeTarget(target)}
+          >
+          <Card accent={overdue}>
             <Text style={styles.questionNumber}>
               {humanize(task.stepType)} · {humanize(task.instance.entityType)}
             </Text>
@@ -151,8 +174,13 @@ function TaskInbox({
                 ? `${overdue ? "Overdue" : "Due"} ${formatDate(task.dueAt)}`
                 : "No due date"}
             </Text>
-            <Text style={styles.fieldHelp}>Assignment details are available here in the native inbox. Related native execution appears in its authorized module.</Text>
+            <Text style={styles.fieldHelp}>
+              {target
+                ? "Tap to open this assigned record in the native app."
+                : "No native destination is available for this workflow step."}
+            </Text>
           </Card>
+          </Pressable>
         );
       })}
     </View>
@@ -395,17 +423,21 @@ function AlertInbox({
   workspace,
   online,
   onRead,
+  onOpenNativeTarget,
 }: {
   workspace: MobileBootstrap;
   online: boolean;
   onRead: (id: string) => Promise<void>;
+  onOpenNativeTarget: (target: NativeRecordTarget) => void;
 }) {
   if (!workspace.notifications.length) {
     return <Empty text="You have no notifications." />;
   }
   return (
     <View style={styles.section}>
-      {workspace.notifications.map((item) => (
+      {workspace.notifications.map((item) => {
+        const target = resolveNativeRecordTarget(item.link);
+        return (
         <Card key={item.id} accent={!item.readAt}>
           <Text style={styles.cardTitle}>{item.title}</Text>
           <Text style={styles.muted}>{item.message}</Text>
@@ -423,10 +455,16 @@ function AlertInbox({
                 }}
               />
             ) : null}
-            {item.link ? <Text style={styles.fieldHelp}>The linked record remains available through its native module.</Text> : null}
+            {target ? (
+              <SecondaryButton
+                label="Open linked record"
+                onPress={() => onOpenNativeTarget(target)}
+              />
+            ) : null}
           </View>
         </Card>
-      ))}
+        );
+      })}
     </View>
   );
 }

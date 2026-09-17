@@ -20,10 +20,17 @@ export async function registerForMobilePush() {
   return "Push notifications are active.";
 }
 
-export function subscribeToMobileNotificationResponses(onOpen: () => void) {
+export type MobilePushOpen = {
+  notificationId: string | null;
+  link: string | null;
+};
+
+export function subscribeToMobileNotificationResponses(onOpen: (open: MobilePushOpen) => void) {
   const handle = (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data ?? {};
-    if (typeof data.notificationId === "string" || typeof data.link === "string") onOpen();
+    const notificationId = typeof data.notificationId === "string" ? data.notificationId : null;
+    const link = typeof data.link === "string" ? data.link : null;
+    if (notificationId || link) onOpen({ notificationId, link });
     void Notifications.clearLastNotificationResponseAsync();
   };
   const subscription = Notifications.addNotificationResponseReceivedListener(handle);
