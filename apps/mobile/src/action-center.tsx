@@ -39,6 +39,7 @@ export function ActionCenterScreen({
   initialRecordId = null,
   onReadNotification,
   onOpenNativeTarget,
+  onWorkflowDecision,
 }: {
   workspace: MobileBootstrap;
   ownerKey: string;
@@ -50,6 +51,11 @@ export function ActionCenterScreen({
   initialRecordId?: string | null;
   onReadNotification: (id: string) => Promise<void>;
   onOpenNativeTarget: (target: NativeRecordTarget) => void;
+  onWorkflowDecision: (
+    task: MobileBootstrap["tasks"][number],
+    decision: "APPROVE" | "REJECT",
+    comments: string
+  ) => Promise<void>;
 }) {
   const [selectedCapaId, setSelectedCapaId] = useState<string | null>(
     view === "capa" ? initialRecordId : null
@@ -122,6 +128,7 @@ export function ActionCenterScreen({
         <TaskInbox
           workspace={workspace}
           onOpenNativeTarget={onOpenNativeTarget}
+          onWorkflowDecision={onWorkflowDecision}
         />
       ) : null}
       {view === "capa" ? (
@@ -145,10 +152,19 @@ export function ActionCenterScreen({
 function TaskInbox({
   workspace,
   onOpenNativeTarget,
+  onWorkflowDecision,
 }: {
   workspace: MobileBootstrap;
   onOpenNativeTarget: (target: NativeRecordTarget) => void;
+  onWorkflowDecision: (
+    task: MobileBootstrap["tasks"][number],
+    decision: "APPROVE" | "REJECT",
+    comments: string
+  ) => Promise<void>;
 }) {
+  const [decisionTaskId, setDecisionTaskId] = useState<string | null>(null);
+  const [decisionComments, setDecisionComments] = useState("");
+  const [deciding, setDeciding] = useState(false);
   if (!workspace.tasks.length) {
     return <Empty text="No active workflow steps are assigned to you." />;
   }
@@ -183,6 +199,53 @@ function TaskInbox({
                 ? "Tap to open this assigned record in the native app."
                 : "No native destination is available for this workflow step."}
             </Text>
+            {decisionTaskId === task.id ? (
+              <View style={styles.section}>
+                <FieldLabel text="Decision comments" />
+                <Input
+                  value={decisionComments}
+                  onChangeText={setDecisionComments}
+                  placeholder="Add context for this workflow decision"
+                  multiline
+                />
+                <View style={styles.row}>
+                  <Secondary
+                    label={deciding ? "Saving…" : "Approve"}
+                    disabled={deciding}
+                    onPress={() => {
+                      setDeciding(true);
+                      void onWorkflowDecision(task, "APPROVE", decisionComments)
+                        .then(() => {
+                          setDecisionTaskId(null);
+                          setDecisionComments("");
+                        })
+                        .finally(() => setDeciding(false));
+                    }}
+                  />
+                  <Secondary
+                    label={deciding ? "Saving…" : "Reject"}
+                    disabled={deciding}
+                    onPress={() => {
+                      setDeciding(true);
+                      void onWorkflowDecision(task, "REJECT", decisionComments)
+                        .then(() => {
+                          setDecisionTaskId(null);
+                          setDecisionComments("");
+                        })
+                        .finally(() => setDeciding(false));
+                    }}
+                  />
+                </View>
+              </View>
+            ) : (
+              <Secondary
+                label="Make workflow decision"
+                onPress={() => {
+                  setDecisionTaskId(task.id);
+                  setDecisionComments("");
+                }}
+              />
+            )}
           </Card>
           </Pressable>
         );
