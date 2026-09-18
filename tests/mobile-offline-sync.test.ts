@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   PermissionKey,
@@ -1094,3 +1095,103 @@ test("mobile outbox decoder preserves legacy observation rows", () => {
     payload: { reviewId: "review-1" },
   });
 });
+
+const offlineSource = (path: string) =>
+  readFile(new URL(`../${path}`, import.meta.url), "utf8");
+
+test("offline reliability preserves server idempotency and permission revocation safeguards", async () => {
+  const service = await offlineSource("src/modules/mobile/offline-sync.service.ts");
+  assert.match(service, /prisma\.offlineSubmission\.findUnique/);
+  assert.match(service, /status: "already_synced"/);
+  assert.match(service, /existing\.organizationId === input\.organizationId && existing\.userId === input\.userId/);
+  assert.match(service, /requiredOfflinePermission/);
+  assert.match(service, /!granted\.has\(requiredPermission\)/);
+  assert.match(service, /Your role cannot synchronize this record type/);
+});
+
+test("offline outbox retains failed work and never deletes it on ordinary synchronization failure", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  assert.match(storage, /UPDATE mobile_outbox SET last_error = \?/);
+  assert.match(storage, /UPDATE mobile_evidence SET last_error = \?/);
+  assert.match(storage, /result\.status === "synced" \|\| result\.status === "already_synced"/);
+  assert.doesNotMatch(
+    storage,
+    /else\s*\{\s*await database\.runAsync\(\s*"DELETE FROM mobile_outbox/
+  );
+});
+
+test("offline evidence remains local until secure server registration is confirmed", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  const synchronizeEvidence = storage.slice(
+    storage.indexOf("async function synchronizeEvidence"),
+    storage.indexOf("async function evidenceSynchronized")
+  );
+  assert.match(synchronizeEvidence, /evidenceSynchronized\(row\.id\)/);
+  assert.match(synchronizeEvidence, /uploadPrivateMobileEvidence/);
+  assert.match(
+    synchronizeEvidence,
+    /if \(!synchronizedOnServer\) \{\s*throw new Error\("Evidence was uploaded and is awaiting secure server registration/
+  );
+  assert.match(
+    synchronizeEvidence,
+    /DELETE FROM mobile_evidence WHERE id = \? AND owner_key = \?/
+  );
+  assert.match(
+    synchronizeEvidence,
+    /UPDATE mobile_evidence SET last_error = \? WHERE id = \? AND owner_key = \?/
+  );
+  assert.ok(
+    synchronizeEvidence.indexOf("if (!synchronizedOnServer)") <
+      synchronizeEvidence.indexOf("DELETE FROM mobile_evidence")
+  );
+});
+
+test("dependent offline responses wait for queued evidence parents", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  assert.match(storage, /pendingEvidenceParents/);
+  assert.match(storage, /responses\.filter\(\(\{ row \}\) => !pendingEvidenceParents\.has\(row\.id\)\)/);
+  assert.ok(storage.indexOf("synchronizeEvidence(database, ownerKey)") < storage.indexOf("responses.filter"));
+});
+
+test("offline retry preserves queued identity while discard remains owner scoped and atomic", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  assert.match(storage, /retryOfflineOutboxItem/);
+  assert.match(storage, /UPDATE \$\{table\} SET last_error = NULL WHERE id = \? AND owner_key = \?/);
+  assert.doesNotMatch(storage, /retryOfflineOutboxItem[\s\S]{0,700}INSERT INTO mobile_outbox/);
+  assert.match(storage, /withExclusiveTransactionAsync/);
+  assert.match(storage, /DELETE FROM mobile_evidence WHERE parent_submission_id = \? AND owner_key = \?/);
+  assert.match(storage, /DELETE FROM mobile_outbox WHERE id = \? AND owner_key = \?/);
+});
+
+test("offline synchronization history is bounded owner scoped and payload free", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  assert.match(storage, /CREATE TABLE IF NOT EXISTS mobile_sync_history/);
+  assert.match(storage, /WHERE owner_key = \?/);
+  assert.match(storage, /ORDER BY occurred_at DESC LIMIT 100/);
+  assert.match(storage, /ORDER BY occurred_at DESC LIMIT 50/);
+  const historySchema = storage.slice(
+    storage.indexOf("CREATE TABLE IF NOT EXISTS mobile_sync_history"),
+    storage.indexOf("CREATE INDEX IF NOT EXISTS mobile_sync_history_owner_occurred")
+  );
+  assert.doesNotMatch(historySchema, /\bpayload\b|\bbytes\b|\bchecksum\b/);
+});
+
+test("offline history distinguishes idempotent replay failures retries and discard", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  for (const outcome of ["SYNCED", "ALREADY_SYNCED", "FAILED", "RETRIED", "DISCARDED"]) {
+    assert.match(storage, new RegExp(`"${outcome}"`));
+  }
+  assert.match(storage, /Server idempotency confirmed this submission was already synchronized/);
+  assert.match(storage, /Authorization changed\. This item cannot synchronize with the current access/);
+});
+
+test("offline outbox exposes recovery metadata without record payload or evidence contents", async () => {
+  const outbox = await offlineSource("apps/mobile/src/offline-outbox.tsx");
+  assert.match(outbox, /Synchronization history/);
+  assert.match(outbox, /Need attention/);
+  assert.match(outbox, /Retry/);
+  assert.match(outbox, /Discard/);
+  assert.match(outbox, /This action cannot be undone/);
+  assert.doesNotMatch(outbox, /\.payload\b|\.bytes\b|checksum/);
+});
+

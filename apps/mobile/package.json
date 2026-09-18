@@ -10,7 +10,7 @@
     "check": "tsc --noEmit && expo-doctor --verbose"
   },
   "dependencies": {
-    "expo": "~56.0.21",
+    "expo": "~56.0.22",
     "expo-constants": "~56.0.26",
     "expo-crypto": "~56.0.5",
     "expo-dev-client": "~56.0.27",
