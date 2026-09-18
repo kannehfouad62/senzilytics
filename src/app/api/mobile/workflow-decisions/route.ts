@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { WorkflowDecision, WorkflowEntityType } from "@prisma/client";
+import { WorkflowDecision, WorkflowEntityType, WorkflowStepType } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { decideWorkflowStep } from "@/core/workflow/workflow.service";
@@ -40,12 +40,24 @@ export async function POST(request: Request) {
           status: "ACTIVE",
         },
       },
-      select: { id: true },
+      select: { id: true, stepType: true },
     });
     if (!task) {
       return NextResponse.json(
         { error: "not_found", errorDescription: "The assigned workflow step is no longer active." },
         { status: 404, headers: { "cache-control": "no-store" } }
+      );
+    }
+    const decisionStepTypes = new Set<WorkflowStepType>([
+      WorkflowStepType.REVIEW,
+      WorkflowStepType.APPROVAL,
+      WorkflowStepType.VERIFICATION,
+      WorkflowStepType.CLOSE,
+    ]);
+    if (!decisionStepTypes.has(task.stepType)) {
+      return NextResponse.json(
+        { error: "invalid_step", errorDescription: "This workflow step does not accept an approve or reject decision." },
+        { status: 400, headers: { "cache-control": "no-store" } }
       );
     }
 

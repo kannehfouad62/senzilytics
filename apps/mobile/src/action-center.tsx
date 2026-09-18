@@ -199,7 +199,7 @@ function TaskInbox({
                 ? "Tap to open this assigned record in the native app."
                 : "No native destination is available for this workflow step."}
             </Text>
-            {decisionTaskId === task.id ? (
+            {task.canDecide && decisionTaskId === task.id ? (
               <View style={styles.section}>
                 <FieldLabel text="Decision comments" />
                 <TextInput
@@ -237,7 +237,7 @@ function TaskInbox({
                   />
                 </View>
               </View>
-            ) : (
+            ) : task.canDecide ? (
               <SecondaryButton
                 label="Make workflow decision"
                 onPress={() => {
@@ -245,6 +245,10 @@ function TaskInbox({
                   setDecisionComments("");
                 }}
               />
+            ) : (
+              <Text style={styles.fieldHelp}>
+                This assigned workflow step does not require an approve/reject decision.
+              </Text>
             )}
           </Card>
           </Pressable>

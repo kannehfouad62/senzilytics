@@ -3,6 +3,7 @@ import {
   Status,
   UserRole,
   WorkflowEntityType,
+  WorkflowStepType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -171,6 +172,11 @@ export async function getMobileActionCenter(input: {
     capabilities,
     tasks: taskRecords.map((task) => ({
       ...task,
+      canDecide:
+        task.stepType === WorkflowStepType.REVIEW ||
+        task.stepType === WorkflowStepType.APPROVAL ||
+        task.stepType === WorkflowStepType.VERIFICATION ||
+        task.stepType === WorkflowStepType.CLOSE,
       href: mobileWorkflowEntityHref(
         task.instance.entityType,
         task.instance.entityId

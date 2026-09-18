@@ -44,6 +44,7 @@ export type MobileTask = {
   id: string;
   name: string;
   stepType: string;
+  canDecide: boolean;
   assignedRole: string | null;
   dueAt: string | null;
   status: string;

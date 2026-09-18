@@ -151,3 +151,32 @@ test("phase 4 priority native record details expose operational lifecycle contex
   assert.match(regulatory, /change\.implementationSummary/);
   assert.match(regulatory, /change\.closeRationale/);
 });
+
+
+test("phase 4 governed workflow decisions are server-derived from decision-capable step types", async () => {
+  const service = await mobileSource("src/modules/mobile/mobile-action-center.service.ts");
+  for (const stepType of ["REVIEW", "APPROVAL", "VERIFICATION", "CLOSE"]) {
+    assert.match(service, new RegExp(`WorkflowStepType\\.${stepType}`));
+  }
+  assert.match(service, /canDecide:/);
+  assert.doesNotMatch(service, /WorkflowStepType\.TASK\s*\|\|/);
+
+  const actionCenter = await mobileSource("apps/mobile/src/action-center.tsx");
+  assert.match(actionCenter, /task\.canDecide/);
+  assert.match(actionCenter, /does not require an approve\/reject decision/);
+
+  const route = await mobileSource("src/app/api/mobile/workflow-decisions/route.ts");
+  assert.match(route, /decisionStepTypes/);
+  assert.match(route, /WorkflowStepType\.APPROVAL/);
+  assert.match(route, /invalid_step/);
+  assert.match(route, /does not accept an approve or reject decision/);
+});
+
+test("phase 4 mobile workflow decision endpoint still excludes skip and revalidates active tenant record", async () => {
+  const route = await mobileSource("src/app/api/mobile/workflow-decisions/route.ts");
+  assert.match(route, /z\.enum\(\[WorkflowDecision\.APPROVE, WorkflowDecision\.REJECT\]\)/);
+  assert.doesNotMatch(route, /WorkflowDecision\.SKIP/);
+  assert.match(route, /organizationId: organization\.id/);
+  assert.match(route, /status: "IN_PROGRESS"/);
+  assert.match(route, /status: "ACTIVE"/);
+});

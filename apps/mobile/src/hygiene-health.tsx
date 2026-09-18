@@ -339,10 +339,10 @@ function AssessmentDetail({
         <Detail label="Sampling plan" value={assessment.samplingPlan || "Not recorded"} />
         <Detail label="Existing controls" value={assessment.group.existingControls || "Not recorded"} />
         <Detail label="Required PPE" value={assessment.group.requiredPpe || "Not recorded"} />
-        <Detail label="Scheduled" value={formatDate(assessment.scheduledAt)} />
-        <Detail label="Due" value={formatDate(assessment.dueDate)} />
-        <Detail label="Started" value={formatDate(assessment.startedAt)} />
-        <Detail label="Completed" value={formatDate(assessment.completedAt)} />
+        <Detail label="Scheduled" value={assessment.scheduledAt ? formatDate(assessment.scheduledAt) : "Not recorded"} />
+        <Detail label="Due" value={assessment.dueDate ? formatDate(assessment.dueDate) : "Not recorded"} />
+        <Detail label="Started" value={assessment.startedAt ? formatDate(assessment.startedAt) : "Not recorded"} />
+        <Detail label="Completed" value={assessment.completedAt ? formatDate(assessment.completedAt) : "Not recorded"} />
         <Detail label="Observations" value={assessment.observations || "Not recorded"} />
         <Detail label="Conclusions" value={assessment.conclusions || "Not recorded"} />
         <Detail label="Recommendations" value={assessment.recommendations || "Not recorded"} />
