@@ -202,3 +202,99 @@ test("phase 4 action center filtering never expands beyond authorized bootstrap 
   assert.match(source, /workspace\.notifications\.filter/);
   assert.doesNotMatch(source, /fetch\(|axios|\/api\/.*search/);
 });
+
+test("phase 4 certification preserves exact-record native continuity across priority workspaces", async () => {
+  const routing = await mobileSource("apps/mobile/src/native-routing.ts");
+  const app = await mobileSource("apps/mobile/App.tsx");
+  for (const route of ["industrial-hygiene", "occupational-health", "esg", "regulatory", "intelligence"]) {
+    assert.match(routing, new RegExp(`case "${route}"`));
+  }
+  for (const screen of ["HygieneHealthScreen", "EsgScreen", "RegulatoryIntelligenceScreen", "ExecutiveCommandScreen"]) {
+    assert.match(app, new RegExp(`<${screen}[^>]*initialRecordId=`, "s"));
+  }
+});
+
+test("phase 4 certification preserves operational detail context in priority native records", async () => {
+  const risk = await mobileSource("apps/mobile/src/risk-field.tsx");
+  assert.match(risk, /risk\.currentLikelihood/);
+  assert.match(risk, /risk\.residualLikelihood/);
+  assert.match(risk, /risk\.lastReviewedAt/);
+  assert.match(risk, /jsa\.reviewDueDate/);
+
+  const hygiene = await mobileSource("apps/mobile/src/hygiene-health.tsx");
+  assert.match(hygiene, /assessment\.observations/);
+  assert.match(hygiene, /assessment\.conclusions/);
+  assert.match(hygiene, /assessment\.recommendations/);
+  assert.match(hygiene, /program\.responsibleUser\.name/);
+
+  const esg = await mobileSource("apps/mobile/src/esg.tsx");
+  assert.match(esg, /period\.approvedAt/);
+  assert.match(esg, /period\.publishedAt/);
+
+  const regulatory = await mobileSource("apps/mobile/src/regulatory-intelligence.tsx");
+  assert.match(regulatory, /source\.lastReviewedAt/);
+  assert.match(regulatory, /change\.implementationSummary/);
+  assert.match(regulatory, /change\.closeRationale/);
+});
+
+test("phase 4 certification keeps consequential workflow decisions server-derived and fail-closed", async () => {
+  const service = await mobileSource("src/modules/mobile/mobile-action-center.service.ts");
+  const route = await mobileSource("src/app/api/mobile/workflow-decisions/route.ts");
+  const ui = await mobileSource("apps/mobile/src/action-center.tsx");
+
+  assert.match(service, /canDecide:/);
+  for (const stepType of ["REVIEW", "APPROVAL", "VERIFICATION", "CLOSE"]) {
+    assert.match(service, new RegExp(`WorkflowStepType\\.${stepType}`));
+  }
+  assert.match(ui, /task\.canDecide/);
+  assert.match(route, /decisionStepTypes/);
+  assert.match(route, /invalid_step/);
+  assert.match(route, /z\.enum\(\[WorkflowDecision\.APPROVE, WorkflowDecision\.REJECT\]\)/);
+  assert.doesNotMatch(route, /WorkflowDecision\.SKIP/);
+});
+
+test("phase 4 certification keeps action-center search inside authorized bootstrap collections", async () => {
+  const ui = await mobileSource("apps/mobile/src/action-center.tsx");
+  assert.match(ui, /workspace\.tasks\.filter/);
+  assert.match(ui, /actions\.filter/);
+  assert.match(ui, /workspace\.notifications\.filter/);
+  assert.match(ui, /Decision required/);
+  assert.match(ui, /statusFilter/);
+  assert.match(ui, /scope === "unread"/);
+  assert.doesNotMatch(ui, /fetch\(|axios|\/api\/.*search/);
+});
+
+test("phase 4 certification retains module-native governed action families", async () => {
+  const expected = new Map([
+    ["apps/mobile/src/risk-field.tsx", ["queueRiskReview", "queueJsaAcknowledgment"]],
+    ["apps/mobile/src/moc-permits.tsx", ["queueMocApprovalDecision", "queuePermitGasTest", "queuePermitStatus"]],
+    ["apps/mobile/src/assets-contractors.tsx", ["queueAssetInspection", "queueAssetDefect", "queueContractorStatus"]],
+    ["apps/mobile/src/hygiene-health.tsx", ["queueHygieneSample", "queueSurveillanceCompletion", "queueSurveillanceProgramStatus"]],
+    ["apps/mobile/src/chemical-environmental.tsx", ["queueChemicalEvidence", "queueEnvironmentalReview", "queueEnvironmentalEvidence"]],
+    ["apps/mobile/src/esg.tsx", ["queueEsgDisclosureStatus", "queueEsgEvidence", "queueEsgInitiativeStatus"]],
+    ["apps/mobile/src/behavior-assurance.tsx", ["queueSifVerification", "queueCertificationReviewComplete", "queueCertificationReviewApprove"]],
+    ["apps/mobile/src/regulatory-intelligence.tsx", ["queueRegulatoryImpactAssessment", "queueRegulatoryImplementation", "queueRegulatoryChangeClose"]],
+  ]);
+  for (const [path, actions] of expected) {
+    const source = await mobileSource(path);
+    for (const action of actions) assert.match(source, new RegExp(`${action}\\(`));
+  }
+});
+
+test("phase 4 certification keeps priority operational workspaces native without WebView fallback", async () => {
+  for (const path of [
+    "apps/mobile/src/action-center.tsx",
+    "apps/mobile/src/risk-field.tsx",
+    "apps/mobile/src/moc-permits.tsx",
+    "apps/mobile/src/assets-contractors.tsx",
+    "apps/mobile/src/hygiene-health.tsx",
+    "apps/mobile/src/chemical-environmental.tsx",
+    "apps/mobile/src/esg.tsx",
+    "apps/mobile/src/behavior-assurance.tsx",
+    "apps/mobile/src/regulatory-intelligence.tsx",
+    "apps/mobile/src/executive-command.tsx",
+  ]) {
+    const source = await mobileSource(path);
+    assert.doesNotMatch(source, /react-native-webview|<WebView/);
+  }
+});
