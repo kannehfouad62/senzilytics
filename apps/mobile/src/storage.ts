@@ -916,6 +916,76 @@ export async function readOfflineOutbox(ownerKey: string): Promise<OfflineOutbox
   };
 }
 
+
+export async function retryOfflineOutboxItem(
+  ownerKey: string,
+  kind: "record" | "evidence",
+  id: string
+) {
+  const database = await db();
+  const table = kind === "record" ? "mobile_outbox" : "mobile_evidence";
+  const result = await database.runAsync(
+    `UPDATE ${table} SET last_error = NULL WHERE id = ? AND owner_key = ?`,
+    id,
+    ownerKey
+  );
+  if (!result.changes) {
+    throw new Error("The queued item is no longer available for this device user.");
+  }
+}
+
+export async function discardOfflineOutboxItem(
+  ownerKey: string,
+  kind: "record" | "evidence",
+  id: string
+) {
+  const database = await db();
+  if (kind === "evidence") {
+    const result = await database.runAsync(
+      "DELETE FROM mobile_evidence WHERE id = ? AND owner_key = ?",
+      id,
+      ownerKey
+    );
+    if (!result.changes) {
+      throw new Error("The queued evidence is no longer available for this device user.");
+    }
+    return { discardedRecords: 0, discardedEvidence: 1 };
+  }
+
+  let discardedEvidence = 0;
+  await database.withExclusiveTransactionAsync(async (transaction) => {
+    const record = await transaction.getFirstAsync<{ id: string }>(
+      "SELECT id FROM mobile_outbox WHERE id = ? AND owner_key = ?",
+      id,
+      ownerKey
+    );
+    if (!record) {
+      throw new Error("The queued record is no longer available for this device user.");
+    }
+    const evidence = await transaction.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM mobile_evidence
+       WHERE parent_submission_id = ? AND owner_key = ?`,
+      id,
+      ownerKey
+    );
+    await transaction.runAsync(
+      "DELETE FROM mobile_evidence WHERE parent_submission_id = ? AND owner_key = ?",
+      id,
+      ownerKey
+    );
+    await transaction.runAsync(
+      "DELETE FROM mobile_outbox WHERE id = ? AND owner_key = ?",
+      id,
+      ownerKey
+    );
+    discardedEvidence = evidence?.count ?? 0;
+  });
+  return {
+    discardedRecords: 1,
+    discardedEvidence,
+  };
+}
+
 export async function pendingOfflineCount(ownerKey: string) {
   const database = await db();
   const [outbox, evidence] = await Promise.all([

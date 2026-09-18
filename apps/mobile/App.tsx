@@ -83,8 +83,10 @@ import {
   clearCachedControlledDocuments,
   clearWorkspaceCache,
   initializeOfflineStore,
+  discardOfflineOutboxItem,
   pendingOfflineCount,
   readOfflineOutbox,
+  retryOfflineOutboxItem,
   queueAuditResponse,
   queueAuditStart,
   queueIncident,
@@ -480,7 +482,7 @@ function SenzilyticsApp() {
       </View>
       {notice ? <Pressable onPress={() => setNotice("")} style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></Pressable> : null}
       {tab === "home" && <HomeScreen workspace={workspace} pending={pending} busy={busy} onRefresh={async () => { try { return await refreshWorkspace(); } catch (error) { setNotice(`Refresh paused: ${messageOf(error)}`); return workspace; } }} onSync={sync} onNavigate={setTab} onOpenActions={(view) => { setActionCenterView(view); setTab("actions"); }} />}
-      {tab === "outbox" && <OfflineOutboxScreen ownerKey={ownerKey} online={online} busy={busy} loadSnapshot={() => readOfflineOutbox(ownerKey)} onBack={() => setTab("home")} onSync={() => sync(false)} />}
+      {tab === "outbox" && <OfflineOutboxScreen ownerKey={ownerKey} online={online} busy={busy} loadSnapshot={() => readOfflineOutbox(ownerKey)} onBack={() => setTab("home")} onSync={() => sync(false)} onRetry={async (kind, id) => { await retryOfflineOutboxItem(ownerKey, kind, id); await sync(false); }} onDiscard={async (kind, id) => { await discardOfflineOutboxItem(ownerKey, kind, id); setPending(await pendingOfflineCount(ownerKey)); }} />}
       {tab === "workspace" && <WorkspaceScreen modules={workspace.modules ?? []} online={online} onCapture={(mode) => { setCaptureMode(mode); setTab("capture"); }} onInspect={() => setTab("inspections")} onAudit={() => setTab("audits")} onAuditServices={() => setTab("auditServices")} onResearch={() => setTab("research")} onRisk={(view) => { setRiskFieldView(view); setTab("risks"); }} onGovernance={(view) => { setComplianceTrainingView(view); setTab("governance"); }} onComplianceDocuments={(view) => { setComplianceDocumentView(view); setTab("complianceDocuments"); }} onControlledWork={(view) => { setMocPermitView(view); setTab("controlledWork"); }} onAssetContractor={(view) => { setAssetContractorView(view); setTab("assetContractors"); }} onHygieneHealth={(view) => { setHygieneHealthView(view); setTab("hygieneHealth"); }} onChemicalEnvironmental={(view) => { setChemicalEnvironmentalView(view); setTab("chemicalEnvironmental"); }} onEsg={(view) => { setEsgView(view); setTab("esg"); }} onBehaviorAssurance={(view) => { setBehaviorAssuranceView(view); setTab("behaviorAssurance"); }} onRegulatory={() => setTab("regulatory")} onExecutive={(view) => { setExecutiveCommandView(view); setTab("executive"); if (online) void refreshExecutiveWorkspace().catch((error) => setNotice(`Executive refresh paused: ${messageOf(error)}`)); }} onAdministration={(view) => { setTenantAdministrationView(view); setTab("administration"); if (online) void refreshTenantAdministrationWorkspace().catch((error) => setNotice(`Administration refresh paused: ${messageOf(error)}`)); }} onActions={(view) => { setActionCenterView(view); setTab("actions"); }} />}
       {tab === "capture" && <CaptureScreen mode={captureMode} onModeChange={setCaptureMode} workspace={workspace} ownerKey={ownerKey} online={online} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "inspections" && <InspectionsScreen inspections={workspace.inspections ?? []} initialRecordId={nativeInspectionId} ownerKey={ownerKey} online={online} onBack={() => { setNativeInspectionId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
