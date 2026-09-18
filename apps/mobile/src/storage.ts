@@ -74,6 +74,52 @@ import type {
 } from "./types";
 
 type QueueRow = { id: string; payload: string; captured_at: string };
+
+export type OfflineOutboxStatus = "PENDING" | "FAILED" | "EVIDENCE_PENDING";
+
+export type OfflineOutboxItem = {
+  id: string;
+  kind: "record";
+  recordType: OfflineRecordType;
+  label: string;
+  capturedAt: string;
+  status: OfflineOutboxStatus;
+  attachmentCount: number;
+  lastError: string | null;
+};
+
+export type OfflineEvidenceItem = {
+  id: string;
+  kind: "evidence";
+  parentSubmissionId: string | null;
+  label: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  capturedAt: string;
+  status: "EVIDENCE_PENDING" | "FAILED";
+  lastError: string | null;
+};
+
+export type OfflineOutboxSnapshot = {
+  records: OfflineOutboxItem[];
+  evidence: OfflineEvidenceItem[];
+  pendingCount: number;
+  failedCount: number;
+};
+
+type OutboxMetadataRow = QueueRow & { last_error: string | null };
+type EvidenceMetadataRow = {
+  id: string;
+  parent_submission_id: string | null;
+  target_type: EvidenceTargetType;
+  title: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  captured_at: string;
+  last_error: string | null;
+};
 type EvidenceTargetType =
   | "SAFETY_OBSERVATION"
   | "INCIDENT"
@@ -791,6 +837,83 @@ export async function queueRegulatoryChangeClose(
   payload: RegulatoryChangeClosePayload
 ) {
   return queueOfflineItem(ownerKey, "REGULATORY_CHANGE_CLOSE", payload);
+}
+
+const offlineRecordLabels: Record<OfflineRecordType, string> = {
+  SAFETY_OBSERVATION: "Safety observation", INCIDENT: "Incident",
+  INSPECTION_RESPONSE: "Inspection response", AUDIT_START: "Audit start", AUDIT_RESPONSE: "Audit response",
+  CAPA_STATUS: "Corrective action", RISK_CAPTURE: "Risk assessment", RISK_REVIEW: "Risk review",
+  JSA_ACKNOWLEDGMENT: "JSA/JHA acknowledgment", COMPLIANCE_COMPLETION: "Compliance completion",
+  COMPLIANCE_REVIEW: "Compliance review", TRAINING_PROGRESS: "Training progress", TRAINING_COMPLETION: "Training completion",
+  MOC_STATUS: "Management of change", MOC_APPROVAL_DECISION: "MOC approval", MOC_TASK_STATUS: "MOC task",
+  PERMIT_STATUS: "Permit to work", PERMIT_CONTROL: "Permit control", PERMIT_GAS_TEST: "Permit gas test",
+  ASSET_STATUS: "Asset status", ASSET_INSPECTION: "Asset inspection", ASSET_DEFECT: "Asset defect",
+  ASSET_DEFECT_STATUS: "Asset defect status", ASSET_MAINTENANCE_STATUS: "Asset maintenance",
+  ASSET_MAINTENANCE_COMPLETE: "Asset maintenance completion", CONTRACTOR_STATUS: "Contractor status",
+  IH_ASSESSMENT_STATUS: "Hygiene assessment", IH_SAMPLE: "Hygiene sample", IH_FORMS: "Hygiene form",
+  OH_PROGRAM_STATUS: "Health surveillance program", OH_ENROLLMENT: "Health surveillance enrollment",
+  OH_ENROLLMENT_COMPLETE: "Health surveillance completion", OH_ENROLLMENT_REMOVE: "Health surveillance removal",
+  CHEMICAL_INVENTORY: "Chemical inventory", CHEMICAL_STATUS: "Chemical status", CHEMICAL_FORMS: "Chemical form",
+  ENVIRONMENTAL_DATA: "Environmental data", ENVIRONMENTAL_REVIEW: "Environmental review", ENVIRONMENTAL_FORMS: "Environmental form",
+  ESG_DATA: "ESG data", ESG_FORMS: "ESG form", ESG_DISCLOSURE_STATUS: "ESG disclosure", ESG_INITIATIVE_STATUS: "ESG initiative",
+  BEHAVIOR_SESSION: "Behavior coaching session", BEHAVIOR_FOLLOW_UP: "Behavior follow-up",
+  BEHAVIOR_RECOGNITION: "Behavior recognition", BEHAVIOR_PROGRAM_REVIEW: "Behavior program review",
+  SIF_VERIFICATION: "Critical-control verification", SIF_SIGNAL_REVIEW: "SIF signal review",
+  CERTIFICATION_REVIEW_COMPLETE: "Certification review", CERTIFICATION_REVIEW_APPROVE: "Certification approval",
+  REGULATORY_SOURCE_REVIEW: "Regulatory source review", REGULATORY_CHANGE_REVIEW: "Regulatory change review",
+  REGULATORY_IMPACT_ASSESSMENT: "Regulatory impact assessment", REGULATORY_ASSESSMENT_REVIEW: "Regulatory assessment review",
+  REGULATORY_IMPLEMENTATION: "Regulatory implementation", REGULATORY_CHANGE_CLOSE: "Regulatory change closure",
+  RESEARCH_FIELDWORK_RESPONSE: "Research fieldwork response",
+};
+
+function boundedOfflineError(value: string | null) {
+  const normalized = value?.trim();
+  return normalized ? normalized.slice(0, 500) : null;
+}
+
+export async function readOfflineOutbox(ownerKey: string): Promise<OfflineOutboxSnapshot> {
+  const database = await db();
+  const [rows, evidenceRows] = await Promise.all([
+    database.getAllAsync<OutboxMetadataRow>(
+      `SELECT id, payload, captured_at, last_error FROM mobile_outbox
+       WHERE owner_key = ? ORDER BY captured_at ASC LIMIT 250`,
+      ownerKey
+    ),
+    database.getAllAsync<EvidenceMetadataRow>(
+      `SELECT id, parent_submission_id, target_type, title, file_name, mime_type,
+        size_bytes, captured_at, last_error FROM mobile_evidence
+       WHERE owner_key = ? ORDER BY captured_at ASC LIMIT 250`,
+      ownerKey
+    ),
+  ]);
+  const evidenceByParent = new Map<string, number>();
+  for (const item of evidenceRows) {
+    if (item.parent_submission_id) {
+      evidenceByParent.set(item.parent_submission_id, (evidenceByParent.get(item.parent_submission_id) ?? 0) + 1);
+    }
+  }
+  const records = rows.map((row): OfflineOutboxItem => {
+    const envelope = decodeOfflineEnvelope(JSON.parse(row.payload));
+    const lastError = boundedOfflineError(row.last_error);
+    const attachmentCount = evidenceByParent.get(row.id) ?? 0;
+    return {
+      id: row.id, kind: "record", recordType: envelope.type, label: offlineRecordLabels[envelope.type],
+      capturedAt: row.captured_at, status: lastError ? "FAILED" : attachmentCount ? "EVIDENCE_PENDING" : "PENDING",
+      attachmentCount, lastError,
+    };
+  });
+  const evidence = evidenceRows.map((row): OfflineEvidenceItem => {
+    const lastError = boundedOfflineError(row.last_error);
+    return {
+      id: row.id, kind: "evidence", parentSubmissionId: row.parent_submission_id, label: row.title,
+      fileName: row.file_name, mimeType: row.mime_type, sizeBytes: row.size_bytes, capturedAt: row.captured_at,
+      status: lastError ? "FAILED" : "EVIDENCE_PENDING", lastError,
+    };
+  });
+  return {
+    records, evidence, pendingCount: records.length + evidence.length,
+    failedCount: records.filter((item) => item.status === "FAILED").length + evidence.filter((item) => item.status === "FAILED").length,
+  };
 }
 
 export async function pendingOfflineCount(ownerKey: string) {
