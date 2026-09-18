@@ -158,6 +158,7 @@ function SenzilyticsApp() {
   const [nativeActionId, setNativeActionId] = useState<string | null>(null);
   const [nativeGovernanceId, setNativeGovernanceId] = useState<string | null>(null);
   const [nativeComplianceDocumentId, setNativeComplianceDocumentId] = useState<string | null>(null);
+  const [nativeBehaviorAssuranceId, setNativeBehaviorAssuranceId] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
   const [busy, setBusy] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -415,6 +416,7 @@ function SenzilyticsApp() {
         setTab("chemicalEnvironmental");
         break;
       case "behaviorAssurance":
+        setNativeBehaviorAssuranceId(target.recordId ?? null);
         setBehaviorAssuranceView(target.view);
         setTab("behaviorAssurance");
         break;
@@ -490,7 +492,7 @@ function SenzilyticsApp() {
       {tab === "hygieneHealth" && <HygieneHealthScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={hygieneHealthView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "chemicalEnvironmental" && <ChemicalEnvironmentalScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={chemicalEnvironmentalView} initialRecordId={nativeChemicalEnvironmentalId} onBack={() => { setNativeChemicalEnvironmentalId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "esg" && <EsgScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={esgView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "behaviorAssurance" && <BehaviorAssuranceScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={behaviorAssuranceView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "behaviorAssurance" && <BehaviorAssuranceScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={behaviorAssuranceView} initialRecordId={nativeBehaviorAssuranceId} onBack={() => { setNativeBehaviorAssuranceId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "regulatory" && <RegulatoryIntelligenceScreen workspace={workspace} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "executive" && <ExecutiveCommandScreen workspace={workspace} online={online} initialView={executiveCommandView} onBack={() => setTab("workspace")} onRefresh={refreshExecutiveWorkspace} onNotice={setNotice} />}
       {tab === "administration" && <TenantAdministrationScreen workspace={workspace} online={online} initialView={tenantAdministrationView} onBack={() => setTab("workspace")} onRefresh={refreshTenantAdministrationWorkspace} onNotice={setNotice} />}
