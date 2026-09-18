@@ -202,14 +202,14 @@ function TaskInbox({
             {decisionTaskId === task.id ? (
               <View style={styles.section}>
                 <FieldLabel text="Decision comments" />
-                <Input
+                <TextInput
                   value={decisionComments}
                   onChangeText={setDecisionComments}
                   placeholder="Add context for this workflow decision"
                   multiline
                 />
                 <View style={styles.row}>
-                  <Secondary
+                  <SecondaryButton
                     label={deciding ? "Saving…" : "Approve"}
                     disabled={deciding}
                     onPress={() => {
@@ -222,7 +222,7 @@ function TaskInbox({
                         .finally(() => setDeciding(false));
                     }}
                   />
-                  <Secondary
+                  <SecondaryButton
                     label={deciding ? "Saving…" : "Reject"}
                     disabled={deciding}
                     onPress={() => {
@@ -238,7 +238,7 @@ function TaskInbox({
                 </View>
               </View>
             ) : (
-              <Secondary
+              <SecondaryButton
                 label="Make workflow decision"
                 onPress={() => {
                   setDecisionTaskId(task.id);
