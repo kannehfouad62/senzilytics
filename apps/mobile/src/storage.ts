@@ -101,9 +101,20 @@ export type OfflineEvidenceItem = {
   lastError: string | null;
 };
 
+export type OfflineSyncHistoryItem = {
+  id: string;
+  itemKind: "record" | "evidence";
+  itemId: string;
+  label: string;
+  outcome: "SYNCED" | "ALREADY_SYNCED" | "FAILED" | "RETRIED" | "DISCARDED";
+  occurredAt: string;
+  detail: string | null;
+};
+
 export type OfflineOutboxSnapshot = {
   records: OfflineOutboxItem[];
   evidence: OfflineEvidenceItem[];
+  history: OfflineSyncHistoryItem[];
   pendingCount: number;
   failedCount: number;
 };
@@ -219,6 +230,18 @@ export async function initializeOfflineStore() {
     );
     CREATE INDEX IF NOT EXISTS mobile_evidence_owner_captured
       ON mobile_evidence(owner_key, captured_at);
+    CREATE TABLE IF NOT EXISTS mobile_sync_history (
+      id TEXT PRIMARY KEY NOT NULL,
+      owner_key TEXT NOT NULL,
+      item_kind TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      label TEXT NOT NULL,
+      outcome TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      detail TEXT
+    );
+    CREATE INDEX IF NOT EXISTS mobile_sync_history_owner_occurred
+      ON mobile_sync_history(owner_key, occurred_at);
     CREATE TABLE IF NOT EXISTS mobile_document_cache (
       cache_key TEXT PRIMARY KEY NOT NULL,
       owner_key TEXT NOT NULL,
@@ -839,6 +862,48 @@ export async function queueRegulatoryChangeClose(
   return queueOfflineItem(ownerKey, "REGULATORY_CHANGE_CLOSE", payload);
 }
 
+function classifyOfflineFailure(error: string) {
+  const normalized = error.toLowerCase();
+  if (
+    normalized.includes("role cannot") ||
+    normalized.includes("permission") ||
+    normalized.includes("not included in this subscription") ||
+    normalized.includes("not authorized")
+  ) {
+    return "Authorization changed. This item cannot synchronize with the current access.";
+  }
+  return error;
+}
+
+async function appendOfflineSyncHistory(
+  database: SQLite.SQLiteDatabase,
+  ownerKey: string,
+  input: Omit<OfflineSyncHistoryItem, "id" | "occurredAt">
+) {
+  await database.runAsync(
+    `INSERT INTO mobile_sync_history (
+      id, owner_key, item_kind, item_id, label, outcome, occurred_at, detail
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    Crypto.randomUUID(),
+    ownerKey,
+    input.itemKind,
+    input.itemId,
+    input.label,
+    input.outcome,
+    new Date().toISOString(),
+    input.detail
+  );
+  await database.runAsync(
+    `DELETE FROM mobile_sync_history
+     WHERE owner_key = ? AND id NOT IN (
+       SELECT id FROM mobile_sync_history WHERE owner_key = ?
+       ORDER BY occurred_at DESC LIMIT 100
+     )`,
+    ownerKey,
+    ownerKey
+  );
+}
+
 const offlineRecordLabels: Record<OfflineRecordType, string> = {
   SAFETY_OBSERVATION: "Safety observation", INCIDENT: "Incident",
   INSPECTION_RESPONSE: "Inspection response", AUDIT_START: "Audit start", AUDIT_RESPONSE: "Audit response",
@@ -873,7 +938,7 @@ function boundedOfflineError(value: string | null) {
 
 export async function readOfflineOutbox(ownerKey: string): Promise<OfflineOutboxSnapshot> {
   const database = await db();
-  const [rows, evidenceRows] = await Promise.all([
+  const [rows, evidenceRows, historyRows] = await Promise.all([
     database.getAllAsync<OutboxMetadataRow>(
       `SELECT id, payload, captured_at, last_error FROM mobile_outbox
        WHERE owner_key = ? ORDER BY captured_at ASC LIMIT 250`,
@@ -883,6 +948,16 @@ export async function readOfflineOutbox(ownerKey: string): Promise<OfflineOutbox
       `SELECT id, parent_submission_id, target_type, title, file_name, mime_type,
         size_bytes, captured_at, last_error FROM mobile_evidence
        WHERE owner_key = ? ORDER BY captured_at ASC LIMIT 250`,
+      ownerKey
+    ),
+    database.getAllAsync<{
+      id: string; item_kind: "record" | "evidence"; item_id: string;
+      label: string; outcome: OfflineSyncHistoryItem["outcome"];
+      occurred_at: string; detail: string | null;
+    }>(
+      `SELECT id, item_kind, item_id, label, outcome, occurred_at, detail
+       FROM mobile_sync_history WHERE owner_key = ?
+       ORDER BY occurred_at DESC LIMIT 50`,
       ownerKey
     ),
   ]);
@@ -910,8 +985,12 @@ export async function readOfflineOutbox(ownerKey: string): Promise<OfflineOutbox
       status: lastError ? "FAILED" : "EVIDENCE_PENDING", lastError,
     };
   });
+  const history = historyRows.map((row): OfflineSyncHistoryItem => ({
+    id: row.id, itemKind: row.item_kind, itemId: row.item_id, label: row.label,
+    outcome: row.outcome, occurredAt: row.occurred_at, detail: boundedOfflineError(row.detail),
+  }));
   return {
-    records, evidence, pendingCount: records.length + evidence.length,
+    records, evidence, history, pendingCount: records.length + evidence.length,
     failedCount: records.filter((item) => item.status === "FAILED").length + evidence.filter((item) => item.status === "FAILED").length,
   };
 }
@@ -932,6 +1011,10 @@ export async function retryOfflineOutboxItem(
   if (!result.changes) {
     throw new Error("The queued item is no longer available for this device user.");
   }
+  await appendOfflineSyncHistory(database, ownerKey, {
+    itemKind: kind, itemId: id, label: kind === "record" ? "Queued record" : "Queued evidence",
+    outcome: "RETRIED", detail: "Manual retry requested.",
+  });
 }
 
 export async function discardOfflineOutboxItem(
@@ -949,6 +1032,10 @@ export async function discardOfflineOutboxItem(
     if (!result.changes) {
       throw new Error("The queued evidence is no longer available for this device user.");
     }
+    await appendOfflineSyncHistory(database, ownerKey, {
+      itemKind: "evidence", itemId: id, label: "Queued evidence",
+      outcome: "DISCARDED", detail: "Unsynchronized local evidence discarded by the device user.",
+    });
     return { discardedRecords: 0, discardedEvidence: 1 };
   }
 
@@ -979,6 +1066,12 @@ export async function discardOfflineOutboxItem(
       ownerKey
     );
     discardedEvidence = evidence?.count ?? 0;
+  });
+  await appendOfflineSyncHistory(database, ownerKey, {
+    itemKind: "record", itemId: id, label: "Queued record", outcome: "DISCARDED",
+    detail: discardedEvidence
+      ? `Unsynchronized local record and ${discardedEvidence} linked evidence attachment${discardedEvidence === 1 ? "" : "s"} discarded by the device user.`
+      : "Unsynchronized local record discarded by the device user.",
   });
   return {
     discardedRecords: 1,
@@ -1069,7 +1162,7 @@ export async function synchronizeOfflineItems(ownerKey: string) {
     envelope.type === "REGULATORY_ASSESSMENT_REVIEW" ||
     envelope.type === "REGULATORY_CHANGE_CLOSE"
   );
-  const first = await synchronizeRows(database, parents);
+  const first = await synchronizeRows(database, ownerKey, parents);
   const files = await synchronizeEvidence(database, ownerKey);
   const pendingEvidenceParents = new Set(
     (await database.getAllAsync<{ parent_submission_id: string }>(
@@ -1081,6 +1174,7 @@ export async function synchronizeOfflineItems(ownerKey: string) {
   );
   const last = await synchronizeRows(
     database,
+    ownerKey,
     responses.filter(({ row }) => !pendingEvidenceParents.has(row.id))
   );
   return {
@@ -1123,6 +1217,7 @@ async function insertEvidence(
 
 async function synchronizeRows(
   database: SQLite.SQLiteDatabase,
+  ownerKey: string,
   rows: Array<{ row: QueueRow; envelope: ReturnType<typeof decodeOfflineEnvelope> }>
 ) {
   if (!rows.length) return { synchronized: 0, failed: 0 };
@@ -1141,15 +1236,29 @@ async function synchronizeRows(
   });
   let synchronized = 0;
   for (const result of response.results) {
+    const queued = rows.find(({ row }) => row.id === result.id);
+    const label = queued ? offlineRecordLabels[queued.envelope.type] : "Queued record";
     if (result.status === "synced" || result.status === "already_synced") {
-      await database.runAsync("DELETE FROM mobile_outbox WHERE id = ?", result.id);
+      await database.runAsync("DELETE FROM mobile_outbox WHERE id = ? AND owner_key = ?", result.id, ownerKey);
+      await appendOfflineSyncHistory(database, ownerKey, {
+        itemKind: "record", itemId: result.id, label,
+        outcome: result.status === "already_synced" ? "ALREADY_SYNCED" : "SYNCED",
+        detail: result.status === "already_synced"
+          ? "Server idempotency confirmed this submission was already synchronized."
+          : null,
+      });
       synchronized++;
     } else {
+      const error = classifyOfflineFailure(result.error || "Synchronization failed.");
       await database.runAsync(
-        "UPDATE mobile_outbox SET last_error = ? WHERE id = ?",
-        (result.error || "Synchronization failed.").slice(0, 1000),
-        result.id
+        "UPDATE mobile_outbox SET last_error = ? WHERE id = ? AND owner_key = ?",
+        error.slice(0, 1000),
+        result.id,
+        ownerKey
       );
+      await appendOfflineSyncHistory(database, ownerKey, {
+        itemKind: "record", itemId: result.id, label, outcome: "FAILED", detail: error,
+      });
     }
   }
   return {
@@ -1213,16 +1322,28 @@ async function synchronizeEvidence(
         }
       }
       await database.runAsync(
-        "DELETE FROM mobile_evidence WHERE id = ?",
-        row.id
+        "DELETE FROM mobile_evidence WHERE id = ? AND owner_key = ?",
+        row.id,
+        ownerKey
       );
+      await appendOfflineSyncHistory(database, ownerKey, {
+        itemKind: "evidence", itemId: row.id, label: row.title,
+        outcome: "SYNCED", detail: "Private evidence upload and secure server registration confirmed.",
+      });
       synchronized++;
     } catch (error) {
-      await database.runAsync(
-        "UPDATE mobile_evidence SET last_error = ? WHERE id = ?",
-        (error instanceof Error ? error.message : "Evidence synchronization failed.").slice(0, 1000),
-        row.id
+      const detail = classifyOfflineFailure(
+        error instanceof Error ? error.message : "Evidence synchronization failed."
       );
+      await database.runAsync(
+        "UPDATE mobile_evidence SET last_error = ? WHERE id = ? AND owner_key = ?",
+        detail.slice(0, 1000),
+        row.id,
+        ownerKey
+      );
+      await appendOfflineSyncHistory(database, ownerKey, {
+        itemKind: "evidence", itemId: row.id, label: row.title, outcome: "FAILED", detail,
+      });
       failed++;
     }
   }
