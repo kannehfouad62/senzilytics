@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { WorkflowDecision, WorkflowEntityType } from "@prisma/client";
 import { z } from "zod";
+import { prisma } from "@/lib/prisma";
 import { decideWorkflowStep } from "@/core/workflow/workflow.service";
 import {
   authenticateMobileRequest,
@@ -11,7 +12,7 @@ const decisionSchema = z.object({
   taskId: z.string().min(1).max(100),
   entityType: z.nativeEnum(WorkflowEntityType),
   entityId: z.string().min(1).max(100),
-  decision: z.nativeEnum(WorkflowDecision),
+  decision: z.enum([WorkflowDecision.APPROVE, WorkflowDecision.REJECT]),
   comments: z.string().trim().max(2000).optional(),
 });
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const task = await (await import("@/lib/prisma")).prisma.workflowInstanceStep.findFirst({
+    const task = await prisma.workflowInstanceStep.findFirst({
       where: {
         id: parsed.data.taskId,
         status: "IN_PROGRESS",

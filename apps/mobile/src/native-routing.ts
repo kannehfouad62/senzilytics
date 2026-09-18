@@ -68,6 +68,7 @@ export function resolveNativeRecordTarget(
     case "contractors": return { tab: "assetContractors", view: "contractors", recordId: recordId(parts, 1) };
     case "chemicals": return { tab: "chemicalEnvironmental", view: "chemicals", recordId: recordId(parts, 1) };
     case "environmental": return { tab: "chemicalEnvironmental", view: "environmental", recordId: recordId(parts, 1) };
+    case "behavior-safety": return { tab: "behaviorAssurance", view: "behavior", recordId: parts.at(-1) };
     case "assurance":
       if (parts[1] === "sif") {
         return { tab: "behaviorAssurance", view: "sif", recordId: parts.at(-1) };
@@ -95,6 +96,7 @@ export function resolveWorkflowNativeTarget(
     PERMIT: `/compliance/permits/${entityId}`, CHEMICAL: `/chemicals/${entityId}`,
     MOC: `/moc/${entityId}`, OBSERVATION: `/observations/${entityId}`,
     RISK: `/risks/${entityId}`, TRAINING: `/training/${entityId}`,
+    ENVIRONMENTAL: `/environmental/${entityId}`,
   };
   return resolveNativeRecordTarget(fallback[entityType]);
 }

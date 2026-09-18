@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   PermissionKey,
@@ -45,6 +46,33 @@ test("workflow inbox routes mobile users only to local tenant application paths"
     mobileWorkflowEntityHref(WorkflowEntityType.TRAINING, "record-1"),
     "/training"
   );
+});
+
+const mobileSource = (path: string) =>
+  readFile(new URL(`../${path}`, import.meta.url), "utf8");
+
+test("native routing certifies assurance and environmental continuity", async () => {
+  const routing = await mobileSource("apps/mobile/src/native-routing.ts");
+  assert.match(routing, /case "behavior-safety"/);
+  assert.match(routing, /ENVIRONMENTAL: `\/environmental\/\$\{entityId\}`/);
+  assert.doesNotMatch(routing, /WebView|react-native-webview/);
+});
+
+test("mobile workflow decisions admit only explicit human approve or reject", async () => {
+  const route = await mobileSource("src/app/api/mobile/workflow-decisions/route.ts");
+  assert.match(
+    route,
+    /z\.enum\(\[WorkflowDecision\.APPROVE, WorkflowDecision\.REJECT\]\)/
+  );
+  assert.match(route, /authenticateMobileRequest\(request\)/);
+  assert.match(route, /organizationId: organization\.id/);
+  assert.match(route, /status: "IN_PROGRESS"/);
+  assert.match(route, /decideWorkflowStep/);
+});
+
+test("native action continuity never imports a webview", async () => {
+  const routing = await mobileSource("apps/mobile/src/native-routing.ts");
+  assert.doesNotMatch(routing, /react-native-webview|<WebView/);
 });
 
 test("corrective-action source traceability prioritizes governed source records", () => {
