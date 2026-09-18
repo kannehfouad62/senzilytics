@@ -1195,3 +1195,157 @@ test("offline outbox exposes recovery metadata without record payload or evidenc
   assert.doesNotMatch(outbox, /\.payload\b|\.bytes\b|checksum/);
 });
 
+test("phase 3 native configurable FILE fields use governed evidence pickers and required validation", async () => {
+  const app = await offlineSource("apps/mobile/App.tsx");
+  assert.match(app, /field\.fieldType === "FILE"/);
+  assert.match(app, /EvidenceAttachmentPicker/);
+  assert.match(app, /isSelectedEvidenceArray/);
+  assert.match(app, /field\.isRequired/);
+  assert.doesNotMatch(app, /Files can be attached from the web workspace after this record synchronizes/);
+});
+
+test("phase 3 evidence selection preserves governed file controls", async () => {
+  const evidence = await offlineSource("apps/mobile/src/evidence.ts");
+  assert.match(evidence, /MAX_MOBILE_EVIDENCE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(evidence, /MAX_EVIDENCE_FILES_PER_RECORD/);
+  assert.match(evidence, /checksum/);
+  assert.match(evidence, /Crypto\.digest\(Crypto\.CryptoDigestAlgorithm\.SHA256, bytes\)/);
+  assert.match(evidence, /kind: "PHOTO" \| "VIDEO" \| "DOCUMENT"/);
+});
+
+test("phase 3 configurable evidence keeps binary bytes outside captured answer JSON", async () => {
+  const app = await offlineSource("apps/mobile/App.tsx");
+  assert.match(app, /draftSafeAnswers/);
+  assert.match(app, /!isSelectedEvidenceArray\(value\)/);
+  assert.match(app, /if \(field\.fieldType === "FILE"\)/);
+  assert.match(app, /continue;/);
+  const types = await offlineSource("apps/mobile/src/types.ts");
+  assert.doesNotMatch(
+    types.slice(types.indexOf("export type CapturedAnswer"), types.indexOf("export type CapturedForm")),
+    /SelectedEvidence|Uint8Array|\bbytes\b/
+  );
+});
+
+test("phase 3 offline evidence preserves configurable form lineage and parent identity", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  for (const column of ["form_definition_id", "form_version_id", "form_field_id"]) {
+    assert.match(storage, new RegExp(column));
+  }
+  assert.match(storage, /targetType: "CONFIGURABLE_FORM"/);
+  assert.match(storage, /evidenceGroup\.targetType === "CONFIGURABLE_FORM"/);
+  assert.match(storage, /parentSubmissionId/);
+  assert.match(storage, /formDefinitionId/);
+  assert.match(storage, /formVersionId/);
+  assert.match(storage, /formFieldId/);
+});
+
+test("phase 3 server requires configurable evidence lineage and a synchronized parent", async () => {
+  const service = await offlineSource("src/modules/mobile/mobile-evidence.service.ts");
+  assert.match(service, /value\.targetType === "CONFIGURABLE_FORM"/);
+  assert.match(service, /!value\.parentSubmissionId/);
+  assert.match(service, /!value\.formDefinitionId \|\| !value\.formVersionId \|\| !value\.formFieldId/);
+  assert.match(service, /Synchronize the configurable-form parent before uploading its evidence/);
+  assert.match(service, /organizationId: input\.organizationId/);
+  assert.match(service, /userId: input\.userId/);
+});
+
+test("phase 3 server derives cross-module configurable evidence governance from the synchronized parent", async () => {
+  const service = await offlineSource("src/modules/mobile/mobile-evidence.service.ts");
+  for (const recordType of [
+    "SAFETY_OBSERVATION", "INCIDENT", "ASSET_INSPECTION", "IH_FORMS",
+    "CHEMICAL_FORMS", "ENVIRONMENTAL_DATA", "ENVIRONMENTAL_FORMS",
+    "ESG_FORMS", "BEHAVIOR_SESSION", "SIF_VERIFICATION",
+    "CERTIFICATION_REVIEW_COMPLETE", "RESEARCH_FIELDWORK_RESPONSE",
+  ]) {
+    assert.match(service, new RegExp(recordType));
+  }
+  assert.match(service, /const policy = parentModules\[parent\.recordType\]/);
+  assert.match(service, /rolePermission\.findFirst/);
+  assert.match(service, /permission: policy\.permission/);
+});
+
+test("phase 3 server validates immutable definition version and FILE field before upload", async () => {
+  const service = await offlineSource("src/modules/mobile/mobile-evidence.service.ts");
+  assert.match(service, /definitionId: input\.payload\.formDefinitionId/);
+  assert.match(service, /versionId: input\.payload\.formVersionId/);
+  assert.match(service, /id: input\.payload\.formFieldId/);
+  assert.match(service, /fieldType: "FILE"/);
+  assert.match(service, /submittedById: input\.userId/);
+  assert.match(service, /This configurable-form FILE field is not available for mobile evidence capture/);
+});
+
+test("phase 3 configurable evidence persists privately through Document and ConfigurableFormFileAnswer", async () => {
+  const service = await offlineSource("src/modules/mobile/mobile-evidence.service.ts");
+  assert.match(service, /completeConfigurableFormEvidence/);
+  assert.match(service, /transaction\.document\.create/);
+  assert.match(service, /transaction\.configurableFormFileAnswer\.create/);
+  assert.match(service, /submissionId: input\.payload\.resolvedEntityId/);
+  assert.match(service, /fieldId: input\.payload\.formFieldId/);
+  assert.match(service, /documentId: document\.id/);
+  assert.match(service, /offlineSubmission\.create/);
+});
+
+test("phase 3 configurable evidence retains idempotency and failed upload recovery", async () => {
+  const service = await offlineSource("src/modules/mobile/mobile-evidence.service.ts");
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  assert.match(service, /prisma\.offlineSubmission\.findUnique/);
+  assert.match(service, /recordType === "MOBILE_EVIDENCE"/);
+  assert.match(storage, /UPDATE mobile_evidence SET last_error = \?/);
+  assert.match(storage, /Evidence was uploaded and is awaiting secure server registration/);
+  assert.match(storage, /DELETE FROM mobile_evidence WHERE id = \? AND owner_key = \?/);
+});
+
+test("phase 3 research FILE drafts are encrypted owner assignment and collection scoped", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  assert.match(storage, /CREATE TABLE IF NOT EXISTS mobile_research_draft_evidence/);
+  assert.match(storage, /owner_key TEXT NOT NULL/);
+  assert.match(storage, /assignment_id TEXT NOT NULL/);
+  assert.match(storage, /collection_id TEXT NOT NULL/);
+  assert.match(storage, /form_definition_id TEXT NOT NULL/);
+  assert.match(storage, /form_version_id TEXT NOT NULL/);
+  assert.match(storage, /form_field_id TEXT NOT NULL/);
+  assert.match(storage, /bytes BLOB NOT NULL/);
+  assert.match(storage, /WHERE owner_key = \? AND assignment_id = \? AND collection_id = \?/);
+});
+
+test("phase 3 research FILE drafts preserve evidence kind and reconstruct SelectedEvidence", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  assert.match(storage, /kind TEXT NOT NULL/);
+  assert.match(storage, /file\.kind/);
+  assert.match(storage, /kind: row\.kind/);
+  assert.match(storage, /Promise<Record<string, SelectedEvidence\[\]>>/);
+});
+
+test("phase 3 research interview restores FILE drafts and cleans them after completion or collection switch", async () => {
+  const app = await offlineSource("apps/mobile/App.tsx");
+  assert.match(app, /readResearchInterviewDraftEvidence/);
+  assert.match(app, /setAnswers\(\{ \.\.\.draft\.answers, \.\.\.fileAnswers \}\)/);
+  assert.match(app, /saveResearchInterviewDraftEvidence/);
+  assert.match(app, /clearResearchInterviewDraftEvidence\(ownerKey, assignment\.id\)/);
+  assert.match(app, /clearResearchInterviewDraftEvidence\(ownerKey, assignment\.id, collection\.id\)/);
+});
+
+test("phase 3 module-native configurable forms expose FILE evidence without serializing it as answers", async () => {
+  for (const path of [
+    "apps/mobile/src/assets-contractors.tsx",
+    "apps/mobile/src/hygiene-health.tsx",
+    "apps/mobile/src/chemical-environmental.tsx",
+    "apps/mobile/src/behavior-assurance.tsx",
+  ]) {
+    const source = await offlineSource(path);
+    assert.match(source, /field\.fieldType === "FILE"/);
+    assert.match(source, /EvidencePicker/);
+    assert.match(source, /configurableFormEvidence/);
+    assert.match(source, /isSelectedEvidenceArray/);
+  }
+});
+
+test("phase 3 mobile evidence server enforces size MIME checksum and private-upload contract", async () => {
+  const service = await offlineSource("src/modules/mobile/mobile-evidence.service.ts");
+  assert.match(service, /MAX_MOBILE_EVIDENCE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(service, /contentTypes\.has\(value\)/);
+  assert.match(service, /checksum: z\.string\(\)\.regex\(\/\^\[a-f0-9\]\{64\}\$\/\)/);
+  assert.match(service, /DOCUMENT_UPLOAD/);
+  assert.match(service, /OFFLINE_COLLECTION/);
+});
+
