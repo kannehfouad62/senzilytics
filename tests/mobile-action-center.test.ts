@@ -180,3 +180,25 @@ test("phase 4 mobile workflow decision endpoint still excludes skip and revalida
   assert.match(route, /status: "IN_PROGRESS"/);
   assert.match(route, /status: "ACTIVE"/);
 });
+
+
+test("phase 4 native action center provides bounded client-side search and operational filters", async () => {
+  const source = await mobileSource("apps/mobile/src/action-center.tsx");
+  assert.match(source, /Search tasks, workflows, or record types/);
+  assert.match(source, /Decision required/);
+  assert.match(source, /visibleTasks/);
+  assert.match(source, /Search CAPA, source, assignee, risk, or status/);
+  assert.match(source, /statusFilter/);
+  assert.match(source, /Any status/);
+  assert.match(source, /Search notification title, message, or type/);
+  assert.match(source, /visibleNotifications/);
+  assert.match(source, /scope === "unread"/);
+});
+
+test("phase 4 action center filtering never expands beyond authorized bootstrap collections", async () => {
+  const source = await mobileSource("apps/mobile/src/action-center.tsx");
+  assert.match(source, /workspace\.tasks\.filter/);
+  assert.match(source, /actions\.filter/);
+  assert.match(source, /workspace\.notifications\.filter/);
+  assert.doesNotMatch(source, /fetch\(|axios|\/api\/.*search/);
+});

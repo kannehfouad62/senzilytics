@@ -165,12 +165,35 @@ function TaskInbox({
   const [decisionTaskId, setDecisionTaskId] = useState<string | null>(null);
   const [decisionComments, setDecisionComments] = useState("");
   const [deciding, setDeciding] = useState(false);
+  const [query, setQuery] = useState("");
+  const [scope, setScope] = useState<"all" | "decision" | "overdue">("all");
+  const normalized = query.trim().toLowerCase();
+  const visibleTasks = workspace.tasks.filter((task) => {
+    const overdue = Boolean(task.dueAt && new Date(task.dueAt) < new Date());
+    if (scope === "decision" && !task.canDecide) return false;
+    if (scope === "overdue" && !overdue) return false;
+    if (!normalized) return true;
+    return [task.name, task.stepType, task.instance.entityType, task.instance.template.name]
+      .some((value) => value.toLowerCase().includes(normalized));
+  });
   if (!workspace.tasks.length) {
     return <Empty text="No active workflow steps are assigned to you." />;
   }
   return (
     <View style={styles.section}>
-      {workspace.tasks.map((task) => {
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search tasks, workflows, or record types"
+        placeholderTextColor="#64748b"
+        style={styles.searchInput}
+      />
+      <View style={styles.chips}>
+        <Chip label="All" active={scope === "all"} onPress={() => setScope("all")} />
+        <Chip label="Decision required" active={scope === "decision"} onPress={() => setScope("decision")} />
+        <Chip label="Overdue" active={scope === "overdue"} onPress={() => setScope("overdue")} />
+      </View>
+      {visibleTasks.map((task) => {
         const overdue = Boolean(task.dueAt && new Date(task.dueAt) < new Date());
         const target = resolveWorkflowNativeTarget(
           task.instance.entityType,
@@ -254,6 +277,7 @@ function TaskInbox({
           </Pressable>
         );
       })}
+      {!visibleTasks.length ? <Empty text="No workflow tasks match this search or filter." /> : null}
     </View>
   );
 }
@@ -266,15 +290,37 @@ function CapaInbox({
   onSelect: (id: string) => void;
 }) {
   const [scope, setScope] = useState<"mine" | "all">("mine");
-  const visible = useMemo(
-    () =>
-      scope === "mine"
-        ? actions.filter((action) => action.isAssignedToCurrentUser)
-        : actions,
-    [actions, scope]
-  );
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "overdue" | "completed">("all");
+  const visible = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return actions.filter((action) => {
+      if (scope === "mine" && !action.isAssignedToCurrentUser) return false;
+      const overdue = !["COMPLETED", "CLOSED"].includes(action.status) && new Date(action.dueDate) < new Date();
+      if (statusFilter === "open" && ["COMPLETED", "CLOSED"].includes(action.status)) return false;
+      if (statusFilter === "overdue" && !overdue) return false;
+      if (statusFilter === "completed" && !["COMPLETED", "CLOSED"].includes(action.status)) return false;
+      if (!normalized) return true;
+      return [
+        action.title,
+        action.description ?? "",
+        action.source.type,
+        action.source.label,
+        action.assignedTo.name,
+        action.riskLevel,
+        action.status,
+      ].some((value) => value.toLowerCase().includes(normalized));
+    });
+  }, [actions, query, scope, statusFilter]);
   return (
     <View style={styles.section}>
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search CAPA, source, assignee, risk, or status"
+        placeholderTextColor="#64748b"
+        style={styles.searchInput}
+      />
       <View style={styles.chips}>
         <Chip
           label="Assigned to me"
@@ -286,6 +332,12 @@ function CapaInbox({
           active={scope === "all"}
           onPress={() => setScope("all")}
         />
+      </View>
+      <View style={styles.chips}>
+        <Chip label="Any status" active={statusFilter === "all"} onPress={() => setStatusFilter("all")} />
+        <Chip label="Open" active={statusFilter === "open"} onPress={() => setStatusFilter("open")} />
+        <Chip label="Overdue" active={statusFilter === "overdue"} onPress={() => setStatusFilter("overdue")} />
+        <Chip label="Completed" active={statusFilter === "completed"} onPress={() => setStatusFilter("completed")} />
       </View>
       {visible.map((action) => {
         const overdue =
@@ -316,9 +368,11 @@ function CapaInbox({
       {!visible.length ? (
         <Empty
           text={
-            scope === "mine"
-              ? "No corrective actions are currently assigned to you."
-              : "No corrective actions are available to your role."
+            query.trim() || statusFilter !== "all"
+              ? "No corrective actions match this search or filter."
+              : scope === "mine"
+                ? "No corrective actions are currently assigned to you."
+                : "No corrective actions are available to your role."
           }
         />
       ) : null}
@@ -501,12 +555,32 @@ function AlertInbox({
   onRead: (id: string) => Promise<void>;
   onOpenNativeTarget: (target: NativeRecordTarget) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [scope, setScope] = useState<"unread" | "all">("unread");
+  const normalized = query.trim().toLowerCase();
+  const visibleNotifications = workspace.notifications.filter((item) => {
+    if (scope === "unread" && item.readAt) return false;
+    if (!normalized) return true;
+    return [item.title, item.message, item.type]
+      .some((value) => value.toLowerCase().includes(normalized));
+  });
   if (!workspace.notifications.length) {
     return <Empty text="You have no notifications." />;
   }
   return (
     <View style={styles.section}>
-      {workspace.notifications.map((item) => {
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search notification title, message, or type"
+        placeholderTextColor="#64748b"
+        style={styles.searchInput}
+      />
+      <View style={styles.chips}>
+        <Chip label="Unread" active={scope === "unread"} onPress={() => setScope("unread")} />
+        <Chip label="All" active={scope === "all"} onPress={() => setScope("all")} />
+      </View>
+      {visibleNotifications.map((item) => {
         const target = resolveNativeRecordTarget(item.link);
         return (
         <Card key={item.id} accent={!item.readAt}>
@@ -749,6 +823,15 @@ function messageOf(error: unknown) {
 
 const styles = StyleSheet.create({
   content: { flex: 1 },
+  searchInput: {
+    color: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#ffffff20",
+    borderRadius: 14,
+    backgroundColor: "#020617aa",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
   contentInner: { padding: 20, paddingBottom: 120, gap: 14 },
   section: { gap: 12 },
   eyebrow: {
