@@ -339,6 +339,13 @@ function AssessmentDetail({
         <Detail label="Sampling plan" value={assessment.samplingPlan || "Not recorded"} />
         <Detail label="Existing controls" value={assessment.group.existingControls || "Not recorded"} />
         <Detail label="Required PPE" value={assessment.group.requiredPpe || "Not recorded"} />
+        <Detail label="Scheduled" value={formatDate(assessment.scheduledAt)} />
+        <Detail label="Due" value={formatDate(assessment.dueDate)} />
+        <Detail label="Started" value={formatDate(assessment.startedAt)} />
+        <Detail label="Completed" value={formatDate(assessment.completedAt)} />
+        <Detail label="Observations" value={assessment.observations || "Not recorded"} />
+        <Detail label="Conclusions" value={assessment.conclusions || "Not recorded"} />
+        <Detail label="Recommendations" value={assessment.recommendations || "Not recorded"} />
       </Card>
       <Card>
         <Text style={styles.cardTitle}>Exposure agents and limits</Text>
@@ -641,6 +648,9 @@ function ProgramDetail({
         <Detail label="Exposure agent" value={program.agent?.name || "Not linked"} />
         <Detail label="Exposure group" value={program.group?.name || "Not linked"} />
         <Detail label="Frequency" value={`Every ${program.frequencyMonths} month${program.frequencyMonths === 1 ? "" : "s"}`} />
+        <Detail label="Lead time" value={`${program.leadDays} day${program.leadDays === 1 ? "" : "s"}`} />
+        <Detail label="Responsible" value={program.responsibleUser.name} />
+        <Detail label="Program active" value={program.isActive ? "Yes" : "No"} />
       </Card>
       <Card accent={program.enrollments.some((item) => item.status === "OVERDUE")}>
         <Text style={styles.cardTitle}>{canManage ? "Worker readiness" : "My surveillance milestones"}</Text>

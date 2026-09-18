@@ -275,6 +275,10 @@ function PeriodDetail({
           label="Published by"
           value={period.publishedBy?.name || null}
         />
+        <Detail label="Approved" value={period.approvedAt ? formatDate(period.approvedAt) : null} />
+        <Detail label="Published" value={period.publishedAt ? formatDate(period.publishedAt) : null} />
+        <Detail label="Missing metrics" value={String(period.missingMetricIds.length)} />
+        <Detail label="Missing forms" value={String(period.missingFormDefinitionIds.length)} />
       </Card>
       {canManage &&
       (period.status === "DATA_COLLECTION" ||

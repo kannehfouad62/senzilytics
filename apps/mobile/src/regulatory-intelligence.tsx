@@ -259,8 +259,12 @@ function SourceDetail({
         <Fact label="Authority" value={source.authority} />
         <Fact label="Jurisdiction" value={source.jurisdiction} />
         <Fact label="Owner" value={source.owner.name} />
+        <Fact label="Type" value={humanize(source.type)} />
         <Fact label="Review cadence" value={`${source.reviewCadenceDays} days`} />
+        <Fact label="Last reviewed" value={formatDate(source.lastReviewedAt)} />
         <Fact label="Next review" value={formatDate(source.nextReviewAt)} />
+        <Fact label="Tracked changes" value={String(source.changeCount)} />
+        <Fact label="Linked obligations" value={String(source.obligationCount)} />
         <Button label="Open official source" onPress={() => void Linking.openURL(source.sourceUrl)} />
       </Card>
       {source.canReview ? (
@@ -307,7 +311,12 @@ function ChangeDetail(props: Props & { change: MobileRegulatoryChange }) {
         <Fact label="Owner" value={change.owner.name} />
         <Fact label="Published" value={formatDate(change.publishedAt)} />
         <Fact label="Effective" value={formatDate(change.effectiveAt)} />
+        <Fact label="Detected" value={formatDate(change.detectedAt)} />
         <Fact label="Assessment due" value={formatDate(change.assessmentDueAt)} />
+        <Fact label="Implemented" value={formatDate(change.implementedAt)} />
+        <Fact label="Closed" value={formatDate(change.closedAt)} />
+        {change.implementationSummary ? <Fact label="Implementation" value={change.implementationSummary} /> : null}
+        {change.closeRationale ? <Fact label="Close rationale" value={change.closeRationale} /> : null}
         {change.citation ? <Fact label="Citation" value={change.citation} /> : null}
         <Button label="Open official publication" onPress={() => void Linking.openURL(change.sourceUrl)} />
       </Card>

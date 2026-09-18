@@ -536,8 +536,15 @@ function RiskDetail({
         ) : null}
         {risk.process ? <Text style={styles.meta}>Process: {risk.process}</Text> : null}
         <Text style={styles.meta}>
+          Current: {humanize(risk.currentLikelihood)} likelihood · {humanize(risk.currentImpact)} impact
+        </Text>
+        <Text style={styles.meta}>
+          Residual: {humanize(risk.residualLikelihood)} likelihood · {humanize(risk.residualImpact)} impact
+        </Text>
+        <Text style={styles.meta}>
           {risk.reviewCount} completed review{risk.reviewCount === 1 ? "" : "s"} ·{" "}
           {humanize(risk.reviewFrequency)}
+          {risk.lastReviewedAt ? ` · Last reviewed ${formatDate(risk.lastReviewedAt)}` : ""}
         </Text>
         <Text style={overdue(risk.nextReviewDate) ? styles.overdue : styles.due}>
           {risk.nextReviewDate
@@ -557,6 +564,7 @@ function RiskDetail({
           ) : null}
           <Text style={styles.meta}>
             {humanize(control.status)} · {humanize(control.effectiveness)}
+            {control.dueDate ? ` · Due ${formatDate(control.dueDate)}` : ""}
           </Text>
         </Card>
       ))}
@@ -765,6 +773,10 @@ function JsaDetail({
         {jsa.requiredPpe ? (
           <Text style={styles.meta}>Required PPE: {jsa.requiredPpe}</Text>
         ) : null}
+        {jsa.owner ? <Text style={styles.meta}>Owner: {jsa.owner.name}</Text> : null}
+        <Text style={styles.meta}>
+          Effective {jsa.effectiveDate ? formatDate(jsa.effectiveDate) : "not set"} · Review due {jsa.reviewDueDate ? formatDate(jsa.reviewDueDate) : "not set"}
+        </Text>
         {jsa.emergencyRequirements ? (
           <Text style={styles.meta}>
             Emergency requirements: {jsa.emergencyRequirements}

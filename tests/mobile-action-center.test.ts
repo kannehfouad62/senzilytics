@@ -121,3 +121,33 @@ test("phase 4 exact-record native screens accept routed record identity without 
     assert.doesNotMatch(source, /react-native-webview|<WebView/);
   }
 });
+
+
+test("phase 4 priority native record details expose operational lifecycle context", async () => {
+  const risk = await mobileSource("apps/mobile/src/risk-field.tsx");
+  assert.match(risk, /Current:.*currentLikelihood/s);
+  assert.match(risk, /Residual:.*residualLikelihood/s);
+  assert.match(risk, /Last reviewed/);
+  assert.match(risk, /control\.dueDate/);
+  assert.match(risk, /jsa\.effectiveDate/);
+  assert.match(risk, /jsa\.reviewDueDate/);
+
+  const hygiene = await mobileSource("apps/mobile/src/hygiene-health.tsx");
+  for (const label of ["Scheduled", "Due", "Started", "Completed", "Observations", "Conclusions", "Recommendations"]) {
+    assert.match(hygiene, new RegExp(`label="${label}"`));
+  }
+  assert.match(hygiene, /label="Responsible"/);
+
+  const esg = await mobileSource("apps/mobile/src/esg.tsx");
+  assert.match(esg, /period\.approvedAt/);
+  assert.match(esg, /period\.publishedAt/);
+  assert.match(esg, /period\.missingMetricIds\.length/);
+  assert.match(esg, /period\.missingFormDefinitionIds\.length/);
+
+  const regulatory = await mobileSource("apps/mobile/src/regulatory-intelligence.tsx");
+  assert.match(regulatory, /source\.lastReviewedAt/);
+  assert.match(regulatory, /source\.changeCount/);
+  assert.match(regulatory, /change\.detectedAt/);
+  assert.match(regulatory, /change\.implementationSummary/);
+  assert.match(regulatory, /change\.closeRationale/);
+});
