@@ -122,7 +122,7 @@ import type {
 
 type Tab = "home" | "workspace" | "outbox" | "capture" | "inspections" | "audits" | "auditServices" | "research" | "risks" | "governance" | "complianceDocuments" | "controlledWork" | "assetContractors" | "hygieneHealth" | "chemicalEnvironmental" | "esg" | "behaviorAssurance" | "regulatory" | "executive" | "administration" | "actions" | "settings";
 type CaptureMode = "observation" | "incident";
-type FieldValue = string | boolean | string[] | MobileRepeatingGroupRow[];
+type FieldValue = string | boolean | string[] | MobileRepeatingGroupRow[] | SelectedEvidence[];
 const observationTypes = ["UNSAFE_ACT", "UNSAFE_CONDITION", "POSITIVE_PRACTICE", "ENVIRONMENTAL", "QUALITY", "OTHER"] as const;
 const incidentTypes = ["INJURY", "NEAR_MISS", "PROPERTY_DAMAGE", "ENVIRONMENTAL", "VEHICLE", "SECURITY", "OTHER"] as const;
 const riskLevels = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
@@ -674,7 +674,7 @@ function ResearchInterviewEditor({ assignment, ownerKey, online, onBack, onQueue
   }, [assignment.id, assignment.collections, ownerKey]);
   useEffect(() => {
     if (!draftReady) return;
-    const timer = setTimeout(() => { void saveResearchInterviewDraft(ownerKey, assignment.id, { collectionId, locale, interviewStartedAt: startedAt, consent, answers, updatedAt: new Date().toISOString() }); }, 500);
+    const timer = setTimeout(() => { void saveResearchInterviewDraft(ownerKey, assignment.id, { collectionId, locale, interviewStartedAt: startedAt, consent, answers: draftSafeAnswers(answers, assignment.collections.map((item) => item.form)), updatedAt: new Date().toISOString() }); }, 500);
     return () => clearTimeout(timer);
   }, [answers, assignment.id, collectionId, consent, draftReady, locale, ownerKey, startedAt]);
   if (!collection) return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><SecondaryButton label="← Assigned research fieldwork" onPress={onBack} /><EmptyState text="No active questionnaire is available for this sampled unit." /></ScrollView>;
@@ -1006,7 +1006,10 @@ function DynamicField({ field, value, calculatedValue, onChange }: { field: Runt
   if (field.fieldType === "RANKING") return <MobileRankingField field={field} value={value} onChange={onChange} />;
   if (field.fieldType === "REPEATING_GROUP") return <MobileRepeatingGroupField field={field} value={value} onChange={onChange} />;
   if (field.fieldType === "CALCULATED") { const result=typeof calculatedValue==="number"?calculatedValue:null,config=mobileCalculationConfig(field.options),band=result===null?null:config?.bands.find((item)=>result>=item.min&&result<=item.max)?.label; return <View style={styles.evidencePanel}><FieldLabel text={field.label}/><Text style={styles.cardTitle}>{result??"Waiting for source responses"}</Text>{band?<Text style={styles.successText}>{band}</Text>:null}<Text style={styles.fieldHelp}>Automatically calculated and independently verified during synchronization.</Text></View>; }
-  if (field.fieldType === "FILE") return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><Text style={styles.muted}>Files can be attached from the web workspace after this record synchronizes.</Text></View>;
+  if (field.fieldType === "FILE") {
+    const files = isSelectedEvidenceArray(value) ? value : [];
+    return <EvidenceAttachmentPicker label={`${field.label}${field.isRequired ? " *" : ""}`} value={files} onChange={onChange} />;
+  }
   if (field.fieldType === "BOOLEAN") return <Pressable style={styles.checkRow} onPress={() => onChange(value !== true)}><View style={[styles.checkbox, value === true && styles.checkboxOn]}>{value === true ? <Text style={styles.checkmark}>✓</Text> : null}</View><Text style={styles.checkLabel}>{field.label}{field.isRequired ? " *" : ""}</Text></Pressable>;
   if (field.fieldType === "SINGLE_SELECT") return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><ChipGroup values={options.map((option) => ({ value: option, label: field.optionLabels?.[option] || option }))} selected={typeof value === "string" ? value : ""} onSelect={onChange} /></View>;
   if (field.fieldType === "MULTI_SELECT") { const selected = Array.isArray(value) ? value.filter((item):item is string=>typeof item==="string") : []; return <View style={styles.fieldBlock}><FieldLabel text={`${field.label}${field.isRequired ? " *" : ""}`} /><View style={styles.chips}>{options.map((option) => <Pressable key={option} style={[styles.chip, selected.includes(option) && styles.chipOn]} onPress={() => onChange(selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option])}><Text style={[styles.chipText, selected.includes(option) && styles.chipTextOn]}>{field.optionLabels?.[option] || option}</Text></Pressable>)}</View></View>; }
@@ -1062,11 +1065,16 @@ function buildCapturedForms(forms: RuntimeForm[], answers: Record<string, FieldV
   return forms.map((form) => {
     const captured: CapturedAnswer[] = [];
     for (const field of form.version.fields) {
-      if (!isVisible(field, form, answers) || field.fieldType === "FILE" || field.fieldType === "CALCULATED") continue;
+      if (!isVisible(field, form, answers) || field.fieldType === "CALCULATED") continue;
       const value = answers[field.id];
       const empty = value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
       if (field.isRequired && (empty || (field.fieldType === "BOOLEAN" && value !== true))) throw new Error(`${field.label} is required.`);
       if (empty) continue;
+      if (field.fieldType === "FILE") {
+        if (!isSelectedEvidenceArray(value)) throw new Error(`${field.label} has invalid native evidence.`);
+        continue;
+      }
+      if (isSelectedEvidenceArray(value)) throw new Error(`${field.label} has invalid evidence for this field type.`);
       if(field.fieldType==="REPEATING_GROUP") { const config=mobileRosterConfig(field.options); if(!config||!isMobileRosterRows(value)||value.length<config.minRows||value.length>config.maxRows)throw new Error(`${field.label} has invalid roster rows.`); const ids=new Set<string>(); value.forEach((row,index)=>{if(!/^[a-zA-Z0-9_-]{8,80}$/.test(row.id)||ids.has(row.id))throw new Error(`${field.label} row ${index+1} has an invalid identifier.`);ids.add(row.id);config.columns.forEach((column)=>{if(column.showWhen&&String(row.values[column.showWhen.columnKey]??"")!==column.showWhen.value)return;const answer=row.values[column.key];const missing=answer===undefined||answer===null||answer==="";if(column.required&&missing)throw new Error(`${field.label}, row ${index+1}: ${column.label} is required.`);if(missing)return;if(column.type==="NUMBER"&&!Number.isFinite(Number(answer)))throw new Error(`${field.label}, row ${index+1}: ${column.label} must be a number.`);if(column.type==="DATE"&&!/^\d{4}-\d{2}-\d{2}$/.test(String(answer)))throw new Error(`${field.label}, row ${index+1}: ${column.label} must be a valid date.`);if(column.type==="SINGLE_SELECT"&&!column.options.includes(String(answer)))throw new Error(`${field.label}, row ${index+1}: select a valid ${column.label}.`);});});captured.push({fieldId:field.id,value}); }
       else if (field.fieldType === "NUMBER") { const number = Number(value); if (!Number.isFinite(number)) throw new Error(`${field.label} must be a valid number.`); captured.push({ fieldId: field.id, value: number }); }
       else captured.push({ fieldId: field.id, value });
@@ -1094,6 +1102,33 @@ function SecondaryButton({ label, onPress, disabled = false }: { label: string; 
 function ChipGroup({ values, selected, onSelect }: { values: Array<{ value: string; label: string }>; selected: string; onSelect: (value: string) => void }) { return <View style={styles.chips}>{values.map((item) => <Pressable key={item.value} style={[styles.chip, selected === item.value && styles.chipOn]} onPress={() => onSelect(item.value)}><Text style={[styles.chipText, selected === item.value && styles.chipTextOn]}>{item.label}</Text></Pressable>)}</View>; }
 function TabButton({ active, label, badge, onPress }: { active: boolean; label: string; badge?: number; onPress: () => void }) { return <Pressable style={styles.tab} onPress={onPress}><View><Text style={[styles.tabText, active && styles.tabTextOn]}>{label}</Text>{badge ? <View style={styles.badge}><Text style={styles.badgeText}>{badge > 99 ? "99+" : badge}</Text></View> : null}</View></Pressable>; }
 function EmptyState({ text }: { text: string }) { return <View style={styles.empty}><Text style={styles.muted}>{text}</Text></View>; }
+function draftSafeAnswers(
+  answers: Record<string, FieldValue>,
+  forms: RuntimeForm[]
+): Record<string, string | boolean | string[] | MobileRepeatingGroupRow[]> {
+  const fileFieldIds = new Set(
+    forms.flatMap((form) =>
+      form.version.fields.filter((field) => field.fieldType === "FILE").map((field) => field.id)
+    )
+  );
+  return Object.fromEntries(
+    Object.entries(answers).filter(
+      ([fieldId, value]) => !fileFieldIds.has(fieldId) && !isSelectedEvidenceArray(value)
+    )
+  ) as Record<string, string | boolean | string[] | MobileRepeatingGroupRow[]>;
+}
+function isSelectedEvidenceArray(value: FieldValue | undefined): value is SelectedEvidence[] {
+  return Array.isArray(value) && value.every((item) =>
+    typeof item === "object" &&
+    item !== null &&
+    "id" in item &&
+    "fileName" in item &&
+    "mimeType" in item &&
+    "sizeBytes" in item &&
+    "checksum" in item &&
+    "bytes" in item
+  );
+}
 function humanize(value: string) { return value.toLowerCase().split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "); }
 function formatDate(value: string) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
 function formatFileSize(value: number) { return value >= 1024 * 1024 ? `${(value / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(value / 1024))} KB`; }
