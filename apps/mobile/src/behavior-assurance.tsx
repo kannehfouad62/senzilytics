@@ -97,6 +97,7 @@ export function BehaviorAssuranceScreen({
   ownerKey,
   online,
   initialView,
+  initialRecordId = null,
   onBack,
   onQueued,
   onSync,
@@ -105,6 +106,7 @@ export function BehaviorAssuranceScreen({
   ownerKey: string;
   online: boolean;
   initialView: BehaviorAssuranceView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
@@ -155,11 +157,11 @@ export function BehaviorAssuranceScreen({
           <Banner text="Authorized assurance records remain encrypted on this device and synchronize idempotently when connectivity returns." />
         ) : null}
         {active === "behavior" ? (
-          <BehaviorWorkspace workspace={workspace} {...shared} />
+          <BehaviorWorkspace workspace={workspace} initialRecordId={initialRecordId} {...shared} />
         ) : active === "sif" ? (
-          <SifWorkspace workspace={workspace} {...shared} />
+          <SifWorkspace workspace={workspace} initialRecordId={initialRecordId} {...shared} />
         ) : (
-          <CertificationWorkspace workspace={workspace} {...shared} />
+          <CertificationWorkspace workspace={workspace} initialRecordId={initialRecordId} {...shared} />
         )}
       </Page>
     </KeyboardAvoidingView>
@@ -168,11 +170,23 @@ export function BehaviorAssuranceScreen({
 
 function BehaviorWorkspace({
   workspace,
+  initialRecordId,
   ...shared
-}: { workspace: MobileBootstrap } & SharedProps) {
+}: { workspace: MobileBootstrap; initialRecordId?: string | null } & SharedProps) {
+  const initialProgram = workspace.behaviorPrograms.find(
+    (item) =>
+      item.id === initialRecordId ||
+      item.sessions.some((session) => session.id === initialRecordId)
+  );
   const [query, setQuery] = useState("");
-  const [programId, setProgramId] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [programId, setProgramId] = useState<string | null>(
+    initialProgram?.id ?? null
+  );
+  const [sessionId, setSessionId] = useState<string | null>(
+    initialProgram?.sessions.some((session) => session.id === initialRecordId)
+      ? initialRecordId ?? null
+      : null
+  );
   const program = workspace.behaviorPrograms.find(
     (item) => item.id === programId
   );
@@ -801,12 +815,21 @@ function BehaviorSessionDetail({
 
 function SifWorkspace({
   workspace,
+  initialRecordId,
   ...shared
-}: { workspace: MobileBootstrap } & SharedProps) {
-  const [mode, setMode] = useState<"signals" | "controls" | "clusters">("signals");
-  const [signalId, setSignalId] = useState<string | null>(null);
-  const [controlId, setControlId] = useState<string | null>(null);
+}: { workspace: MobileBootstrap; initialRecordId?: string | null } & SharedProps) {
   const sif = workspace.sifAssurance;
+  const initialSignalId = sif?.signals.some((item) => item.id === initialRecordId)
+    ? initialRecordId ?? null
+    : null;
+  const initialControlId = sif?.controls.some((item) => item.id === initialRecordId)
+    ? initialRecordId ?? null
+    : null;
+  const [mode, setMode] = useState<"signals" | "controls" | "clusters">(
+    initialControlId ? "controls" : "signals"
+  );
+  const [signalId, setSignalId] = useState<string | null>(initialSignalId);
+  const [controlId, setControlId] = useState<string | null>(initialControlId);
   const signal = sif?.signals.find((item) => item.id === signalId);
   const control = sif?.controls.find((item) => item.id === controlId);
   if (!sif) return <Empty text="No SIF intelligence is available for this role." />;
@@ -1090,10 +1113,22 @@ function CriticalControlDetail({
 
 function CertificationWorkspace({
   workspace,
+  initialRecordId,
   ...shared
-}: { workspace: MobileBootstrap } & SharedProps) {
-  const [programId, setProgramId] = useState<string | null>(null);
-  const [reviewId, setReviewId] = useState<string | null>(null);
+}: { workspace: MobileBootstrap; initialRecordId?: string | null } & SharedProps) {
+  const initialProgram = workspace.certificationPrograms.find(
+    (item) =>
+      item.id === initialRecordId ||
+      item.reviews.some((review) => review.id === initialRecordId)
+  );
+  const [programId, setProgramId] = useState<string | null>(
+    initialProgram?.id ?? null
+  );
+  const [reviewId, setReviewId] = useState<string | null>(
+    initialProgram?.reviews.some((review) => review.id === initialRecordId)
+      ? initialRecordId ?? null
+      : null
+  );
   const program = workspace.certificationPrograms.find(
     (item) => item.id === programId
   );
