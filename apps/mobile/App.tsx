@@ -78,6 +78,9 @@ import {
 import { registerForMobilePush, subscribeToMobileNotificationResponses } from "./src/push";
 import { MOBILE_WORKSPACE_MAX_OFFLINE_AGE_MS } from "./src/session-lifecycle";
 import {
+  clearResearchInterviewDraftEvidence,
+  readResearchInterviewDraftEvidence,
+  saveResearchInterviewDraftEvidence,
   cacheWorkspace,
   clearResearchInterviewDraft,
   clearCachedControlledDocuments,
@@ -668,13 +671,20 @@ function ResearchInterviewEditor({ assignment, ownerKey, online, onBack, onQueue
     let active = true;
     void readResearchInterviewDraft(ownerKey, assignment.id).then((draft) => {
       if (!active || !draft || !assignment.collections.some((item) => item.id === draft.collectionId)) return;
-      setCollectionId(draft.collectionId); setLocale(draft.locale); setStartedAt(draft.interviewStartedAt); setConsent(draft.consent); setAnswers(draft.answers);
+      setCollectionId(draft.collectionId); setLocale(draft.locale); setStartedAt(draft.interviewStartedAt); setConsent(draft.consent);
+      void readResearchInterviewDraftEvidence(ownerKey, assignment.id, draft.collectionId).then((fileAnswers) => {
+        if (active) setAnswers({ ...draft.answers, ...fileAnswers });
+      });
     }).finally(() => { if (active) setDraftReady(true); });
     return () => { active = false; };
   }, [assignment.id, assignment.collections, ownerKey]);
   useEffect(() => {
     if (!draftReady) return;
-    const timer = setTimeout(() => { void saveResearchInterviewDraft(ownerKey, assignment.id, { collectionId, locale, interviewStartedAt: startedAt, consent, answers: draftSafeAnswers(answers, assignment.collections.map((item) => item.form)), updatedAt: new Date().toISOString() }); }, 500);
+    const timer = setTimeout(() => {
+      void saveResearchInterviewDraft(ownerKey, assignment.id, { collectionId, locale, interviewStartedAt: startedAt, consent, answers: draftSafeAnswers(answers, assignment.collections.map((item) => item.form)), updatedAt: new Date().toISOString() });
+      const activeCollection = assignment.collections.find((item) => item.id === collectionId);
+      if (activeCollection) void saveResearchInterviewDraftEvidence(ownerKey, assignment.id, collectionId, configurableFormEvidence(activeCollection.form, answers));
+    }, 500);
     return () => clearTimeout(timer);
   }, [answers, assignment.id, collectionId, consent, draftReady, locale, ownerKey, startedAt]);
   if (!collection) return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><SecondaryButton label="← Assigned research fieldwork" onPress={onBack} /><EmptyState text="No active questionnaire is available for this sampled unit." /></ScrollView>;
@@ -693,6 +703,7 @@ function ResearchInterviewEditor({ assignment, ownerKey, online, onBack, onQueue
         configurableFormEvidence(localized.form, answers)
       );
       await clearResearchInterviewDraft(ownerKey, assignment.id);
+      await clearResearchInterviewDraftEvidence(ownerKey, assignment.id);
       setAnswers({});
       await onQueued(online ? "Research interview queued. Synchronizing now…" : "Research interview encrypted and saved offline.");
       if (online) onSync();
@@ -701,7 +712,7 @@ function ResearchInterviewEditor({ assignment, ownerKey, online, onBack, onQueue
     finally { setSaving(false); }
   };
   const languages = [{ value: collection.questionnaire.defaultLanguage.trim().replaceAll("_", "-").toLowerCase(), label: "Default" }, ...collection.localizations.map((item) => ({ value: item.locale, label: item.languageName }))];
-  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><SecondaryButton label="← Assigned research fieldwork" onPress={onBack} /><Text style={styles.eyebrow}>{online ? "GOVERNED INTERVIEW" : "ENCRYPTED OFFLINE INTERVIEW"}</Text><Text style={styles.pageTitle}>{assignment.unitReference}</Text><Text style={styles.muted}>{assignment.project.client?.name ?? assignment.project.title} · {assignment.project.reference}</Text>{assignment.collections.length > 1 ? <><FieldLabel text="Collection wave" /><ChipGroup values={assignment.collections.map((item) => ({ value: item.id, label: item.name }))} selected={collection.id} onSelect={(value) => { const next = assignment.collections.find((item) => item.id === value); setCollectionId(value); setLocale(next?.questionnaire.defaultLanguage.trim().replaceAll("_", "-").toLowerCase() ?? "en"); setAnswers({}); setConsent(false); }} /></> : null}{languages.length > 1 ? <><FieldLabel text="Interview language" /><ChipGroup values={languages} selected={locale} onSelect={(value) => setLocale(value)} /></> : null}<Card accent><Text style={styles.cardTitle}>{localized.questionnaire.name}</Text><Text style={styles.muted}>{localized.questionnaire.purpose}</Text>{localized.instructions ? <Text style={styles.fieldHelp}>{localized.instructions}</Text> : null}</Card>{localized.questionnaire.consentStatement ? <Pressable style={styles.checkRow} onPress={() => setConsent((value) => !value)}><View style={[styles.checkbox, consent && styles.checkboxOn]}>{consent ? <Text style={styles.checkmark}>✓</Text> : null}</View><View style={styles.flex}><Text style={styles.checkLabel}>Participant consent recorded *</Text><Text style={styles.fieldHelp}>{localized.questionnaire.consentStatement}</Text></View></Pressable> : null}<DynamicForm form={localized.form} answers={answers} setAnswers={setAnswers} />{draftReady ? <Text style={styles.fieldHelp}>Draft answers are encrypted and recovered automatically on this device.</Text> : <Text style={styles.fieldHelp}>Recovering encrypted draft…</Text>}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Encrypting response…" : online ? "Complete and synchronize" : "Complete and save offline"} disabled={saving || !draftReady} onPress={save} /><Text style={styles.fieldHelp}>The response is bound to this sample unit and immutable questionnaire version. Synchronization is idempotent and requires your current tenant permission.</Text></ScrollView></KeyboardAvoidingView>;
+  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled"><SecondaryButton label="← Assigned research fieldwork" onPress={onBack} /><Text style={styles.eyebrow}>{online ? "GOVERNED INTERVIEW" : "ENCRYPTED OFFLINE INTERVIEW"}</Text><Text style={styles.pageTitle}>{assignment.unitReference}</Text><Text style={styles.muted}>{assignment.project.client?.name ?? assignment.project.title} · {assignment.project.reference}</Text>{assignment.collections.length > 1 ? <><FieldLabel text="Collection wave" /><ChipGroup values={assignment.collections.map((item) => ({ value: item.id, label: item.name }))} selected={collection.id} onSelect={(value) => { if (value !== collection.id) void clearResearchInterviewDraftEvidence(ownerKey, assignment.id, collection.id); const next = assignment.collections.find((item) => item.id === value); setCollectionId(value); setLocale(next?.questionnaire.defaultLanguage.trim().replaceAll("_", "-").toLowerCase() ?? "en"); setAnswers({}); setConsent(false); }} /></> : null}{languages.length > 1 ? <><FieldLabel text="Interview language" /><ChipGroup values={languages} selected={locale} onSelect={(value) => setLocale(value)} /></> : null}<Card accent><Text style={styles.cardTitle}>{localized.questionnaire.name}</Text><Text style={styles.muted}>{localized.questionnaire.purpose}</Text>{localized.instructions ? <Text style={styles.fieldHelp}>{localized.instructions}</Text> : null}</Card>{localized.questionnaire.consentStatement ? <Pressable style={styles.checkRow} onPress={() => setConsent((value) => !value)}><View style={[styles.checkbox, consent && styles.checkboxOn]}>{consent ? <Text style={styles.checkmark}>✓</Text> : null}</View><View style={styles.flex}><Text style={styles.checkLabel}>Participant consent recorded *</Text><Text style={styles.fieldHelp}>{localized.questionnaire.consentStatement}</Text></View></Pressable> : null}<DynamicForm form={localized.form} answers={answers} setAnswers={setAnswers} />{draftReady ? <Text style={styles.fieldHelp}>Draft answers are encrypted and recovered automatically on this device.</Text> : <Text style={styles.fieldHelp}>Recovering encrypted draft…</Text>}{error ? <Text style={styles.error}>{error}</Text> : null}<PrimaryButton label={saving ? "Encrypting response…" : online ? "Complete and synchronize" : "Complete and save offline"} disabled={saving || !draftReady} onPress={save} /><Text style={styles.fieldHelp}>The response is bound to this sample unit and immutable questionnaire version. Synchronization is idempotent and requires your current tenant permission.</Text></ScrollView></KeyboardAvoidingView>;
 }
 
 function localizedMobileResearchCollection(collection: MobileResearchFieldworkAssignment["collections"][number], locale: string) {

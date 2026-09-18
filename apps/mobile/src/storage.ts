@@ -231,6 +231,7 @@ export async function initializeOfflineStore() {
       title TEXT NOT NULL,
       description TEXT,
       file_name TEXT NOT NULL,
+      kind TEXT NOT NULL,
       mime_type TEXT NOT NULL,
       size_bytes INTEGER NOT NULL,
       checksum TEXT NOT NULL,
@@ -240,6 +241,23 @@ export async function initializeOfflineStore() {
     );
     CREATE INDEX IF NOT EXISTS mobile_evidence_owner_captured
       ON mobile_evidence(owner_key, captured_at);
+    CREATE TABLE IF NOT EXISTS mobile_research_draft_evidence (
+      id TEXT PRIMARY KEY NOT NULL,
+      owner_key TEXT NOT NULL,
+      assignment_id TEXT NOT NULL,
+      collection_id TEXT NOT NULL,
+      form_definition_id TEXT NOT NULL,
+      form_version_id TEXT NOT NULL,
+      form_field_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      checksum TEXT NOT NULL,
+      captured_at TEXT NOT NULL,
+      bytes BLOB NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS mobile_research_draft_evidence_owner_assignment
+      ON mobile_research_draft_evidence(owner_key, assignment_id, collection_id);
     CREATE TABLE IF NOT EXISTS mobile_sync_history (
       id TEXT PRIMARY KEY NOT NULL,
       owner_key TEXT NOT NULL,
@@ -1474,6 +1492,78 @@ export async function clearWorkspaceCache(ownerKey: string) {
 }
 
 const researchDraftKey = (ownerKey: string, sampleUnitId: string) => `research-draft:${ownerKey}:${sampleUnitId}`;
+
+export async function saveResearchInterviewDraftEvidence(
+  ownerKey: string,
+  assignmentId: string,
+  collectionId: string,
+  evidence: ConfigurableFormEvidenceInput[]
+) {
+  const database = await db();
+  await database.withExclusiveTransactionAsync(async (transaction) => {
+    await transaction.runAsync(
+      "DELETE FROM mobile_research_draft_evidence WHERE owner_key = ? AND assignment_id = ? AND collection_id = ?",
+      ownerKey, assignmentId, collectionId
+    );
+    for (const group of evidence) {
+      for (const file of group.files) {
+        await transaction.runAsync(
+          `INSERT INTO mobile_research_draft_evidence
+           (id, owner_key, assignment_id, collection_id, form_definition_id, form_version_id, form_field_id,
+            file_name, kind, mime_type, size_bytes, checksum, captured_at, bytes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          file.id, ownerKey, assignmentId, collectionId, group.formDefinitionId, group.formVersionId,
+          group.formFieldId, file.fileName, file.kind, file.mimeType, file.sizeBytes, file.checksum, new Date().toISOString(), file.bytes
+        );
+      }
+    }
+  });
+}
+
+export async function readResearchInterviewDraftEvidence(
+  ownerKey: string,
+  assignmentId: string,
+  collectionId: string
+): Promise<Record<string, SelectedEvidence[]>> {
+  const database = await db();
+  const rows = await database.getAllAsync<{
+    id: string; form_field_id: string; file_name: string; kind: SelectedEvidence["kind"]; mime_type: string;
+    size_bytes: number; checksum: string; captured_at: string; bytes: Uint8Array;
+  }>(
+    `SELECT id, form_field_id, file_name, kind, mime_type, size_bytes, checksum, captured_at, bytes
+     FROM mobile_research_draft_evidence
+     WHERE owner_key = ? AND assignment_id = ? AND collection_id = ?
+     ORDER BY captured_at ASC`,
+    ownerKey, assignmentId, collectionId
+  );
+  const result: Record<string, SelectedEvidence[]> = {};
+  for (const row of rows) {
+    (result[row.form_field_id] ??= []).push({
+      id: row.id, fileName: row.file_name, kind: row.kind, mimeType: row.mime_type,
+      sizeBytes: row.size_bytes, checksum: row.checksum, bytes: row.bytes,
+    });
+  }
+  return result;
+}
+
+export async function clearResearchInterviewDraftEvidence(
+  ownerKey: string,
+  assignmentId: string,
+  collectionId?: string
+) {
+  const database = await db();
+  if (collectionId) {
+    await database.runAsync(
+      "DELETE FROM mobile_research_draft_evidence WHERE owner_key = ? AND assignment_id = ? AND collection_id = ?",
+      ownerKey, assignmentId, collectionId
+    );
+  } else {
+    await database.runAsync(
+      "DELETE FROM mobile_research_draft_evidence WHERE owner_key = ? AND assignment_id = ?",
+      ownerKey, assignmentId
+    );
+  }
+}
 
 export async function saveResearchInterviewDraft(ownerKey: string, sampleUnitId: string, draft: ResearchInterviewDraft) {
   const database = await db();
