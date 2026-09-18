@@ -35,6 +35,7 @@ type Props = {
   workspace: MobileBootstrap;
   ownerKey: string;
   online: boolean;
+  initialRecordId?: string | null;
   onBack: () => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
@@ -43,7 +44,7 @@ type Props = {
 export function RegulatoryIntelligenceScreen(props: Props) {
   const [view, setView] = useState<"sources" | "changes">("changes");
   const [sourceId, setSourceId] = useState<string | null>(null);
-  const [changeId, setChangeId] = useState<string | null>(null);
+  const [changeId, setChangeId] = useState<string | null>(props.initialRecordId ?? null);
   const source = props.workspace.regulatorySources?.find(
     (item) => item.id === sourceId
   );

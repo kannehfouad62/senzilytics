@@ -52,6 +52,7 @@ export function HygieneHealthScreen({
   ownerKey,
   online,
   initialView,
+  initialRecordId = null,
   onBack,
   onQueued,
   onSync,
@@ -60,14 +61,15 @@ export function HygieneHealthScreen({
   ownerKey: string;
   online: boolean;
   initialView: HygieneHealthView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
 }) {
   const [view, setView] = useState(initialView);
   const [query, setQuery] = useState("");
-  const [assessmentId, setAssessmentId] = useState<string | null>(null);
-  const [programId, setProgramId] = useState<string | null>(null);
+  const [assessmentId, setAssessmentId] = useState<string | null>(initialView === "hygiene" ? initialRecordId : null);
+  const [programId, setProgramId] = useState<string | null>(initialView === "health" ? initialRecordId : null);
   const capabilities = workspace.hygieneHealthCapabilities;
   const assessments = workspace.exposureAssessments ?? [];
   const programs = workspace.surveillancePrograms ?? [];

@@ -162,6 +162,10 @@ function SenzilyticsApp() {
   const [nativeControlledWorkId, setNativeControlledWorkId] = useState<string | null>(null);
   const [nativeAssetContractorId, setNativeAssetContractorId] = useState<string | null>(null);
   const [nativeChemicalEnvironmentalId, setNativeChemicalEnvironmentalId] = useState<string | null>(null);
+  const [nativeHygieneHealthId, setNativeHygieneHealthId] = useState<string | null>(null);
+  const [nativeEsgId, setNativeEsgId] = useState<string | null>(null);
+  const [nativeRegulatoryId, setNativeRegulatoryId] = useState<string | null>(null);
+  const [nativeExecutiveId, setNativeExecutiveId] = useState<string | null>(null);
   const [nativeActionId, setNativeActionId] = useState<string | null>(null);
   const [nativeGovernanceId, setNativeGovernanceId] = useState<string | null>(null);
   const [nativeComplianceDocumentId, setNativeComplianceDocumentId] = useState<string | null>(null);
@@ -422,6 +426,25 @@ function SenzilyticsApp() {
         setChemicalEnvironmentalView(target.view);
         setTab("chemicalEnvironmental");
         break;
+      case "hygieneHealth":
+        setNativeHygieneHealthId(target.recordId ?? null);
+        setHygieneHealthView(target.view);
+        setTab("hygieneHealth");
+        break;
+      case "esg":
+        setNativeEsgId(target.recordId ?? null);
+        setEsgView(target.view);
+        setTab("esg");
+        break;
+      case "regulatory":
+        setNativeRegulatoryId(target.recordId ?? null);
+        setTab("regulatory");
+        break;
+      case "executive":
+        setNativeExecutiveId(target.recordId ?? null);
+        setExecutiveCommandView(target.view);
+        setTab("executive");
+        break;
       case "behaviorAssurance":
         setNativeBehaviorAssuranceId(target.recordId ?? null);
         setBehaviorAssuranceView(target.view);
@@ -497,12 +520,12 @@ function SenzilyticsApp() {
       {tab === "complianceDocuments" && <ComplianceDocumentsScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={complianceDocumentView} initialRecordId={nativeComplianceDocumentId} onBack={() => { setNativeComplianceDocumentId(null); setTab("workspace"); }} onRefresh={refreshWorkspace} onNotice={setNotice} />}
       {tab === "controlledWork" && <MocPermitScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={mocPermitView} initialRecordId={nativeControlledWorkId} onBack={() => { setNativeControlledWorkId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "assetContractors" && <AssetContractorScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={assetContractorView} initialRecordId={nativeAssetContractorId} onBack={() => { setNativeAssetContractorId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "hygieneHealth" && <HygieneHealthScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={hygieneHealthView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "hygieneHealth" && <HygieneHealthScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={hygieneHealthView} initialRecordId={nativeHygieneHealthId} onBack={() => { setNativeHygieneHealthId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "chemicalEnvironmental" && <ChemicalEnvironmentalScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={chemicalEnvironmentalView} initialRecordId={nativeChemicalEnvironmentalId} onBack={() => { setNativeChemicalEnvironmentalId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "esg" && <EsgScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={esgView} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "esg" && <EsgScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={esgView} initialRecordId={nativeEsgId} onBack={() => { setNativeEsgId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
       {tab === "behaviorAssurance" && <BehaviorAssuranceScreen workspace={workspace} ownerKey={ownerKey} online={online} initialView={behaviorAssuranceView} initialRecordId={nativeBehaviorAssuranceId} onBack={() => { setNativeBehaviorAssuranceId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "regulatory" && <RegulatoryIntelligenceScreen workspace={workspace} ownerKey={ownerKey} online={online} onBack={() => setTab("workspace")} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
-      {tab === "executive" && <ExecutiveCommandScreen workspace={workspace} online={online} initialView={executiveCommandView} onBack={() => setTab("workspace")} onRefresh={refreshExecutiveWorkspace} onNotice={setNotice} />}
+      {tab === "regulatory" && <RegulatoryIntelligenceScreen workspace={workspace} ownerKey={ownerKey} online={online} initialRecordId={nativeRegulatoryId} onBack={() => { setNativeRegulatoryId(null); setTab("workspace"); }} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} />}
+      {tab === "executive" && <ExecutiveCommandScreen workspace={workspace} online={online} initialView={executiveCommandView} initialRecordId={nativeExecutiveId} onBack={() => { setNativeExecutiveId(null); setTab("workspace"); }} onRefresh={refreshExecutiveWorkspace} onNotice={setNotice} />}
       {tab === "administration" && <TenantAdministrationScreen workspace={workspace} online={online} initialView={tenantAdministrationView} onBack={() => setTab("workspace")} onRefresh={refreshTenantAdministrationWorkspace} onNotice={setNotice} />}
       {tab === "actions" && <ActionCenterScreen workspace={workspace} ownerKey={ownerKey} online={online} view={actionCenterView} initialRecordId={nativeActionId} onViewChange={setActionCenterView} onQueued={async (message) => { setPending(await pendingOfflineCount(ownerKey)); setNotice(message); }} onSync={sync} onOpenNativeTarget={openNativeTarget} onWorkflowDecision={async (task, decision, comments) => { if (!online) { setNotice("Connect to the internet before making a workflow decision."); return; } try { await mobileApi("/api/mobile/workflow-decisions", { method: "POST", body: JSON.stringify({ taskId: task.id, entityType: task.instance.entityType, entityId: task.instance.entityId, decision, comments }) }); setNotice(`Workflow step ${decision === "APPROVE" ? "approved" : "rejected"}.`); await refreshWorkspace(); } catch (error) { setNotice(`Workflow decision failed: ${messageOf(error)}`); throw error; } }} onReadNotification={async (id) => { if (!online) { setNotice("Notification status will remain unchanged until the device is online."); return; } try { await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId: id }) }); setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item) } : current); } catch (error) { setNotice(`Notification update paused: ${messageOf(error)}`); } }} />}
       {tab === "settings" && <SettingsScreen workspace={workspace} pending={pending} signingOut={signingOut} onOpenOutbox={() => setTab("outbox")} releaseStatus={releaseStatus} systemHealth={systemHealth} verifiedAt={verifiedAt} onRefreshDiagnostics={() => { void refreshDiagnostics().catch((error) => setNotice(`Diagnostics refresh paused: ${messageOf(error)}`)); }} onEnablePush={async () => { setBusy(true); try { setNotice(await registerForMobilePush()); } catch (error) { setNotice(messageOf(error)); } finally { setBusy(false); } }} onLogout={async () => { if (signingOut) return; setSigningOut(true); setNotice("Signing out securely…"); let remoteRevokeFailed = false; try { await logoutMobileSession(); } catch { remoteRevokeFailed = true; } try { await clearWorkspaceCache(ownerKey); } finally { setWorkspace(null); setVerifiedAt(null); setPending(0); setTab("home"); setNotice(remoteRevokeFailed ? "You have signed out on this device. The server session could not be reached and will expire automatically." : "You have signed out securely. Your protected workspace is no longer available on this device session."); setAuthState("signed-out"); setSigningOut(false); } }} />}

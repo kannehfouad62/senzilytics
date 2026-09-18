@@ -48,6 +48,7 @@ export function EsgScreen({
   ownerKey,
   online,
   initialView,
+  initialRecordId = null,
   onBack,
   onQueued,
   onSync,
@@ -56,14 +57,15 @@ export function EsgScreen({
   ownerKey: string;
   online: boolean;
   initialView: EsgView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onQueued: (message: string) => Promise<void>;
   onSync: () => void;
 }) {
   const [view, setView] = useState<EsgView>(initialView);
   const [query, setQuery] = useState("");
-  const [periodId, setPeriodId] = useState<string | null>(null);
-  const [initiativeId, setInitiativeId] = useState<string | null>(null);
+  const [periodId, setPeriodId] = useState<string | null>(initialView === "disclosures" ? initialRecordId : null);
+  const [initiativeId, setInitiativeId] = useState<string | null>(initialView === "initiatives" ? initialRecordId : null);
   const shared = { ownerKey, online, onQueued, onSync };
   const period = workspace.esgPeriods.find((item) => item.id === periodId);
   const initiative = workspace.esgInitiatives.find(

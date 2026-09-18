@@ -26,6 +26,7 @@ type Props = {
   workspace: MobileBootstrap;
   online: boolean;
   initialView: ExecutiveCommandView;
+  initialRecordId?: string | null;
   onBack: () => void;
   onRefresh: () => Promise<MobileBootstrap>;
   onNotice: (message: string) => void;
@@ -47,7 +48,7 @@ export function ExecutiveCommandScreen(props: Props) {
       ? props.initialView
       : (available[0] ?? "overview")
   );
-  const [analysisId, setAnalysisId] = useState<string | null>(null);
+  const [analysisId, setAnalysisId] = useState<string | null>(props.initialView === "ai" ? (props.initialRecordId ?? null) : null);
   const analysis = props.workspace.executiveAiAnalyses?.find(
     (item) => item.id === analysisId
   );

@@ -93,3 +93,31 @@ test("corrective-action source traceability prioritizes governed source records"
     href: "/incidents/incident-1",
   });
 });
+
+
+test("phase 4 exact-record routing preserves native hygiene ESG regulatory and executive identities", async () => {
+  const routing = await mobileSource("apps/mobile/src/native-routing.ts");
+  assert.match(routing, /case "industrial-hygiene"/);
+  assert.match(routing, /tab: "hygieneHealth", view: "hygiene"/);
+  assert.match(routing, /case "occupational-health"/);
+  assert.match(routing, /tab: "hygieneHealth", view: "health"/);
+  assert.match(routing, /case "esg"/);
+  assert.match(routing, /tab: "esg"/);
+  assert.match(routing, /case "regulatory"/);
+  assert.match(routing, /tab: "regulatory"/);
+  assert.match(routing, /case "intelligence"/);
+  assert.match(routing, /tab: "executive", view: "ai"/);
+});
+
+test("phase 4 exact-record native screens accept routed record identity without web fallback", async () => {
+  for (const path of [
+    "apps/mobile/src/hygiene-health.tsx",
+    "apps/mobile/src/esg.tsx",
+    "apps/mobile/src/regulatory-intelligence.tsx",
+    "apps/mobile/src/executive-command.tsx",
+  ]) {
+    const source = await mobileSource(path);
+    assert.match(source, /initialRecordId/);
+    assert.doesNotMatch(source, /react-native-webview|<WebView/);
+  }
+});

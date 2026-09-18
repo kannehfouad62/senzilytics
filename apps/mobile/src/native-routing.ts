@@ -26,7 +26,11 @@ export type NativeRecordTarget =
       tab: "behaviorAssurance";
       view: "behavior" | "sif" | "certification";
       recordId?: string;
-    };
+    }
+  | { tab: "hygieneHealth"; view: "hygiene" | "health"; recordId?: string }
+  | { tab: "esg"; view: "disclosures" | "initiatives"; recordId?: string }
+  | { tab: "regulatory"; view: "changes" | "sources"; recordId?: string }
+  | { tab: "executive"; view: "overview" | "assurance" | "reports" | "ai"; recordId?: string };
 
 function recordId(parts: string[], index: number) {
   const value = parts[index];
@@ -69,6 +73,16 @@ export function resolveNativeRecordTarget(
     case "chemicals": return { tab: "chemicalEnvironmental", view: "chemicals", recordId: recordId(parts, 1) };
     case "environmental": return { tab: "chemicalEnvironmental", view: "environmental", recordId: recordId(parts, 1) };
     case "behavior-safety": return { tab: "behaviorAssurance", view: "behavior", recordId: parts.at(-1) };
+    case "industrial-hygiene": return { tab: "hygieneHealth", view: "hygiene", recordId: recordId(parts, 1) };
+    case "occupational-health": return { tab: "hygieneHealth", view: "health", recordId: recordId(parts, 1) };
+    case "esg":
+      if (parts[1] === "initiatives") return { tab: "esg", view: "initiatives", recordId: recordId(parts, 2) };
+      return { tab: "esg", view: "disclosures", recordId: recordId(parts, 1) };
+    case "regulatory":
+      if (parts[1] === "sources") return { tab: "regulatory", view: "sources", recordId: recordId(parts, 2) };
+      return { tab: "regulatory", view: "changes", recordId: recordId(parts, 1) };
+    case "intelligence": return { tab: "executive", view: "ai", recordId: recordId(parts, 1) };
+    case "reports": return { tab: "executive", view: "reports", recordId: recordId(parts, 1) };
     case "assurance":
       if (parts[1] === "sif") {
         return { tab: "behaviorAssurance", view: "sif", recordId: parts.at(-1) };
@@ -97,6 +111,10 @@ export function resolveWorkflowNativeTarget(
     MOC: `/moc/${entityId}`, OBSERVATION: `/observations/${entityId}`,
     RISK: `/risks/${entityId}`, TRAINING: `/training/${entityId}`,
     ENVIRONMENTAL: `/environmental/${entityId}`,
+    INDUSTRIAL_HYGIENE: `/industrial-hygiene/${entityId}`,
+    OCCUPATIONAL_HEALTH: `/occupational-health/${entityId}`,
+    ESG: `/esg/${entityId}`,
+    REGULATORY_CHANGE: `/regulatory/${entityId}`,
   };
   return resolveNativeRecordTarget(fallback[entityType]);
 }
