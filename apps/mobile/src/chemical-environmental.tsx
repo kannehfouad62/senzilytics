@@ -37,7 +37,7 @@ import type {
 } from "./types";
 
 export type ChemicalEnvironmentalView = "chemicals" | "environmental";
-type FieldValue = string | boolean | string[];
+type FieldValue = string | boolean | string[] | SelectedEvidence[];
 type Shared = {
   ownerKey: string;
   online: boolean;
@@ -570,7 +570,8 @@ function EnvironmentalDataForm({
             answers
           ),
         },
-        evidence
+        evidence,
+        configurableFormEvidence(workspace.environmentalForms, answers)
       );
       await queued(shared, "Environmental data");
       setValue("");
@@ -827,7 +828,7 @@ function DynamicForm({
           );
         }
         if (field.fieldType === "SINGLE_SELECT" || field.fieldType === "MULTI_SELECT") {
-          const selected = Array.isArray(value) ? value : [];
+          const selected: string[] = Array.isArray(value) && value.every((item) => typeof item === "string") ? value : [];
           return (
             <View key={field.id} style={styles.row}>
               {options.map((option) => (
@@ -863,6 +864,17 @@ function DynamicForm({
   );
 }
 
+function isSelectedEvidenceArray(value: FieldValue | undefined): value is SelectedEvidence[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "object" && item !== null && "id" in item && "bytes" in item && "checksum" in item);
+}
+function configurableFormEvidence(forms: RuntimeForm[], answers: Record<string, FieldValue>) {
+  return forms.flatMap((form) => form.version.fields.flatMap((field) => {
+    if (field.fieldType !== "FILE") return [];
+    const files = answers[field.id];
+    return isSelectedEvidenceArray(files) && files.length ? [{ files, formDefinitionId: form.id, formVersionId: form.version.id, formFieldId: field.id, fieldLabel: field.label }] : [];
+  }));
+}
+
 function buildCapturedForms(
   forms: RuntimeForm[],
   answers: Record<string, FieldValue>
@@ -870,7 +882,11 @@ function buildCapturedForms(
   return forms.map((form) => {
     const captured: CapturedAnswer[] = [];
     for (const field of form.version.fields) {
-      if (field.fieldType === "FILE") continue;
+      if (field.fieldType === "FILE") {
+        const files = answers[field.id];
+        if (field.isRequired && (!isSelectedEvidenceArray(files) || !files.length)) throw new Error(`${field.label} is required.`);
+        continue;
+      }
       const value = answers[field.id];
       const empty =
         value === undefined ||
@@ -883,6 +899,7 @@ function buildCapturedForms(
         throw new Error(`${field.label} is required.`);
       }
       if (empty) continue;
+      if (isSelectedEvidenceArray(value)) throw new Error(`${field.label} has invalid evidence for this field type.`);
       if (field.fieldType === "NUMBER") {
         const numeric = Number(value);
         if (!Number.isFinite(numeric)) {
@@ -890,6 +907,7 @@ function buildCapturedForms(
         }
         captured.push({ fieldId: field.id, value: numeric });
       } else {
+        if (isSelectedEvidenceArray(value)) throw new Error(`${field.label} has invalid evidence for this field type.`);
         captured.push({ fieldId: field.id, value });
       }
     }

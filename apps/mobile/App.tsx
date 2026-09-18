@@ -749,7 +749,7 @@ function ObservationCaptureScreen({ workspace, ownerKey, online, onQueued, onSyn
     catch (reason) { setError(messageOf(reason)); return; }
     setSaving(true);
     try {
-      await queueObservation(ownerKey, { siteId, title: title.trim(), description: description.trim(), type, riskLevel, location: location.trim() || undefined, immediateAction: immediateAction.trim() || undefined, observedAt: new Date().toISOString(), isAnonymous: anonymous, customForms }, evidence);
+      await queueObservation(ownerKey, { siteId, title: title.trim(), description: description.trim(), type, riskLevel, location: location.trim() || undefined, immediateAction: immediateAction.trim() || undefined, observedAt: new Date().toISOString(), isAnonymous: anonymous, customForms }, evidence, configurableFormEvidence(workspace.observationForms, answers));
       setTitle(""); setDescription(""); setLocation(""); setImmediateAction(""); setAnswers({}); setEvidence([]);
       await onQueued(online ? "Observation queued. Synchronizing now…" : "Observation saved offline and will synchronize when connectivity returns.");
       if (online) onSync();
@@ -782,7 +782,7 @@ function IncidentCaptureScreen({ workspace, ownerKey, online, onQueued, onSync }
     catch (reason) { setError(messageOf(reason)); return; }
     setSaving(true);
     try {
-      await queueIncident(ownerKey, { siteId, title: title.trim(), description: description.trim(), type, riskLevel, location: location.trim() || undefined, occurredAt: new Date().toISOString(), customForms }, evidence);
+      await queueIncident(ownerKey, { siteId, title: title.trim(), description: description.trim(), type, riskLevel, location: location.trim() || undefined, occurredAt: new Date().toISOString(), customForms }, evidence, configurableFormEvidence(workspace.incidentForms ?? [], answers));
       setTitle(""); setDescription(""); setLocation(""); setAnswers({}); setEvidence([]);
       await onQueued(online ? "Incident queued. Synchronizing now…" : "Incident saved offline and will synchronize when connectivity returns.");
       if (online) onSync();
@@ -1065,8 +1065,9 @@ function SettingsScreen({ workspace, pending, signingOut, releaseStatus, systemH
   return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><Text style={styles.eyebrow}>ACCOUNT</Text><Text style={styles.pageTitle}>Mobile settings</Text><Card><Text style={styles.cardTitle}>{workspace.user.name}</Text><Text style={styles.muted}>{workspace.user.email}</Text><Text style={styles.due}>{humanize(workspace.user.role)} · {workspace.organization.name}</Text></Card><MobileDiagnosticsPanel release={releaseStatus} health={systemHealth} verifiedAt={verifiedAt} pending={pending} onRefresh={onRefreshDiagnostics} /><Card><Text style={styles.cardTitle}>Data protection</Text><Text style={styles.muted}>Credentials are stored in the device Keychain or Android Keystore. Offline records and evidence file bytes are encrypted and isolated by tenant and user. Private uploads revalidate your role, assignment, subscription, and record ownership.</Text></Card><Card><Text style={styles.cardTitle}>Account switching</Text><Text style={styles.muted}>Signing out visibly revokes this device session and removes the cached workspace. Encrypted unsynchronized records remain isolated to this tenant and user so field data is not lost.</Text></Card><Card><Text style={styles.cardTitle}>Offline queue</Text><Text style={styles.muted}>{pending} queued field item{pending === 1 ? "" : "s"} waiting on this device.</Text><SecondaryButton label="Open Offline Outbox" onPress={onOpenOutbox} /></Card><PrimaryButton label="Enable push notifications" onPress={onEnablePush} /><SecondaryButton label="Privacy policy" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/privacy"); }} /><SecondaryButton label="Support center" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/support"); }} /><SecondaryButton label="Account and data deletion" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/account-deletion"); }} /><SecondaryButton label={signingOut ? "Signing out securely…" : "Sign out and choose another account"} disabled={signingOut} onPress={onLogout} /></ScrollView>;
 }
 
-function configurableFormEvidence(form: RuntimeForm, answers: Record<string, FieldValue>) {
-  return form.version.fields.flatMap((field) => {
+function configurableFormEvidence(formOrForms: RuntimeForm | RuntimeForm[], answers: Record<string, FieldValue>) {
+  const forms = Array.isArray(formOrForms) ? formOrForms : [formOrForms];
+  return forms.flatMap((form) => form.version.fields.flatMap((field) => {
     if (field.fieldType !== "FILE" || !isVisible(field, form, answers)) return [];
     const files = answers[field.id];
     if (!isSelectedEvidenceArray(files) || !files.length) return [];
@@ -1077,7 +1078,7 @@ function configurableFormEvidence(form: RuntimeForm, answers: Record<string, Fie
       formFieldId: field.id,
       fieldLabel: field.label,
     }];
-  });
+  }));
 }
 
 function buildCapturedForms(forms: RuntimeForm[], answers: Record<string, FieldValue>): CapturedForm[] {

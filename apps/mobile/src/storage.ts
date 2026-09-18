@@ -327,27 +327,35 @@ async function queueOfflineItem(
 export async function queueObservation(
   ownerKey: string,
   payload: ObservationPayload,
-  evidence: SelectedEvidence[] = []
+  evidence: SelectedEvidence[] = [],
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "SAFETY_OBSERVATION", payload, {
+  return queueOfflineItem(ownerKey, "SAFETY_OBSERVATION", payload, [
+    {
     files: evidence,
     targetType: "SAFETY_OBSERVATION",
     title: `Observation evidence: ${payload.title}`,
     description: payload.description,
-  });
+  },
+    ...configurableEvidenceGroups(formEvidence),
+  ]);
 }
 
 export async function queueIncident(
   ownerKey: string,
   payload: IncidentPayload,
-  evidence: SelectedEvidence[] = []
+  evidence: SelectedEvidence[] = [],
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "INCIDENT", payload, {
+  return queueOfflineItem(ownerKey, "INCIDENT", payload, [
+    {
     files: evidence,
     targetType: "INCIDENT",
     title: `Incident evidence: ${payload.title}`,
     description: payload.description,
-  });
+  },
+    ...configurableEvidenceGroups(formEvidence),
+  ]);
 }
 
 export async function queueInspectionResponse(
@@ -419,30 +427,36 @@ export async function queueJsaAcknowledgment(
   return queueOfflineItem(ownerKey, "JSA_ACKNOWLEDGMENT", payload);
 }
 
+export type ConfigurableFormEvidenceInput = {
+  files: SelectedEvidence[];
+  formDefinitionId: string;
+  formVersionId: string;
+  formFieldId: string;
+  fieldLabel: string;
+};
+
+function configurableEvidenceGroups(items: ConfigurableFormEvidenceInput[]) {
+  return items.map((item) => ({
+    files: item.files,
+    targetType: "CONFIGURABLE_FORM" as const,
+    formDefinitionId: item.formDefinitionId,
+    formVersionId: item.formVersionId,
+    formFieldId: item.formFieldId,
+    title: `Form evidence: ${item.fieldLabel}`,
+    description: "Native configurable-form file field evidence.",
+  }));
+}
+
 export async function queueResearchFieldworkResponse(
   ownerKey: string,
   payload: ResearchFieldworkResponsePayload,
-  formEvidence: Array<{
-    files: SelectedEvidence[];
-    formDefinitionId: string;
-    formVersionId: string;
-    formFieldId: string;
-    fieldLabel: string;
-  }> = []
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
   return queueOfflineItem(
     ownerKey,
     "RESEARCH_FIELDWORK_RESPONSE",
     payload,
-    formEvidence.map((item) => ({
-      files: item.files,
-      targetType: "CONFIGURABLE_FORM" as const,
-      formDefinitionId: item.formDefinitionId,
-      formVersionId: item.formVersionId,
-      formFieldId: item.formFieldId,
-      title: `Form evidence: ${item.fieldLabel}`,
-      description: "Native configurable-form file field evidence.",
-    }))
+    configurableEvidenceGroups(formEvidence)
   );
 }
 
@@ -526,15 +540,19 @@ export async function queueAssetStatus(
 export async function queueAssetInspection(
   ownerKey: string,
   payload: AssetInspectionPayload,
-  evidence: SelectedEvidence[] = []
+  evidence: SelectedEvidence[] = [],
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "ASSET_INSPECTION", payload, {
+  return queueOfflineItem(ownerKey, "ASSET_INSPECTION", payload, [
+    {
     files: evidence,
     targetType: "ASSET_INSPECTION",
     entityId: payload.assetId,
     title: "Asset inspection evidence",
     description: payload.observations || payload.evidenceReference,
-  });
+  },
+    ...configurableEvidenceGroups(formEvidence),
+  ]);
 }
 
 export async function queueAssetDefect(
@@ -608,9 +626,10 @@ export async function queueHygieneSample(
 
 export async function queueHygieneForms(
   ownerKey: string,
-  payload: HygieneFormsPayload
+  payload: HygieneFormsPayload,
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "IH_FORMS", payload);
+  return queueOfflineItem(ownerKey, "IH_FORMS", payload, configurableEvidenceGroups(formEvidence));
 }
 
 export async function queueSurveillanceProgramStatus(
@@ -657,22 +676,27 @@ export async function queueChemicalStatus(
 
 export async function queueChemicalForms(
   ownerKey: string,
-  payload: ChemicalFormsPayload
+  payload: ChemicalFormsPayload,
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "CHEMICAL_FORMS", payload);
+  return queueOfflineItem(ownerKey, "CHEMICAL_FORMS", payload, configurableEvidenceGroups(formEvidence));
 }
 
 export async function queueEnvironmentalData(
   ownerKey: string,
   payload: EnvironmentalDataPayload,
-  evidence: SelectedEvidence[] = []
+  evidence: SelectedEvidence[] = [],
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "ENVIRONMENTAL_DATA", payload, {
+  return queueOfflineItem(ownerKey, "ENVIRONMENTAL_DATA", payload, [
+    {
     files: evidence,
     targetType: "ENVIRONMENTAL",
     title: "Environmental data evidence",
     description: payload.evidenceSummary || payload.notes,
-  });
+  },
+    ...configurableEvidenceGroups(formEvidence),
+  ]);
 }
 
 export async function queueEnvironmentalReview(
@@ -684,9 +708,10 @@ export async function queueEnvironmentalReview(
 
 export async function queueEnvironmentalForms(
   ownerKey: string,
-  payload: EnvironmentalFormsPayload
+  payload: EnvironmentalFormsPayload,
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "ENVIRONMENTAL_FORMS", payload);
+  return queueOfflineItem(ownerKey, "ENVIRONMENTAL_FORMS", payload, configurableEvidenceGroups(formEvidence));
 }
 
 export async function queueChemicalEvidence(
@@ -742,9 +767,10 @@ export async function queueEsgData(
 
 export async function queueEsgForms(
   ownerKey: string,
-  payload: EsgFormsPayload
+  payload: EsgFormsPayload,
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "ESG_FORMS", payload);
+  return queueOfflineItem(ownerKey, "ESG_FORMS", payload, configurableEvidenceGroups(formEvidence));
 }
 
 export async function queueEsgDisclosureStatus(
@@ -783,14 +809,18 @@ export async function queueEsgEvidence(
 export async function queueBehaviorSession(
   ownerKey: string,
   payload: BehaviorSessionPayload,
-  evidence: SelectedEvidence[] = []
+  evidence: SelectedEvidence[] = [],
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "BEHAVIOR_SESSION", payload, {
+  return queueOfflineItem(ownerKey, "BEHAVIOR_SESSION", payload, [
+    {
     files: evidence,
     targetType: "BEHAVIOR_SAFETY",
     title: "Behavior coaching evidence",
     description: payload.discussionSummary || payload.immediateAction,
-  });
+  },
+    ...configurableEvidenceGroups(formEvidence),
+  ]);
 }
 
 export async function queueBehaviorFollowUp(
@@ -817,14 +847,18 @@ export async function queueBehaviorProgramReview(
 export async function queueSifVerification(
   ownerKey: string,
   payload: SifVerificationPayload,
-  evidence: SelectedEvidence[] = []
+  evidence: SelectedEvidence[] = [],
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "SIF_VERIFICATION", payload, {
+  return queueOfflineItem(ownerKey, "SIF_VERIFICATION", payload, [
+    {
     files: evidence,
     targetType: "SIF_ASSURANCE",
     title: "Critical-control verification evidence",
     description: payload.findings || payload.immediateAction,
-  });
+  },
+    ...configurableEvidenceGroups(formEvidence),
+  ]);
 }
 
 export async function queueSifSignalReview(
@@ -837,14 +871,18 @@ export async function queueSifSignalReview(
 export async function queueCertificationReviewComplete(
   ownerKey: string,
   payload: CertificationReviewCompletePayload,
-  evidence: SelectedEvidence[] = []
+  evidence: SelectedEvidence[] = [],
+  formEvidence: ConfigurableFormEvidenceInput[] = []
 ) {
-  return queueOfflineItem(ownerKey, "CERTIFICATION_REVIEW_COMPLETE", payload, {
+  return queueOfflineItem(ownerKey, "CERTIFICATION_REVIEW_COMPLETE", payload, [
+    {
     files: evidence,
     targetType: "CERTIFICATION_READINESS",
     title: "Management-review evidence",
     description: payload.decisions,
-  });
+  },
+    ...configurableEvidenceGroups(formEvidence),
+  ]);
 }
 
 export async function queueCertificationReviewApprove(

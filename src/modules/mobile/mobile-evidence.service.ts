@@ -201,7 +201,7 @@ export function requiredMobileEvidencePermission(
     return PermissionKey.MANAGE_COMPLIANCE;
   }
   if (targetType === "CONFIGURABLE_FORM") {
-    return PermissionKey.COLLECT_RESEARCH_DATA;
+    return PermissionKey.VIEW_DASHBOARD;
   }
   return PermissionKey.MANAGE_AUDITS;
 }
@@ -243,39 +243,43 @@ export async function resolveMobileEvidenceTarget(input: {
   let resolvedEntityId = input.payload.entityId || "";
   if (input.payload.targetType === "CONFIGURABLE_FORM") {
     const parent = await prisma.offlineSubmission.findFirst({
-      where: {
-        id: input.payload.parentSubmissionId,
-        organizationId: input.organizationId,
-        userId: input.userId,
-        recordType: "RESEARCH_FIELDWORK_RESPONSE",
-      },
-      select: { recordId: true },
+      where: { id: input.payload.parentSubmissionId, organizationId: input.organizationId, userId: input.userId },
+      select: { recordId: true, recordType: true },
     });
-    if (!parent) {
-      throw new Error("Synchronize the configurable-form parent before uploading its evidence.");
+    if (!parent) throw new Error("Synchronize the configurable-form parent before uploading its evidence.");
+    const parentModules: Record<string, { module: string; permission: PermissionKey }> = {
+      SAFETY_OBSERVATION: { module: "OBSERVATION", permission: PermissionKey.CREATE_OBSERVATION },
+      INCIDENT: { module: "INCIDENT", permission: PermissionKey.CREATE_INCIDENT },
+      ASSET_INSPECTION: { module: "ASSET_SAFETY", permission: PermissionKey.MANAGE_ASSETS },
+      IH_FORMS: { module: "INDUSTRIAL_HYGIENE", permission: PermissionKey.MANAGE_INDUSTRIAL_HYGIENE },
+      CHEMICAL_FORMS: { module: "CHEMICAL", permission: PermissionKey.MANAGE_CHEMICALS },
+      ENVIRONMENTAL_DATA: { module: "ENVIRONMENTAL", permission: PermissionKey.MANAGE_ENVIRONMENTAL },
+      ENVIRONMENTAL_FORMS: { module: "ENVIRONMENTAL", permission: PermissionKey.MANAGE_ENVIRONMENTAL },
+      ESG_FORMS: { module: "ESG", permission: PermissionKey.MANAGE_ESG },
+      BEHAVIOR_SESSION: { module: "BEHAVIOR_SAFETY", permission: PermissionKey.RECORD_BEHAVIOR_COACHING },
+      SIF_VERIFICATION: { module: "SIF_ASSURANCE", permission: PermissionKey.MANAGE_CRITICAL_CONTROLS },
+      CERTIFICATION_REVIEW_COMPLETE: { module: "CERTIFICATION_READINESS", permission: PermissionKey.MANAGE_CERTIFICATION_READINESS },
+      RESEARCH_FIELDWORK_RESPONSE: { module: "RESEARCH", permission: PermissionKey.COLLECT_RESEARCH_DATA },
+    };
+    const policy = parentModules[parent.recordType];
+    if (!policy) throw new Error("This configurable-form parent type is not supported for mobile evidence.");
+    if (input.role !== UserRole.SUPER_ADMIN) {
+      const allowed = await prisma.rolePermission.findFirst({ where: { role: input.role, permission: policy.permission }, select: { id: true } });
+      if (!allowed) throw new Error("Your role cannot upload evidence for this configurable form.");
     }
     const submission = await prisma.configurableFormSubmission.findFirst({
       where: {
-        id: parent.recordId,
         organizationId: input.organizationId,
         definitionId: input.payload.formDefinitionId,
         versionId: input.payload.formVersionId,
         submittedById: input.userId,
-        entityType: "RESEARCH",
-        version: {
-          fields: {
-            some: {
-              id: input.payload.formFieldId,
-              fieldType: "FILE",
-            },
-          },
-        },
+        entityType: policy.module as never,
+        entityId: parent.recordId,
+        version: { fields: { some: { id: input.payload.formFieldId, fieldType: "FILE" } } },
       },
       select: { id: true },
     });
-    if (!submission) {
-      throw new Error("This configurable-form FILE field is not available for mobile evidence capture.");
-    }
+    if (!submission) throw new Error("This configurable-form FILE field is not available for mobile evidence capture.");
     resolvedEntityId = submission.id;
   } else if (input.payload.targetType === "CHEMICAL") {
     const chemical = await prisma.chemical.findFirst({
