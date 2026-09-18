@@ -46,6 +46,7 @@ const targetTypeSchema = z.enum([
   "SIF_ASSURANCE",
   "CERTIFICATION_READINESS",
   "REGULATORY_CHANGE",
+  "CONFIGURABLE_FORM",
 ]);
 
 export const mobileEvidencePayloadSchema = z.object({
@@ -55,6 +56,9 @@ export const mobileEvidencePayloadSchema = z.object({
   entityId: z.string().min(1).max(200).optional(),
   questionId: z.string().min(1).max(200).optional(),
   checklistItemId: z.string().min(1).max(200).optional(),
+  formDefinitionId: z.string().min(1).max(200).optional(),
+  formVersionId: z.string().min(1).max(200).optional(),
+  formFieldId: z.string().min(1).max(200).optional(),
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5000).optional(),
   fileName: z.string().trim().min(1).max(180)
@@ -128,6 +132,13 @@ export const mobileEvidencePayloadSchema = z.object({
       path: ["entityId"],
       message: "The ESG disclosure evidence target is required.",
     });
+  }  if (value.targetType === "CONFIGURABLE_FORM") {
+    if (!value.parentSubmissionId) {
+      context.addIssue({ code: "custom", path: ["parentSubmissionId"], message: "A synchronized parent record is required." });
+    }
+    if (!value.formDefinitionId || !value.formVersionId || !value.formFieldId) {
+      context.addIssue({ code: "custom", path: ["formFieldId"], message: "Configurable-form evidence lineage is required." });
+    }
   }
 });
 
@@ -189,6 +200,9 @@ export function requiredMobileEvidencePermission(
   if (targetType === "REGULATORY_CHANGE") {
     return PermissionKey.MANAGE_COMPLIANCE;
   }
+  if (targetType === "CONFIGURABLE_FORM") {
+    return PermissionKey.COLLECT_RESEARCH_DATA;
+  }
   return PermissionKey.MANAGE_AUDITS;
 }
 
@@ -227,7 +241,43 @@ export async function resolveMobileEvidenceTarget(input: {
   }
 
   let resolvedEntityId = input.payload.entityId || "";
-  if (input.payload.targetType === "CHEMICAL") {
+  if (input.payload.targetType === "CONFIGURABLE_FORM") {
+    const parent = await prisma.offlineSubmission.findFirst({
+      where: {
+        id: input.payload.parentSubmissionId,
+        organizationId: input.organizationId,
+        userId: input.userId,
+        recordType: "RESEARCH_FIELDWORK_RESPONSE",
+      },
+      select: { recordId: true },
+    });
+    if (!parent) {
+      throw new Error("Synchronize the configurable-form parent before uploading its evidence.");
+    }
+    const submission = await prisma.configurableFormSubmission.findFirst({
+      where: {
+        id: parent.recordId,
+        organizationId: input.organizationId,
+        definitionId: input.payload.formDefinitionId,
+        versionId: input.payload.formVersionId,
+        submittedById: input.userId,
+        entityType: "RESEARCH",
+        version: {
+          fields: {
+            some: {
+              id: input.payload.formFieldId,
+              fieldType: "FILE",
+            },
+          },
+        },
+      },
+      select: { id: true },
+    });
+    if (!submission) {
+      throw new Error("This configurable-form FILE field is not available for mobile evidence capture.");
+    }
+    resolvedEntityId = submission.id;
+  } else if (input.payload.targetType === "CHEMICAL") {
     const chemical = await prisma.chemical.findFirst({
       where: {
         id: input.payload.entityId,
@@ -597,6 +647,10 @@ export async function completeMobileEvidenceUpload(input: {
     await completeAuditEvidence(input);
     return;
   }
+  if (input.payload.targetType === "CONFIGURABLE_FORM") {
+    await completeConfigurableFormEvidence(input);
+    return;
+  }
   await completeDocumentEvidence(input);
 }
 
@@ -645,6 +699,41 @@ async function completeAuditEvidence(input: {
     });
     await transaction.offlineSubmission.create({
       data: offlineSubmissionData(input.payload, evidence.id),
+    });
+  });
+}
+
+async function completeConfigurableFormEvidence(input: {
+  payload: ResolvedMobileEvidence;
+  blob: { url: string; pathname: string; contentType: string };
+}) {
+  await prisma.$transaction(async (transaction) => {
+    const document = await transaction.document.create({
+      data: {
+        organizationId: input.payload.organizationId,
+        uploadedById: input.payload.userId,
+        entityType: DocumentEntityType.OTHER,
+        entityId: input.payload.resolvedEntityId,
+        category: documentCategory(input.blob.contentType),
+        name: input.payload.title,
+        originalName: input.payload.fileName,
+        description: input.payload.description || null,
+        storageKey: input.blob.pathname,
+        storageUrl: input.blob.url,
+        mimeType: input.blob.contentType,
+        sizeBytes: input.payload.sizeBytes,
+        checksum: input.payload.checksum,
+      },
+    });
+    await transaction.configurableFormFileAnswer.create({
+      data: {
+        submissionId: input.payload.resolvedEntityId,
+        fieldId: input.payload.formFieldId!,
+        documentId: document.id,
+      },
+    });
+    await transaction.offlineSubmission.create({
+      data: offlineSubmissionData(input.payload, document.id),
     });
   });
 }
