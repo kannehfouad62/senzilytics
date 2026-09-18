@@ -687,7 +687,11 @@ function ResearchInterviewEditor({ assignment, ownerKey, online, onBack, onQueue
     catch (reason) { setError(messageOf(reason)); return; }
     setSaving(true);
     try {
-      await queueResearchFieldworkResponse(ownerKey, { sampleUnitId: assignment.id, collectionId: collection.id, locale, interviewStartedAt: startedAt, consent, form });
+      await queueResearchFieldworkResponse(
+        ownerKey,
+        { sampleUnitId: assignment.id, collectionId: collection.id, locale, interviewStartedAt: startedAt, consent, form },
+        configurableFormEvidence(localized.form, answers)
+      );
       await clearResearchInterviewDraft(ownerKey, assignment.id);
       setAnswers({});
       await onQueued(online ? "Research interview queued. Synchronizing now…" : "Research interview encrypted and saved offline.");
@@ -1059,6 +1063,21 @@ function MobileRepeatingGroupField({field,value,onChange}:{field:RuntimeField;va
 
 function SettingsScreen({ workspace, pending, signingOut, releaseStatus, systemHealth, verifiedAt, onOpenOutbox, onRefreshDiagnostics, onEnablePush, onLogout }: { workspace: MobileBootstrap; pending: number; signingOut: boolean; releaseStatus: MobileReleaseStatus | null; systemHealth: MobileSystemHealth | null; verifiedAt: number | null; onOpenOutbox: () => void; onRefreshDiagnostics: () => void; onEnablePush: () => void; onLogout: () => void }) {
   return <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}><Text style={styles.eyebrow}>ACCOUNT</Text><Text style={styles.pageTitle}>Mobile settings</Text><Card><Text style={styles.cardTitle}>{workspace.user.name}</Text><Text style={styles.muted}>{workspace.user.email}</Text><Text style={styles.due}>{humanize(workspace.user.role)} · {workspace.organization.name}</Text></Card><MobileDiagnosticsPanel release={releaseStatus} health={systemHealth} verifiedAt={verifiedAt} pending={pending} onRefresh={onRefreshDiagnostics} /><Card><Text style={styles.cardTitle}>Data protection</Text><Text style={styles.muted}>Credentials are stored in the device Keychain or Android Keystore. Offline records and evidence file bytes are encrypted and isolated by tenant and user. Private uploads revalidate your role, assignment, subscription, and record ownership.</Text></Card><Card><Text style={styles.cardTitle}>Account switching</Text><Text style={styles.muted}>Signing out visibly revokes this device session and removes the cached workspace. Encrypted unsynchronized records remain isolated to this tenant and user so field data is not lost.</Text></Card><Card><Text style={styles.cardTitle}>Offline queue</Text><Text style={styles.muted}>{pending} queued field item{pending === 1 ? "" : "s"} waiting on this device.</Text><SecondaryButton label="Open Offline Outbox" onPress={onOpenOutbox} /></Card><PrimaryButton label="Enable push notifications" onPress={onEnablePush} /><SecondaryButton label="Privacy policy" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/privacy"); }} /><SecondaryButton label="Support center" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/support"); }} /><SecondaryButton label="Account and data deletion" onPress={() => { void Linking.openURL("https://www.senzilytics.cloud/account-deletion"); }} /><SecondaryButton label={signingOut ? "Signing out securely…" : "Sign out and choose another account"} disabled={signingOut} onPress={onLogout} /></ScrollView>;
+}
+
+function configurableFormEvidence(form: RuntimeForm, answers: Record<string, FieldValue>) {
+  return form.version.fields.flatMap((field) => {
+    if (field.fieldType !== "FILE" || !isVisible(field, form, answers)) return [];
+    const files = answers[field.id];
+    if (!isSelectedEvidenceArray(files) || !files.length) return [];
+    return [{
+      files,
+      formDefinitionId: form.id,
+      formVersionId: form.version.id,
+      formFieldId: field.id,
+      fieldLabel: field.label,
+    }];
+  });
 }
 
 function buildCapturedForms(forms: RuntimeForm[], answers: Record<string, FieldValue>): CapturedForm[] {

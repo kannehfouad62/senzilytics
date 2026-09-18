@@ -147,7 +147,8 @@ type EvidenceTargetType =
   | "BEHAVIOR_SAFETY"
   | "SIF_ASSURANCE"
   | "CERTIFICATION_READINESS"
-  | "REGULATORY_CHANGE";
+  | "REGULATORY_CHANGE"
+  | "CONFIGURABLE_FORM";
 type EvidenceRow = {
   id: string;
   parent_submission_id: string | null;
@@ -155,6 +156,9 @@ type EvidenceRow = {
   entity_id: string | null;
   question_id: string | null;
   checklist_item_id: string | null;
+  form_definition_id: string | null;
+  form_version_id: string | null;
+  form_field_id: string | null;
   title: string;
   description: string | null;
   file_name: string;
@@ -171,6 +175,9 @@ type EvidenceQueueInput = {
   entityId?: string;
   questionId?: string;
   checklistItemId?: string;
+  formDefinitionId?: string;
+  formVersionId?: string;
+  formFieldId?: string;
   title: string;
   description?: string;
 };
@@ -218,6 +225,9 @@ export async function initializeOfflineStore() {
       entity_id TEXT,
       question_id TEXT,
       checklist_item_id TEXT,
+      form_definition_id TEXT,
+      form_version_id TEXT,
+      form_field_id TEXT,
       title TEXT NOT NULL,
       description TEXT,
       file_name TEXT NOT NULL,
@@ -255,13 +265,26 @@ export async function initializeOfflineStore() {
     CREATE INDEX IF NOT EXISTS mobile_document_cache_owner
       ON mobile_document_cache(owner_key, downloaded_at);
   `);
+  const evidenceColumns = await database.getAllAsync<{ name: string }>(
+    "PRAGMA table_info(mobile_evidence)"
+  );
+  const existingEvidenceColumns = new Set(evidenceColumns.map((column) => column.name));
+  for (const [name, definition] of [
+    ["form_definition_id", "TEXT"],
+    ["form_version_id", "TEXT"],
+    ["form_field_id", "TEXT"],
+  ] as const) {
+    if (!existingEvidenceColumns.has(name)) {
+      await database.execAsync(`ALTER TABLE mobile_evidence ADD COLUMN ${name} ${definition}`);
+    }
+  }
 }
 
 async function queueOfflineItem(
   ownerKey: string,
   type: OfflineRecordType,
   payload: OfflineRecordPayload,
-  evidence?: Omit<EvidenceQueueInput, "parentSubmissionId">
+  evidence?: Omit<EvidenceQueueInput, "parentSubmissionId"> | Array<Omit<EvidenceQueueInput, "parentSubmissionId">>
 ) {
   const database = await db();
   const id = Crypto.randomUUID();
@@ -274,10 +297,13 @@ async function queueOfflineItem(
       JSON.stringify({ type, payload }),
       capturedAt
     );
-    if (evidence?.files.length) {
+    const evidenceGroups = evidence ? (Array.isArray(evidence) ? evidence : [evidence]) : [];
+    for (const evidenceGroup of evidenceGroups) {
+      if (!evidenceGroup.files.length) continue;
       await insertEvidence(transaction, ownerKey, {
-        ...evidence,
+        ...evidenceGroup,
         parentSubmissionId:
+          evidenceGroup.targetType === "CONFIGURABLE_FORM" ||
           type === "SAFETY_OBSERVATION" ||
           type === "INCIDENT" ||
           type === "CAPA_STATUS" ||
@@ -396,8 +422,28 @@ export async function queueJsaAcknowledgment(
 export async function queueResearchFieldworkResponse(
   ownerKey: string,
   payload: ResearchFieldworkResponsePayload,
+  formEvidence: Array<{
+    files: SelectedEvidence[];
+    formDefinitionId: string;
+    formVersionId: string;
+    formFieldId: string;
+    fieldLabel: string;
+  }> = []
 ) {
-  return queueOfflineItem(ownerKey, "RESEARCH_FIELDWORK_RESPONSE", payload);
+  return queueOfflineItem(
+    ownerKey,
+    "RESEARCH_FIELDWORK_RESPONSE",
+    payload,
+    formEvidence.map((item) => ({
+      files: item.files,
+      targetType: "CONFIGURABLE_FORM" as const,
+      formDefinitionId: item.formDefinitionId,
+      formVersionId: item.formVersionId,
+      formFieldId: item.formFieldId,
+      title: `Form evidence: ${item.fieldLabel}`,
+      description: "Native configurable-form file field evidence.",
+    }))
+  );
 }
 
 export async function queueComplianceCompletion(
@@ -1193,9 +1239,10 @@ async function insertEvidence(
     await transaction.runAsync(
       `INSERT INTO mobile_evidence (
         id, owner_key, parent_submission_id, target_type, entity_id,
-        question_id, checklist_item_id, title, description, file_name,
-        mime_type, size_bytes, checksum, captured_at, bytes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        question_id, checklist_item_id, form_definition_id, form_version_id,
+        form_field_id, title, description, file_name, mime_type, size_bytes,
+        checksum, captured_at, bytes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       file.id,
       ownerKey,
       input.parentSubmissionId ?? null,
@@ -1203,6 +1250,9 @@ async function insertEvidence(
       input.entityId ?? null,
       input.questionId ?? null,
       input.checklistItemId ?? null,
+      input.formDefinitionId ?? null,
+      input.formVersionId ?? null,
+      input.formFieldId ?? null,
       input.title,
       input.description ?? null,
       file.fileName,
