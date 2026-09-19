@@ -1478,9 +1478,22 @@ export async function cacheWorkspace(ownerKey: string, value: MobileBootstrap, v
 
 export async function readCachedWorkspace(ownerKey: string) {
   const database = await db();
-  const row = await database.getFirstAsync<{ value: string; updated_at: string }>("SELECT value, updated_at FROM mobile_cache WHERE cache_key = ?", `bootstrap:${ownerKey}`);
-  if (!row || !isMobileWorkspaceCacheFresh(row.updated_at)) return null;
-  try { return { workspace: JSON.parse(row.value) as MobileBootstrap, verifiedAt: row.updated_at }; } catch { return null; }
+  const cacheKey = `bootstrap:${ownerKey}`;
+  const row = await database.getFirstAsync<{ value: string; updated_at: string }>(
+    "SELECT value, updated_at FROM mobile_cache WHERE cache_key = ?",
+    cacheKey
+  );
+  if (!row) return null;
+  if (!isMobileWorkspaceCacheFresh(row.updated_at)) {
+    await database.runAsync("DELETE FROM mobile_cache WHERE cache_key = ?", cacheKey);
+    return null;
+  }
+  try {
+    return { workspace: JSON.parse(row.value) as MobileBootstrap, verifiedAt: row.updated_at };
+  } catch {
+    await database.runAsync("DELETE FROM mobile_cache WHERE cache_key = ?", cacheKey);
+    return null;
+  }
 }
 
 export async function clearWorkspaceCache(ownerKey: string) {

@@ -1367,3 +1367,27 @@ test("phase 9 evidence recovery remains bounded while allowing meaningful queue 
   assert.match(storage, /evidenceSynchronized\(row\.id\)/);
   assert.match(storage, /UPDATE mobile_evidence SET last_error = \?/);
 });
+
+
+test("phase 9 expired or malformed workspace cache self-heals without touching queued work", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  const readCache = storage.slice(
+    storage.indexOf("export async function readCachedWorkspace"),
+    storage.indexOf("export async function clearWorkspaceCache")
+  );
+  assert.match(readCache, /const cacheKey = `bootstrap:\$\{ownerKey\}`/);
+  assert.match(readCache, /if \(!isMobileWorkspaceCacheFresh\(row\.updated_at\)\) \{[\s\S]*DELETE FROM mobile_cache WHERE cache_key = \?/);
+  assert.match(readCache, /catch \{[\s\S]*DELETE FROM mobile_cache WHERE cache_key = \?/);
+  assert.doesNotMatch(readCache, /DELETE FROM mobile_outbox|DELETE FROM mobile_evidence|DELETE FROM mobile_research_draft_evidence/);
+});
+
+test("phase 9 evidence replay remains server-acknowledged before local cleanup", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  const synchronizeEvidence = storage.slice(
+    storage.indexOf("async function synchronizeEvidence"),
+    storage.indexOf("async function evidenceSynchronized")
+  );
+  assert.ok(synchronizeEvidence.indexOf("evidenceSynchronized(row.id)") < synchronizeEvidence.indexOf("uploadPrivateMobileEvidence"));
+  assert.ok(synchronizeEvidence.lastIndexOf("evidenceSynchronized(row.id)") < synchronizeEvidence.indexOf("DELETE FROM mobile_evidence"));
+  assert.match(synchronizeEvidence, /DELETE FROM mobile_evidence WHERE id = \? AND owner_key = \?/);
+});
