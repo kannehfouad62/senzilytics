@@ -35,3 +35,13 @@ test("only tenant owners manage user modules and changes are audited", () => {
   assert.match(usersPage, /Save module access/);
   assert.match(permissions, /filterUserModulePermissions/);
 });
+
+
+test("phase 8 web tenant identity changes preserve administrator continuity and audit evidence", () => {
+  assert.match(actions, /assertAnotherActiveAdministrator/);
+  assert.match(actions, /At least one other active organization administrator is required/);
+  assert.match(actions, /title:\"Tenant user invited\"/);
+  assert.match(actions, /title:active\?\"Tenant user restored\":\"Tenant user suspended\"/);
+  assert.match(actions, /ActivityAction\.STATUS_CHANGE/);
+  assert.match(actions, /if\(id===user\.id\)throw new Error\(\"You cannot suspend your own account\.\"\)/);
+});
