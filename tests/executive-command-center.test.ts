@@ -96,3 +96,14 @@ test("executive dashboard route and export enforce dashboard permission", async 
   assert.match(service, /organizationId: input\.organizationId/);
   assert.match(service, /departmentId: scope\.departmentId/);
 });
+
+
+test("phase 7 research executive signal is tenant scoped permission filtered and operationally bounded", async () => {
+  const source = await readFile(new URL("../src/core/analytics/global-executive-dashboard.service.ts", import.meta.url), "utf8");
+  assert.match(source, /allowed\.has\(PermissionKey\.VIEW_RESEARCH\) \? prisma\.researchProject\.count/);
+  assert.match(source, /prisma\.researchSampleUnit\.count/);
+  assert.match(source, /execution: \{ organizationId \}/);
+  assert.match(source, /prisma\.researchFieldworkResponse\.count/);
+  assert.match(source, /backcheckRequired: true/);
+  assert.match(source, /ResearchFieldworkBackcheckStatus\.RECONTACT_REQUIRED/);
+});

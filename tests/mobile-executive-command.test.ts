@@ -216,3 +216,18 @@ test("phase 7 executive portfolio register links do not masquerade as record ide
   assert.match(routing, /case "capa": return \{ tab: "actions", view: "capa" \}/);
   assert.match(routing, /case "research": return \{ tab: "research"/);
 });
+
+
+test("phase 7 decision snapshot reuses governed portfolio domains including research", async () => {
+  const [screen, portfolio] = await Promise.all([
+    readFile(new URL("../apps/mobile/src/executive-command.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/core/analytics/global-executive-dashboard.service.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(screen, /title="Decision snapshot"/);
+  for (const label of ["CAPA", "Risk", "Audits", "Audit Findings", "Inspections", "Compliance", "Research"]) {
+    assert.match(screen, new RegExp(`"${label}"`));
+  }
+  assert.match(portfolio, /Research: \[PermissionKey\.VIEW_RESEARCH\]/);
+  assert.match(portfolio, /label: "Research"/);
+  assert.match(portfolio, /href: "\/research"/);
+});

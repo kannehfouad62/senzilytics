@@ -158,6 +158,26 @@ function Overview({
       </View>
 
       <Section
+        title="Decision snapshot"
+        detail="Permission-filtered exposure across priority operating domains"
+      >
+        <View style={styles.metrics}>
+          {decisionSnapshot(portfolio.modules).map((item) => (
+            <Pressable
+              key={item.label}
+              disabled={!resolveNativeRecordTarget(item.href)}
+              onPress={() => openExecutiveHref(item.href, onOpenNativeTarget)}
+              style={styles.metric}
+            >
+              <Text style={styles.metricLabel}>{item.label}</Text>
+              <Text style={styles.metricValue}>{item.value}</Text>
+              <Text style={styles.muted}>{item.note}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </Section>
+
+      <Section
         title="12-month operating trend"
         detail="Incidents and controlled-document activity"
       >
@@ -872,6 +892,22 @@ function openExecutiveHref(
 ) {
   const target = resolveNativeRecordTarget(href);
   if (target) onOpenNativeTarget(target);
+}
+
+const DECISION_SNAPSHOT_LABELS = new Set([
+  "CAPA",
+  "Risk",
+  "Audits",
+  "Audit Findings",
+  "Inspections",
+  "Compliance",
+  "Research",
+]);
+
+function decisionSnapshot(
+  modules: NonNullable<MobileBootstrap["executivePortfolio"]>["modules"]
+) {
+  return modules.filter((item) => DECISION_SNAPSHOT_LABELS.has(item.label));
 }
 
 function availableViews(workspace: MobileBootstrap): ExecutiveCommandView[] {
