@@ -2004,9 +2004,14 @@ export type MobileRegisterLimits = {
   surveillancePrograms: number;
   chemicalRecords: number;
   environmentalDefinitions: number;
+  environmentalTargets: number;
+  esgPeriods: number;
   esgDefinitions: number;
+  esgTargets: number;
+  esgInitiatives: number;
   behaviorPrograms: number;
-  regulatoryRecords: number;
+  regulatorySources: number;
+  regulatoryChanges: number;
 };
 
 export type MobileBootstrap = {
@@ -2065,6 +2070,7 @@ export type MobileBootstrap = {
   environmentalTargets: MobileEnvironmentalTarget[];
   chemicalEnvironmentalCapabilities:
     MobileChemicalEnvironmentalCapabilities;
+  chemicalEnvironmentalRegisterWindows: { chemicals: MobileRegisterWindow; metrics: MobileRegisterWindow; targets: MobileRegisterWindow };
   chemicalForms: RuntimeForm[];
   environmentalForms: RuntimeForm[];
   esgPeriods: MobileEsgPeriod[];
@@ -2072,10 +2078,12 @@ export type MobileBootstrap = {
   esgTargets: MobileEsgTarget[];
   esgInitiatives: MobileEsgInitiative[];
   esgCapabilities: MobileEsgCapabilities;
+  esgRegisterWindows: { periods: MobileRegisterWindow; metrics: MobileRegisterWindow; targets: MobileRegisterWindow; initiatives: MobileRegisterWindow };
   esgForms: RuntimeForm[];
   behaviorPrograms: MobileBehaviorProgram[];
   behaviorAssurancePeople: Array<{ id: string; name: string }>;
   behaviorAssuranceCapabilities: MobileBehaviorAssuranceCapabilities;
+  behaviorAssuranceRegisterWindows: { behaviorPrograms: MobileRegisterWindow };
   behaviorForms: RuntimeForm[];
   sifAssurance: MobileSifAssurance | null;
   sifForms: RuntimeForm[];
@@ -2092,6 +2100,7 @@ export type MobileBootstrap = {
     governedObligations: number;
     implementationActionsOpen: number;
   } | null;
+  regulatoryRegisterWindows: { sources: MobileRegisterWindow; changes: MobileRegisterWindow };
   regulatorySources: MobileRegulatorySource[];
   regulatoryChanges: MobileRegulatoryChange[];
   regulatoryCapabilities: MobileRegulatoryCapabilities;

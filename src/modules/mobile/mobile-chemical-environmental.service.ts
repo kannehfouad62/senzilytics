@@ -4,6 +4,7 @@ import {
   PermissionKey,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { MOBILE_REGISTER_LIMITS, mobileRegisterWindow } from "@/modules/mobile/mobile-register-limits";
 import { getChemicalNextStatuses } from "@/modules/chemicals/chemical-lifecycle";
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 
@@ -75,7 +76,7 @@ export async function getMobileChemicalEnvironmentalWorkspace(input: {
               },
             },
             orderBy: [{ status: "asc" }, { productName: "asc" }],
-            take: 200,
+            take: MOBILE_REGISTER_LIMITS.chemicalRecords,
           })
         : Promise.resolve([]),
       capabilities.canViewEnvironmental
@@ -130,7 +131,7 @@ export async function getMobileChemicalEnvironmentalWorkspace(input: {
               },
             },
             orderBy: [{ type: "asc" }, { name: "asc" }],
-            take: 150,
+            take: MOBILE_REGISTER_LIMITS.environmentalDefinitions,
           })
         : Promise.resolve([]),
       capabilities.canViewEnvironmental
@@ -150,7 +151,7 @@ export async function getMobileChemicalEnvironmentalWorkspace(input: {
               description: true,
             },
             orderBy: [{ targetYear: "asc" }, { name: "asc" }],
-            take: 150,
+            take: MOBILE_REGISTER_LIMITS.environmentalTargets,
           })
         : Promise.resolve([]),
       capabilities.canViewChemicals
@@ -217,6 +218,11 @@ export async function getMobileChemicalEnvironmentalWorkspace(input: {
   const environmentalFormIds = environmentalForms.map((form) => form.id);
 
   return {
+    windows: {
+      chemicals: mobileRegisterWindow("chemicalRecords", chemicals.length),
+      metrics: mobileRegisterWindow("environmentalDefinitions", metrics.length),
+      targets: mobileRegisterWindow("environmentalTargets", targets.length),
+    },
     capabilities,
     chemicals: chemicals.map((chemical) => ({
       ...chemical,

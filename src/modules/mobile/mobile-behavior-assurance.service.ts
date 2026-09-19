@@ -6,6 +6,7 @@ import {
   PermissionKey,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { MOBILE_REGISTER_LIMITS, mobileRegisterWindow } from "@/modules/mobile/mobile-register-limits";
 import { getBehaviorProgramNextStatuses } from "@/modules/behavior-safety/behavior-safety-lifecycle";
 import { getCertificationPortfolioService } from "@/modules/assurance/certification-readiness.service";
 import { getSifIntelligenceOverview } from "@/modules/assurance/sif-intelligence.service";
@@ -167,7 +168,7 @@ export async function getMobileBehaviorAssuranceWorkspace(input: {
             },
           },
           orderBy: [{ status: "asc" }, { name: "asc" }],
-          take: 75,
+          take: MOBILE_REGISTER_LIMITS.behaviorPrograms,
         })
       : Promise.resolve([]),
     capabilities.canViewBehavior
@@ -229,6 +230,9 @@ export async function getMobileBehaviorAssuranceWorkspace(input: {
   );
 
   return {
+    windows: {
+      behaviorPrograms: mobileRegisterWindow("behaviorPrograms", behaviorPrograms.length),
+    },
     capabilities,
     people,
     behaviorForms,

@@ -306,7 +306,8 @@ test("phase 5 mobile register scalability uses one bounded server contract", asy
     "actionCenterTasks", "actionCenterCorrectiveActions", "riskRecords", "jsaRecords",
     "mocRecords", "permitRecords", "assetRecords", "contractorRecords",
     "hygieneAssessments", "surveillancePrograms", "chemicalRecords",
-    "environmentalDefinitions", "esgDefinitions", "behaviorPrograms", "regulatoryRecords",
+    "environmentalDefinitions", "environmentalTargets", "esgPeriods", "esgDefinitions",
+    "esgTargets", "esgInitiatives", "behaviorPrograms", "regulatorySources", "regulatoryChanges",
   ]) {
     assert.match(limits, new RegExp(`${key}: \\d+`));
   }
@@ -354,4 +355,32 @@ test("phase 5 bootstrap exposes priority register window metadata to the native 
   const types = await mobileSource("apps/mobile/src/types.ts");
   assert.match(types, /export type MobileRegisterWindow/);
   assert.match(types, /hasMore: boolean/);
+});
+
+
+test("phase 5 governance and assurance registers use shared server windows", async () => {
+  const expected = new Map([
+    ["src/modules/mobile/mobile-chemical-environmental.service.ts", ["chemicalRecords", "environmentalDefinitions", "environmentalTargets"]],
+    ["src/modules/mobile/mobile-esg.service.ts", ["esgPeriods", "esgDefinitions", "esgTargets", "esgInitiatives"]],
+    ["src/modules/mobile/mobile-behavior-assurance.service.ts", ["behaviorPrograms"]],
+    ["src/modules/mobile/mobile-regulatory-intelligence.service.ts", ["regulatorySources", "regulatoryChanges"]],
+  ]);
+  for (const [path, keys] of expected) {
+    const source = await mobileSource(path);
+    for (const key of keys) {
+      assert.match(source, new RegExp(`MOBILE_REGISTER_LIMITS\\.${key}`));
+      assert.match(source, new RegExp(`mobileRegisterWindow\\("${key}"`));
+    }
+  }
+});
+
+test("phase 5 bootstrap exposes governance register windows without widening authorization", async () => {
+  const bootstrap = await mobileSource("src/app/api/mobile/bootstrap/route.ts");
+  for (const property of ["chemicalEnvironmentalRegisterWindows", "esgRegisterWindows", "behaviorAssuranceRegisterWindows", "regulatoryRegisterWindows"]) {
+    assert.match(bootstrap, new RegExp(`${property}:`));
+  }
+  const regulatory = await mobileSource("src/modules/mobile/mobile-regulatory-intelligence.service.ts");
+  assert.match(regulatory, /if \(!capabilities\.canView\)/);
+  assert.match(regulatory, /sources: \[\]/);
+  assert.match(regulatory, /changes: \[\]/);
 });

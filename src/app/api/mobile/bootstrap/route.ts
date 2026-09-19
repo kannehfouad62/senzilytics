@@ -409,6 +409,7 @@ export async function GET(request: Request) {
       environmentalTargets: chemicalEnvironmental.targets,
       chemicalEnvironmentalCapabilities:
         chemicalEnvironmental.capabilities,
+      chemicalEnvironmentalRegisterWindows: chemicalEnvironmental.windows,
       chemicalForms: serializeRuntimeForms(
         chemicalEnvironmental.chemicalForms
       ),
@@ -420,10 +421,12 @@ export async function GET(request: Request) {
       esgTargets: esg.targets,
       esgInitiatives: esg.initiatives,
       esgCapabilities: esg.capabilities,
+      esgRegisterWindows: esg.windows,
       esgForms: serializeRuntimeForms(esg.forms),
       behaviorPrograms: behaviorAssurance.behaviorPrograms,
       behaviorAssurancePeople: behaviorAssurance.people,
       behaviorAssuranceCapabilities: behaviorAssurance.capabilities,
+      behaviorAssuranceRegisterWindows: behaviorAssurance.windows,
       behaviorForms: serializeRuntimeForms(behaviorAssurance.behaviorForms),
       sifAssurance: behaviorAssurance.sif,
       sifForms: serializeRuntimeForms(behaviorAssurance.sifForms),
@@ -433,6 +436,7 @@ export async function GET(request: Request) {
       ),
       regulatoryGeneratedAt: regulatoryIntelligence.generatedAt,
       regulatoryMetrics: regulatoryIntelligence.metrics,
+      regulatoryRegisterWindows: regulatoryIntelligence.windows,
       regulatorySources: regulatoryIntelligence.sources,
       regulatoryChanges: regulatoryIntelligence.changes,
       regulatoryCapabilities: regulatoryIntelligence.capabilities,

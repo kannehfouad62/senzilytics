@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { MOBILE_REGISTER_LIMITS, mobileRegisterWindow } from "@/modules/mobile/mobile-register-limits";
 import {
   getEsgDisclosureNextStatuses,
   getEsgInitiativeNextStatuses,
@@ -65,7 +66,7 @@ export async function getMobileEsgWorkspace(input: {
         },
       },
       orderBy: { periodEnd: "desc" },
-      take: 50,
+      take: MOBILE_REGISTER_LIMITS.esgPeriods,
     }),
     prisma.esgMetricDefinition.findMany({
       where: { organizationId: input.organizationId, isActive: true },
@@ -82,7 +83,7 @@ export async function getMobileEsgWorkspace(input: {
         },
       },
       orderBy: [{ pillar: "asc" }, { code: "asc" }],
-      take: 250,
+      take: MOBILE_REGISTER_LIMITS.esgDefinitions,
     }),
     prisma.esgTarget.findMany({
       where: {
@@ -101,7 +102,7 @@ export async function getMobileEsgWorkspace(input: {
         description: true,
       },
       orderBy: [{ targetYear: "asc" }, { createdAt: "desc" }],
-      take: 250,
+      take: MOBILE_REGISTER_LIMITS.esgTargets,
     }),
     prisma.esgInitiative.findMany({
       where: { organizationId: input.organizationId },
@@ -118,7 +119,7 @@ export async function getMobileEsgWorkspace(input: {
         owner: { select: { id: true, name: true } },
       },
       orderBy: [{ status: "asc" }, { targetDate: "asc" }],
-      take: 250,
+      take: MOBILE_REGISTER_LIMITS.esgInitiatives,
     }),
     getPublishedRuntimeForms(
       input.organizationId,
@@ -148,6 +149,12 @@ export async function getMobileEsgWorkspace(input: {
   const metricIds = new Set(metrics.map((metric) => metric.id));
 
   return {
+    windows: {
+      periods: mobileRegisterWindow("esgPeriods", periods.length),
+      metrics: mobileRegisterWindow("esgDefinitions", metrics.length),
+      targets: mobileRegisterWindow("esgTargets", targets.length),
+      initiatives: mobileRegisterWindow("esgInitiatives", initiatives.length),
+    },
     capabilities,
     periods: periods.map((period) => {
       const captured = capturedByPeriod.get(period.id) ?? new Set<string>();

@@ -5,6 +5,7 @@ import {
   RegulatorySourceStatus,
 } from "@prisma/client";
 import { getRegulatoryIntelligenceDashboardService } from "@/modules/compliance/regulatory-intelligence.service";
+import { MOBILE_REGISTER_LIMITS, mobileRegisterWindow } from "@/modules/mobile/mobile-register-limits";
 
 export function mobileRegulatoryCapabilities(
   permissions: readonly PermissionKey[]
@@ -30,6 +31,10 @@ export async function getMobileRegulatoryIntelligenceWorkspace(input: {
       metrics: null,
       sources: [],
       changes: [],
+      windows: {
+        sources: mobileRegisterWindow("regulatorySources", 0),
+        changes: mobileRegisterWindow("regulatoryChanges", 0),
+      },
     };
   }
 
@@ -44,13 +49,27 @@ export async function getMobileRegulatoryIntelligenceWorkspace(input: {
     capabilities,
     generatedAt: now,
     metrics: dashboard.metrics,
+    windows: {
+      sources: mobileRegisterWindow("regulatorySources", Math.min(
+        dashboard.sources.filter((source) =>
+          source.status !== RegulatorySourceStatus.RETIRED || source.updatedAt >= recentCutoff
+        ).length,
+        MOBILE_REGISTER_LIMITS.regulatorySources
+      )),
+      changes: mobileRegisterWindow("regulatoryChanges", Math.min(
+        dashboard.changes.filter((change) =>
+          change.status !== RegulatoryChangeStatus.CLOSED || change.updatedAt >= recentCutoff
+        ).length,
+        MOBILE_REGISTER_LIMITS.regulatoryChanges
+      )),
+    },
     sources: dashboard.sources
       .filter(
         (source) =>
           source.status !== RegulatorySourceStatus.RETIRED ||
           source.updatedAt >= recentCutoff
       )
-      .slice(0, 150)
+      .slice(0, MOBILE_REGISTER_LIMITS.regulatorySources)
       .map((source) => ({
         id: source.id,
         code: source.code,
@@ -80,7 +99,7 @@ export async function getMobileRegulatoryIntelligenceWorkspace(input: {
           change.status !== RegulatoryChangeStatus.CLOSED ||
           change.updatedAt >= recentCutoff
       )
-      .slice(0, 200)
+      .slice(0, MOBILE_REGISTER_LIMITS.regulatoryChanges)
       .map((change) => {
         const latestAssessment = change.assessments[0] ?? null;
         const pendingAssessment =

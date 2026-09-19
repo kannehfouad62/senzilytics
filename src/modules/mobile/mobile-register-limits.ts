@@ -11,9 +11,14 @@ export const MOBILE_REGISTER_LIMITS = {
   surveillancePrograms: 75,
   chemicalRecords: 200,
   environmentalDefinitions: 150,
+  environmentalTargets: 150,
+  esgPeriods: 50,
   esgDefinitions: 250,
-  behaviorPrograms: 100,
-  regulatoryRecords: 100,
+  esgTargets: 250,
+  esgInitiatives: 250,
+  behaviorPrograms: 75,
+  regulatorySources: 150,
+  regulatoryChanges: 200,
 } as const;
 
 export type MobileRegisterKey = keyof typeof MOBILE_REGISTER_LIMITS;
