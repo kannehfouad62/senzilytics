@@ -1391,3 +1391,30 @@ test("phase 9 evidence replay remains server-acknowledged before local cleanup",
   assert.ok(synchronizeEvidence.lastIndexOf("evidenceSynchronized(row.id)") < synchronizeEvidence.indexOf("DELETE FROM mobile_evidence"));
   assert.match(synchronizeEvidence, /DELETE FROM mobile_evidence WHERE id = \? AND owner_key = \?/);
 });
+
+
+test("phase 9 certification preserves interruption replay batching recovery and owner isolation", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  const service = await offlineSource("src/modules/mobile/offline-sync.service.ts");
+  assert.match(storage, /MOBILE_SYNC_RECORD_BATCH_SIZE = 50/);
+  assert.match(storage, /MOBILE_SYNC_RECORD_WINDOW = 200/);
+  assert.match(storage, /MOBILE_SYNC_EVIDENCE_WINDOW = 100/);
+  assert.match(storage, /UPDATE mobile_outbox SET last_error = \?/);
+  assert.match(storage, /UPDATE mobile_evidence SET last_error = \?/);
+  assert.match(storage, /evidenceSynchronized\(row\.id\)/);
+  assert.match(storage, /DELETE FROM mobile_cache WHERE cache_key = \?/);
+  assert.match(service, /prisma\.offlineSubmission\.findUnique/);
+  assert.match(service, /status: "already_synced"/);
+  assert.match(service, /Your role cannot synchronize this record type/);
+});
+
+test("phase 9 certification keeps offline recovery bounded without weakening authorization", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  const route = await offlineSource("src/app/api/mobile/sync/route.ts");
+  assert.match(storage, /mobile_sync_history/);
+  assert.match(storage, /owner_key = \?/);
+  assert.match(storage, /retryOfflineOutboxItem/);
+  assert.match(storage, /discardOfflineOutboxItem/);
+  assert.match(route, /authenticateMobileRequest/);
+  assert.match(route, /organizationId: organization\.id/);
+});
