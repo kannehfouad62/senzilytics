@@ -38,6 +38,7 @@ export function ActionCenterScreen({
   onSync,
   initialRecordId = null,
   onReadNotification,
+  onOpenNotification,
   onOpenNativeTarget,
   onWorkflowDecision,
 }: {
@@ -50,6 +51,7 @@ export function ActionCenterScreen({
   onSync: () => void;
   initialRecordId?: string | null;
   onReadNotification: (id: string) => Promise<void>;
+  onOpenNotification: (notificationId: string, fallbackLink: string | null) => Promise<void>;
   onOpenNativeTarget: (target: NativeRecordTarget) => void;
   onWorkflowDecision: (
     task: MobileBootstrap["tasks"][number],
@@ -142,7 +144,7 @@ export function ActionCenterScreen({
           workspace={workspace}
           online={online}
           onRead={onReadNotification}
-          onOpenNativeTarget={onOpenNativeTarget}
+          onOpenNotification={onOpenNotification}
         />
       ) : null}
     </ScrollView>
@@ -548,12 +550,12 @@ function AlertInbox({
   workspace,
   online,
   onRead,
-  onOpenNativeTarget,
+  onOpenNotification,
 }: {
   workspace: MobileBootstrap;
   online: boolean;
   onRead: (id: string) => Promise<void>;
-  onOpenNativeTarget: (target: NativeRecordTarget) => void;
+  onOpenNotification: (notificationId: string, fallbackLink: string | null) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<"unread" | "all">("unread");
@@ -603,7 +605,7 @@ function AlertInbox({
             {target ? (
               <SecondaryButton
                 label="Open linked record"
-                onPress={() => onOpenNativeTarget(target)}
+                onPress={() => { void onOpenNotification(item.id, item.link); }}
               />
             ) : null}
           </View>

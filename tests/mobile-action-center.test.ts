@@ -530,3 +530,26 @@ test("phase 5 certification preserves native exact-record continuity while regis
     assert.doesNotMatch(source, /react-native-webview|<WebView/);
   }
 });
+
+
+test("phase 6 notification opens revalidate notification ownership before native routing", async () => {
+  const route = await mobileSource("src/app/api/mobile/notifications/route.ts");
+  const app = await mobileSource("apps/mobile/App.tsx");
+  assert.match(route, /notificationIdSchema/);
+  assert.match(route, /organizationId: organization\.id, userId: user\.id/);
+  assert.match(route, /notification_unavailable/);
+  assert.match(route, /cache-control": "no-store"/);
+  assert.match(app, /openGovernedNotification/);
+  assert.match(app, /notificationId=\$\{encodeURIComponent\(notificationId\)\}/);
+  assert.match(app, /resolveNativeRecordTarget\(link\)/);
+  assert.match(app, /notificationId \? \{ \.\.\.item, readAt:/);
+});
+
+test("phase 6 push and in-app alerts converge on the governed notification opener", async () => {
+  const app = await mobileSource("apps/mobile/App.tsx");
+  const actions = await mobileSource("apps/mobile/src/action-center.tsx");
+  assert.match(app, /subscribeToMobileNotificationResponses\(\(\{ notificationId, link \}\) =>/);
+  assert.match(app, /openGovernedNotification\(notificationId, link\)/);
+  assert.match(actions, /onOpenNotification\(item\.id, item\.link\)/);
+  assert.doesNotMatch(actions, /onPress=\{\(\) => onOpenNativeTarget\(target\)\}/);
+});
