@@ -446,3 +446,87 @@ test("phase 5 priority native registers expose online load-more retry behavior",
   assert.match(api, /loadMobileRegister/);
   assert.match(api, /encodeURIComponent\(cursor\)/);
 });
+
+
+test("phase 5 certification keeps bootstrap registers centrally bounded and client-visible", async () => {
+  const limits = await mobileSource("src/modules/mobile/mobile-register-limits.ts");
+  const bootstrap = await mobileSource("src/app/api/mobile/bootstrap/route.ts");
+  for (const key of [
+    "riskRecords", "jsaRecords", "mocRecords", "permitRecords",
+    "assetRecords", "contractorRecords", "hygieneAssessments",
+    "surveillancePrograms", "chemicalRecords", "environmentalDefinitions",
+    "environmentalTargets", "esgPeriods", "esgDefinitions", "esgTargets",
+    "esgInitiatives", "behaviorPrograms", "regulatorySources", "regulatoryChanges",
+  ]) assert.match(limits, new RegExp(`${key}: \\d+`));
+  for (const property of [
+    "riskRegisterWindows", "mocPermitRegisterWindows",
+    "assetContractorRegisterWindows", "hygieneHealthRegisterWindows",
+    "chemicalEnvironmentalRegisterWindows", "esgRegisterWindows",
+    "behaviorAssuranceRegisterWindows", "regulatoryRegisterWindows",
+  ]) assert.match(bootstrap, new RegExp(`${property}:`));
+});
+
+test("phase 5 certification continuation is authenticated tenant-derived allowlisted and no-store", async () => {
+  const route = await mobileSource("src/app/api/mobile/registers/[register]/route.ts");
+  assert.match(route, /authenticateMobileRequest\(request\)/);
+  assert.match(route, /getMobileAssignedPermissions\(user\.role\)/);
+  assert.match(route, /organizationId: organization\.id/);
+  assert.match(route, /REGISTER_KEYS/);
+  assert.match(route, /cache-control": "no-store"/);
+  assert.doesNotMatch(route, /organizationId.*searchParams|organizationId.*params/);
+});
+
+test("phase 5 certification cursors are opaque register-bound validated and bounded", async () => {
+  const cursor = await mobileSource("src/modules/mobile/mobile-register-cursor.ts");
+  assert.match(cursor, /CURSOR_VERSION = 1/);
+  assert.match(cursor, /ID_PATTERN/);
+  assert.match(cursor, /toString\("base64url"\)/);
+  assert.match(cursor, /parsed\.register !== register/);
+  assert.match(cursor, /raw\.length > 512/);
+  assert.match(cursor, /records\.slice\(0, limit\)/);
+  assert.match(cursor, /records\.length > limit/);
+});
+
+test("phase 5 certification priority services use cursor skip and one-record lookahead", async () => {
+  const expected = new Map([
+    ["src/modules/mobile/mobile-risk-field.service.ts", [["riskCursor", "riskRecords"], ["jsaCursor", "jsaRecords"]]],
+    ["src/modules/mobile/mobile-moc-permit.service.ts", [["mocCursor", "mocRecords"], ["permitCursor", "permitRecords"]]],
+    ["src/modules/mobile/mobile-asset-contractor.service.ts", [["assetCursor", "assetRecords"], ["contractorCursor", "contractorRecords"]]],
+    ["src/modules/mobile/mobile-hygiene-health.service.ts", [["assessmentCursor", "hygieneAssessments"], ["programCursor", "surveillancePrograms"]]],
+  ]);
+  for (const [path, contracts] of expected) {
+    const source = await mobileSource(path);
+    for (const [cursor, limit] of contracts) {
+      assert.match(source, new RegExp(`cursor: \\{ id: input\\.${cursor} \\}, skip: 1`));
+      assert.match(source, new RegExp(`MOBILE_REGISTER_LIMITS\\.${limit} \\+ \\(input\\.${cursor} \\? 1 : 0\\)`));
+    }
+  }
+});
+
+test("phase 5 certification native pagination is duplicate-safe offline-safe and refresh-reset", async () => {
+  const pagination = await mobileSource("apps/mobile/src/register-pagination.ts");
+  assert.match(pagination, /new Set\(current\.map\(\(item\) => item\.id\)\)/);
+  assert.match(pagination, /incoming\.filter\(\(item\) => !seen\.has\(item\.id\)\)/);
+  assert.match(pagination, /if \(!online \|\| !hasMore \|\| !nextCursor \|\| loadingMore\) return/);
+  assert.match(pagination, /useEffect\(\(\) => \{/);
+  assert.match(pagination, /setItems\(initialItems\)/);
+  assert.match(pagination, /setHasMore\(initialHasMore\)/);
+  assert.match(pagination, /\[initialItems, initialHasMore, register\]/);
+});
+
+test("phase 5 certification preserves native exact-record continuity while registers scale", async () => {
+  const app = await mobileSource("apps/mobile/App.tsx");
+  for (const screen of ["RiskFieldScreen", "MocPermitScreen", "AssetContractorScreen", "HygieneHealthScreen"]) {
+    assert.match(app, new RegExp(`<${screen}[^>]*initialRecordId=`, "s"));
+  }
+  for (const path of [
+    "apps/mobile/src/risk-field.tsx",
+    "apps/mobile/src/moc-permits.tsx",
+    "apps/mobile/src/assets-contractors.tsx",
+    "apps/mobile/src/hygiene-health.tsx",
+  ]) {
+    const source = await mobileSource(path);
+    assert.match(source, /RegisterLoadMore/);
+    assert.doesNotMatch(source, /react-native-webview|<WebView/);
+  }
+});
