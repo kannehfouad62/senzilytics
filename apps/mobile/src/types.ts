@@ -1985,7 +1985,26 @@ export type MobileTenantAdministrationWorkspace = {
   };
 };
 
+export type MobileRegisterLimits = {
+  actionCenterTasks: number;
+  actionCenterCorrectiveActions: number;
+  riskRecords: number;
+  jsaRecords: number;
+  mocRecords: number;
+  permitRecords: number;
+  assetRecords: number;
+  contractorRecords: number;
+  hygieneAssessments: number;
+  surveillancePrograms: number;
+  chemicalRecords: number;
+  environmentalDefinitions: number;
+  esgDefinitions: number;
+  behaviorPrograms: number;
+  regulatoryRecords: number;
+};
+
 export type MobileBootstrap = {
+  mobileRegisterLimits: MobileRegisterLimits;
   user: MobileUser;
   organization: { id: string; name: string; subscriptionPlan: string };
   permissions: string[];

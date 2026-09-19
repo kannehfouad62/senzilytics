@@ -298,3 +298,28 @@ test("phase 4 certification keeps priority operational workspaces native without
     assert.doesNotMatch(source, /react-native-webview|<WebView/);
   }
 });
+
+
+test("phase 5 mobile register scalability uses one bounded server contract", async () => {
+  const limits = await mobileSource("src/modules/mobile/mobile-register-limits.ts");
+  for (const key of [
+    "actionCenterTasks", "actionCenterCorrectiveActions", "riskRecords", "jsaRecords",
+    "mocRecords", "permitRecords", "assetRecords", "contractorRecords",
+    "hygieneAssessments", "surveillancePrograms", "chemicalRecords",
+    "environmentalDefinitions", "esgDefinitions", "behaviorPrograms", "regulatoryRecords",
+  ]) {
+    assert.match(limits, new RegExp(`${key}: \\d+`));
+  }
+  assert.match(limits, /hasMore: returned >= limit/);
+
+  const bootstrap = await mobileSource("src/app/api/mobile/bootstrap/route.ts");
+  assert.match(bootstrap, /mobileRegisterLimits: MOBILE_REGISTER_LIMITS/);
+
+  const types = await mobileSource("apps/mobile/src/types.ts");
+  assert.match(types, /mobileRegisterLimits: MobileRegisterLimits/);
+});
+
+test("phase 5 action center task window is sourced from the shared register limit", async () => {
+  const service = await mobileSource("src/modules/mobile/mobile-action-center.service.ts");
+  assert.match(service, /MOBILE_REGISTER_LIMITS\.actionCenterTasks/);
+});

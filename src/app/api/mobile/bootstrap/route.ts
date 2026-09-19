@@ -7,6 +7,7 @@ import {
 } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { MOBILE_REGISTER_LIMITS } from "@/modules/mobile/mobile-register-limits";
 import { authenticateMobileRequest, MobileAuthError } from "@/modules/mobile/mobile-auth.service";
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import { getMobileActionCenter } from "@/modules/mobile/mobile-action-center.service";
@@ -458,6 +459,7 @@ export async function GET(request: Request) {
       executiveReport: null,
       executiveAiAnalyses: [],
       executiveAiMetrics: null,
+      mobileRegisterLimits: MOBILE_REGISTER_LIMITS,
       notifications,
       tasks: actionCenter.tasks,
       correctiveActions: actionCenter.correctiveActions,

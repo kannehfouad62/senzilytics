@@ -6,6 +6,7 @@ import {
   WorkflowStepType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { MOBILE_REGISTER_LIMITS } from "@/modules/mobile/mobile-register-limits";
 
 const capaPermissions = [
   PermissionKey.CREATE_CAPA,
@@ -92,7 +93,7 @@ export async function getMobileActionCenter(input: {
         },
       },
       orderBy: { dueAt: { sort: "asc", nulls: "last" } },
-      take: 50,
+      take: MOBILE_REGISTER_LIMITS.actionCenterTasks,
     }),
     capabilities.canView
       ? prisma.correctiveAction.findMany({
