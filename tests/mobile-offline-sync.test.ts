@@ -1349,3 +1349,21 @@ test("phase 3 mobile evidence server enforces size MIME checksum and private-upl
   assert.match(service, /OFFLINE_COLLECTION/);
 });
 
+
+
+test("phase 9 large outboxes advance through bounded server-sized record batches", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  assert.match(storage, /MOBILE_SYNC_RECORD_BATCH_SIZE = 50/);
+  assert.match(storage, /MOBILE_SYNC_RECORD_WINDOW = 200/);
+  assert.match(storage, /rows\.slice\(offset, offset \+ MOBILE_SYNC_RECORD_BATCH_SIZE\)/);
+  assert.match(storage, /offset \+= MOBILE_SYNC_RECORD_BATCH_SIZE/);
+  assert.match(storage, /items: batch\.map/);
+});
+
+test("phase 9 evidence recovery remains bounded while allowing meaningful queue progress", async () => {
+  const storage = await offlineSource("apps/mobile/src/storage.ts");
+  assert.match(storage, /MOBILE_SYNC_EVIDENCE_WINDOW = 100/);
+  assert.match(storage, /LIMIT \$\{MOBILE_SYNC_EVIDENCE_WINDOW\}/);
+  assert.match(storage, /evidenceSynchronized\(row\.id\)/);
+  assert.match(storage, /UPDATE mobile_evidence SET last_error = \?/);
+});

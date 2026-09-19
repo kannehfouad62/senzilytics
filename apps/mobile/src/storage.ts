@@ -10,6 +10,10 @@ import {
   type OfflineRecordType,
 } from "./offline-envelope";
 import { isMobileWorkspaceCacheFresh } from "./session-lifecycle";
+const MOBILE_SYNC_RECORD_BATCH_SIZE = 50;
+const MOBILE_SYNC_RECORD_WINDOW = 200;
+const MOBILE_SYNC_EVIDENCE_WINDOW = 100;
+
 import type {
   AssetDefectPayload,
   AssetDefectStatusPayload,
@@ -1198,7 +1202,7 @@ export async function pendingOfflineCount(ownerKey: string) {
 
 export async function synchronizeOfflineItems(ownerKey: string) {
   const database = await db();
-  const rows = await database.getAllAsync<QueueRow>("SELECT id, payload, captured_at FROM mobile_outbox WHERE owner_key = ? ORDER BY captured_at ASC LIMIT 50", ownerKey);
+  const rows = await database.getAllAsync<QueueRow>(`SELECT id, payload, captured_at FROM mobile_outbox WHERE owner_key = ? ORDER BY captured_at ASC LIMIT ${MOBILE_SYNC_RECORD_WINDOW}`, ownerKey);
   const decoded = rows.map((row) => ({
     row,
     envelope: decodeOfflineEnvelope(JSON.parse(row.payload)),
@@ -1327,21 +1331,24 @@ async function synchronizeRows(
   rows: Array<{ row: QueueRow; envelope: ReturnType<typeof decodeOfflineEnvelope> }>
 ) {
   if (!rows.length) return { synchronized: 0, failed: 0 };
-  const response = await mobileApi<{
-    results: Array<{ id: string; status: string; error?: string }>;
-  }>("/api/mobile/sync", {
-    method: "POST",
-    body: JSON.stringify({
-      items: rows.map(({ row, envelope }) => ({
-        id: row.id,
-        type: envelope.type,
-        capturedAt: row.captured_at,
-        payload: envelope.payload,
-      })),
-    }),
-  });
   let synchronized = 0;
-  for (const result of response.results) {
+  let failed = 0;
+  for (let offset = 0; offset < rows.length; offset += MOBILE_SYNC_RECORD_BATCH_SIZE) {
+    const batch = rows.slice(offset, offset + MOBILE_SYNC_RECORD_BATCH_SIZE);
+    const response = await mobileApi<{
+      results: Array<{ id: string; status: string; error?: string }>;
+    }>("/api/mobile/sync", {
+      method: "POST",
+      body: JSON.stringify({
+        items: batch.map(({ row, envelope }) => ({
+          id: row.id,
+          type: envelope.type,
+          capturedAt: row.captured_at,
+          payload: envelope.payload,
+        })),
+      }),
+    });
+    for (const result of response.results) {
     const queued = rows.find(({ row }) => row.id === result.id);
     const label = queued ? offlineRecordLabels[queued.envelope.type] : "Queued record";
     if (result.status === "synced" || result.status === "already_synced") {
@@ -1365,12 +1372,11 @@ async function synchronizeRows(
       await appendOfflineSyncHistory(database, ownerKey, {
         itemKind: "record", itemId: result.id, label, outcome: "FAILED", detail: error,
       });
+      failed++;
+    }
     }
   }
-  return {
-    synchronized,
-    failed: response.results.length - synchronized,
-  };
+  return { synchronized, failed };
 }
 
 async function synchronizeEvidence(
@@ -1384,7 +1390,7 @@ async function synchronizeEvidence(
      FROM mobile_evidence
      WHERE owner_key = ?
      ORDER BY captured_at ASC
-     LIMIT 25`,
+     LIMIT ${MOBILE_SYNC_EVIDENCE_WINDOW}`,
     ownerKey
   );
   let synchronized = 0;
