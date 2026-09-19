@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { isMobileWorkspaceCacheFresh, mobileOwnerKey, parseStoredMobileContext, shouldDiscardMobileSession } from "../apps/mobile/src/session-lifecycle";
 
@@ -23,4 +24,17 @@ test("encrypted offline workspace access expires after the bounded grace period"
   assert.equal(isMobileWorkspaceCacheFresh("2026-07-18T12:00:00.000Z", now), true);
   assert.equal(isMobileWorkspaceCacheFresh("2026-07-18T11:59:59.999Z", now), false);
   assert.equal(isMobileWorkspaceCacheFresh("invalid", now), false);
+});
+
+
+test("phase 9 connectivity recovery preserves temporary sessions while terminal authorization fails closed", async () => {
+  const api = await readFile(new URL("../apps/mobile/src/api.ts", import.meta.url), "utf8");
+  const lifecycle = await readFile(new URL("../apps/mobile/src/session-lifecycle.ts", import.meta.url), "utf8");
+  const app = await readFile(new URL("../apps/mobile/App.tsx", import.meta.url), "utf8");
+  assert.match(api, /response\.status === 401 && retry/);
+  assert.match(api, /refreshInFlight/);
+  assert.match(api, /shouldDiscardMobileSession\(error\)/);
+  assert.match(lifecycle, /shouldDiscardMobileSession/);
+  assert.match(app, /syncInFlight/);
+  assert.match(app, /authState === "signed-in" && ownerKey && online/);
 });

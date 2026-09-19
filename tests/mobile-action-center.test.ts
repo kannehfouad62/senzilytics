@@ -621,3 +621,15 @@ test("phase 6 certification preserves one native router and fails closed for uns
   assert.doesNotMatch(app, /react-native-webview|<WebView/);
   assert.doesNotMatch(nativeRouting, /react-native-webview|<WebView/);
 });
+
+
+test("phase 9 pagination preserves cursor on failure and retries through the governed continuation contract", async () => {
+  const pagination = await readFile(new URL("../apps/mobile/src/register-pagination.ts", import.meta.url), "utf8");
+  const route = await readFile(new URL("../src/app/api/mobile/registers/[register]/route.ts", import.meta.url), "utf8");
+  assert.match(pagination, /loadMobileRegister\(register,\s*nextCursor\)/);
+  assert.match(pagination, /catch\s*\([^)]*\)\s*\{[\s\S]*setLoadError/);
+  assert.match(pagination, /mergeRegisterRecords/);
+  assert.match(pagination, /setNextCursor/);
+  assert.match(route, /authenticateMobileRequest/);
+  assert.match(route, /decodeMobileRegisterCursor|parseMobileRegisterCursor/);
+});
