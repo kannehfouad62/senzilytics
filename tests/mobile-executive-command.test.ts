@@ -8,6 +8,7 @@ import {
 import {
   executeMobileExecutiveAction,
   getMobileExecutiveReportingWindow,
+  MOBILE_EXECUTIVE_LIMITS,
   mobileExecutiveActionSchema,
   mobileExecutiveCapabilities,
   MobileExecutiveActionError,
@@ -230,4 +231,39 @@ test("phase 7 decision snapshot reuses governed portfolio domains including rese
   assert.match(portfolio, /Research: \[PermissionKey\.VIEW_RESEARCH\]/);
   assert.match(portfolio, /label: "Research"/);
   assert.match(portfolio, /href: "\/research"/);
+});
+
+
+test("phase 7 mobile executive payload uses one explicit bounded analytics contract", async () => {
+  assert.deepEqual(MOBILE_EXECUTIVE_LIMITS, {
+    trendMonths: 12,
+    recentIncidents: 5,
+    overdueActions: 5,
+    assuranceSignals: 30,
+    sitePerformance: 15,
+    managementAttention: 30,
+    aiAnalyses: 20,
+  });
+
+  const service = await readFile(
+    new URL("../src/modules/mobile/mobile-executive.service.ts", import.meta.url),
+    "utf8"
+  );
+  assert.match(service, /limit: MOBILE_EXECUTIVE_LIMITS\.assuranceSignals/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.aiAnalyses/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.sitePerformance/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.managementAttention/);
+});
+
+test("phase 7 executive trends stay on the rolling twelve-month mobile window and outside bootstrap", async () => {
+  const [service, bootstrap, route] = await Promise.all([
+    readFile(new URL("../src/modules/mobile/mobile-executive.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/mobile/bootstrap/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/mobile/executive/route.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(service, /monthlyTrend: dashboard\.charts\.monthlyTrend\.slice/);
+  assert.match(service, /monthlyTrend: report\.monthlyTrend\.slice/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.trendMonths/);
+  assert.doesNotMatch(bootstrap, /getMobileExecutiveWorkspace\(/);
+  assert.match(route, /headers: \{ "cache-control": "no-store" \}/);
 });

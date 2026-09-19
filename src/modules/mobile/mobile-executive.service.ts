@@ -19,6 +19,16 @@ import {
   reviewEnterpriseAiAnalysisService,
 } from "@/modules/intelligence/enterprise-ai.service";
 
+export const MOBILE_EXECUTIVE_LIMITS = {
+  trendMonths: 12,
+  recentIncidents: 5,
+  overdueActions: 5,
+  assuranceSignals: 30,
+  sitePerformance: 15,
+  managementAttention: 30,
+  aiAnalyses: 20,
+} as const;
+
 export const mobileExecutiveActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("GENERATE_AI_ANALYSIS"),
@@ -133,7 +143,7 @@ export async function getMobileExecutiveWorkspace(input: {
         ? getOperationalAssuranceOverview({
             organizationId: input.organizationId,
             permissions: input.permissions,
-            limit: 30,
+            limit: MOBILE_EXECUTIVE_LIMITS.assuranceSignals,
           })
         : null,
       capabilities.canViewReports
@@ -148,7 +158,7 @@ export async function getMobileExecutiveWorkspace(input: {
       capabilities.canUseAi
         ? listEnterpriseAiAnalysesWithSourcesService(
             input.organizationId,
-            20
+            MOBILE_EXECUTIVE_LIMITS.aiAnalyses
           )
         : [],
     ]);
@@ -160,8 +170,15 @@ export async function getMobileExecutiveWorkspace(input: {
       ? {
           generatedAt: dashboard.generatedAt.toISOString(),
           kpis: dashboard.kpis,
-          charts: dashboard.charts,
-          recentIncidents: dashboard.recentIncidents.map((incident) => ({
+          charts: {
+            ...dashboard.charts,
+            monthlyTrend: dashboard.charts.monthlyTrend.slice(
+              -MOBILE_EXECUTIVE_LIMITS.trendMonths
+            ),
+          },
+          recentIncidents: dashboard.recentIncidents
+            .slice(0, MOBILE_EXECUTIVE_LIMITS.recentIncidents)
+            .map((incident) => ({
             id: incident.id,
             title: incident.title,
             status: incident.status,
@@ -169,8 +186,10 @@ export async function getMobileExecutiveWorkspace(input: {
             occurredAt: incident.occurredAt.toISOString(),
             site: incident.site,
             reportedBy: incident.reportedBy,
-          })),
-          overdueActions: dashboard.recentOverdueActions.map((action) => ({
+            })),
+          overdueActions: dashboard.recentOverdueActions
+            .slice(0, MOBILE_EXECUTIVE_LIMITS.overdueActions)
+            .map((action) => ({
             id: action.id,
             title: action.title,
             status: action.status,
@@ -178,7 +197,7 @@ export async function getMobileExecutiveWorkspace(input: {
             dueDate: action.dueDate.toISOString(),
             assignedTo: action.assignedTo,
             incident: action.incident,
-          })),
+            })),
         }
       : null,
     portfolio: portfolio
@@ -207,10 +226,15 @@ export async function getMobileExecutiveWorkspace(input: {
             siteName: report.filters.siteName,
           },
           summary: report.summary,
-          monthlyTrend: report.monthlyTrend,
-          sitePerformance: report.sitePerformance.slice(0, 15),
+          monthlyTrend: report.monthlyTrend.slice(
+            -MOBILE_EXECUTIVE_LIMITS.trendMonths
+          ),
+          sitePerformance: report.sitePerformance.slice(
+            0,
+            MOBILE_EXECUTIVE_LIMITS.sitePerformance
+          ),
           managementAttention: report.managementAttention
-            .slice(0, 30)
+            .slice(0, MOBILE_EXECUTIVE_LIMITS.managementAttention)
             .map((item) => ({
               ...item,
               dueDate: item.dueDate?.toISOString() ?? null,
