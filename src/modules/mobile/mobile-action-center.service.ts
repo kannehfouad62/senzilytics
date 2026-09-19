@@ -26,7 +26,7 @@ export function mobileWorkflowEntityHref(
     [WorkflowEntityType.INSPECTION]: "/inspections",
     [WorkflowEntityType.COMPLIANCE]: "/compliance",
     [WorkflowEntityType.DOCUMENT]: "/documents",
-    [WorkflowEntityType.PERMIT]: "/compliance/permits",
+    [WorkflowEntityType.PERMIT]: "/permits-to-work",
     [WorkflowEntityType.CHEMICAL]: "/chemicals",
     [WorkflowEntityType.MOC]: "/moc",
     [WorkflowEntityType.OBSERVATION]: "/observations",

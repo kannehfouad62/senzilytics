@@ -575,3 +575,24 @@ test("phase 6 notification lifecycle deduplicates startup responses and keeps re
   assert.match(app, /no longer available or does not have an accessible native destination/);
   assert.doesNotMatch(app, /react-native-webview|<WebView/);
 });
+
+
+test("phase 6 notification parity resolves canonical operational links to exact native records", async () => {
+  const routing = await mobileSource("apps/mobile/src/native-routing.ts");
+  assert.match(routing, /parts\[1\] === "jsa" \|\| parts\[1\] === "jha"/);
+  assert.match(routing, /view: "jsa", recordId: recordId\(parts, 2\)/);
+  assert.match(routing, /case "permits-to-work"/);
+  assert.match(routing, /view: "permits", recordId: recordId\(parts, 1\)/);
+  assert.match(routing, /parts\[1\] === "calendar"/);
+  assert.match(routing, /view: "calendar", recordId: recordId\(parts, 2\)/);
+  assert.match(routing, /parts\[1\] === "regulatory" && parts\[2\] === "changes"/);
+  assert.match(routing, /view: "changes", recordId: recordId\(parts, 3\)/);
+});
+
+test("phase 6 workflow permit routing uses the canonical permit-to-work record path", async () => {
+  const actionCenter = await mobileSource("src/modules/mobile/mobile-action-center.service.ts");
+  const routing = await mobileSource("apps/mobile/src/native-routing.ts");
+  assert.match(actionCenter, /\[WorkflowEntityType\.PERMIT\]: "\/permits-to-work"/);
+  assert.match(routing, /case "permits-to-work"/);
+  assert.doesNotMatch(actionCenter, /\[WorkflowEntityType\.PERMIT\]: "\/compliance\/permits"/);
+});

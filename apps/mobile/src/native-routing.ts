@@ -57,7 +57,11 @@ export function resolveNativeRecordTarget(
     case "audits": return { tab: "audits", recordId: recordId(parts, 1) };
     case "inspections": return { tab: "inspections", recordId: recordId(parts, 1) };
     case "research": return { tab: "research", recordId: parts.at(-1) };
-    case "risks": return { tab: "risks", view: "risks", recordId: recordId(parts, 1) };
+    case "risks":
+      if (parts[1] === "jsa" || parts[1] === "jha") {
+        return { tab: "risks", view: "jsa", recordId: recordId(parts, 2) };
+      }
+      return { tab: "risks", view: "risks", recordId: recordId(parts, 1) };
     case "jsa":
     case "jha": return { tab: "risks", view: "jsa", recordId: recordId(parts, 1) };
     case "training": return { tab: "governance", view: "training", recordId: recordId(parts, 1) };
@@ -65,7 +69,18 @@ export function resolveNativeRecordTarget(
       if (parts[1] === "permits") {
         return { tab: "controlledWork", view: "permits", recordId: recordId(parts, 2) };
       }
+      if (parts[1] === "calendar") {
+        return { tab: "governance", view: "calendar", recordId: recordId(parts, 2) };
+      }
+      if (parts[1] === "regulatory" && parts[2] === "changes") {
+        return { tab: "regulatory", view: "changes", recordId: recordId(parts, 3) };
+      }
+      if (parts[1] === "regulatory" && parts[2] === "sources") {
+        return { tab: "regulatory", view: "sources", recordId: recordId(parts, 3) };
+      }
       return { tab: "complianceDocuments", view: "compliance", recordId: recordId(parts, 1) };
+    case "permits-to-work":
+      return { tab: "controlledWork", view: "permits", recordId: recordId(parts, 1) };
     case "documents": return { tab: "complianceDocuments", view: "documents", recordId: recordId(parts, 1) };
     case "moc": return { tab: "controlledWork", view: "moc", recordId: recordId(parts, 1) };
     case "assets": return { tab: "assetContractors", view: "assets", recordId: recordId(parts, 1) };
