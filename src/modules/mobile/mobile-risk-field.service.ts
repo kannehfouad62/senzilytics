@@ -20,6 +20,8 @@ export async function getMobileRiskField(input: {
   organizationId: string;
   userId: string;
   permissions: readonly PermissionKey[];
+  riskCursor?: string | null;
+  jsaCursor?: string | null;
 }) {
   const capabilities = mobileRiskCapabilities(input.permissions);
   if (!capabilities.canView) {
@@ -49,6 +51,9 @@ export async function getMobileRiskField(input: {
       ],
     }),
     prisma.risk.findMany({
+          ...(input.riskCursor
+            ? { cursor: { id: input.riskCursor }, skip: 1 }
+            : {}),
       where: {
         organizationId: input.organizationId,
         status: {
@@ -121,9 +126,12 @@ export async function getMobileRiskField(input: {
         { nextReviewDate: { sort: "asc", nulls: "last" } },
         { updatedAt: "desc" },
       ],
-      take: MOBILE_REGISTER_LIMITS.riskRecords,
+      take: MOBILE_REGISTER_LIMITS.riskRecords + (input.riskCursor ? 1 : 0),
     }),
     prisma.jobSafetyAnalysis.findMany({
+          ...(input.jsaCursor
+            ? { cursor: { id: input.jsaCursor }, skip: 1 }
+            : {}),
       where: {
         organizationId: input.organizationId,
         status: {
@@ -215,7 +223,7 @@ export async function getMobileRiskField(input: {
         { reviewDueDate: { sort: "asc", nulls: "last" } },
         { updatedAt: "desc" },
       ],
-      take: MOBILE_REGISTER_LIMITS.jsaRecords,
+      take: MOBILE_REGISTER_LIMITS.jsaRecords + (input.jsaCursor ? 1 : 0),
     }),
   ]);
 

@@ -384,3 +384,39 @@ test("phase 5 bootstrap exposes governance register windows without widening aut
   assert.match(regulatory, /sources: \[\]/);
   assert.match(regulatory, /changes: \[\]/);
 });
+
+
+test("phase 5 continuation cursors are register-bound opaque and bounded", async () => {
+  const cursor = await mobileSource("src/modules/mobile/mobile-register-cursor.ts");
+  assert.match(cursor, /toString\("base64url"\)/);
+  assert.match(cursor, /raw\.length > 512/);
+  assert.match(cursor, /parsed\.register !== register/);
+  assert.match(cursor, /records\.slice\(0, limit\)/);
+  assert.match(cursor, /records\.length > limit/);
+});
+
+test("phase 5 priority continuation endpoint reauthenticates and admits only named registers", async () => {
+  const route = await mobileSource("src/app/api/mobile/registers/[register]/route.ts");
+  assert.match(route, /authenticateMobileRequest\(request\)/);
+  assert.match(route, /getMobileAssignedPermissions\(user\.role\)/);
+  assert.match(route, /REGISTER_KEYS/);
+  assert.match(route, /invalid_cursor/);
+  assert.match(route, /organizationId: organization\.id/);
+  assert.doesNotMatch(route, /organizationId.*searchParams|organizationId.*params/);
+});
+
+test("phase 5 priority register continuation uses unique record cursors and bounded lookahead", async () => {
+  const expected = new Map([
+    ["src/modules/mobile/mobile-risk-field.service.ts", ["riskCursor", "jsaCursor"]],
+    ["src/modules/mobile/mobile-moc-permit.service.ts", ["mocCursor", "permitCursor"]],
+    ["src/modules/mobile/mobile-asset-contractor.service.ts", ["assetCursor", "contractorCursor"]],
+    ["src/modules/mobile/mobile-hygiene-health.service.ts", ["assessmentCursor", "programCursor"]],
+  ]);
+  for (const [path, cursors] of expected) {
+    const source = await mobileSource(path);
+    for (const cursor of cursors) {
+      assert.match(source, new RegExp(`input\\.${cursor}`));
+      assert.match(source, new RegExp(`cursor: \\{ id: input\\.${cursor} \\}`));
+    }
+  }
+});

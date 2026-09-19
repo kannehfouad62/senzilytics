@@ -35,6 +35,8 @@ export async function getMobileHygieneHealthWorkspace(input: {
   organizationId: string;
   userId: string;
   permissions: readonly PermissionKey[];
+  assessmentCursor?: string | null;
+  programCursor?: string | null;
   now?: Date;
 }) {
   const capabilities = mobileHygieneHealthCapabilities(input.permissions);
@@ -47,6 +49,9 @@ export async function getMobileHygieneHealthWorkspace(input: {
   const [assessments, programs, people, forms] = await Promise.all([
     capabilities.canViewIndustrialHygiene
       ? prisma.exposureAssessment.findMany({
+          ...(input.assessmentCursor
+            ? { cursor: { id: input.assessmentCursor }, skip: 1 }
+            : {}),
           where: {
             organizationId: input.organizationId,
             OR: [
@@ -157,11 +162,14 @@ export async function getMobileHygieneHealthWorkspace(input: {
             { dueDate: { sort: "asc", nulls: "last" } },
             { updatedAt: "desc" },
           ],
-          take: MOBILE_REGISTER_LIMITS.hygieneAssessments,
+          take: MOBILE_REGISTER_LIMITS.hygieneAssessments + (input.assessmentCursor ? 1 : 0),
         })
       : Promise.resolve([]),
     capabilities.canViewOccupationalHealth
       ? prisma.medicalSurveillanceProgram.findMany({
+          ...(input.programCursor
+            ? { cursor: { id: input.programCursor }, skip: 1 }
+            : {}),
           where: {
             organizationId: input.organizationId,
             ...(capabilities.canManageOccupationalHealth
@@ -229,7 +237,7 @@ export async function getMobileHygieneHealthWorkspace(input: {
             },
           },
           orderBy: [{ status: "asc" }, { name: "asc" }],
-          take: MOBILE_REGISTER_LIMITS.surveillancePrograms,
+          take: MOBILE_REGISTER_LIMITS.surveillancePrograms + (input.programCursor ? 1 : 0),
         })
       : Promise.resolve([]),
     canManageEither

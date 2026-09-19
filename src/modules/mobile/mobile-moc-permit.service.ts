@@ -24,6 +24,8 @@ export async function getMobileMocPermitWorkspace(input: {
   organizationId: string;
   userId: string;
   permissions: readonly PermissionKey[];
+  mocCursor?: string | null;
+  permitCursor?: string | null;
   now?: Date;
 }) {
   const capabilities = mobileMocPermitCapabilities(input.permissions);
@@ -33,6 +35,9 @@ export async function getMobileMocPermitWorkspace(input: {
   const [mocs, permits] = await Promise.all([
     capabilities.canViewMoc
       ? prisma.managementOfChange.findMany({
+          ...(input.mocCursor
+            ? { cursor: { id: input.mocCursor }, skip: 1 }
+            : {}),
           where: {
             organizationId: input.organizationId,
             OR: [
@@ -137,11 +142,14 @@ export async function getMobileMocPermitWorkspace(input: {
             { plannedCompletionDate: { sort: "asc", nulls: "last" } },
             { updatedAt: "desc" },
           ],
-          take: MOBILE_REGISTER_LIMITS.mocRecords,
+          take: MOBILE_REGISTER_LIMITS.mocRecords + (input.mocCursor ? 1 : 0),
         })
       : Promise.resolve([]),
     capabilities.canViewPermits
       ? prisma.permitToWork.findMany({
+          ...(input.permitCursor
+            ? { cursor: { id: input.permitCursor }, skip: 1 }
+            : {}),
           where: {
             organizationId: input.organizationId,
             OR: [
@@ -254,7 +262,7 @@ export async function getMobileMocPermitWorkspace(input: {
             { plannedStartAt: "asc" },
             { updatedAt: "desc" },
           ],
-          take: MOBILE_REGISTER_LIMITS.permitRecords,
+          take: MOBILE_REGISTER_LIMITS.permitRecords + (input.permitCursor ? 1 : 0),
         })
       : Promise.resolve([]),
   ]);

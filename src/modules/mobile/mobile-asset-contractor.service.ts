@@ -34,6 +34,8 @@ export async function getMobileAssetContractorWorkspace(input: {
   organizationId: string;
   userId: string;
   permissions: readonly PermissionKey[];
+  assetCursor?: string | null;
+  contractorCursor?: string | null;
   now?: Date;
 }) {
   const capabilities = mobileAssetContractorCapabilities(input.permissions);
@@ -44,6 +46,9 @@ export async function getMobileAssetContractorWorkspace(input: {
     await Promise.all([
       capabilities.canViewAssets
         ? prisma.asset.findMany({
+          ...(input.assetCursor
+            ? { cursor: { id: input.assetCursor }, skip: 1 }
+            : {}),
             where: {
               organizationId: input.organizationId,
               OR: [
@@ -160,11 +165,14 @@ export async function getMobileAssetContractorWorkspace(input: {
               { criticality: "desc" },
               { nextInspectionDueAt: "asc" },
             ],
-            take: MOBILE_REGISTER_LIMITS.assetRecords,
+            take: MOBILE_REGISTER_LIMITS.assetRecords + (input.assetCursor ? 1 : 0),
           })
         : Promise.resolve([]),
       capabilities.canViewContractors
         ? prisma.contractor.findMany({
+          ...(input.contractorCursor
+            ? { cursor: { id: input.contractorCursor }, skip: 1 }
+            : {}),
             where: {
               organizationId: input.organizationId,
               OR: [
@@ -240,7 +248,7 @@ export async function getMobileAssetContractorWorkspace(input: {
               },
             },
             orderBy: [{ status: "asc" }, { name: "asc" }],
-            take: MOBILE_REGISTER_LIMITS.contractorRecords,
+            take: MOBILE_REGISTER_LIMITS.contractorRecords + (input.contractorCursor ? 1 : 0),
           })
         : Promise.resolve([]),
       capabilities.canViewAssets
