@@ -553,3 +553,25 @@ test("phase 6 push and in-app alerts converge on the governed notification opene
   assert.match(actions, /onOpenNotification\(item\.id, item\.link\)/);
   assert.doesNotMatch(actions, /onPress=\{\(\) => onOpenNativeTarget\(target\)\}/);
 });
+
+
+test("phase 6 notification lifecycle defers cold-start and offline opens until authorization is ready", async () => {
+  const app = await mobileSource("apps/mobile/App.tsx");
+  assert.match(app, /pendingNotificationOpen = useRef/);
+  assert.match(app, /authState !== "signed-in" \|\| !online \|\| !workspaceRef\.current/);
+  assert.match(app, /pendingNotificationOpen\.current = \{ notificationId, link: fallbackLink \}/);
+  assert.match(app, /if \(authState !== "signed-in" \|\| !online \|\| !workspace \|\| !pendingNotificationOpen\.current\) return/);
+  assert.match(app, /openGovernedNotification\(pendingOpen\.notificationId, pendingOpen\.link\)/);
+});
+
+test("phase 6 notification lifecycle deduplicates startup responses and keeps read updates non-destructive", async () => {
+  const push = await mobileSource("apps/mobile/src/push.ts");
+  const app = await mobileSource("apps/mobile/App.tsx");
+  assert.match(push, /lastHandledNotificationResponseId/);
+  assert.match(push, /response\.notification\.request\.identifier/);
+  assert.match(push, /responseId === lastHandledNotificationResponseId/);
+  assert.match(push, /getLastNotificationResponseAsync/);
+  assert.match(app, /Record opened, but notification read status could not be updated/);
+  assert.match(app, /no longer available or does not have an accessible native destination/);
+  assert.doesNotMatch(app, /react-native-webview|<WebView/);
+});

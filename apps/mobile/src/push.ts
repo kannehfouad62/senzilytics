@@ -20,6 +20,8 @@ export async function registerForMobilePush() {
   return "Push notifications are active.";
 }
 
+let lastHandledNotificationResponseId: string | null = null;
+
 export type MobilePushOpen = {
   notificationId: string | null;
   link: string | null;
@@ -27,6 +29,9 @@ export type MobilePushOpen = {
 
 export function subscribeToMobileNotificationResponses(onOpen: (open: MobilePushOpen) => void) {
   const handle = (response: Notifications.NotificationResponse) => {
+    const responseId = response.notification.request.identifier;
+    if (responseId === lastHandledNotificationResponseId) return;
+    lastHandledNotificationResponseId = responseId;
     const data = response.notification.request.content.data ?? {};
     const notificationId = typeof data.notificationId === "string" ? data.notificationId : null;
     const link = typeof data.link === "string" ? data.link : null;

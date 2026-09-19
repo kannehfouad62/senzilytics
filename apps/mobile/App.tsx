@@ -182,6 +182,7 @@ function SenzilyticsApp() {
   const syncInFlight = useRef(false);
   const workspaceRef = useRef<MobileBootstrap | null>(null);
   const lastInactiveAt = useRef<number | null>(null);
+  const pendingNotificationOpen = useRef<{ notificationId: string | null; link: string | null } | null>(null);
 
   useEffect(() => {
     workspaceRef.current = workspace;
@@ -454,12 +455,16 @@ function SenzilyticsApp() {
   }, []);
 
   const openGovernedNotification = useCallback(async (notificationId: string | null, fallbackLink: string | null) => {
-    if (authState !== "signed-in" || !online) {
-      setActionCenterView("alerts");
-      setTab("actions");
-      setNotice("Connect to the internet to securely open this notification.");
+    if (authState !== "signed-in" || !online || !workspaceRef.current) {
+      pendingNotificationOpen.current = { notificationId, link: fallbackLink };
+      if (authState === "signed-in" && !online) {
+        setActionCenterView("alerts");
+        setTab("actions");
+        setNotice("This notification is waiting for a secure connection before it can open.");
+      }
       return;
     }
+    pendingNotificationOpen.current = null;
     try {
       const verified = notificationId
         ? await mobileApi<{ notification: MobileBootstrap["notifications"][number] }>(`/api/mobile/notifications?notificationId=${encodeURIComponent(notificationId)}`)
@@ -469,13 +474,17 @@ function SenzilyticsApp() {
       if (!target) {
         setActionCenterView("alerts");
         setTab("actions");
-        setNotice("This notification does not have an available native destination.");
+        setNotice("This notification is no longer available or does not have an accessible native destination.");
         return;
       }
       openNativeTarget(target);
       if (notificationId) {
-        await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId }) });
-        setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === notificationId ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item) } : current);
+        try {
+          await mobileApi("/api/mobile/notifications", { method: "PATCH", body: JSON.stringify({ notificationId }) });
+          setWorkspace((current) => current ? { ...current, notifications: current.notifications.map((item) => item.id === notificationId ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item) } : current);
+        } catch (error) {
+          setNotice(`Record opened, but notification read status could not be updated: ${messageOf(error)}`);
+        }
       }
     } catch (error) {
       setActionCenterView("alerts");
@@ -487,6 +496,13 @@ function SenzilyticsApp() {
   useEffect(() => subscribeToMobileNotificationResponses(({ notificationId, link }) => {
     void openGovernedNotification(notificationId, link);
   }), [openGovernedNotification]);
+
+  useEffect(() => {
+    if (authState !== "signed-in" || !online || !workspace || !pendingNotificationOpen.current) return;
+    const pendingOpen = pendingNotificationOpen.current;
+    pendingNotificationOpen.current = null;
+    void openGovernedNotification(pendingOpen.notificationId, pendingOpen.link);
+  }, [authState, online, openGovernedNotification, workspace]);
 
   useEffect(() => {
     if (authState !== "signed-in" || verifiedAt === null) return;
