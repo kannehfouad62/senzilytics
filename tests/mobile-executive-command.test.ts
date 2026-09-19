@@ -267,3 +267,50 @@ test("phase 7 executive trends stay on the rolling twelve-month mobile window an
   assert.doesNotMatch(bootstrap, /getMobileExecutiveWorkspace\(/);
   assert.match(route, /headers: \{ "cache-control": "no-store" \}/);
 });
+
+test("phase 7 certification covers decision analytics native drill-through and research visibility", async () => {
+  const [screen, app, portfolio, routing] = await Promise.all([
+    readFile(new URL("../apps/mobile/src/executive-command.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../apps/mobile/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/core/analytics/global-executive-dashboard.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../apps/mobile/src/native-routing.ts", import.meta.url), "utf8"),
+  ]);
+
+  for (const label of ["Open incidents", "High-risk incidents", "Overdue actions", "Portfolio attention"]) {
+    assert.match(screen, new RegExp(label));
+  }
+  for (const domain of ["CAPA", "Risk", "Audits", "Audit Findings", "Inspections", "Compliance", "Research"]) {
+    assert.match(screen, new RegExp(`"${domain}"`));
+  }
+  assert.match(screen, /openExecutiveHref\(`\/incidents\/\$\{incident\.id\}`/);
+  assert.match(screen, /openExecutiveHref\(`\/actions\/\$\{action\.id\}`/);
+  assert.match(screen, /openExecutiveHref\(signal\.href/);
+  assert.match(screen, /openExecutiveHref\(item\.link/);
+  assert.match(app, /onOpenNativeTarget=\{openNativeTarget\}/);
+  assert.match(portfolio, /Research: \[PermissionKey\.VIEW_RESEARCH\]/);
+  assert.match(routing, /case "research": return \{ tab: "research"/);
+  assert.doesNotMatch(screen, /WebView/);
+});
+
+test("phase 7 certification keeps executive analytics permission filtered bounded and isolated from bootstrap", async () => {
+  const [service, route, bootstrap, portfolio] = await Promise.all([
+    readFile(new URL("../src/modules/mobile/mobile-executive.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/mobile/executive/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/api/mobile/bootstrap/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/core/analytics/global-executive-dashboard.service.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(route, /getMobileAssignedPermissions\(user\.role\)/);
+  assert.match(route, /getMobileExecutiveWorkspace/);
+  assert.match(route, /"cache-control": "no-store"/);
+  assert.doesNotMatch(bootstrap, /getMobileExecutiveWorkspace\(/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.trendMonths/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.recentIncidents/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.overdueActions/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.assuranceSignals/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.sitePerformance/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.managementAttention/);
+  assert.match(service, /MOBILE_EXECUTIVE_LIMITS\.aiAnalyses/);
+  assert.match(portfolio, /allowed\.has\(PermissionKey\.VIEW_RESEARCH\)/);
+  assert.match(portfolio, /organizationId/);
+});
