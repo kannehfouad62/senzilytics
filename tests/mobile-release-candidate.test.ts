@@ -155,3 +155,38 @@ test("Expo plist parsing keeps each XML parser on its compatible patched line", 
     "0.9.12"
   );
 });
+
+
+test("phase 10 release candidate keeps the signed iOS release contract aligned", async () => {
+  const [metadataText, config, easText, storeText] = await Promise.all([
+    readFile(new URL("../apps/mobile/release-metadata.json", import.meta.url), "utf8"),
+    readFile(new URL("../apps/mobile/app.config.ts", import.meta.url), "utf8"),
+    readFile(new URL("../apps/mobile/eas.json", import.meta.url), "utf8"),
+    readFile(new URL("../apps/mobile/store.config.json", import.meta.url), "utf8"),
+  ]);
+  const metadata = JSON.parse(metadataText) as { appVersion: string; apiVersion: string };
+  const eas = JSON.parse(easText) as {
+    cli: { appVersionSource: string };
+    build: { production: { autoIncrement: boolean; env: { EXPO_PUBLIC_API_URL: string } } };
+    submit: { production: { ios: { ascAppId: string } } };
+  };
+  const store = JSON.parse(storeText) as { apple: { version: string } };
+
+  assert.equal(metadata.appVersion, "1.2.0");
+  assert.equal(metadata.apiVersion, "1");
+  assert.equal(store.apple.version, metadata.appVersion);
+  assert.equal(eas.cli.appVersionSource, "remote");
+  assert.equal(eas.build.production.autoIncrement, true);
+  assert.equal(eas.build.production.env.EXPO_PUBLIC_API_URL, "https://www.senzilytics.cloud");
+  assert.equal(eas.submit.production.ios.ascAppId, "6793741558");
+  assert.match(config, /bundleIdentifier:\s*"com\.senzilytics\.mobile"/);
+  assert.match(config, /EAS_BUILD_PROFILE === "production" \? "production" : "development"/);
+});
+
+test("phase 10 release candidate retains encrypted storage and declared iOS privacy controls", async () => {
+  const config = await readFile(new URL("../apps/mobile/app.config.ts", import.meta.url), "utf8");
+  assert.match(config, /\["expo-sqlite", \{ useSQLCipher: true \}\]/);
+  assert.match(config, /NSPrivacyTracking:\s*false/);
+  assert.match(config, /NSPrivacyAccessedAPICategoryDiskSpace/);
+  assert.match(config, /usesNonExemptEncryption:\s*false/);
+});
