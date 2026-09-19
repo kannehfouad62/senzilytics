@@ -16,12 +16,12 @@ export const marketingNavigation = [
 export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-cyan-100/10 bg-[#071421]/88 backdrop-blur-2xl">
-      <div className="mx-auto flex max-w-[90rem] items-center justify-between gap-5 px-5 py-4 sm:px-8 xl:px-10">
-        <Link href="/" aria-label="Senzilytics home" className="group flex items-center gap-3 transition hover:-translate-y-0.5">
+      <div className="mx-auto flex max-w-[90rem] items-center justify-between gap-2 px-4 py-3 sm:gap-5 sm:px-8 sm:py-4 xl:px-10">
+        <Link href="/" aria-label="Senzilytics home" className="group flex min-w-0 items-center gap-2 transition hover:-translate-y-0.5 sm:gap-3">
           <Image src="/brand/senzilytics-mark.png" alt="" width={42} height={42} className="rounded-2xl shadow-[0_8px_30px_rgba(34,211,238,.18)]" priority />
-          <span>
-            <strong className="block text-lg tracking-tight">Senzilytics</strong>
-            <span className="block text-[10px] uppercase tracking-[.22em] text-cyan-200">Governed Intelligence</span>
+          <span className="min-w-0">
+            <strong className="block truncate text-base tracking-tight sm:text-lg">Senzilytics</strong>
+            <span className="hidden text-[10px] uppercase tracking-[.22em] text-cyan-200 sm:block">Governed Intelligence</span>
           </span>
         </Link>
         <nav aria-label="Primary navigation" className="hidden items-center gap-5 xl:flex">
@@ -35,7 +35,7 @@ export function MarketingHeader() {
           <Link href="/login" className="hidden rounded-xl px-4 py-2 text-sm text-slate-200 hover:bg-white/5 sm:block">
             Sign in
           </Link>
-          <Link href="/demo" className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_0_30px_rgba(34,211,238,.18)] transition hover:bg-cyan-200">
+          <Link href="/demo" className="hidden rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold sm:block text-slate-950 shadow-[0_0_30px_rgba(34,211,238,.18)] transition hover:bg-cyan-200">
             Try Demo
           </Link>
           <details className="relative xl:hidden">
@@ -134,7 +134,7 @@ export function MarketingPageHero({ eyebrow, title, description, children }: { e
       <div className="landing-orb absolute -right-32 -top-32 h-96 w-96 rounded-full bg-cyan-400/20 blur-3xl" />
       <div className="relative mx-auto max-w-[90rem]">
         <p className="text-sm font-semibold uppercase tracking-[.2em] text-cyan-200">{eyebrow}</p>
-        <h1 className="mt-5 max-w-5xl text-5xl font-bold tracking-[-.04em] sm:text-6xl lg:text-7xl">{title}</h1>
+        <h1 className="mt-5 max-w-5xl text-[clamp(2.5rem,11vw,3.75rem)] font-bold leading-[1.04] tracking-[-.04em] sm:text-6xl lg:text-7xl">{title}</h1>
         <p className="mt-7 max-w-3xl text-lg leading-8 text-slate-200 sm:text-xl">{description}</p>
         {children}
       </div>

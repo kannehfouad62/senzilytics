@@ -201,13 +201,13 @@ export async function Topbar() {
   }
 
   return (
-    <header className="relative z-40 flex min-h-20 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-slate-950/90 px-4 py-3 backdrop-blur-xl sm:px-8 lg:pl-20">
-      <div>
-        <p className="text-sm text-cyan-300">AI Command Center</p>
-        <h2 className="text-xl font-semibold">Enterprise Risk Overview</h2>
+    <header className="relative z-40 flex min-h-16 shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-slate-950/95 px-3 py-2.5 backdrop-blur-xl sm:min-h-20 sm:gap-3 sm:px-6 sm:py-3 lg:pl-20 lg:pr-8">
+      <div className="min-w-0">
+        <p className="hidden text-sm text-cyan-300 sm:block">AI Command Center</p>
+        <h2 className="truncate text-sm font-semibold sm:text-xl">Enterprise Risk Overview</h2>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
         <MobileNavigationMenu>
           {mobileSections.map((section) => (
             <div key={section.label} className="mb-4 last:mb-0">
@@ -256,7 +256,7 @@ export async function Topbar() {
         </form>
         <Link
           href="/search"
-          className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10 md:hidden"
+          className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-slate-300 hover:bg-white/10 sm:rounded-2xl sm:p-3 md:hidden"
           title="Search Senzilytics"
         >
           <Search size={20} />
@@ -265,7 +265,7 @@ export async function Topbar() {
         {entitlements.AI && permissions.includes(PermissionKey.USE_AI) && (
           <Link
             href="/intelligence"
-            className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-300 hover:bg-cyan-400/20"
+            className="hidden rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-2.5 text-cyan-300 hover:bg-cyan-400/20 sm:block sm:rounded-2xl sm:p-3"
             title="EHS Intelligence Workspace"
           >
             <Sparkles size={20} />
@@ -275,7 +275,7 @@ export async function Topbar() {
         {!demoMode && entitlements.IN_APP_NOTIFICATIONS && (
           <Link
             href="/tasks"
-            className="relative rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10"
+            className="relative rounded-xl border border-white/10 bg-white/5 p-2.5 text-slate-300 hover:bg-white/10 sm:rounded-2xl sm:p-3"
             title="My Tasks"
           >
             <ClipboardList size={20} />
@@ -295,7 +295,7 @@ export async function Topbar() {
         {!demoMode && entitlements.IN_APP_NOTIFICATIONS && (
           <Link
             href="/notifications"
-            className="relative rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10"
+            className="relative rounded-xl border border-white/10 bg-white/5 p-2.5 text-slate-300 hover:bg-white/10 sm:rounded-2xl sm:p-3"
             title="Notifications"
           >
             <Bell size={20} />
@@ -329,7 +329,7 @@ export async function Topbar() {
         <form action={logout}>
           <button
             type="submit"
-            className="rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-red-300 transition hover:bg-red-400/20"
+            className="rounded-xl border border-red-400/20 bg-red-400/10 p-2.5 text-red-300 transition hover:bg-red-400/20 sm:rounded-2xl sm:p-3"
             title="Logout"
           >
             <LogOut size={20} />

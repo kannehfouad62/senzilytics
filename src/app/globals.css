@@ -59,5 +59,19 @@ html { scroll-behavior: smooth; }
 @keyframes core-spin { to { transform:rotate(360deg) } }
 @keyframes node-float { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-8px) } }
 @keyframes pricing-breathe { 0%,100% { box-shadow:0 0 0 rgba(34,211,238,0) } 50% { box-shadow:0 16px 60px rgba(34,211,238,.07) } }
-@media (max-width:640px) { .landing-network { min-height:28rem; } .landing-node { max-width:10rem; } .landing-node > div { gap:.5rem; padding:.65rem; } .landing-node svg { width:17px; height:17px; } }
+@media (max-width:640px) {
+  .landing-canvas { overflow-x:clip; }
+  .landing-canvas h1,.landing-canvas h2,.landing-canvas h3,.landing-canvas p,.landing-canvas a,.landing-canvas span { overflow-wrap:anywhere; }
+  .landing-network { width:100%; min-height:22rem; max-height:24rem; overflow:hidden; border-radius:1.75rem; }
+  .landing-network-grid { inset:5% !important; transform:perspective(700px) rotateX(58deg) scale(.88); }
+  .landing-node { max-width:8.25rem; font-size:.72rem; }
+  .landing-node > div { gap:.4rem; padding:.5rem .6rem; }
+  .landing-node svg { width:15px; height:15px; flex:none; }
+  .landing-core { transform:translate(-50%,-50%) scale(.78); }
+  .landing-core-ring { transform-origin:center; }
+}
+@media (max-width:380px) {
+  .landing-network { min-height:20rem; max-height:21rem; }
+  .landing-node { max-width:7rem; font-size:.65rem; }
+}
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto } .landing-orb,.landing-orb-reverse,.landing-rise,.landing-float,.landing-bar,.landing-network::before,.landing-scan,.landing-signal-path,.landing-core,.landing-core-ring,.landing-node,.pricing-card { animation:none } .landing-card,.pricing-card { transition:none } }

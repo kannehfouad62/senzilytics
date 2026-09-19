@@ -515,7 +515,7 @@ export async function Sidebar() {
   const visibleInspectionItems = recommend(filterNavigationItems(inspectionNavItems, permissions));
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl lg:flex">
+    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/90 px-5 py-6 backdrop-blur-xl lg:flex">
       <Link
         href="/dashboard"
         aria-label="Senzilytics dashboard"

@@ -32,21 +32,21 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <div className="landing-orb-reverse absolute -right-32 top-0 h-[34rem] w-[34rem] rounded-full bg-blue-500/20 blur-3xl" />
         <div className="relative mx-auto grid max-w-[90rem] gap-14 lg:grid-cols-[minmax(0,1.12fr)_minmax(32rem,.88fr)] lg:items-center xl:gap-20">
           <div className="landing-rise">
-            <p className="inline-flex items-center gap-2 rounded-full border border-cyan-200/30 bg-cyan-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[.18em] text-cyan-100">
+            <p className="inline-flex max-w-full items-center gap-2 rounded-full border border-cyan-200/30 bg-cyan-200/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[.12em] text-cyan-100 sm:px-4 sm:text-xs sm:tracking-[.18em]">
               <Sparkles size={15} />
               Connected operational intelligence
             </p>
-            <h1 className="mt-7 max-w-4xl text-5xl font-bold tracking-[-.04em] sm:text-7xl xl:text-[5.8rem] xl:leading-[.96]">
+            <h1 className="mt-7 max-w-4xl text-[clamp(2.6rem,12vw,4rem)] font-bold leading-[1.02] tracking-[-.04em] sm:text-7xl xl:text-[5.8rem] xl:leading-[.96]">
               See risk sooner.
               <br />
               <span className="bg-gradient-to-r from-cyan-200 via-sky-200 to-emerald-200 bg-clip-text text-transparent">Act with confidence.</span>
             </h1>
             <p className="mt-7 max-w-3xl text-lg leading-8 text-slate-200 sm:text-xl sm:leading-9">Senzilytics unifies EHS, ESG, research, audit, compliance and enterprise risk—turning field and professional-service activity into governed workflows and decision-ready intelligence.</p>
-            <div className="mt-9 flex flex-wrap gap-4">
-              <Link href="/demo" className="inline-flex items-center gap-2 rounded-2xl bg-cyan-300 px-6 py-3.5 font-semibold text-slate-950 shadow-[0_0_45px_rgba(34,211,238,.2)] transition hover:-translate-y-0.5 hover:bg-cyan-200">
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
+              <Link href="/demo" className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-6 py-3.5 text-center font-semibold sm:w-auto text-slate-950 shadow-[0_0_45px_rgba(34,211,238,.2)] transition hover:-translate-y-0.5 hover:bg-cyan-200">
                 Explore Interactive Demo <ArrowRight size={18} />
               </Link>
-              <a href="#solutions" className="rounded-2xl border border-white/20 bg-white/[.06] px-6 py-3.5 font-semibold text-white backdrop-blur transition hover:border-cyan-200/50 hover:bg-white/[.09]">
+              <a href="#solutions" className="w-full rounded-2xl border border-white/20 bg-white/[.06] px-6 py-3.5 text-center font-semibold text-white sm:w-auto backdrop-blur transition hover:border-cyan-200/50 hover:bg-white/[.09]">
                 Explore Solutions
               </a>
             </div>
