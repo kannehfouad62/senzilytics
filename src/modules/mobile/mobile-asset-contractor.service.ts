@@ -8,6 +8,7 @@ import {
   PermissionKey,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { MOBILE_REGISTER_LIMITS, mobileRegisterWindow } from "@/modules/mobile/mobile-register-limits";
 import {
   getAssetDefectNextStatuses,
 } from "@/modules/assets/asset.service";
@@ -159,7 +160,7 @@ export async function getMobileAssetContractorWorkspace(input: {
               { criticality: "desc" },
               { nextInspectionDueAt: "asc" },
             ],
-            take: 75,
+            take: MOBILE_REGISTER_LIMITS.assetRecords,
           })
         : Promise.resolve([]),
       capabilities.canViewContractors
@@ -239,7 +240,7 @@ export async function getMobileAssetContractorWorkspace(input: {
               },
             },
             orderBy: [{ status: "asc" }, { name: "asc" }],
-            take: 75,
+            take: MOBILE_REGISTER_LIMITS.contractorRecords,
           })
         : Promise.resolve([]),
       capabilities.canViewAssets
@@ -276,6 +277,10 @@ export async function getMobileAssetContractorWorkspace(input: {
   }
 
   return {
+    windows: {
+      assets: mobileRegisterWindow("assetRecords", assets.length),
+      contractors: mobileRegisterWindow("contractorRecords", contractors.length),
+    },
     capabilities,
     assetInspectionForms,
     assets: assets.map((asset) => ({

@@ -4,6 +4,7 @@ import {
   RiskStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { MOBILE_REGISTER_LIMITS, mobileRegisterWindow } from "@/modules/mobile/mobile-register-limits";
 
 export function mobileRiskCapabilities(
   permissions: readonly PermissionKey[]
@@ -120,7 +121,7 @@ export async function getMobileRiskField(input: {
         { nextReviewDate: { sort: "asc", nulls: "last" } },
         { updatedAt: "desc" },
       ],
-      take: 75,
+      take: MOBILE_REGISTER_LIMITS.riskRecords,
     }),
     prisma.jobSafetyAnalysis.findMany({
       where: {
@@ -214,11 +215,15 @@ export async function getMobileRiskField(input: {
         { reviewDueDate: { sort: "asc", nulls: "last" } },
         { updatedAt: "desc" },
       ],
-      take: 50,
+      take: MOBILE_REGISTER_LIMITS.jsaRecords,
     }),
   ]);
 
   return {
+    windows: {
+      risks: mobileRegisterWindow("riskRecords", risks.length),
+      jsas: mobileRegisterWindow("jsaRecords", jsas.length),
+    },
     departments,
     risks: risks.map(({ _count, ...risk }) => ({
       ...risk,

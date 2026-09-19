@@ -1985,6 +1985,12 @@ export type MobileTenantAdministrationWorkspace = {
   };
 };
 
+export type MobileRegisterWindow = {
+  limit: number;
+  returned: number;
+  hasMore: boolean;
+};
+
 export type MobileRegisterLimits = {
   actionCenterTasks: number;
   actionCenterCorrectiveActions: number;
@@ -2029,6 +2035,7 @@ export type MobileBootstrap = {
   risks: MobileRisk[];
   jsas: MobileJsa[];
   riskCapabilities: MobileRiskCapabilities;
+  riskRegisterWindows: { risks: MobileRegisterWindow; jsas: MobileRegisterWindow };
   complianceOccurrences: MobileComplianceOccurrence[];
   trainingAssignments: MobileTrainingAssignment[];
   complianceTrainingCapabilities: MobileComplianceTrainingCapabilities;
@@ -2041,14 +2048,17 @@ export type MobileBootstrap = {
   managementOfChanges: MobileManagementOfChange[];
   permitsToWork: MobilePermitToWork[];
   mocPermitCapabilities: MobileMocPermitCapabilities;
+  mocPermitRegisterWindows: { mocs: MobileRegisterWindow; permits: MobileRegisterWindow };
   assets: MobileAsset[];
   contractors: MobileContractor[];
   assetContractorCapabilities: MobileAssetContractorCapabilities;
+  assetContractorRegisterWindows: { assets: MobileRegisterWindow; contractors: MobileRegisterWindow };
   assetInspectionForms: RuntimeForm[];
   exposureAssessments: MobileExposureAssessment[];
   surveillancePrograms: MobileSurveillanceProgram[];
   hygieneHealthPeople: Array<{ id: string; name: string }>;
   hygieneHealthCapabilities: MobileHygieneHealthCapabilities;
+  hygieneHealthRegisterWindows: { assessments: MobileRegisterWindow; programs: MobileRegisterWindow };
   industrialHygieneForms: RuntimeForm[];
   chemicals: MobileChemical[];
   environmentalMetrics: MobileEnvironmentalMetric[];

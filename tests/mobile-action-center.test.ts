@@ -323,3 +323,35 @@ test("phase 5 action center task window is sourced from the shared register limi
   const service = await mobileSource("src/modules/mobile/mobile-action-center.service.ts");
   assert.match(service, /MOBILE_REGISTER_LIMITS\.actionCenterTasks/);
 });
+
+
+test("phase 5 priority operational registers use shared deterministic server windows", async () => {
+  const expectations = new Map([
+    ["src/modules/mobile/mobile-risk-field.service.ts", ["riskRecords", "jsaRecords"]],
+    ["src/modules/mobile/mobile-moc-permit.service.ts", ["mocRecords", "permitRecords"]],
+    ["src/modules/mobile/mobile-asset-contractor.service.ts", ["assetRecords", "contractorRecords"]],
+    ["src/modules/mobile/mobile-hygiene-health.service.ts", ["hygieneAssessments", "surveillancePrograms"]],
+  ]);
+  for (const [path, keys] of expectations) {
+    const source = await mobileSource(path);
+    for (const key of keys) {
+      assert.match(source, new RegExp(`MOBILE_REGISTER_LIMITS\\.${key}`));
+      assert.match(source, new RegExp(`mobileRegisterWindow\\("${key}"`));
+    }
+  }
+});
+
+test("phase 5 bootstrap exposes priority register window metadata to the native client", async () => {
+  const bootstrap = await mobileSource("src/app/api/mobile/bootstrap/route.ts");
+  for (const property of [
+    "riskRegisterWindows",
+    "mocPermitRegisterWindows",
+    "assetContractorRegisterWindows",
+    "hygieneHealthRegisterWindows",
+  ]) {
+    assert.match(bootstrap, new RegExp(`${property}:`));
+  }
+  const types = await mobileSource("apps/mobile/src/types.ts");
+  assert.match(types, /export type MobileRegisterWindow/);
+  assert.match(types, /hasMore: boolean/);
+});

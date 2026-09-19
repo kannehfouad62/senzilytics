@@ -4,6 +4,7 @@ import {
   PermitToWorkStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { MOBILE_REGISTER_LIMITS, mobileRegisterWindow } from "@/modules/mobile/mobile-register-limits";
 import { getMocNextStatuses } from "@/modules/moc/moc.service";
 import { getPermitToWorkNextStatuses } from "@/modules/permits-to-work/permit-to-work-lifecycle";
 
@@ -136,7 +137,7 @@ export async function getMobileMocPermitWorkspace(input: {
             { plannedCompletionDate: { sort: "asc", nulls: "last" } },
             { updatedAt: "desc" },
           ],
-          take: 75,
+          take: MOBILE_REGISTER_LIMITS.mocRecords,
         })
       : Promise.resolve([]),
     capabilities.canViewPermits
@@ -253,12 +254,16 @@ export async function getMobileMocPermitWorkspace(input: {
             { plannedStartAt: "asc" },
             { updatedAt: "desc" },
           ],
-          take: 75,
+          take: MOBILE_REGISTER_LIMITS.permitRecords,
         })
       : Promise.resolve([]),
   ]);
 
   return {
+    windows: {
+      mocs: mobileRegisterWindow("mocRecords", mocs.length),
+      permits: mobileRegisterWindow("permitRecords", permits.length),
+    },
     mocs: mocs.map((moc) => ({
       ...moc,
       nextStatuses: getMocNextStatuses(moc.status),

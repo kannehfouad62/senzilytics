@@ -6,6 +6,7 @@ import {
   SurveillanceProgramStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { MOBILE_REGISTER_LIMITS, mobileRegisterWindow } from "@/modules/mobile/mobile-register-limits";
 import { getPublishedRuntimeForms } from "@/modules/forms/runtime-form.service";
 import { getExposureAssessmentNextStatuses } from "@/modules/industrial-hygiene/exposure-assessment-lifecycle";
 import { getSurveillanceProgramNextStatuses } from "@/modules/occupational-health/surveillance-program-lifecycle";
@@ -156,7 +157,7 @@ export async function getMobileHygieneHealthWorkspace(input: {
             { dueDate: { sort: "asc", nulls: "last" } },
             { updatedAt: "desc" },
           ],
-          take: 75,
+          take: MOBILE_REGISTER_LIMITS.hygieneAssessments,
         })
       : Promise.resolve([]),
     capabilities.canViewOccupationalHealth
@@ -228,7 +229,7 @@ export async function getMobileHygieneHealthWorkspace(input: {
             },
           },
           orderBy: [{ status: "asc" }, { name: "asc" }],
-          take: 75,
+          take: MOBILE_REGISTER_LIMITS.surveillancePrograms,
         })
       : Promise.resolve([]),
     canManageEither
@@ -266,6 +267,10 @@ export async function getMobileHygieneHealthWorkspace(input: {
   );
 
   return {
+    windows: {
+      assessments: mobileRegisterWindow("hygieneAssessments", assessments.length),
+      programs: mobileRegisterWindow("surveillancePrograms", programs.length),
+    },
     capabilities,
     people,
     forms,

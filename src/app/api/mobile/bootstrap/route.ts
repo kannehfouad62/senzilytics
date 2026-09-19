@@ -377,6 +377,7 @@ export async function GET(request: Request) {
       risks: riskField.risks,
       jsas: riskField.jsas,
       riskCapabilities: riskField.capabilities,
+      riskRegisterWindows: riskField.windows,
       complianceOccurrences: complianceTraining.complianceOccurrences,
       trainingAssignments: complianceTraining.trainingAssignments,
       complianceTrainingCapabilities: complianceTraining.capabilities,
@@ -389,9 +390,11 @@ export async function GET(request: Request) {
       managementOfChanges: mocPermits.mocs,
       permitsToWork: mocPermits.permits,
       mocPermitCapabilities: mocPermits.capabilities,
+      mocPermitRegisterWindows: mocPermits.windows,
       assets: assetContractors.assets,
       contractors: assetContractors.contractors,
       assetContractorCapabilities: assetContractors.capabilities,
+      assetContractorRegisterWindows: assetContractors.windows,
       assetInspectionForms: serializeRuntimeForms(
         assetContractors.assetInspectionForms
       ),
@@ -399,6 +402,7 @@ export async function GET(request: Request) {
       surveillancePrograms: hygieneHealth.programs,
       hygieneHealthPeople: hygieneHealth.people,
       hygieneHealthCapabilities: hygieneHealth.capabilities,
+      hygieneHealthRegisterWindows: hygieneHealth.windows,
       industrialHygieneForms: serializeRuntimeForms(hygieneHealth.forms),
       chemicals: chemicalEnvironmental.chemicals,
       environmentalMetrics: chemicalEnvironmental.metrics,
