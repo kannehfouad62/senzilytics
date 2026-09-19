@@ -177,3 +177,20 @@ test("phase 8 mobile tenant administration blocks every self profile and access 
   assert.match(source, /if \(user\.id === input\.actorId\) \{[\s\S]*You cannot suspend or restore your own account/);
   assert.doesNotMatch(source, /user\.id === input\.actorId && user\.role !== payload\.role/);
 });
+
+test("phase 8 certification keeps native administration tenant derived permission gated audited and self safe", async () => {
+  const [route, service, app] = await Promise.all([
+    readFile(new URL("../src/app/api/mobile/tenant-administration/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/modules/mobile/mobile-tenant-administration.service.ts", import.meta.url), "utf8"),
+    readFile(new URL("../apps/mobile/App.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(route, /authenticateMobileRequest(?:WithSession)?\(request\)/);
+  assert.match(route, /organizationId: organization\.id/);
+  assert.match(service, /z\.enum\(\[[\s\S]*UserRole\.ORG_ADMIN[\s\S]*UserRole\.AUDITOR/);
+  assert.doesNotMatch(service, /UserRole\.SUPER_ADMIN,[\s\S]*UserRole\.ORG_ADMIN/);
+  assert.match(service, /You cannot change your own profile or tenant access/);
+  assert.match(service, /You cannot suspend or restore your own account/);
+  assert.match(service, /activityLog\.create/);
+  assert.match(app, /preserveTenantAdministrationSnapshot/);
+});

@@ -45,3 +45,20 @@ test("phase 8 web tenant identity changes preserve administrator continuity and 
   assert.match(actions, /ActivityAction\.STATUS_CHANGE/);
   assert.match(actions, /if\(id===user\.id\)throw new Error\(\"You cannot suspend your own account\.\"\)/);
 });
+
+test("phase 8 certification preserves immutable self profile governed modules tenant isolation and auditability", () => {
+  const profile = readFileSync("src/app/(platform)/profile/page.tsx", "utf8");
+
+  assert.match(profile, /profile is intentionally read-only/i);
+  assert.match(profile, /cannot change your own email, role, organization, department/);
+  assert.match(profile, /permissions, module access, or account status/);
+  assert.match(profile, /Module visibility never grants authority beyond your governed role permissions/);
+  assert.match(actions, /if\(targetUserId===user\.id\)throw new Error\("You cannot change your own module access\."\)/);
+  assert.match(actions, /where:\{id:targetUserId,organizationId\}/);
+  assert.match(actions, /if\(id===user\.id\)throw new Error\("You cannot suspend your own account\."\)/);
+  assert.match(actions, /At least one other active organization administrator is required/);
+  assert.match(actions, /title:"User module access updated"/);
+  assert.match(actions, /title:"Tenant user invited"/);
+  assert.match(actions, /title:active\?"Tenant user restored":"Tenant user suspended"/);
+  assert.match(permissions, /filterUserModulePermissions/);
+});
