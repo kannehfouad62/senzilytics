@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMobileRegisterPagination } from "./register-pagination";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -61,8 +62,20 @@ export function MocPermitScreen({
   const [selectedPermitId, setSelectedPermitId] = useState<string | null>(
     initialView === "permits" ? initialRecordId : null
   );
-  const mocs = workspace.managementOfChanges ?? [];
-  const permits = workspace.permitsToWork ?? [];
+  const mocsPage = useMobileRegisterPagination({
+    register: "mocRecords",
+    initialItems: workspace.managementOfChanges ?? [],
+    initialHasMore: workspace.mocPermitRegisterWindows.mocs.hasMore,
+    online,
+  });
+  const mocs = mocsPage.items;
+  const permitsPage = useMobileRegisterPagination({
+    register: "permitRecords",
+    initialItems: workspace.permitsToWork ?? [],
+    initialHasMore: workspace.mocPermitRegisterWindows.permits.hasMore,
+    online,
+  });
+  const permits = permitsPage.items;
   const capabilities = workspace.mocPermitCapabilities ?? {
     canViewMoc: false,
     canManageMoc: false,
@@ -220,6 +233,7 @@ export function MocPermitScreen({
             </Pressable>
           ))}
           {!visibleMocs.length ? <Empty text="No MOC records match this search." /> : null}
+          <RegisterLoadMore page={mocsPage} online={online} />
         </>
       ) : (
         <>
@@ -264,6 +278,7 @@ export function MocPermitScreen({
             );
           })}
           {!visiblePermits.length ? <Empty text="No permits match this search." /> : null}
+          <RegisterLoadMore page={permitsPage} online={online} />
         </>
       )}
     </Page>
@@ -992,6 +1007,32 @@ function formatDateTime(value: string) {
 
 function messageOf(reason: unknown) {
   return reason instanceof Error ? reason.message : "The controlled-work update could not be saved.";
+}
+
+function RegisterLoadMore({
+  page,
+  online,
+}: {
+  page: { hasMore: boolean; loadingMore: boolean; loadError: string | null; loadMore: () => Promise<void> };
+  online: boolean;
+}) {
+  if (!page.hasMore && !page.loadError) return null;
+  return (
+    <View style={{ gap: 8 }}>
+      {page.loadError ? <Text style={styles.error}>{page.loadError}</Text> : null}
+      {page.hasMore ? (
+        <Pressable
+          disabled={!online || page.loadingMore}
+          onPress={() => void page.loadMore()}
+          style={[styles.secondaryButton, (!online || page.loadingMore) && styles.disabled]}
+        >
+          <Text style={styles.secondaryButtonText}>
+            {!online ? "Connect to load more" : page.loadingMore ? "Loading…" : page.loadError ? "Retry load more" : "Load more"}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

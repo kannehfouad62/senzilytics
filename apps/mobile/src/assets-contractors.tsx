@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMobileRegisterPagination } from "./register-pagination";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -79,8 +80,20 @@ export function AssetContractorScreen({
     useState<string | null>(
       initialView === "contractors" ? initialRecordId : null
     );
-  const assets = workspace.assets ?? [];
-  const contractors = workspace.contractors ?? [];
+  const assetsPage = useMobileRegisterPagination({
+    register: "assetRecords",
+    initialItems: workspace.assets ?? [],
+    initialHasMore: workspace.assetContractorRegisterWindows.assets.hasMore,
+    online,
+  });
+  const assets = assetsPage.items;
+  const contractorsPage = useMobileRegisterPagination({
+    register: "contractorRecords",
+    initialItems: workspace.contractors ?? [],
+    initialHasMore: workspace.assetContractorRegisterWindows.contractors.hasMore,
+    online,
+  });
+  const contractors = contractorsPage.items;
   const capabilities = workspace.assetContractorCapabilities ?? {
     canViewAssets: false,
     canManageAssets: false,
@@ -247,6 +260,7 @@ export function AssetContractorScreen({
             </Pressable>
           ))}
           {!visibleAssets.length ? <Empty text="No assets match this search." /> : null}
+          <RegisterLoadMore page={assetsPage} online={online} />
         </>
       ) : (
         <>
@@ -1560,6 +1574,32 @@ function messageOf(reason: unknown) {
   return reason instanceof Error
     ? reason.message
     : "The operational-control update could not be saved.";
+}
+
+function RegisterLoadMore({
+  page,
+  online,
+}: {
+  page: { hasMore: boolean; loadingMore: boolean; loadError: string | null; loadMore: () => Promise<void> };
+  online: boolean;
+}) {
+  if (!page.hasMore && !page.loadError) return null;
+  return (
+    <View style={{ gap: 8 }}>
+      {page.loadError ? <Text style={styles.error}>{page.loadError}</Text> : null}
+      {page.hasMore ? (
+        <Pressable
+          disabled={!online || page.loadingMore}
+          onPress={() => void page.loadMore()}
+          style={[styles.secondaryButton, (!online || page.loadingMore) && styles.disabled]}
+        >
+          <Text style={styles.secondaryButtonText}>
+            {!online ? "Connect to load more" : page.loadingMore ? "Loading…" : page.loadError ? "Retry load more" : "Load more"}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

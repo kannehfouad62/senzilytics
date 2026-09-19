@@ -420,3 +420,29 @@ test("phase 5 priority register continuation uses unique record cursors and boun
     }
   }
 });
+
+
+test("phase 5 native register continuation merges pages without duplicate identities", async () => {
+  const pagination = await mobileSource("apps/mobile/src/register-pagination.ts");
+  assert.match(pagination, /new Set\(current\.map\(\(item\) => item\.id\)\)/);
+  assert.match(pagination, /incoming\.filter\(\(item\) => !seen\.has\(item\.id\)\)/);
+  assert.match(pagination, /setItems\(\(current\) => mergeRegisterRecords/);
+  assert.match(pagination, /setNextCursor\(page\.nextCursor\)/);
+});
+
+test("phase 5 priority native registers expose online load-more retry behavior", async () => {
+  for (const path of [
+    "apps/mobile/src/risk-field.tsx",
+    "apps/mobile/src/moc-permits.tsx",
+    "apps/mobile/src/assets-contractors.tsx",
+    "apps/mobile/src/hygiene-health.tsx",
+  ]) {
+    const source = await mobileSource(path);
+    assert.match(source, /RegisterLoadMore/);
+    assert.match(source, /Connect to load more/);
+    assert.match(source, /Retry load more/);
+  }
+  const api = await mobileSource("apps/mobile/src/api.ts");
+  assert.match(api, /loadMobileRegister/);
+  assert.match(api, /encodeURIComponent\(cursor\)/);
+});

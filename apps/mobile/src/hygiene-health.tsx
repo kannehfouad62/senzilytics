@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMobileRegisterPagination } from "./register-pagination";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -71,8 +72,20 @@ export function HygieneHealthScreen({
   const [assessmentId, setAssessmentId] = useState<string | null>(initialView === "hygiene" ? initialRecordId : null);
   const [programId, setProgramId] = useState<string | null>(initialView === "health" ? initialRecordId : null);
   const capabilities = workspace.hygieneHealthCapabilities;
-  const assessments = workspace.exposureAssessments ?? [];
-  const programs = workspace.surveillancePrograms ?? [];
+  const assessmentsPage = useMobileRegisterPagination({
+    register: "hygieneAssessments",
+    initialItems: workspace.exposureAssessments ?? [],
+    initialHasMore: workspace.hygieneHealthRegisterWindows.assessments.hasMore,
+    online,
+  });
+  const assessments = assessmentsPage.items;
+  const programsPage = useMobileRegisterPagination({
+    register: "surveillancePrograms",
+    initialItems: workspace.surveillancePrograms ?? [],
+    initialHasMore: workspace.hygieneHealthRegisterWindows.programs.hasMore,
+    online,
+  });
+  const programs = programsPage.items;
   const assessment = assessments.find((item) => item.id === assessmentId);
   const program = programs.find((item) => item.id === programId);
   const shared: SharedProps = {
@@ -170,6 +183,8 @@ export function HygieneHealthScreen({
           query={query}
           setQuery={setQuery}
           onSelect={setAssessmentId}
+          pagination={assessmentsPage}
+          online={online}
         />
       ) : (
         <HealthList
@@ -183,6 +198,8 @@ export function HygieneHealthScreen({
           setQuery={setQuery}
           onSelect={setProgramId}
           managed={capabilities.canManageOccupationalHealth}
+          pagination={programsPage}
+          online={online}
         />
       )}
     </Page>
@@ -194,11 +211,15 @@ function HygieneList({
   query,
   setQuery,
   onSelect,
+  pagination,
+  online,
 }: {
   assessments: MobileExposureAssessment[];
   query: string;
   setQuery: (value: string) => void;
   onSelect: (id: string) => void;
+  pagination: ReturnType<typeof useMobileRegisterPagination<MobileExposureAssessment>>;
+  online: boolean;
 }) {
   const open = assessments.filter(
     (item) => !["COMPLETED", "CANCELLED"].includes(item.status)
@@ -245,6 +266,7 @@ function HygieneList({
         </Pressable>
       ))}
       {!assessments.length ? <Empty text="No exposure assessments match this view." /> : null}
+      <RegisterLoadMore page={pagination} online={online} />
     </>
   );
 }
@@ -255,12 +277,16 @@ function HealthList({
   setQuery,
   onSelect,
   managed,
+  pagination,
+  online,
 }: {
   programs: MobileSurveillanceProgram[];
   query: string;
   setQuery: (value: string) => void;
   onSelect: (id: string) => void;
   managed: boolean;
+  pagination: ReturnType<typeof useMobileRegisterPagination<MobileSurveillanceProgram>>;
+  online: boolean;
 }) {
   const overdue = programs.reduce(
     (count, item) =>
@@ -1290,6 +1316,32 @@ function messageOf(reason: unknown) {
   return reason instanceof Error
     ? reason.message
     : "The exposure or occupational-health record could not be saved.";
+}
+
+function RegisterLoadMore({
+  page,
+  online,
+}: {
+  page: { hasMore: boolean; loadingMore: boolean; loadError: string | null; loadMore: () => Promise<void> };
+  online: boolean;
+}) {
+  if (!page.hasMore && !page.loadError) return null;
+  return (
+    <View style={{ gap: 8 }}>
+      {page.loadError ? <Text style={styles.error}>{page.loadError}</Text> : null}
+      {page.hasMore ? (
+        <Pressable
+          disabled={!online || page.loadingMore}
+          onPress={() => void page.loadMore()}
+          style={[styles.secondaryButton, (!online || page.loadingMore) && styles.disabled]}
+        >
+          <Text style={styles.secondaryButtonText}>
+            {!online ? "Connect to load more" : page.loadingMore ? "Loading…" : page.loadError ? "Retry load more" : "Load more"}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

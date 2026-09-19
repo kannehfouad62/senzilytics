@@ -9,7 +9,18 @@ import {
   MOBILE_APP_VERSION,
 } from "./release-metadata";
 import { mobileOwnerKey, parseStoredMobileContext, shouldDiscardMobileSession } from "./session-lifecycle";
-import type { MobileBootstrap, MobileTokens } from "./types";
+import type {
+  MobileAsset,
+  MobileBootstrap,
+  MobileContractor,
+  MobileExposureAssessment,
+  MobileJsa,
+  MobileManagementOfChange,
+  MobilePermitToWork,
+  MobileRisk,
+  MobileSurveillanceProgram,
+  MobileTokens,
+} from "./types";
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || "https://www.senzilytics.cloud").replace(/\/$/, "");
 const REFRESH_TOKEN_KEY = "senzilytics.mobile.refresh-token";
@@ -213,6 +224,43 @@ async function authorizedMobileFetch(
 }
 
 export function loadMobileWorkspace() { return mobileApi<MobileBootstrap>("/api/mobile/bootstrap"); }
+
+export type MobileRegisterName =
+  | "riskRecords"
+  | "jsaRecords"
+  | "mocRecords"
+  | "permitRecords"
+  | "assetRecords"
+  | "contractorRecords"
+  | "hygieneAssessments"
+  | "surveillancePrograms";
+
+export type MobileRegisterRecordMap = {
+  riskRecords: MobileRisk;
+  jsaRecords: MobileJsa;
+  mocRecords: MobileManagementOfChange;
+  permitRecords: MobilePermitToWork;
+  assetRecords: MobileAsset;
+  contractorRecords: MobileContractor;
+  hygieneAssessments: MobileExposureAssessment;
+  surveillancePrograms: MobileSurveillanceProgram;
+};
+
+export type MobileRegisterPage<T> = {
+  items: T[];
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
+export function loadMobileRegister<K extends MobileRegisterName>(
+  register: K,
+  cursor: string
+) {
+  return mobileApi<MobileRegisterPage<MobileRegisterRecordMap[K]>>(
+    `/api/mobile/registers/${register}?cursor=${encodeURIComponent(cursor)}`
+  );
+}
+
 
 export async function logoutMobileSession() {
   try { await mobileApi("/api/mobile/auth/logout", { method: "POST" }, false); }

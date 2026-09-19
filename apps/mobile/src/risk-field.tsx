@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useMobileRegisterPagination } from "./register-pagination";
 import {
   Pressable,
   ScrollView,
@@ -98,11 +99,23 @@ export function RiskFieldScreen({
     initialView === "jsa" ? initialRecordId : null
   );
   const [creatingRisk, setCreatingRisk] = useState(false);
+  const jsasPage = useMobileRegisterPagination({
+    register: "jsaRecords",
+    initialItems: workspace.jsas,
+    initialHasMore: workspace.riskRegisterWindows.jsas.hasMore,
+    online,
+  });
+  const risksPage = useMobileRegisterPagination({
+    register: "riskRecords",
+    initialItems: workspace.risks,
+    initialHasMore: workspace.riskRegisterWindows.risks.hasMore,
+    online,
+  });
 
-  const selectedRisk = workspace.risks.find(
+  const selectedRisk = risksPage.items.find(
     (risk) => risk.id === selectedRiskId
   );
-  const selectedJsa = workspace.jsas.find((jsa) => jsa.id === selectedJsaId);
+  const selectedJsa = jsasPage.items.find((jsa) => jsa.id === selectedJsaId);
 
   if (!workspace.riskCapabilities.canView) {
     return (
@@ -156,13 +169,13 @@ export function RiskFieldScreen({
   }
 
   const normalized = query.trim().toLowerCase();
-  const risks = workspace.risks.filter((risk) =>
+  const risks = risksPage.items.filter((risk) =>
     !normalized ||
     `${risk.reference} ${risk.title} ${risk.description} ${risk.category} ${risk.site?.name ?? ""}`
       .toLowerCase()
       .includes(normalized)
   );
-  const jsas = workspace.jsas.filter((jsa) =>
+  const jsas = jsasPage.items.filter((jsa) =>
     !normalized ||
     `${jsa.reference} ${jsa.title} ${jsa.jobDescription} ${jsa.site.name}`
       .toLowerCase()
@@ -186,7 +199,7 @@ export function RiskFieldScreen({
       ) : null}
       <View style={styles.chips}>
         <Chip
-          label={`Risk Register ${workspace.risks.length}`}
+          label={`Risk Register ${risksPage.items.length}`}
           active={view === "risks"}
           onPress={() => {
             setView("risks");
@@ -194,7 +207,7 @@ export function RiskFieldScreen({
           }}
         />
         <Chip
-          label={`JSA / JHA ${workspace.jsas.length}`}
+          label={`JSA / JHA ${jsasPage.items.length}`}
           active={view === "jsa"}
           onPress={() => {
             setView("jsa");
@@ -247,6 +260,7 @@ export function RiskFieldScreen({
             </Pressable>
           ))}
           {!risks.length ? <Empty text="No Risk Register records match this search." /> : null}
+          <RegisterLoadMore page={risksPage} online={online} />
         </>
       ) : (
         <>
@@ -1097,6 +1111,32 @@ function riskTextStyle(level: string) {
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong.";
+}
+
+function RegisterLoadMore({
+  page,
+  online,
+}: {
+  page: { hasMore: boolean; loadingMore: boolean; loadError: string | null; loadMore: () => Promise<void> };
+  online: boolean;
+}) {
+  if (!page.hasMore && !page.loadError) return null;
+  return (
+    <View style={{ gap: 8 }}>
+      {page.loadError ? <Text style={styles.error}>{page.loadError}</Text> : null}
+      {page.hasMore ? (
+        <Pressable
+          disabled={!online || page.loadingMore}
+          onPress={() => void page.loadMore()}
+          style={[styles.secondaryButton, (!online || page.loadingMore) && styles.disabled]}
+        >
+          <Text style={styles.secondaryButtonText}>
+            {!online ? "Connect to load more" : page.loadingMore ? "Loading…" : page.loadError ? "Retry load more" : "Load more"}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
