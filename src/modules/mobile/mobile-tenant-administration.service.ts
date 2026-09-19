@@ -693,8 +693,8 @@ async function updateUserAccess(
   >
 ) {
   const user = await tenantUser(input.organizationId, payload.userId);
-  if (user.id === input.actorId && user.role !== payload.role) {
-    conflict("You cannot change your own tenant role.");
+  if (user.id === input.actorId) {
+    conflict("You cannot change your own profile or tenant access.");
   }
   const departmentId = payload.departmentId || null;
   if (departmentId) {

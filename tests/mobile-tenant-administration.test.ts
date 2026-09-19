@@ -165,3 +165,15 @@ test("native administration cache removes slices after permission loss", async (
     /capabilities\.canViewActivity[\s\S]*previous\.tenantActivityLogs/
   );
 });
+
+
+test("phase 8 mobile tenant administration blocks every self profile and access mutation server-side", async () => {
+  const source = await readFile(
+    new URL("../src/modules/mobile/mobile-tenant-administration.service.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /if \(user\.id === input\.actorId\) \{[\s\S]*You cannot change your own profile or tenant access/);
+  assert.match(source, /if \(user\.id === input\.actorId\) \{[\s\S]*You cannot suspend or restore your own account/);
+  assert.doesNotMatch(source, /user\.id === input\.actorId && user\.role !== payload\.role/);
+});
