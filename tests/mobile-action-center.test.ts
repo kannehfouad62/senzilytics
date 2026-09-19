@@ -596,3 +596,28 @@ test("phase 6 workflow permit routing uses the canonical permit-to-work record p
   assert.match(routing, /case "permits-to-work"/);
   assert.doesNotMatch(actionCenter, /\[WorkflowEntityType\.PERMIT\]: "\/compliance\/permits"/);
 });
+
+test("phase 6 certification revalidates destination permission and tenant record before notification routing", async () => {
+  const route = await mobileSource("src/app/api/mobile/notifications/route.ts");
+  const destination = await mobileSource("src/modules/mobile/mobile-notification-destination.service.ts");
+  assert.match(route, /getMobileAssignedPermissions\(user\.role\)/);
+  assert.match(route, /canOpenMobileNotificationDestination/);
+  assert.match(route, /notification_destination_unavailable/);
+  assert.match(destination, /organizationId/);
+  assert.match(destination, /PermissionKey\.VIEW_RISKS/);
+  assert.match(destination, /PermissionKey\.VIEW_PERMITS_TO_WORK/);
+  assert.match(destination, /prisma\.risk\.findFirst/);
+  assert.match(destination, /prisma\.permitToWork\.findFirst/);
+  assert.match(destination, /prisma\.regulatoryChange\.findFirst/);
+});
+
+test("phase 6 certification preserves one native router and fails closed for unsupported destinations", async () => {
+  const destination = await mobileSource("src/modules/mobile/mobile-notification-destination.service.ts");
+  const nativeRouting = await mobileSource("apps/mobile/src/native-routing.ts");
+  const app = await mobileSource("apps/mobile/App.tsx");
+  assert.match(destination, /default:\s*\n\s*return false/);
+  assert.match(app, /resolveNativeRecordTarget/);
+  assert.match(nativeRouting, /resolveNativeRecordTarget/);
+  assert.doesNotMatch(app, /react-native-webview|<WebView/);
+  assert.doesNotMatch(nativeRouting, /react-native-webview|<WebView/);
+});
