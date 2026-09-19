@@ -172,7 +172,7 @@ test("phase 10 release candidate keeps the signed iOS release contract aligned",
   };
   const store = JSON.parse(storeText) as { apple: { version: string } };
 
-  assert.equal(metadata.appVersion, "1.2.0");
+  assert.equal(metadata.appVersion, "1.2.1");
   assert.equal(metadata.apiVersion, "1");
   assert.equal(store.apple.version, metadata.appVersion);
   assert.equal(eas.cli.appVersionSource, "remote");
