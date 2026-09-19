@@ -32,9 +32,20 @@ export type NativeRecordTarget =
   | { tab: "regulatory"; view: "changes" | "sources"; recordId?: string }
   | { tab: "executive"; view: "overview" | "assurance" | "reports" | "ai"; recordId?: string };
 
+const REGISTER_SEGMENTS = new Set([
+  "analytics",
+  "competencies",
+  "dashboard",
+  "governance",
+  "operations",
+  "report",
+]);
+
 function recordId(parts: string[], index: number) {
   const value = parts[index];
-  return value && value !== "new" ? decodeURIComponent(value) : undefined;
+  return value && value !== "new" && !REGISTER_SEGMENTS.has(value)
+    ? decodeURIComponent(value)
+    : undefined;
 }
 
 export function resolveNativeRecordTarget(
@@ -54,9 +65,10 @@ export function resolveNativeRecordTarget(
     case "incidents": return { tab: "capture", view: "incident", recordId: recordId(parts, 1) };
     case "observations": return { tab: "capture", view: "observation", recordId: recordId(parts, 1) };
     case "actions": return { tab: "actions", view: "capa", recordId: recordId(parts, 1) };
+    case "capa": return { tab: "actions", view: "capa" };
     case "audits": return { tab: "audits", recordId: recordId(parts, 1) };
     case "inspections": return { tab: "inspections", recordId: recordId(parts, 1) };
-    case "research": return { tab: "research", recordId: parts.at(-1) };
+    case "research": return { tab: "research", recordId: parts.length > 1 ? recordId(parts, parts.length - 1) : undefined };
     case "risks":
       if (parts[1] === "jsa" || parts[1] === "jha") {
         return { tab: "risks", view: "jsa", recordId: recordId(parts, 2) };
@@ -87,7 +99,7 @@ export function resolveNativeRecordTarget(
     case "contractors": return { tab: "assetContractors", view: "contractors", recordId: recordId(parts, 1) };
     case "chemicals": return { tab: "chemicalEnvironmental", view: "chemicals", recordId: recordId(parts, 1) };
     case "environmental": return { tab: "chemicalEnvironmental", view: "environmental", recordId: recordId(parts, 1) };
-    case "behavior-safety": return { tab: "behaviorAssurance", view: "behavior", recordId: parts.at(-1) };
+    case "behavior-safety": return { tab: "behaviorAssurance", view: "behavior", recordId: recordId(parts, parts.length - 1) };
     case "industrial-hygiene": return { tab: "hygieneHealth", view: "hygiene", recordId: recordId(parts, 1) };
     case "occupational-health": return { tab: "hygieneHealth", view: "health", recordId: recordId(parts, 1) };
     case "esg":
@@ -100,10 +112,10 @@ export function resolveNativeRecordTarget(
     case "reports": return { tab: "executive", view: "reports", recordId: recordId(parts, 1) };
     case "assurance":
       if (parts[1] === "sif") {
-        return { tab: "behaviorAssurance", view: "sif", recordId: parts.at(-1) };
+        return { tab: "behaviorAssurance", view: "sif", recordId: parts.length > 2 ? recordId(parts, parts.length - 1) : undefined };
       }
       if (parts[1] === "certification") {
-        return { tab: "behaviorAssurance", view: "certification", recordId: parts.at(-1) };
+        return { tab: "behaviorAssurance", view: "certification", recordId: parts.length > 2 ? recordId(parts, parts.length - 1) : undefined };
       }
       return null;
     default:

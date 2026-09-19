@@ -8,6 +8,10 @@ import {
   View,
 } from "react-native";
 import { mobileApi } from "./api";
+import {
+  resolveNativeRecordTarget,
+  type NativeRecordTarget,
+} from "./native-routing";
 import type {
   MobileBootstrap,
   MobileExecutiveActionResponse,
@@ -30,6 +34,7 @@ type Props = {
   onBack: () => void;
   onRefresh: () => Promise<MobileBootstrap>;
   onNotice: (message: string) => void;
+  onOpenNativeTarget: (target: NativeRecordTarget) => void;
 };
 
 const useCases = [
@@ -91,16 +96,21 @@ export function ExecutiveCommandScreen(props: Props) {
         ))}
       </View>
       {view === "overview" ? (
-        <Overview workspace={props.workspace} />
+        <Overview
+          workspace={props.workspace}
+          onOpenNativeTarget={props.onOpenNativeTarget}
+        />
       ) : null}
       {view === "assurance" ? (
         <Assurance
           assurance={props.workspace.operationalAssurance}
+          onOpenNativeTarget={props.onOpenNativeTarget}
         />
       ) : null}
       {view === "reports" ? (
         <Reports
           report={props.workspace.executiveReport}
+          onOpenNativeTarget={props.onOpenNativeTarget}
         />
       ) : null}
       {view === "ai" ? (
@@ -113,7 +123,13 @@ export function ExecutiveCommandScreen(props: Props) {
   );
 }
 
-function Overview({ workspace }: { workspace: MobileBootstrap }) {
+function Overview({
+  workspace,
+  onOpenNativeTarget,
+}: {
+  workspace: MobileBootstrap;
+  onOpenNativeTarget: (target: NativeRecordTarget) => void;
+}) {
   const dashboard = workspace.executiveDashboard;
   const portfolio = workspace.executivePortfolio;
   if (!dashboard || !portfolio) {
@@ -161,8 +177,10 @@ function Overview({ workspace }: { workspace: MobileBootstrap }) {
         detail="Cross-module exposure ranked for leadership attention"
       >
         {portfolio.modules.map((module) => (
-          <View
+          <Pressable
             key={module.label}
+            disabled={!resolveNativeRecordTarget(module.href)}
+            onPress={() => openExecutiveHref(module.href, onOpenNativeTarget)}
             style={styles.listCard}
           >
             <View style={styles.listHeading}>
@@ -172,14 +190,17 @@ function Overview({ workspace }: { workspace: MobileBootstrap }) {
               </View>
               <Status value={String(module.value)} tone={module.tone} />
             </View>
-          </View>
+          </Pressable>
         ))}
       </Section>
 
       <Section title="Recent incidents" detail="Latest reported events">
         {dashboard.recentIncidents.map((incident) => (
-          <View
+          <Pressable
             key={incident.id}
+            onPress={() =>
+              openExecutiveHref(`/incidents/${incident.id}`, onOpenNativeTarget)
+            }
             style={styles.listCard}
           >
             <View style={styles.listHeading}>
@@ -194,7 +215,7 @@ function Overview({ workspace }: { workspace: MobileBootstrap }) {
                 tone={riskTone(incident.riskLevel)}
               />
             </View>
-          </View>
+          </Pressable>
         ))}
         {!dashboard.recentIncidents.length ? (
           <Empty text="No incidents were reported in this tenant." />
@@ -206,15 +227,18 @@ function Overview({ workspace }: { workspace: MobileBootstrap }) {
         detail="Immediate ownership attention"
       >
         {dashboard.overdueActions.map((action) => (
-          <View
+          <Pressable
             key={action.id}
+            onPress={() =>
+              openExecutiveHref(`/actions/${action.id}`, onOpenNativeTarget)
+            }
             style={[styles.listCard, styles.dangerCard]}
           >
             <Text style={styles.cardTitle}>{action.title}</Text>
             <Text style={styles.muted}>
               {action.assignedTo.name} · due {formatDate(action.dueDate)}
             </Text>
-          </View>
+          </Pressable>
         ))}
         {!dashboard.overdueActions.length ? (
           <Empty text="No overdue corrective actions require attention." />
@@ -226,8 +250,10 @@ function Overview({ workspace }: { workspace: MobileBootstrap }) {
 
 function Assurance({
   assurance,
+  onOpenNativeTarget,
 }: {
   assurance: MobileOperationalAssurance | null;
+  onOpenNativeTarget: (target: NativeRecordTarget) => void;
 }) {
   if (!assurance) {
     return <Empty text="Operational Assurance access is not assigned to this role." />;
@@ -249,8 +275,10 @@ function Assurance({
         detail="Permission-filtered evidence requiring management attention"
       >
         {assurance.signals.map((signal) => (
-          <View
+          <Pressable
             key={signal.id}
+            disabled={!resolveNativeRecordTarget(signal.href)}
+            onPress={() => openExecutiveHref(signal.href, onOpenNativeTarget)}
             style={[
               styles.listCard,
               signal.severity === "CRITICAL" && styles.dangerCard,
@@ -270,7 +298,7 @@ function Assurance({
                 tone={riskTone(signal.severity)}
               />
             </View>
-          </View>
+          </Pressable>
         ))}
         {!assurance.signals.length ? (
           <Empty text="No elevated connected-risk signals are visible to this role." />
@@ -281,8 +309,10 @@ function Assurance({
         detail="Traceable links between governed records"
       >
         {assurance.connections.map((connection) => (
-          <View
+          <Pressable
             key={connection.label}
+            disabled={!resolveNativeRecordTarget(connection.href)}
+            onPress={() => openExecutiveHref(connection.href, onOpenNativeTarget)}
             style={styles.listCard}
           >
             <View style={styles.listHeading}>
@@ -292,7 +322,7 @@ function Assurance({
               </View>
               <Text style={styles.largeValue}>{connection.count}</Text>
             </View>
-          </View>
+          </Pressable>
         ))}
       </Section>
     </>
@@ -301,8 +331,10 @@ function Assurance({
 
 function Reports({
   report,
+  onOpenNativeTarget,
 }: {
   report: MobileExecutiveReport | null;
+  onOpenNativeTarget: (target: NativeRecordTarget) => void;
 }) {
   if (!report) {
     return <Empty text="Executive reporting access is not assigned to this role." />;
@@ -372,8 +404,10 @@ function Reports({
         detail="Highest-priority records in the reporting period"
       >
         {report.managementAttention.map((item) => (
-          <View
+          <Pressable
             key={`${item.type}:${item.id}`}
+            disabled={!resolveNativeRecordTarget(item.link)}
+            onPress={() => openExecutiveHref(item.link, onOpenNativeTarget)}
             style={styles.listCard}
           >
             <View style={styles.listHeading}>
@@ -393,7 +427,7 @@ function Reports({
                 />
               ) : null}
             </View>
-          </View>
+          </Pressable>
         ))}
         {!report.managementAttention.length ? (
           <Empty text="No records require management attention in this period." />
@@ -830,6 +864,14 @@ function TrendRows({
       ))}
     </>
   );
+}
+
+function openExecutiveHref(
+  href: string,
+  onOpenNativeTarget: (target: NativeRecordTarget) => void
+) {
+  const target = resolveNativeRecordTarget(href);
+  if (target) onOpenNativeTarget(target);
 }
 
 function availableViews(workspace: MobileBootstrap): ExecutiveCommandView[] {

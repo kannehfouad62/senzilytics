@@ -186,3 +186,33 @@ test("cached executive report refreshes do not create duplicate activity entries
   assert.doesNotMatch(bootstrapRoute, /getMobileExecutiveWorkspace\(/);
   assert.match(executiveRoute, /export async function GET\(/);
 });
+
+
+test("phase 7 executive command drills through governed analytics using the existing native router", async () => {
+  const [screen, app] = await Promise.all([
+    readFile(new URL("../apps/mobile/src/executive-command.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../apps/mobile/App.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(screen, /resolveNativeRecordTarget/);
+  assert.match(screen, /openExecutiveHref\(module\.href/);
+  assert.match(screen, /openExecutiveHref\(signal\.href/);
+  assert.match(screen, /openExecutiveHref\(connection\.href/);
+  assert.match(screen, /openExecutiveHref\(item\.link/);
+  assert.match(screen, /`\/incidents\/\$\{incident\.id\}`/);
+  assert.match(screen, /`\/actions\/\$\{action\.id\}`/);
+  assert.match(app, /onOpenNativeTarget=\{openNativeTarget\}/);
+  assert.doesNotMatch(screen, /WebView/);
+});
+
+test("phase 7 executive portfolio register links do not masquerade as record identities", async () => {
+  const routing = await readFile(
+    new URL("../apps/mobile/src/native-routing.ts", import.meta.url),
+    "utf8"
+  );
+  assert.match(routing, /REGISTER_SEGMENTS/);
+  for (const segment of ["dashboard", "report", "analytics", "governance", "operations"]) {
+    assert.match(routing, new RegExp(`"${segment}"`));
+  }
+  assert.match(routing, /case "capa": return \{ tab: "actions", view: "capa" \}/);
+  assert.match(routing, /case "research": return \{ tab: "research"/);
+});
